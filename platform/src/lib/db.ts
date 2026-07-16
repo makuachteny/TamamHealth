@@ -26,8 +26,23 @@ const IS_BROWSER = typeof window !== 'undefined';
 let PouchDBRef: PouchDBCtor | null = null;
 const databases: Record<string, PouchDatabase> = {};
 
+// pouchdb-find still calls PouchDB's internal, deprecated `db.type()` on every
+// query. The warning is harmless but fires on each find(), flooding dev logs.
+// Drop only that exact message (once); every other console.warn is untouched.
+let deprecationFilterInstalled = false;
+function installPouchDeprecationFilter(): void {
+  if (deprecationFilterInstalled) return;
+  deprecationFilterInstalled = true;
+  const original = console.warn.bind(console);
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('db.type() is deprecated')) return;
+    original(...args);
+  };
+}
+
 function loadPouchDB(): PouchDBCtor {
   if (PouchDBRef) return PouchDBRef;
+  installPouchDeprecationFilter();
 
   if (IS_BROWSER) {
     // Browser path — pouchdb-browser uses IndexedDB and imports browser-only
@@ -108,6 +123,11 @@ export function getDB(name: string): PouchDatabase {
     const PouchDB = loadPouchDB();
     if (IS_BROWSER) {
       databases[name] = new PouchDB(name, { auto_compaction: true });
+      // Each live changes() feed (usePatients, useLabResults, …) attaches a
+      // listener to the DB's EventEmitter; a data-heavy screen mounts well over
+      // the default 10, tripping a spurious MaxListenersExceededWarning. Raise
+      // the cap — the feeds are cancelled on unmount, so this isn't a leak.
+      (databases[name] as unknown as { setMaxListeners?: (n: number) => void }).setMaxListeners?.(50);
     } else {
       const base = serverCouchBaseUrl();
       const authHeader = serverAuthHeader!; // serverCouchBaseUrl() above already threw if missing
@@ -116,11 +136,16 @@ export function getDB(name: string): PouchDatabase {
       // fetch override below, so they never appear in the cached PouchDB URL.
       databases[name] = new PouchDB(`${base}/${name}`, {
         skip_setup: false,
-        fetch: (url: RequestInfo | URL, opts?: RequestInit) =>
-          fetch(url, {
-            ...(opts ?? {}),
-            headers: { ...(opts?.headers ?? {}), Authorization: authHeader },
-          }),
+        fetch: (url: RequestInfo | URL, opts?: RequestInit) => {
+          // PouchDB passes `opts.headers` as a Headers instance. Spreading it
+          // into a plain object copies internal symbol keys (Symbol(map)),
+          // which the Headers/fetch constructor rejects as non-ByteString keys.
+          // Merge through the Headers API instead — it accepts a Headers
+          // object, a plain object, or [key,value][] tuples.
+          const headers = new Headers(opts?.headers as HeadersInit | undefined);
+          headers.set('Authorization', authHeader);
+          return fetch(url, { ...(opts ?? {}), headers });
+        },
       } as PouchDB.Configuration.RemoteDatabaseConfiguration);
     }
   }

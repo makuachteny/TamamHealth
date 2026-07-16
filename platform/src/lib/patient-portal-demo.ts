@@ -32,6 +32,19 @@ export function demoFallbackEnabled(): boolean {
   return process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 }
 
+// Throttled, one-line log for the "CouchDB not reachable → serve demo data"
+// fallback. The routes hit this on every request when no CouchDB is running
+// (e.g. local dev), so logging the full error + stack each time floods the
+// console. Emit one concise line per route per minute instead.
+const fallbackLoggedAt: Record<string, number> = {};
+export function logDemoFallback(route: string, err: unknown): void {
+  const now = Date.now();
+  if (fallbackLoggedAt[route] && now - fallbackLoggedAt[route] < 60_000) return;
+  fallbackLoggedAt[route] = now;
+  const msg = err instanceof Error ? err.message : String(err);
+  console.warn(`[patient-portal/${route}] CouchDB unreachable — serving demo data (${msg})`);
+}
+
 // In-memory store for anything the patient submits (appointment requests,
 // messages). Lives for the lifetime of the server process — long enough for
 // a demo session, gone on restart. Real writes to a configured CouchDB are

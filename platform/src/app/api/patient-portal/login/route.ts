@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientIp } from '@/lib/request-utils';
 import { createPatientToken } from '@/lib/patient-portal-auth';
-import { demoFallbackEnabled, findDemoPatientByUsername } from '@/lib/patient-portal-demo';
+import { demoFallbackEnabled, logDemoFallback, findDemoPatientByUsername } from '@/lib/patient-portal-demo';
 import { verifyPassword } from '@/lib/auth';
 
 // Rate limit: 10 attempts / 15 min / IP + 10 attempts / 15 min / account.
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
       // environment). In demo mode, answer from the same literal seed data the
       // client-side demo uses instead of failing the whole portal.
       if (!demoFallbackEnabled()) throw dbErr;
-      console.warn('[patient-portal/login] DB unreachable, using demo fallback', dbErr);
+      logDemoFallback('login', dbErr);
       found = (await findDemoPatientByUsername(username)) as PatientLike | null;
     }
 

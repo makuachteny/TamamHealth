@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPatientToken } from '@/lib/patient-portal-auth';
-import { demoFallbackEnabled, getDemoLabResultsByPatient } from '@/lib/patient-portal-demo';
+import { demoFallbackEnabled, logDemoFallback, getDemoLabResultsByPatient } from '@/lib/patient-portal-demo';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyPatientToken(req);
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ results });
   } catch (err) {
     if (demoFallbackEnabled()) {
-      console.warn('[patient-portal/labs] DB unreachable, using demo fallback', err);
+      logDemoFallback('labs', err);
       return NextResponse.json({ results: await getDemoLabResultsByPatient(auth.sub) });
     }
     console.error('[patient-portal/labs]', err);

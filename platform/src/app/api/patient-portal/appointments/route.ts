@@ -5,7 +5,7 @@ import { appointmentsDB } from '@/lib/db';
 import { logAuditSafe } from '@/lib/services/audit-service';
 import { emitSyncEvent } from '@/lib/services/sync-event-service';
 import type { AppointmentDoc, AppointmentStatus } from '@/lib/db-types';
-import { demoFallbackEnabled, getDemoAppointmentsByPatient, recordDemoAppointment } from '@/lib/patient-portal-demo';
+import { demoFallbackEnabled, logDemoFallback, getDemoAppointmentsByPatient, recordDemoAppointment } from '@/lib/patient-portal-demo';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyPatientToken(req);
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ appointments });
   } catch (err) {
     if (demoFallbackEnabled()) {
-      console.warn('[patient-portal/appointments] DB unreachable, using demo fallback', err);
+      logDemoFallback('appointments', err);
       return NextResponse.json({ appointments: await getDemoAppointmentsByPatient(auth.sub) });
     }
     console.error('[patient-portal/appointments]', err);
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       // No database to persist to — keep the request for this process's
       // lifetime so it shows up in the patient's own appointment list, same
       // as a real booking would.
-      console.warn('[patient-portal/appointments POST] DB unreachable, using demo fallback', err);
+      logDemoFallback('appointments POST', err);
       recordDemoAppointment(doc);
       return NextResponse.json({ ok: true, id: doc._id, appointment: doc }, { status: 201 });
     }

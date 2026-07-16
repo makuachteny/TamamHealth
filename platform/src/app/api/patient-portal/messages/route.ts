@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyPatientToken } from '@/lib/patient-portal-auth';
 import { logAuditSafe } from '@/lib/services/audit-service';
 import type { MessageDoc } from '@/lib/db-types';
-import { demoFallbackEnabled, getDemoMessagesByPatient, recordDemoMessage } from '@/lib/patient-portal-demo';
+import { demoFallbackEnabled, logDemoFallback, getDemoMessagesByPatient, recordDemoMessage } from '@/lib/patient-portal-demo';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyPatientToken(req);
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ messages });
   } catch (err) {
     if (demoFallbackEnabled()) {
-      console.warn('[patient-portal/messages] DB unreachable, using demo fallback', err);
+      logDemoFallback('messages', err);
       return NextResponse.json({ messages: await getDemoMessagesByPatient(auth.sub) });
     }
     console.error('[patient-portal/messages]', err);
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id: doc._id, message: doc }, { status: 201 });
   } catch (err) {
     if (demoFallbackEnabled()) {
-      console.warn('[patient-portal/messages POST] DB unreachable, using demo fallback', err);
+      logDemoFallback('messages POST', err);
       const doc: MessageDoc = {
         _id: `msg-demo-${Date.now().toString(36)}`,
         type: 'message',
