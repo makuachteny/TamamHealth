@@ -2468,6 +2468,18 @@ export const diseaseAlerts: DiseaseAlert[] = [
   { id: 'alert-006', disease: 'Tuberculosis', state: 'Western Bahr el Ghazal', county: 'Wau', cases: 45, deaths: 2, alertLevel: 'watch', reportDate: '2026-02-08', trend: 'increasing' },
   { id: 'alert-007', disease: 'Kala-azar', state: 'Eastern Equatoria', county: 'Kapoeta East', cases: 18, deaths: 1, alertLevel: 'normal', reportDate: '2026-02-06', trend: 'stable' },
   { id: 'alert-008', disease: 'Hepatitis E', state: 'Lakes', county: 'Rumbek Centre', cases: 31, deaths: 0, alertLevel: 'watch', reportDate: '2026-02-07', trend: 'increasing' },
+  // Fuller Cases-by-State coverage for Unity and Western Bahr el Ghazal —
+  // previously Unity had only Measles and W. Bahr el Ghazal only TB, so their
+  // bars were near-empty. Add the remaining tracked diseases (malaria, cholera,
+  // tb, hiv) for both states.
+  { id: 'alert-009', disease: 'Malaria', state: 'Unity', county: 'Rubkona', cases: 1980, deaths: 12, alertLevel: 'warning', reportDate: '2026-02-09', trend: 'increasing' },
+  { id: 'alert-010', disease: 'Cholera', state: 'Unity', county: 'Leer', cases: 64, deaths: 7, alertLevel: 'warning', reportDate: '2026-02-08', trend: 'increasing' },
+  { id: 'alert-011', disease: 'Tuberculosis', state: 'Unity', county: 'Mayom', cases: 73, deaths: 3, alertLevel: 'watch', reportDate: '2026-02-07', trend: 'stable' },
+  { id: 'alert-012', disease: 'HIV/AIDS', state: 'Unity', county: 'Rubkona', cases: 512, deaths: 4, alertLevel: 'watch', reportDate: '2026-02-06', trend: 'stable' },
+  { id: 'alert-013', disease: 'Malaria', state: 'Western Bahr el Ghazal', county: 'Wau', cases: 2240, deaths: 15, alertLevel: 'warning', reportDate: '2026-02-09', trend: 'increasing' },
+  { id: 'alert-014', disease: 'Cholera', state: 'Western Bahr el Ghazal', county: 'Jur River', cases: 38, deaths: 3, alertLevel: 'watch', reportDate: '2026-02-08', trend: 'stable' },
+  { id: 'alert-015', disease: 'Measles', state: 'Western Bahr el Ghazal', county: 'Wau', cases: 96, deaths: 2, alertLevel: 'warning', reportDate: '2026-02-07', trend: 'increasing' },
+  { id: 'alert-016', disease: 'HIV/AIDS', state: 'Western Bahr el Ghazal', county: 'Wau', cases: 634, deaths: 5, alertLevel: 'watch', reportDate: '2026-02-06', trend: 'increasing' },
 ];
 
 // Weekly disease stats for charts

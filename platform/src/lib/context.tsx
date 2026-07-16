@@ -393,10 +393,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               const { loginCouch } = await import('./sync/couch-client-auth');
               const result = await loginCouch(sanitizedUsername, password);
               if (!result.ok) {
-                console.warn('[login] CouchDB /_session failed', result.status, result.error);
+                // Expected when CouchDB is down (offline-first still works) —
+                // one concise line, not an alarming error.
+                console.warn(`[sync] CouchDB session unavailable — offline-only this session (${result.error || result.status})`);
               }
             } catch (err) {
-              console.warn('[login] CouchDB session establishment threw', err);
+              console.warn(`[sync] CouchDB session unavailable — offline-only this session (${err instanceof Error ? err.message : String(err)})`);
             }
           }
         } else if (res.status === 401 || res.status === 403 || res.status === 429) {

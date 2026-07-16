@@ -134,10 +134,11 @@ export async function POST(request: NextRequest) {
           platformRole: user.role,
         });
       } catch (err) {
-        console.warn(
-          '[login] CouchDB user provisioning failed — sync will be unavailable for this session.',
-          err instanceof Error ? err.message : err,
-        );
+        // Expected when CouchDB isn't running (e.g. local dev) — login still
+        // succeeds; the session is simply offline-only. Concise, single line.
+        const reason = err instanceof Error ? err.message : String(err);
+        const unreachable = /fetch failed|ECONNREFUSED|ENOTFOUND|network/i.test(reason);
+        console.warn(`[login] CouchDB ${unreachable ? 'unreachable' : 'provisioning failed'} — sync unavailable this session (${reason})`);
       }
     }
 

@@ -68,7 +68,11 @@ function isoWeekLabel(iso: string): string {
   target.setUTCDate(target.getUTCDate() - dayNum + 3);
   const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
   const week = 1 + Math.round(((target.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
-  const month = d.toLocaleString('en', { month: 'short' });
+  // Month is taken from the week's own Thursday (`target`), NOT the raw report
+  // date — otherwise reports on either side of a month boundary within the same
+  // ISO week produce two labels (e.g. "W27 Jun" and "W27 Jul") and the week
+  // appears twice with a bogus month jump.
+  const month = target.toLocaleString('en', { month: 'short', timeZone: 'UTC' });
   return `W${week} ${month}`;
 }
 
@@ -903,7 +907,10 @@ export default function GovernmentDashboardPage() {
       <main className="page-container page-enter flex flex-col flex-1 min-h-0 overflow-y-auto">
 
         {/* ═══ ROW 1: Disease Trends + Facility Distribution + Performance ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4 lg:flex-1 lg:min-h-0">
+        {/* Rows size to their content (charts have explicit heights below) and
+            the page scrolls — so the two rows never compress into the viewport
+            and overflow onto each other. */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
 
           {/* Disease Trends (Tableau-style) */}
           <div className="lg:col-span-2 glass-section flex flex-col">
@@ -935,7 +942,7 @@ export default function GovernmentDashboardPage() {
                 <ExpandButton onClick={() => setFullscreenChart('diseaseTrend')} />
               </div>
             </div>
-            <div className="p-3 flex-1 min-h-0">
+            <div className="p-3 flex-1 min-h-[320px]">
               {diseaseTrendHasData ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {renderDiseaseTrend()}
@@ -1011,7 +1018,7 @@ export default function GovernmentDashboardPage() {
         </div>
 
         {/* ═══ ROW 2: Cases by State + Health Visits + Staff ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:flex-1 lg:min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
 
           {/* Cases by State */}
           <div className="glass-section flex flex-col">
@@ -1055,7 +1062,7 @@ export default function GovernmentDashboardPage() {
                 />
               )}
             </div>
-            <div className="p-3 flex-1 min-h-0" style={{ minHeight: '220px' }}>
+            <div className="p-3 h-[300px]">
               {stateCasesHasData ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {renderStateCases()}
@@ -1101,7 +1108,7 @@ export default function GovernmentDashboardPage() {
                 icon={Filter}
               />
             </div>
-            <div className="p-3 flex-1 min-h-0" style={{ minHeight: '220px' }}>
+            <div className="p-3 h-[300px]">
               {visitsHasData ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {renderVisits()}
@@ -1152,7 +1159,7 @@ export default function GovernmentDashboardPage() {
                 icon={Users}
               />
             </div>
-            <div className="p-3 flex-1 min-h-0" style={{ minHeight: '220px' }}>
+            <div className="p-3 h-[300px]">
               {staffHasData ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {renderStaff()}
