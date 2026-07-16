@@ -649,6 +649,22 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               </div>
             </>
           )}
+
+          {/* Inline section shortcuts — the primary health-record sections as
+              icon buttons beside the module menu, exactly like the staff rail's
+              quick-nav cluster. Collapse into the module menu on small screens. */}
+          <span className="hidden lg:flex" style={{ alignItems: 'center', gap: 4 }}>
+            {mainTabs.map(tab => {
+              const on = activeTab === tab.key;
+              return (
+                <button key={tab.key} type="button" title={tab.label} aria-label={tab.label}
+                  aria-current={on ? 'page' : undefined} onClick={() => setActiveTab(tab.key)}
+                  style={on ? { background: 'rgba(255,255,255,0.16)' } : undefined}>
+                  <tab.icon className="w-5 h-5" />
+                </button>
+              );
+            })}
+          </span>
         </nav>
 
         {/* Facility name overlaid on the rail's exact center — same as staff. */}
@@ -685,6 +701,20 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
         </div>
 
         <div className="ehr-top-actions">
+          {/* Right-side action shortcuts — the communication / billing sections
+              as icon buttons, like the staff rail's right action cluster. */}
+          <span className="hidden sm:flex" style={{ alignItems: 'center', gap: 4 }}>
+            {actionTabs.filter(tab => tab.key !== 'profile').map(tab => {
+              const on = activeTab === tab.key;
+              return (
+                <button key={tab.key} type="button" title={tab.label} aria-label={tab.label}
+                  aria-current={on ? 'page' : undefined} onClick={() => setActiveTab(tab.key)}
+                  style={on ? { background: 'rgba(255,255,255,0.16)' } : undefined}>
+                  <tab.icon className="w-5 h-5" />
+                </button>
+              );
+            })}
+          </span>
           <div className="ehr-user-menu-wrap">
             <button type="button" className={`ehr-avatar ehr-avatar--labeled ${userMenuOpen ? 'active' : ''}`}
               onClick={() => { setUserMenuOpen(o => !o); setNavMenuOpen(false); }}
