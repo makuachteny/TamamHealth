@@ -24,7 +24,7 @@ import {
   Calendar, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList, Search,
   MapPin, LogOut, Wallet, CheckCircle, X, Maximize2,
-  SendHorizontal,
+  SendHorizontal, Stethoscope,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
@@ -1002,6 +1002,25 @@ export default function FrontDeskDashboardPage() {
                   </div>
                 )}
                 <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      const target = {
+                        patientId: selectedPatient._id,
+                        patientName: patientFullName(selectedPatient),
+                        hospitalNumber: selectedPatient.hospitalNumber,
+                        triageId: selectedEntry?.id.startsWith('triage-') ? selectedEntry.sourceId : undefined,
+                        currentDoctorId: selectedPatient.assignedDoctor,
+                      };
+                      setSelectedPatientId(null);
+                      setSelectedEntry(null);
+                      setAssignTarget(target);
+                    }}
+                  >
+                    <Stethoscope className="w-3.5 h-3.5" />
+                    {selectedPatient.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign')}
+                  </button>
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => { const pid = selectedPatient._id; setSelectedPatientId(null); setSelectedEntry(null); router.push(`/patients/${pid}`); }}>
                     Open chart
                   </button>

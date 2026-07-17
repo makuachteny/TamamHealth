@@ -78,6 +78,7 @@ import ResultsSection from '@/components/ehr/chart/sections/ResultsSection';
 import OrdersSection from '@/components/ehr/chart/sections/OrdersSection';
 import ProceduresSection from '@/components/ehr/chart/sections/ProceduresSection';
 import ProgramsSection from '@/components/ehr/chart/sections/ProgramsSection';
+import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 
 // Administrative tabs are the only ones a non-clinical role (e.g. Medical
 // Receptionist) may see — the "minimum necessary" rule: contact details,
@@ -151,6 +152,7 @@ export default function PatientDetailPage() {
   const [showOrderLabModal, setShowOrderLabModal] = useState(false);
   const [showPrescribeModal, setShowPrescribeModal] = useState(false);
   const [showReferModal, setShowReferModal] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [showTriagePopup, setShowTriagePopup] = useState(false);
   // One-shot request for the chart shell to open a workspace drawer panel
   // (e.g. header "+ Note" → the persisting visit-note panel).
@@ -222,6 +224,7 @@ export default function PatientDetailPage() {
   const { prescriptions: allPrescriptions } = usePrescriptions();
   const { triages: patientTriages } = useTriage(patient?._id);
   const { canConsult, canViewClinical, canOrderLabs, canPrescribe, canBookAppointments, canManageReferrals } = usePermissions();
+  const canAssignPatients = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
 
   // Defence in depth: if a non-clinical viewer lands on (or deep-links to) a
   // clinical tab, snap them back to the overview so clinical panels never render.
@@ -1161,6 +1164,12 @@ export default function PatientDetailPage() {
                 onExchange={() => (canManageReferrals ? setShowReferModal(true) : setActiveTab('recall'))}
                 onEdit={openEditModal}
                 onStickyNote={() => { if (canViewClinical) setActiveTab('notes'); }}
+                onAssignProvider={canAssignPatients ? () => setAssignTarget({
+                  patientId: patient._id,
+                  patientName: patientFullName(patient),
+                  hospitalNumber: patient.hospitalNumber,
+                  currentDoctorId: patient.assignedDoctor,
+                }) : undefined}
               />
             }
             vitalsBand={canViewClinical ? (
@@ -2627,6 +2636,12 @@ export default function PatientDetailPage() {
         patient={patient}
         currentUser={currentUser}
       />
+      {assignTarget && (
+        <AssignDoctorModal
+          target={assignTarget}
+          onClose={() => setAssignTarget(null)}
+        />
+      )}
     </>
   );
 }

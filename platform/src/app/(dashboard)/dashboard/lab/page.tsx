@@ -1,16 +1,17 @@
 'use client';
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import Modal from '@/components/Modal';
+import type { LabResultDoc } from '@/lib/db-types';
 import {
-  FlaskConical, CheckCircle2, AlertTriangle, Activity,
-  Radio, Microscope, Droplets, FileText,
-  MessageSquare, Beaker, Thermometer, Loader2,
-  X, Save, Table, List, BarChart3, BellOff, Users,
+  FlaskConical, CheckCircle2, AlertTriangle,
+  Microscope, Droplets,
+  Loader2,
+  X, Save, Table, List, BellOff,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
 
@@ -76,31 +77,47 @@ const FLAG_COLORS = {
   CRITICAL: { bg: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)', border: 'rgba(239,68,68,0.25)' },
 };
 
-// ===== Existing Constants =====
-// Live activity ticker is a demo flourish only — gated off in production.
-const LAB_LIVE_FEED_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
+function labStatusLabel(status: 'pending' | 'in_progress' | 'completed'): string {
+  if (status === 'completed') return 'Complete';
+  if (status === 'in_progress') return 'Processing';
+  return 'Pending';
+}
 
-const LAB_EVENT_TYPES = [
-  { label: 'Specimen Received', color: 'var(--color-brand-400)', icon: Droplets },
-  { label: 'Centrifuge Started', color: '#A855F7', icon: Loader2 },
-  { label: 'Malaria RDT Completed', color: 'var(--color-success)', icon: Microscope },
-  { label: 'Critical Hemoglobin Flagged', color: '#F87171', icon: AlertTriangle },
-  { label: 'CBC Analysis Running', color: 'var(--color-brand-500)', icon: Activity },
-  { label: 'Urinalysis Complete', color: 'var(--color-warning)', icon: Beaker },
-  { label: 'Blood Culture Incubated', color: '#EC4899', icon: Thermometer },
-  { label: 'Result Validated', color: 'var(--accent-primary)', icon: CheckCircle2 },
-  { label: 'Specimen Rejected - Hemolyzed', color: 'var(--color-danger)', icon: AlertTriangle },
-  { label: 'Glucose Result Ready', color: 'var(--color-brand-500)', icon: FlaskConical },
-];
+type CompletedDiseaseRow = {
+  id: string;
+  lab: LabResultDoc;
+  disease: string;
+  detail: string;
+  severity: 'normal' | 'abnormal' | 'critical';
+};
 
-interface LiveEvent {
-  id: number;
-  label: string;
-  color: string;
-  icon: typeof Activity;
-  patient: string;
-  time: string;
-  isNew: boolean;
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function diseasesForCompletedLab(lab: LabResultDoc): Omit<CompletedDiseaseRow, 'id' | 'lab'>[] {
+  if (lab.status !== 'completed') return [];
+  const text = `${lab.testName} ${lab.result} ${lab.clinicalNotes || ''}`.toLowerCase();
+  const result = (lab.result || '').toLowerCase();
+  const diseases: string[] = [];
+
+  if (/malaria|p\.?\s*falciparum|plasmodium/.test(text) && /positive|detected|falciparum/.test(result)) diseases.push('Malaria');
+  if (/\bhiv\b|aids/.test(text) && /positive|reactive|detected/.test(result) && !/non[-\s]?reactive|negative/.test(result)) diseases.push('HIV Disease');
+  if (/sputum|afb|tuberculosis|\btb\b/.test(text) && /positive|detected|acid-fast/.test(result)) diseases.push('Tuberculosis');
+  if (/glucose|diabetes|hba1c/.test(text) && lab.abnormal) diseases.push('Diabetes Mellitus');
+  if (/hemoglobin|haemoglobin|\bhb\b|full blood count|cbc|fbc/.test(text) && /hb\s*[0-9]|hemoglobin|haemoglobin/.test(text) && lab.abnormal) diseases.push('Anaemia');
+  if (/wbc|white blood|leucocyt|leukocyt|full blood count|cbc|fbc/.test(text) && /wbc|leucocyt|leukocyt/.test(text) && lab.abnormal) diseases.push('Infection / Leukocytosis');
+  if (/creatinine|bun|renal|kidney/.test(text) && lab.abnormal) diseases.push('Renal Impairment');
+  if (/urinalysis|urine|leucocytes|leukocytes|nitrite/.test(text) && /leucocytes|leukocytes|nitrite|bacteria/.test(text) && lab.abnormal) diseases.push('Urinary Tract Infection');
+  if (/protein/.test(text) && /urine|urinalysis|proteinuria/.test(text) && lab.abnormal) diseases.push('Proteinuria');
+  if (/liver|alt|ast|bilirubin|hepatitis/.test(text) && lab.abnormal) diseases.push('Liver Disease');
+
+  return unique(diseases.length > 0 ? diseases : (lab.abnormal || lab.critical ? [`${lab.testName} Abnormality`] : []))
+    .map(disease => ({
+      disease,
+      detail: `${lab.testName}${lab.result ? `: ${lab.result}` : ''}`,
+      severity: lab.critical ? 'critical' : lab.abnormal ? 'abnormal' : 'normal',
+    }));
 }
 
 interface CriticalAlert {
@@ -124,7 +141,6 @@ interface BatchEntry {
 }
 
 export default function LabDashboardPage() {
-  const router = useRouter();
   const { t } = useTranslation();
   const { currentUser } = useApp();
   const { results: allResults, loading, update } = useLabResults();
@@ -132,11 +148,9 @@ export default function LabDashboardPage() {
   // keep the lab bench focused on specimen-based investigations.
   const results = useMemo(() => allResults.filter(r => !isImagingStudy(r)), [allResults]);
   const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
-  const [eventCounter, setEventCounter] = useState(0);
-  // Specimen Pipeline + Live Feed + Recent Completed moved off the center
+  // Specimen Pipeline + Recent Completed moved off the center
   // panel into the Laboratory side card; this opens one of them in a modal.
-  const [labPanel, setLabPanel] = useState<null | 'specimen' | 'feed' | 'recent'>(null);
+  const [labPanel, setLabPanel] = useState<null | 'specimen' | 'recent'>(null);
   // Work-queue status filter (shell tabs) + inline search bound to the shell's left rail.
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [queueSearch, setQueueSearch] = useState('');
@@ -160,54 +174,17 @@ export default function LabDashboardPage() {
   const kpis = useMemo(() => {
     const pending = results.filter(r => r.status === 'pending').length;
     const inProgress = results.filter(r => r.status === 'in_progress').length;
-    const today = new Date().toISOString().slice(0, 10);
-    const completedToday = results.filter(r => r.status === 'completed' && r.completedAt?.startsWith(today)).length;
+    const completed = results.filter(r => r.status === 'completed').length;
     const critical = results.filter(r => r.critical).length;
     const abnormal = results.filter(r => r.abnormal).length;
-    const completed = results.filter(r => r.status === 'completed' && r.completedAt && r.orderedAt);
-    const avgTurnaround = completed.length > 0
-      ? Math.round(completed.reduce((sum, r) => sum + (new Date(r.completedAt).getTime() - new Date(r.orderedAt).getTime()) / 3600000, 0) / completed.length)
+    const completedWithTimes = results.filter(r => r.status === 'completed' && r.completedAt && r.orderedAt);
+    const avgTurnaround = completedWithTimes.length > 0
+      ? Math.round(completedWithTimes.reduce((sum, r) => sum + (new Date(r.completedAt).getTime() - new Date(r.orderedAt).getTime()) / 3600000, 0) / completedWithTimes.length)
       : 0;
     const specimens = new Set(results.map(r => r.specimen)).size;
     const unacknowledgedCritical = criticalAlerts.filter(a => !a.acknowledged).length;
-    return { pending, inProgress, completedToday, critical, abnormal, avgTurnaround, specimens, total: results.length, unacknowledgedCritical };
+    return { pending, inProgress, completed, critical, abnormal, avgTurnaround, specimens, total: results.length, unacknowledgedCritical };
   }, [results, criticalAlerts]);
-
-  // --- Simulated live events ---
-  // Patient name pool is derived from the real lab orders so the live ticker
-  // shows actual patients from your facility, not hardcoded sample names.
-  const livePatientPool = useMemo(() => {
-    const names = results
-      .map(r => r.patientName)
-      .filter((n): n is string => Boolean(n && n.trim()));
-    return names.length > 0 ? Array.from(new Set(names)) : ['New patient'];
-  }, [results]);
-
-  const generateEvent = useCallback((): LiveEvent => {
-    const evt = LAB_EVENT_TYPES[Math.floor(Math.random() * LAB_EVENT_TYPES.length)];
-    const now = new Date();
-    return {
-      id: Date.now() + Math.random(),
-      ...evt,
-      patient: livePatientPool[Math.floor(Math.random() * livePatientPool.length)],
-      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      isNew: true,
-    };
-  }, [livePatientPool]);
-
-  useEffect(() => {
-    if (!LAB_LIVE_FEED_ENABLED) return;
-    const initial: LiveEvent[] = [];
-    for (let i = 0; i < 5; i++) initial.push({ ...generateEvent(), isNew: false, id: i });
-    setLiveEvents(initial);
-
-    const interval = setInterval(() => {
-      setLiveEvents(prev => [generateEvent(), ...prev.slice(0, 8).map(e => ({ ...e, isNew: false }))]);
-      setEventCounter(c => c + 1);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [generateEvent]);
 
   // Initialize critical alerts from existing results
   useEffect(() => {
@@ -234,12 +211,30 @@ export default function LabDashboardPage() {
   // --- Categorized results ---
   const allPendingOrders = useMemo(() => results.filter(r => r.status === 'pending' || r.status === 'in_progress'), [results]);
   const recentCompleted = useMemo(() => results.filter(r => r.status === 'completed').slice(0, 6), [results]);
+  const completedDiseaseRows = useMemo<CompletedDiseaseRow[]>(() => {
+    return results
+      .flatMap(lab => diseasesForCompletedLab(lab).map((disease, index) => ({
+        ...disease,
+        id: `${lab._id}-${index}`,
+        lab,
+      })))
+      .sort((a, b) => a.disease.localeCompare(b.disease) || a.lab.patientName.localeCompare(b.lab.patientName));
+  }, [results]);
 
   // Work queue rendered by the shared shell: filtered by the selected status
   // chip and the inline search query. Pending / in-progress orders sort first
   // so the most actionable work is at the top of the list.
   const visibleQueue = useMemo(() => {
     const query = queueSearch.trim().toLowerCase();
+    if (queueFilter === 'completed') {
+      return results.filter(r => r.status === 'completed' && (
+        !query ||
+        (r.patientName || '').toLowerCase().includes(query) ||
+        (r.testName || '').toLowerCase().includes(query) ||
+        (r.result || '').toLowerCase().includes(query) ||
+        (r.clinicalNotes || '').toLowerCase().includes(query)
+      )).slice(0, 40);
+    }
     return results.filter(r => {
       const statusOk = queueFilter === 'all' ? true : r.status === queueFilter;
       if (!statusOk) return false;
@@ -252,11 +247,24 @@ export default function LabDashboardPage() {
       );
     }).slice(0, 40);
   }, [results, queueFilter, queueSearch]);
-  const specimenCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    results.forEach(r => { map[r.specimen] = (map[r.specimen] || 0) + 1; });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  }, [results]);
+  const visibleCompletedDiseaseRows = useMemo(() => {
+    const query = queueSearch.trim().toLowerCase();
+    return completedDiseaseRows.filter(row => {
+      if (!query) return true;
+      return (
+        row.disease.toLowerCase().includes(query) ||
+        row.lab.patientName.toLowerCase().includes(query) ||
+        row.lab.testName.toLowerCase().includes(query) ||
+        row.detail.toLowerCase().includes(query)
+      );
+    }).slice(0, 40);
+  }, [completedDiseaseRows, queueSearch]);
+  const labWorkflowStages = useMemo(() => [
+    { key: 'received', label: 'Specimen Received', count: results.filter(r => r.status === 'pending').length, color: '#2563eb' },
+    { key: 'analysis', label: 'Analysis In Progress', count: results.filter(r => r.status === 'in_progress').length, color: '#0891b2' },
+    { key: 'reported', label: 'Result Reported', count: results.filter(r => r.status === 'completed').length, color: '#7c3aed' },
+    { key: 'critical', label: 'Critical Communication', count: results.filter(r => r.status === 'completed' && r.critical).length, color: 'var(--color-danger)' },
+  ], [results]);
 
   // Unique test types for batch mode
   const pendingTestTypes = useMemo(() => {
@@ -418,6 +426,66 @@ export default function LabDashboardPage() {
     setShowResultModal(true);
   };
 
+  const startProcessingOrder = async (orderId: string) => {
+    await update(orderId, { status: 'in_progress' as const });
+  };
+
+  const renderLabWorkflowPopup = (order: typeof visibleQueue[number]) => {
+    const isPending = order.status === 'pending';
+    const isProcessing = order.status === 'in_progress';
+    const isComplete = order.status === 'completed';
+    const steps = [
+      { label: 'Test Ordered', note: order.orderedBy ? t('lab.orderedBy', { name: order.orderedBy }) : order.testName, done: true },
+      { label: 'Specimen Received And Accessioned', note: `${order.specimen} specimen`, done: true, current: isPending },
+      { label: 'Analysis In Progress', note: 'Run the test and record instrument/manual findings.', done: isProcessing || isComplete, current: isProcessing },
+      { label: 'Result Entered And Quality Checked', note: order.result || 'Waiting for result entry and reference-range check.', done: isComplete },
+      { label: order.critical ? 'Critical Result Communicated' : 'Result Reported To Clinician', note: isComplete ? 'Result available for interpretation and care decisions.' : 'Pending reporting.', done: isComplete },
+      { label: 'Complete', note: isComplete ? 'Lab order closed.' : 'Close after reporting.', done: isComplete },
+    ];
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Test</span><strong>{order.testName}</strong></div>
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Specimen</span><strong>{order.specimen}</strong></div>
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Status</span><strong>{labStatusLabel(order.status)}</strong></div>
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Result</span><strong>{order.result || 'Not entered'}</strong></div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {steps.map((step, index) => (
+            <div key={step.label} className="flex items-start gap-3 rounded-xl p-3" style={{
+              background: step.current ? 'var(--bg-card)' : 'var(--overlay-subtle)',
+              border: `1px solid ${step.current ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+            }}>
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{
+                background: step.done ? 'var(--color-success)' : step.current ? 'var(--accent-primary)' : 'var(--overlay-medium)',
+                color: step.done || step.current ? '#fff' : 'var(--text-muted)',
+              }}>
+                {step.done ? <CheckCircle2 className="w-3.5 h-3.5" /> : index + 1}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{step.note}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        {isPending && (
+          <button type="button" className="btn btn-primary w-full" onClick={() => startProcessingOrder(order._id)}>
+            Accept specimen
+          </button>
+        )}
+        {(isPending || isProcessing) && (
+          <button type="button" className="btn btn-primary w-full" onClick={() => openResultForOrder(order._id)}>
+            {t('lab.enterResult')}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -428,9 +496,9 @@ export default function LabDashboardPage() {
           dateLabel={dateLabel}
           tabs={[
             { key: 'all', label: t('lab.viewAll'), count: results.length },
-            { key: 'pending', label: t('lab.pending'), count: kpis.pending },
-            { key: 'in_progress', label: t('lab.processing'), count: kpis.inProgress },
-            { key: 'completed', label: t('lab.completedToday'), count: kpis.completedToday },
+            { key: 'pending', label: 'Pending', count: kpis.pending },
+            { key: 'in_progress', label: 'Processing', count: kpis.inProgress },
+            { key: 'completed', label: 'Complete', count: completedDiseaseRows.length },
           ]}
           activeTab={queueFilter}
           onTabChange={(k) => setQueueFilter(k as typeof queueFilter)}
@@ -441,23 +509,29 @@ export default function LabDashboardPage() {
           actions={[
             { label: t('lab.enterResult'), icon: Microscope, onClick: () => setShowResultModal(true), tone: 'primary' },
             { label: t('lab.batchEntry'), icon: Table, onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
-            { label: t('lab.message'), icon: MessageSquare, onClick: () => router.push('/messages') },
             { label: t('lab.specimenPipeline'), icon: Droplets, onClick: () => setLabPanel(p => (p === 'specimen' ? null : 'specimen')), active: labPanel === 'specimen', tone: labPanel === 'specimen' ? 'primary' : 'neutral' },
-            { label: t('lab.liveFeed'), icon: Radio, onClick: () => setLabPanel(p => (p === 'feed' ? null : 'feed')), active: labPanel === 'feed', tone: labPanel === 'feed' ? 'primary' : 'neutral' },
-            { label: t('lab.recentCompletedResults'), icon: CheckCircle2, onClick: () => setLabPanel(p => (p === 'recent' ? null : 'recent')), active: labPanel === 'recent', tone: labPanel === 'recent' ? 'primary' : 'neutral' },
+            { label: 'Results', icon: CheckCircle2, onClick: () => setLabPanel(p => (p === 'recent' ? null : 'recent')), active: labPanel === 'recent', tone: labPanel === 'recent' ? 'primary' : 'neutral' },
           ]}
           hideRowList={labPanel !== null}
-          actionStrip={[
-            { label: t('nav.patients'), icon: Users, onClick: () => router.push('/patients') },
-            { label: t('lab.acceptOrder'), icon: FileText, onClick: () => router.push('/lab') },
-            { label: t('nav.reports'), icon: BarChart3, onClick: () => router.push('/reports') },
-            { label: t('lab.message'), icon: MessageSquare, onClick: () => router.push('/messages') },
-          ]}
-          rows={visibleQueue.map((order): EhrCareDashboardRow => {
+          rows={queueFilter === 'completed' ? visibleCompletedDiseaseRows.map((row): EhrCareDashboardRow => {
+            const lab = row.lab;
+            const time = lab.completedAt ? new Date(lab.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined;
+            return {
+              id: row.id,
+              title: row.disease,
+              subtitle: `${lab.patientName} · ${row.detail}`,
+              meta: `${lab.hospitalNumber || ''}${lab.orderedBy ? ` · ${t('lab.orderedBy', { name: lab.orderedBy })}` : ''}`.replace(/^ · /, ''),
+              compactMeta: time,
+              time,
+              status: row.severity === 'critical' ? 'Critical' : 'Complete',
+              statusTone: row.severity === 'critical' ? 'danger' : row.severity === 'abnormal' ? 'warning' : 'done',
+              priority: row.severity === 'critical' ? 'Critical' : undefined,
+              popupDetail: renderLabWorkflowPopup(lab),
+            };
+          }) : visibleQueue.map((order): EhrCareDashboardRow => {
             const time = order.status === 'completed'
               ? (order.completedAt ? new Date(order.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined)
               : (order.orderedAt ? new Date(order.orderedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined);
-            const isOpen = order.status === 'pending' || order.status === 'in_progress';
             return {
               id: order._id,
               title: order.patientName,
@@ -465,31 +539,23 @@ export default function LabDashboardPage() {
               meta: order.orderedBy ? t('lab.orderedBy', { name: order.orderedBy }) : undefined,
               compactMeta: time,
               time,
-              status: order.critical ? t('lab.critical') : order.status === 'in_progress' ? t('lab.processing') : order.status === 'completed' ? t('lab.completedToday') : t('lab.pending'),
+              status: order.critical ? 'Critical' : labStatusLabel(order.status),
               statusTone: order.critical ? 'danger' : order.abnormal ? 'warning' : order.status === 'completed' ? 'done' : order.status === 'in_progress' ? 'active' : 'scheduled',
               priority: order.critical ? t('lab.critical') : undefined,
-              actionLabel: isOpen ? t('lab.enterResult') : undefined,
-              onAction: isOpen ? () => openResultForOrder(order._id) : undefined,
-              // Clicking the row mirrors its primary action: open orders pop
-              // the result-entry modal pre-selected on this order; completed
-              // ones deep-link to the result on the patient's chart.
-              onClick: isOpen
-                ? () => openResultForOrder(order._id)
-                : () => router.push(`/patients/${order.patientId}?tab=labs&focus=${order._id}`),
+              popupDetail: renderLabWorkflowPopup(order),
             };
           })}
           metrics={[
-            { label: t('lab.pending'), value: kpis.pending },
-            { label: t('lab.processing'), value: kpis.inProgress },
-            { label: t('lab.completedToday'), value: kpis.completedToday },
-            { label: t('lab.abnormalBadge'), value: kpis.abnormal, tone: 'warning' },
-            { label: t('lab.critical'), value: kpis.critical, tone: 'danger' },
-            // Click-through to the Specimen Pipeline / Live Feed / Recent
+            { label: 'Pending', value: kpis.pending },
+            { label: 'Processing', value: kpis.inProgress },
+            { label: 'Complete', value: completedDiseaseRows.length },
+            { label: t('lab.abnormalBadge'), value: completedDiseaseRows.filter(row => row.severity === 'abnormal').length, tone: 'warning' },
+            { label: t('lab.critical'), value: completedDiseaseRows.filter(row => row.severity === 'critical').length, tone: 'danger' },
+            // Click-through to the Specimen Pipeline / Recent
             // Completed panels, which used to sit in the center but now open
             // from here on demand.
             { label: t('lab.specimenPipeline'), value: kpis.total, onClick: () => setLabPanel('specimen') },
-            { label: t('lab.liveFeed'), value: eventCounter, onClick: () => setLabPanel('feed') },
-            { label: t('lab.recentCompletedResults'), value: recentCompleted.length, onClick: () => setLabPanel('recent') },
+            { label: 'Results', value: results.filter(r => r.status === 'completed').length, onClick: () => setLabPanel('recent') },
           ]}
           metricsTitle={t('lab.laboratory')}
           checklist={[
@@ -538,7 +604,7 @@ export default function LabDashboardPage() {
           </div>
         )}
 
-        {/* Specimen Pipeline / Live Feed / Recent Completed — opened from the
+        {/* Specimen Pipeline / Recent Completed — opened from the
             header toggles (and the Laboratory side card); the active panel
             replaces the worklist and occupies the whole center. */}
         {labPanel && (
@@ -547,14 +613,12 @@ export default function LabDashboardPage() {
               <div className="flex items-center gap-2">
                 {labPanel === 'specimen'
                   ? <Droplets className="w-4 h-4" style={{ color: '#EC4899' }} />
-                  : labPanel === 'feed'
-                    ? <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                    : <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />}
+                  : <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />}
                 <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {labPanel === 'specimen' ? t('lab.specimenPipeline') : labPanel === 'feed' ? t('lab.liveFeed') : t('lab.recentCompletedResults')}
+                  {labPanel === 'specimen' ? t('lab.specimenPipeline') : 'Results'}
                 </span>
                 <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                  {labPanel === 'specimen' ? t('lab.resultsCount', { count: kpis.total }) : labPanel === 'feed' ? t('lab.eventsCount', { count: eventCounter }) : t('lab.resultsCount', { count: recentCompleted.length })}
+                  {labPanel === 'specimen' ? t('lab.resultsCount', { count: kpis.total }) : t('lab.resultsCount', { count: recentCompleted.length })}
                 </span>
               </div>
               <button type="button" onClick={() => setLabPanel(null)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
@@ -563,101 +627,73 @@ export default function LabDashboardPage() {
             </div>
 
             {labPanel === 'specimen' && (
-              <div className="flex-1 overflow-y-auto p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {specimenCounts.length > 0 ? specimenCounts.map(([specimen, count]) => {
-                  const pct = kpis.total > 0 ? Math.round((count / kpis.total) * 100) : 0;
+              <div className="flex-1 overflow-y-auto p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                {labWorkflowStages.map((stage, index) => {
+                  const pct = kpis.total > 0 ? Math.round((stage.count / kpis.total) * 100) : 0;
                   return (
-                    <div key={specimen} className="p-2.5 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                    <div key={stage.key} className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                       <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{specimen}</span>
-                        <span className="text-[10px] font-bold" style={{ color: ACCENT }}>{count}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: stage.color }}>{stage.label}</span>
+                        <span className="text-[10px] font-bold" style={{ color: stage.color }}>{stage.count}</span>
                       </div>
                       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: ACCENT }} />
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: stage.color }} />
                       </div>
-                      <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('lab.percentOfTotal', { pct })}</p>
+                      <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                        {stage.key === 'critical' ? 'Subset requiring urgent communication' : `Stage ${index + 1} of lab workflow`}
+                      </p>
                     </div>
                   );
-                }) : (
-                  <div className="col-span-full flex flex-col items-center justify-center py-10">
-                    <Droplets className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noSpecimenData')}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {labPanel === 'feed' && (
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {liveEvents.length > 0 ? liveEvents.map(evt => {
-                  const Icon = evt.icon;
-                  return (
-                    <div key={evt.id} className="p-2 rounded-lg" style={{
-                      background: evt.isNew ? `${evt.color}08` : 'transparent',
-                      border: evt.isNew ? `1px solid ${evt.color}20` : '1px solid transparent',
-                    }}>
-                      <div className="flex items-start gap-2">
-                        <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Icon className="w-2.5 h-2.5" style={{ color: evt.color }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[11px] font-semibold truncate" style={{ color: evt.color }}>{evt.label}</span>
-                            {evt.isNew && (
-                              <span className="text-[7px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('lab.new')}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{evt.patient}</span>
-                            <span className="text-[10px] font-mono flex-shrink-0 ml-1" style={{ color: 'var(--text-muted)' }}>{evt.time}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <div className="flex flex-col items-center justify-center py-10">
-                    <Radio className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.eventsCount', { count: 0 })}</p>
-                  </div>
-                )}
+                })}
+                </div>
               </div>
             )}
 
             {labPanel === 'recent' && (
-              <div className="flex-1 overflow-y-auto p-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {recentCompleted.length > 0 ? recentCompleted.map(r => (
-                    <div key={r._id} className="p-3 rounded-xl" style={{
-                      background: 'var(--overlay-subtle)',
-                      border: `1px solid ${r.critical ? 'rgba(239,68,68,0.25)' : r.abnormal ? 'rgba(251,146,60,0.25)' : 'var(--border-light)'}`,
-                    }}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{r.testName}</span>
-                        {r.critical ? (
-                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('lab.critical')}</span>
-                        ) : r.abnormal ? (
-                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(251,146,60,0.12)', color: '#FB923C' }}>{t('lab.abnormalBadge')}</span>
-                        ) : (
-                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' }}>{t('lab.normalBadge')}</span>
-                        )}
-                      </div>
-                      <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{r.patientName}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold stat-value" style={{
-                          color: r.critical ? 'var(--color-danger)' : r.abnormal ? '#FB923C' : ACCENT,
-                        }}>{r.result} {r.unit}</span>
-                        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{r.referenceRange}</span>
-                      </div>
-                      <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{r.specimen} &middot; {r.completedAt ? new Date(r.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}</p>
-                    </div>
-                  )) : (
-                    <div className="col-span-2 sm:col-span-3 flex flex-col items-center justify-center py-10 text-center">
+              <div className="flex-1 overflow-y-auto">
+                {recentCompleted.length > 0 ? (
+                  <table className="data-table" style={{ minWidth: 760 }}>
+                    <thead>
+                      <tr>
+                        <th>Patient</th>
+                        <th>Result</th>
+                        <th>Test</th>
+                        <th>Specimen</th>
+                        <th>Flag</th>
+                        <th>Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentCompleted.map(r => (
+                        <tr key={r._id}>
+                          <td className="font-medium text-sm">{r.patientName}</td>
+                          <td className="text-sm font-semibold" style={{ color: r.critical ? 'var(--color-danger)' : r.abnormal ? '#FB923C' : 'var(--text-primary)' }}>
+                            {r.result || 'Recorded'} {r.unit}
+                          </td>
+                          <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r.testName}</td>
+                          <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{r.specimen}</td>
+                          <td>
+                            <span className="badge text-[10px]" style={{
+                              background: r.critical ? 'rgba(239,68,68,0.12)' : r.abnormal ? 'rgba(251,146,60,0.12)' : 'rgba(74,222,128,0.12)',
+                              color: r.critical ? 'var(--color-danger)' : r.abnormal ? '#FB923C' : 'var(--color-success)',
+                            }}>
+                              {r.critical ? t('lab.critical') : r.abnormal ? t('lab.abnormalBadge') : t('lab.normalBadge')}
+                            </span>
+                          </td>
+                          <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                            {r.completedAt ? new Date(r.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
                       <Microscope className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
                       <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noCompletedResults')}</p>
                     </div>
-                  )}
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -667,8 +703,11 @@ export default function LabDashboardPage() {
 
       {/* ===== Feature 1 & 3: Result Entry Modal (Single + Batch) ===== */}
       {showResultModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="dash-card w-full max-w-2xl mx-4 rounded-2xl overflow-hidden" style={{
+        <Modal
+          onClose={() => { setShowResultModal(false); setEntryMode('single'); setSelectedOrderId(''); setResultValue(''); setBatchTestType(''); }}
+          width={672}
+        >
+          <div className="dash-card w-full rounded-2xl overflow-hidden" style={{
             boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
             maxHeight: '85vh', display: 'flex', flexDirection: 'column',
           }}>
@@ -1034,7 +1073,7 @@ export default function LabDashboardPage() {
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

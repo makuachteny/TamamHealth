@@ -5736,6 +5736,13 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   font-weight: 700;
 }
 
+.ehr-care-header-search {
+  flex: 1 1 260px;
+  max-width: 420px;
+  min-width: min(260px, 100%);
+  margin-left: auto;
+}
+
 .ehr-care-filter,
 .ehr-care-rail-action {
   width: 100%;
@@ -10559,6 +10566,148 @@ span:has(> svg:only-child) {
 .modal-panel--md { max-width: min(560px, calc(100vw - 32px)); }
 .modal-panel--lg { max-width: min(720px, calc(100vw - 32px)); }
 
+/* Shared dashboard row details. Kept as a centered compact dialog so pharmacy,
+   reception, and nurse row popups do not stretch across the whole workspace. */
+.appointment-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 980;
+  border: 0;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.28);
+  cursor: default;
+}
+
+.appointment-detail-sidebar {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 981;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 64px));
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+}
+
+.appointment-detail-sidebar__header {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  gap: 10px;
+  align-items: start;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.appointment-detail-sidebar__back,
+.appointment-detail-sidebar__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.appointment-detail-sidebar__back:hover,
+.appointment-detail-sidebar__close:hover {
+  background: var(--bg-hover, rgba(15, 23, 42, 0.06));
+  color: var(--text-primary);
+}
+
+.appointment-detail-sidebar__title {
+  min-width: 0;
+}
+
+.appointment-detail-sidebar__title h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.appointment-detail-sidebar__title p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.appointment-detail-sidebar__time {
+  color: var(--text-primary) !important;
+  font-weight: 700;
+}
+
+.appointment-detail-sidebar__status {
+  grid-column: 2 / 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.appointment-detail-sidebar__status span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(33, 145, 208, 0.1);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.appointment-detail-sidebar__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+}
+
+.appointment-detail-sidebar__tabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 8px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.appointment-detail-sidebar__tabs button.active {
+  border-bottom-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.appointment-detail-sidebar__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 18px 4px;
+}
+
+.appointment-detail-sidebar__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--border-light);
+}
+
 /* Appointment detail slider: fills the right rail column exactly, sliding in
    from the right over the outstanding-items cards. */
 .ehr-right-rail-overlay {
@@ -13217,6 +13366,43 @@ span:has(> svg:only-child) {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.1;
+}
+
+.ehr-appointment-time .ehr-appointment-status.status-received {
+  color: #2563eb;
+}
+
+.ehr-appointment-time .ehr-appointment-status.status-pending {
+  color: #2563eb;
+}
+
+.ehr-appointment-time .ehr-appointment-status.status-processing,
+.ehr-appointment-time .ehr-appointment-status.status-in-progress {
+  color: #0891b2;
+}
+
+.ehr-appointment-time .ehr-appointment-status.status-cleared,
+.ehr-appointment-time .ehr-appointment-status.status-ready {
+  color: #059669;
+}
+
+.ehr-appointment-time .ehr-appointment-status.status-dispensed,
+.ehr-appointment-time .ehr-appointment-status.status-complete,
+.ehr-appointment-time .ehr-appointment-status.status-completed,
+.ehr-appointment-time .ehr-appointment-status.status-completed-today {
+  color: #7c3aed;
+}
+
+.ehr-appointment-time .ehr-appointment-status.status-payment-due,
+.ehr-appointment-time .ehr-appointment-status.status-urgent {
+  color: #d97706;
+}
+
+.ehr-appointment-time .ehr-appointment-status.status-held,
+.ehr-appointment-time .ehr-appointment-status.status-stockout-referred,
+.ehr-appointment-time .ehr-appointment-status.status-critical,
+.ehr-appointment-time .ehr-appointment-status.status-emergency {
+  color: #dc2626;
 }
 
 /* Patient's preferred language — value + caption, mirroring the time column. */

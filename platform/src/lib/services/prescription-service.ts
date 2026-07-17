@@ -15,7 +15,9 @@ export function effectivePrescriptionStatus(
   doc: Pick<PrescriptionDoc, 'orderStatus' | 'status'>,
 ): PrescriptionStatus {
   if (doc.orderStatus) return doc.orderStatus;
-  return doc.status === 'dispensed' ? 'dispensed' : 'prescribed';
+  if (doc.status === 'dispensed') return 'dispensed';
+  if (doc.status === 'discontinued') return 'held_awaiting_clarification';
+  return 'received_in_pharmacy_queue';
 }
 
 /** Coarse `status` derived from the granular lifecycle stage. */

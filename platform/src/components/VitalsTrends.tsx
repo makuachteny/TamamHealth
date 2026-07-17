@@ -163,6 +163,7 @@ function buildBPMetric(records: MedicalRecordDoc[], t: TFn): MetricSummary | nul
     .map(r => {
       const v = r.vitalSigns;
       if (!v || !v.systolic || !v.diastolic) return null;
+      if (!Number.isFinite(v.systolic) || !Number.isFinite(v.diastolic)) return null;
       const d = r.consultedAt || r.visitDate || r.createdAt;
       return { date: d, label: formatDate(d), value: v.systolic, secondary: v.diastolic } as MetricPoint;
     })
@@ -323,6 +324,9 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
   const latestDisplay = key === 'bp' && points.length > 0
     ? `${latest}/${points[points.length - 1].secondary ?? '-'}`
     : latest != null ? String(latest) : '—';
+  const chartPoints = points.filter(point =>
+    Number.isFinite(point.value) && (point.secondary === undefined || Number.isFinite(point.secondary)),
+  );
 
   const changeLabel = (() => {
     if (latest == null || previous == null) return null;
@@ -367,9 +371,10 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
         </div>
       </div>
 
+      {chartPoints.length >= 2 ? (
       <div style={{ width: '100%', height: 80 }}>
-        <ResponsiveContainer>
-          <LineChart data={points} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+          <LineChart data={chartPoints} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
             <XAxis
               dataKey="label"
               tick={{ fontSize: 9, fill: 'var(--text-muted)' }}
@@ -409,8 +414,8 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
               dataKey="value"
               stroke={color}
               strokeWidth={2}
-              dot={{ r: 2.5, fill: color }}
-              activeDot={{ r: 4 }}
+              dot={chartPoints.length > 1 ? { r: 2.5, fill: color } : false}
+              activeDot={chartPoints.length > 1 ? { r: 4 } : false}
               isAnimationActive={false}
             />
             {key === 'bp' && (
@@ -420,17 +425,22 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
                 stroke={color}
                 strokeWidth={1.5}
                 strokeDasharray="3 3"
-                dot={{ r: 2, fill: color }}
+                dot={chartPoints.length > 1 ? { r: 2, fill: color } : false}
                 isAnimationActive={false}
               />
             )}
           </LineChart>
         </ResponsiveContainer>
       </div>
+      ) : (
+        <div className="flex items-center justify-center" style={{ width: '100%', height: 80, color: 'var(--text-muted)', fontSize: 11 }}>
+          {t('vitalsTrends.baseline')}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-        <span>{points.length === 1 ? t('vitalsTrends.readingCountSingular', { count: points.length }) : t('vitalsTrends.readingCountPlural', { count: points.length })}</span>
-        <span>{points[0].label} — {points[points.length - 1].label}</span>
+        <span>{chartPoints.length === 1 ? t('vitalsTrends.readingCountSingular', { count: chartPoints.length }) : t('vitalsTrends.readingCountPlural', { count: chartPoints.length })}</span>
+        <span>{chartPoints[0]?.label || points[0].label} — {chartPoints[chartPoints.length - 1]?.label || points[points.length - 1].label}</span>
       </div>
     </div>
   );

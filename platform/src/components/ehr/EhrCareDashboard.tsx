@@ -1,6 +1,6 @@
 'use client';
 
-import { Children, useMemo, useState, type ReactNode } from 'react';
+import { Children, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
@@ -63,11 +63,17 @@ export type EhrCareDashboardRow = {
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
   detail?: ReactNode;
+  popupDetail?: ReactNode;
   date?: string;
 };
 
 function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function statusClass(value?: string): string {
+  if (!value) return '';
+  return `status-${value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 }
 
 export default function EhrCareDashboard({
@@ -193,6 +199,18 @@ export default function EhrCareDashboard({
     if (!showCalendar || effectiveView !== 'calendar' || rowEventDates.length === 0) return rows;
     return rows.filter(row => row.date === selectedDate);
   }, [effectiveView, rowEventDates.length, rows, selectedDate, showCalendar]);
+  useEffect(() => {
+    if (!openRow) return;
+    const latest = visibleRows.find(row => row.id === openRow.id);
+    const changed = latest && (
+      latest.status !== openRow.status ||
+      latest.priority !== openRow.priority ||
+      latest.subtitle !== openRow.subtitle ||
+      latest.meta !== openRow.meta ||
+      latest.actionLabel !== openRow.actionLabel
+    );
+    if (latest && changed) setOpenRow(latest);
+  }, [openRow, visibleRows]);
   const selectedDateLabel = showCalendar ? formatDateTitle(selectedDate) : dateLabel;
   // The dashboard's primary action (first entry) is promoted to the header's
   // top-left slot as the Clinical Officer-style "+" CTA; every other action
@@ -222,6 +240,17 @@ export default function EhrCareDashboard({
                   every role matches the Clinical Officer header exactly. */}
               <p className="ehr-care-greeting">{headerTitle}</p>
             </div>
+            {onSearchChange && (
+              <div className="ehr-care-search ehr-care-header-search">
+                <Search className="w-4 h-4" />
+                <input
+                  type="search"
+                  value={searchValue ?? ''}
+                  placeholder={searchPlaceholder}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -246,19 +275,6 @@ export default function EhrCareDashboard({
               onDateSelect={setSelectedDate}
             />
           )}
-          {/* Search sits BETWEEN the calendar and the chart — it drives the
-              station's active worklist (e.g. the nurse ward board). */}
-          <div className="ehr-filter-group">
-            <div className="ehr-care-search">
-              <Search className="w-4 h-4" />
-              <input
-                type="search"
-                value={searchValue ?? ''}
-                placeholder={searchPlaceholder}
-                onChange={(event) => onSearchChange?.(event.target.value)}
-              />
-            </div>
-          </div>
           {showChart && (chart ?? <CareStatsChart title={chartTitle} series={autoChartSeries} />)}
           {filters.length > 0 && (
             <div className="ehr-filter-group">
@@ -325,7 +341,11 @@ export default function EhrCareDashboard({
                   </div>
                   <div className="ehr-appointment-time">
                     <strong>{row.time || row.compactMeta || '—'}</strong>
-                    {(row.priority || row.status) && <span>{row.priority || (row.status ? titleCase(row.status) : '')}</span>}
+                    {(row.priority || row.status) && (
+                      <span className={`ehr-appointment-status ${row.priority ? 'status-priority' : statusClass(row.status)}`.trim()}>
+                        {row.priority || (row.status ? titleCase(row.status) : '')}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {row.detail}
@@ -438,52 +458,60 @@ export default function EhrCareDashboard({
               )}
             </div>
 
-            <div className="appointment-detail-sidebar__tabs" role="tablist" aria-label="Detail sections">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={detailTab === 'visit'}
-                className={detailTab === 'visit' ? 'active' : undefined}
-                onClick={() => setDetailTab('visit')}
-              >
-                Visit Information
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={detailTab === 'financial'}
-                className={detailTab === 'financial' ? 'active' : undefined}
-                onClick={() => setDetailTab('financial')}
-              >
-                Financial Information
-              </button>
-            </div>
+            {openRow.popupDetail ? (
+              <div className="appointment-detail-sidebar__body" role="tabpanel">
+                {openRow.popupDetail}
+              </div>
+            ) : (
+              <>
+                <div className="appointment-detail-sidebar__tabs" role="tablist" aria-label="Detail sections">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={detailTab === 'visit'}
+                    className={detailTab === 'visit' ? 'active' : undefined}
+                    onClick={() => setDetailTab('visit')}
+                  >
+                    Visit Information
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={detailTab === 'financial'}
+                    className={detailTab === 'financial' ? 'active' : undefined}
+                    onClick={() => setDetailTab('financial')}
+                  >
+                    Financial Information
+                  </button>
+                </div>
 
-            <div className="appointment-detail-sidebar__body" role="tabpanel">
-              {(detailTab === 'visit'
-                ? [
-                    { label: 'Time', value: openRow.time || openRow.compactMeta },
-                    { label: 'Reason', value: openRow.subtitle },
-                    { label: 'Priority', value: openRow.priority },
-                    { label: 'Status', value: openRow.status ? titleCase(openRow.status) : undefined },
-                    { label: 'Room', value: openRow.room },
-                    { label: 'Details', value: openRow.meta },
-                  ]
-                : [
-                    { label: 'Balance', value: '—' },
-                    { label: 'Charge', value: 'Not started' },
-                    { label: 'Payment Responsibility', value: 'Not recorded' },
-                    { label: 'Insurance', value: 'Not recorded' },
-                    { label: 'Claim Status', value: 'Not started' },
-                  ]
-              ).filter((item): item is { label: string; value: string } => Boolean(item.value))
-                .map(item => (
-                  <div className="appointment-detail-row" key={item.label}>
-                    <dt>{item.label}</dt>
-                    <dd>{item.value}</dd>
-                  </div>
-                ))}
-            </div>
+                <div className="appointment-detail-sidebar__body" role="tabpanel">
+                  {(detailTab === 'visit'
+                    ? [
+                        { label: 'Time', value: openRow.time || openRow.compactMeta },
+                        { label: 'Reason', value: openRow.subtitle },
+                        { label: 'Priority', value: openRow.priority },
+                        { label: 'Status', value: openRow.status ? titleCase(openRow.status) : undefined },
+                        { label: 'Room', value: openRow.room },
+                        { label: 'Details', value: openRow.meta },
+                      ]
+                    : [
+                        { label: 'Balance', value: '—' },
+                        { label: 'Charge', value: 'Not started' },
+                        { label: 'Payment Responsibility', value: 'Not recorded' },
+                        { label: 'Insurance', value: 'Not recorded' },
+                        { label: 'Claim Status', value: 'Not started' },
+                      ]
+                  ).filter((item): item is { label: string; value: string } => Boolean(item.value))
+                    .map(item => (
+                      <div className="appointment-detail-row" key={item.label}>
+                        <dt>{item.label}</dt>
+                        <dd>{item.value}</dd>
+                      </div>
+                    ))}
+                </div>
+              </>
+            )}
 
             <div className="appointment-detail-sidebar__actions">
               {openRow.actionLabel && openRow.onAction && (

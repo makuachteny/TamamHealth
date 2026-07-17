@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
-import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, ChevronRight, AlertOctagon, Filter, Download } from '@/components/icons/lucide';
+import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, ChevronRight, AlertOctagon, Filter, Download, Check } from '@/components/icons/lucide';
 import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
@@ -17,6 +17,9 @@ import { medications } from '@/data/mock';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import PageInstructionCard from '@/components/PageInstructionCard';
+import { formatMoney } from '@/lib/format-utils';
+import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
+import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 
 const UNITS = ['tablets', 'vials', 'bottles', 'sachets', 'tubes', 'ampoules', 'sachet', 'ml'];
 
@@ -51,14 +54,16 @@ export default function PharmacyPage() {
     if (patientParam) setGlobalSearch(patientParam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-  const { canDispense } = usePermissions();
+  const { canDispense, canAccess } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
   const router = useRouter();
-  const { prescriptions: rxQueue, loading: rxLoading, dispense } = usePrescriptions();
+  const { prescriptions: rxQueue, loading: rxLoading, dispense, advance } = usePrescriptions();
   const { items: rawInventory, create: createInventory, update: updateInventory } = usePharmacyInventory();
   const { patients } = usePatients();
   const { users } = useUsers();
+  const [balanceByPatient, setBalanceByPatient] = useState<Map<string, number>>(new Map());
+  const [workflowRxId, setWorkflowRxId] = useState<string | null>(null);
   // Controlled-substance dispense awaiting a witness sign-off.
   const [dispenseTarget, setDispenseTarget] = useState<{ rx: typeof rxQueue[number]; inv: typeof rawInventory[number]; qty: number } | null>(null);
   const [witnessId, setWitnessId] = useState('');
@@ -108,6 +113,26 @@ export default function PharmacyPage() {
     rawInventory.map(item => ({ ...item, status: classifyStockStatus(item) })),
   [rawInventory]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const patientIds = Array.from(new Set(rxQueue.map(rx => rx.patientId).filter(Boolean)));
+    if (patientIds.length === 0) {
+      setBalanceByPatient(new Map());
+      return;
+    }
+    (async () => {
+      const { getPatientBalance } = await import('@/lib/services/ledger-service');
+      const balances = await Promise.all(patientIds.map(async patientId => [patientId, await getPatientBalance(patientId)] as const));
+      if (!cancelled) setBalanceByPatient(new Map(balances));
+    })().catch(() => {
+      if (!cancelled) setBalanceByPatient(new Map());
+    });
+    return () => { cancelled = true; };
+  }, [rxQueue]);
+
+  const patientBalanceFor = (rx: typeof rxQueue[number]) =>
+    rx.patientId ? balanceByPatient.get(rx.patientId) ?? 0 : 0;
+
   // Distinct medication categories present in the current inventory, for the
   // header's "filter by category" select.
   const categories = useMemo(() => Array.from(new Set(inventory.map(i => i.category))).sort(), [inventory]);
@@ -115,6 +140,45 @@ export default function PharmacyPage() {
   // Find the inventory row for a medication at the current facility.
   const findInventoryFor = (medication: string) =>
     inventory.find(i => i.medicationName === medication && (!currentUser?.hospitalId || i.hospitalId === currentUser.hospitalId));
+
+  const advanceRx = async (rx: typeof rxQueue[number], to: PrescriptionStatus, successMessage: string) => {
+    try {
+      await advance(rx._id, to);
+      showToast(successMessage, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not update prescription workflow.', 'error');
+    }
+  };
+
+  const handleStartReview = (rx: typeof rxQueue[number]) => {
+    const stage = pharmacyStage(rx);
+    const next: PrescriptionStatus = stage === 'prescribed' ? 'received_in_pharmacy_queue' : 'under_review';
+    advanceRx(rx, next, `${rx.medication} moved to pharmacist review.`);
+  };
+
+  const handleClearForDispense = (rx: typeof rxQueue[number]) => {
+    const qty = rx.quantityToDispense || 1;
+    const inv = findInventoryFor(rx.medication);
+    if (!inv || inv.stockLevel < qty) {
+      advanceRx(rx, 'stockout_partial_referred', `Stockout recorded: ${inv?.stockLevel ?? 0} ${inv?.unit || 'unit(s)'} available.`);
+      return;
+    }
+    advanceRx(rx, 'cleared_for_dispensing', `${rx.medication} cleared. Send patient for payment if a balance remains.`);
+  };
+
+  const handlePaymentStep = (rx: typeof rxQueue[number]) => {
+    if (canAccess('/payments') && rx.patientId) {
+      router.push(`/payments?patientId=${rx.patientId}`);
+      return;
+    }
+    showToast(`Payment due for ${rx.patientName}: ${formatMoney(patientBalanceFor(rx))}. Send the patient to cashier before dispensing.`, 'error');
+  };
+
+  const handleCounsel = (rx: typeof rxQueue[number]) =>
+    advanceRx(rx, 'counseled', `Counseling recorded for ${rx.patientName}.`);
+
+  const handleComplete = (rx: typeof rxQueue[number]) =>
+    advanceRx(rx, 'complete', `${rx.medication} workflow completed.`);
 
   // Perform the dispense: for controlled drugs record the witnessed movement
   // FIRST (it validates two distinct signatories and a non-negative balance),
@@ -174,6 +238,15 @@ export default function PharmacyPage() {
   const handleDispense = async (rxId: string) => {
     const rx = rxQueue.find(r => r._id === rxId);
     if (!rx) return;
+    const stage = pharmacyStage(rx);
+    if (stage !== 'cleared_for_dispensing') {
+      showToast('Check and clear the medication order before dispensing.', 'error');
+      return;
+    }
+    if (!isFinanciallyCleared(patientBalanceFor(rx))) {
+      handlePaymentStep(rx);
+      return;
+    }
     const qty = rx.quantityToDispense || 1;
     const inv = findInventoryFor(rx.medication);
     // Stock gate: never mark dispensed unless the full course is on the shelf.
@@ -199,6 +272,113 @@ export default function PharmacyPage() {
     }
     const ok = await doDispense(dispenseTarget.rx, dispenseTarget.inv, dispenseTarget.qty, { id: witness._id, name: witness.name });
     if (ok) setDispenseTarget(null);
+  };
+
+  const workflowActionFor = (rx: typeof rxQueue[number]): { label?: string; onClick?: () => void } => {
+    if (!canDispense) return {};
+    const stage = pharmacyStage(rx);
+    const balance = patientBalanceFor(rx);
+    if (stage === 'prescribed') {
+      return { label: 'Receive order', onClick: () => handleStartReview(rx) };
+    }
+    if (stage === 'received_in_pharmacy_queue') {
+      return { label: 'Check order', onClick: () => handleStartReview(rx) };
+    }
+    if (stage === 'under_review' || stage === 'held_awaiting_clarification' || stage === 'stockout_partial_referred' || stage === 'clinician_consultation_in_progress') {
+      return { label: 'Clear', onClick: () => handleClearForDispense(rx) };
+    }
+    if (stage === 'cleared_for_dispensing' && !isFinanciallyCleared(balance)) {
+      return { label: canAccess('/payments') ? 'Collect payment' : 'Send to cashier', onClick: () => handlePaymentStep(rx) };
+    }
+    if (stage === 'cleared_for_dispensing') {
+      return { label: t('pharmacy.dispense'), onClick: () => handleDispense(rx._id) };
+    }
+    if (stage === 'dispensed') {
+      return { label: 'Counsel', onClick: () => handleCounsel(rx) };
+    }
+    if (stage === 'counseled') {
+      return { label: 'Complete', onClick: () => handleComplete(rx) };
+    }
+    return {};
+  };
+
+  const workflowRx = workflowRxId ? rxQueue.find(rx => rx._id === workflowRxId) || null : null;
+
+  const renderWorkflowPopup = (rx: typeof rxQueue[number]) => {
+    const stage = pharmacyStage(rx);
+    const balance = patientBalanceFor(rx);
+    const inv = findInventoryFor(rx.medication);
+    const qty = rx.quantityToDispense || 1;
+    const stockOk = !!inv && inv.stockLevel >= qty;
+    const paymentClear = isFinanciallyCleared(balance);
+    const action = workflowActionFor(rx);
+    const completed = {
+      received: stage !== 'prescribed',
+      review: !['prescribed', 'received_in_pharmacy_queue'].includes(stage),
+      checked: ['cleared_for_dispensing', 'dispensed', 'counseled', 'complete'].includes(stage),
+      payment: ['dispensed', 'counseled', 'complete'].includes(stage) || (stage === 'cleared_for_dispensing' && paymentClear),
+      dispensed: ['dispensed', 'counseled', 'complete'].includes(stage),
+      counseled: ['counseled', 'complete'].includes(stage),
+      cleared: stage === 'complete',
+    };
+    const currentKey =
+      !completed.received ? 'received' :
+      !completed.review ? 'review' :
+      !completed.checked ? 'checked' :
+      !completed.payment ? 'payment' :
+      !completed.dispensed ? 'dispensed' :
+      !completed.counseled ? 'counseled' :
+      !completed.cleared ? 'cleared' :
+      '';
+    const steps = [
+      { key: 'received', label: 'Medication order received', note: rx.prescribedBy ? `Ordered by ${rx.prescribedBy}` : 'Waiting in pharmacy queue', done: completed.received },
+      { key: 'review', label: 'Check medication order', note: 'Confirm dose, frequency, patient and allergies.', done: completed.review },
+      { key: 'checked', label: 'Stock and safety clearance', note: stockOk ? `${qty} ${inv?.unit || 'unit(s)'} available` : `Stock issue: ${inv?.stockLevel ?? 0} available, ${qty} needed`, done: completed.checked },
+      { key: 'payment', label: 'Receive / confirm payment', note: paymentClear ? 'Payment clear or no charge' : `${formatMoney(balance)} outstanding`, done: completed.payment },
+      { key: 'dispensed', label: 'Dispense medication', note: 'Issue the full course and update inventory.', done: completed.dispensed },
+      { key: 'counseled', label: 'Counsel patient', note: 'Explain dose, timing, side effects and return precautions.', done: completed.counseled },
+      { key: 'cleared', label: 'Clear patient from pharmacy', note: 'Medication workflow complete.', done: completed.cleared },
+    ];
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Ordered</span><strong>{rx.medication}</strong></div>
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dose</span><strong>{rx.dose} {rx.frequency}{rx.duration ? ` x ${rx.duration}` : ''}</strong></div>
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Payment</span><strong style={{ color: paymentClear ? 'var(--color-success)' : 'var(--color-warning)' }}>{paymentClear ? 'Clear' : formatMoney(balance)}</strong></div>
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Stage</span><strong>{pharmacyStageLabel(stage)}</strong></div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {steps.map((step, index) => {
+            const isCurrent = step.key === currentKey;
+            return (
+              <div key={step.key} className="flex items-start gap-3 rounded-xl p-3" style={{
+                background: isCurrent ? 'var(--bg-card)' : 'var(--overlay-subtle)',
+                border: `1px solid ${isCurrent ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+              }}>
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{
+                  background: step.done ? 'var(--color-success)' : isCurrent ? 'var(--accent-primary)' : 'var(--overlay-medium)',
+                  color: step.done || isCurrent ? '#fff' : 'var(--text-muted)',
+                }}>
+                  {step.done ? <Check className="w-3.5 h-3.5" /> : index + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{step.note}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {action.label && action.onClick && (
+          <button type="button" className="btn btn-primary w-full" onClick={action.onClick}>
+            {action.label}
+          </button>
+        )}
+      </div>
+    );
   };
 
   const handleStockIn = async () => {
@@ -268,6 +448,8 @@ export default function PharmacyPage() {
   };
 
   const pendingRx = rxQueue.filter(r => r.status === 'pending').length;
+  const paymentDueCount = rxQueue.filter(r => pharmacyStage(r) === 'cleared_for_dispensing' && !isFinanciallyCleared(patientBalanceFor(r))).length;
+  const readyCount = rxQueue.filter(r => pharmacyStage(r) === 'cleared_for_dispensing' && isFinanciallyCleared(patientBalanceFor(r))).length;
   const lowStock = inventory.filter(i => i.status === 'low' || i.status === 'critical').length;
   const totalDispensedToday = inventory.reduce((sum, i) => sum + (i.dispensedToday || 0), 0);
 
@@ -280,7 +462,7 @@ export default function PharmacyPage() {
   });
 
   const filteredQueue = rxQueue.filter(rx => {
-    if (rx.status !== 'pending') return false;
+    if (!isActivePharmacyStage(pharmacyStage(rx)) || rx.status === 'discontinued') return false;
     if (q && !(rx.patientName.toLowerCase().includes(q.toLowerCase()) || rx.medication.toLowerCase().includes(q.toLowerCase()) || rx.prescribedBy.toLowerCase().includes(q.toLowerCase()))) return false;
     if (colFilters.qPatient && !rx.patientName.toLowerCase().includes(colFilters.qPatient.toLowerCase())) return false;
     if (colFilters.qMedication && !rx.medication.toLowerCase().includes(colFilters.qMedication.toLowerCase())) return false;
@@ -289,7 +471,16 @@ export default function PharmacyPage() {
   }).sort((a, b) => {
     // Emergency/immediate meds (given before results) float to the top of the
     // pending queue so they're dispensed first.
-    const rank = (r: typeof a) => (r.status === 'pending' && r.urgency === 'immediate' ? 0 : 1);
+    const rank = (r: typeof a) => {
+      const stage = pharmacyStage(r);
+      if (r.urgency === 'immediate') return 0;
+      if (stage === 'received_in_pharmacy_queue') return 1;
+      if (stage === 'under_review') return 2;
+      if (stage === 'cleared_for_dispensing' && !isFinanciallyCleared(patientBalanceFor(r))) return 3;
+      if (stage === 'cleared_for_dispensing') return 4;
+      if (stage === 'dispensed') return 5;
+      return 6;
+    };
     return rank(a) - rank(b);
   });
 
@@ -400,14 +591,15 @@ export default function PharmacyPage() {
     let rows: (string | number)[][] = [];
     switch (activeTab) {
       case 'queue':
-        header = [t('pharmacy.patient'), t('pharmacy.medication'), t('pharmacy.dosage'), t('pharmacy.prescribedBy'), t('pharmacy.time'), t('pharmacy.statusLabel')];
+        header = [t('pharmacy.patient'), t('pharmacy.medication'), t('pharmacy.dosage'), t('pharmacy.prescribedBy'), t('pharmacy.time'), t('pharmacy.statusLabel'), 'Payment'];
         rows = filteredQueue.map(rx => [
           rx.patientName,
           rx.medication,
           `${rx.dose} ${rx.frequency}${rx.duration ? ` x ${rx.duration}` : ''}`,
           rx.prescribedBy,
           rx.createdAt ? new Date(rx.createdAt).toLocaleString('en-GB') : '',
-          rx.status === 'pending' ? t('pharmacy.pending') : t('pharmacy.dispensed'),
+          pharmacyStageLabel(pharmacyStage(rx)),
+          isFinanciallyCleared(patientBalanceFor(rx)) ? 'Clear' : formatMoney(patientBalanceFor(rx)),
         ]);
         break;
       case 'inventory':
@@ -492,6 +684,8 @@ export default function PharmacyPage() {
           stats={[
             { label: t('pharmacy.prescriptionQueue'), value: rxQueue.length, color: LIST_STAT_COLORS.muted },
             { label: t('pharmacy.pending'), value: pendingRx, color: LIST_STAT_COLORS.blue },
+            { label: 'Payment due', value: paymentDueCount, color: LIST_STAT_COLORS.amber },
+            { label: 'Ready', value: readyCount, color: LIST_STAT_COLORS.green },
             { label: t('pharmacy.kpiDispensedToday'), value: totalDispensedToday, color: LIST_STAT_COLORS.amber },
             { label: 'Low stock', value: lowStock, color: LIST_STAT_COLORS.green },
           ]}
@@ -603,7 +797,7 @@ export default function PharmacyPage() {
                     <th>{t('pharmacy.prescribedBy')}</th>
                     <th>{t('pharmacy.time')}</th>
                     <th>{t('pharmacy.statusLabel')}</th>
-                    <th>{t('pharmacy.action')}</th>
+                    <th>Payment</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -613,45 +807,51 @@ export default function PharmacyPage() {
                         {t('pharmacy.noPrescriptionsFound')}
                       </td>
                     </tr>
-                  ) : filteredQueue.map(rx => (
-                    <tr key={rx._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => { if (rx.patientId) router.push(`/patients/${rx.patientId}`); }}>
-                      <td><PatientName patientId={rx.patientId} name={rx.patientName} nameClassName="text-sm font-medium" /></td>
-                      <td className="text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="icon-box-sm">
-                            <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
+                  ) : filteredQueue.map(rx => {
+                    const stage = pharmacyStage(rx);
+                    const balance = patientBalanceFor(rx);
+                    const paymentClear = isFinanciallyCleared(balance);
+                    return (
+                      <tr key={rx._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setWorkflowRxId(rx._id)}>
+                        <td><PatientName patientId={rx.patientId} name={rx.patientName} nameClassName="text-sm font-medium" /></td>
+                        <td className="text-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="icon-box-sm">
+                              <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
+                            </div>
+                            {rx.medication}
+                            {rx.urgency === 'immediate' && (
+                              <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(217,119,6,0.12)', color: 'var(--color-warning)' }}>Immediate</span>
+                            )}
                           </div>
-                          {rx.medication}
-                          {rx.urgency === 'immediate' && (
-                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(217,119,6,0.12)', color: 'var(--color-warning)' }}>Immediate</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                        {rx.dose} {rx.frequency} {rx.duration ? `x ${rx.duration}` : ''}
-                      </td>
-                      <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{rx.prescribedBy}</td>
-                      <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
-                        <div className="flex items-center gap-1.5">
-                          {rx.createdAt ? new Date(rx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`badge text-[10px] ${rx.status === 'pending' ? 'badge-warning' : 'badge-normal'}`}>
-                          {rx.status === 'pending' ? t('pharmacy.pending') : t('pharmacy.dispensed')}
-                        </span>
-                      </td>
-                      <td>
-                        {rx.status === 'pending' && canDispense && (
-                          <button className="btn btn-primary btn-sm" style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-                            onClick={(e) => { e.stopPropagation(); handleDispense(rx._id); }}>{t('pharmacy.dispense')}</button>
-                        )}
-                        {rx.status === 'pending' && !canDispense && (
-                          <span className="text-[10px] font-medium px-2 py-1 rounded" style={{ background: 'rgba(148,163,184,0.1)', color: 'var(--text-muted)' }}>{t('pharmacy.pharmacistOnly')}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                          {rx.dose} {rx.frequency} {rx.duration ? `x ${rx.duration}` : ''}
+                        </td>
+                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{rx.prescribedBy}</td>
+                        <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                          <div className="flex items-center gap-1.5">
+                            {rx.createdAt ? new Date(rx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge text-[10px] ${
+                            stage === 'cleared_for_dispensing' ? 'badge-normal' :
+                            stage === 'dispensed' || stage === 'counseled' ? 'badge-normal' :
+                            stage === 'held_awaiting_clarification' || stage === 'stockout_partial_referred' ? 'badge-warning' :
+                            'badge-warning'
+                          }`}>
+                            {pharmacyStageLabel(stage)}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge text-[10px] ${paymentClear ? 'badge-normal' : 'badge-warning'}`}>
+                            {paymentClear ? 'Clear' : formatMoney(balance)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -859,62 +1059,6 @@ export default function PharmacyPage() {
         )}
 
         {activeTab === 'patients' && (
-          activePatient ? (
-            <>
-              <div className="flex items-center justify-between px-4 pt-3 pb-2">
-                <div>
-                  <p className="text-sm font-semibold">{patientName(activePatient)}</p>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {activePatient.hospitalNumber} · {t('pharmacy.prescriptionsOnRecord', { count: activeRxs.length })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="btn btn-secondary btn-sm" onClick={() => router.push(`/patients/${activePatient._id}`)}>{t('pharmacy.viewAll')}</button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => setSelectedPatient(null)}>← {t('pharmacy.patientMedHistory')}</button>
-                </div>
-              </div>
-              <hr className="section-divider" />
-              {activeRxs.length === 0 ? (
-                <p className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.noPrescriptionsFound')}</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="data-table" style={{ minWidth: 600 }}>
-                    <thead>
-                      <tr>
-                        <th>{t('pharmacy.medication')}</th>
-                        <th>{t('pharmacy.dosage')}</th>
-                        <th>{t('pharmacy.prescribedBy')}</th>
-                        <th>{t('pharmacy.time')}</th>
-                        <th>{t('pharmacy.statusLabel')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeRxs.map(rx => (
-                        <tr key={rx._id}>
-                          <td className="font-medium text-sm">
-                            <div className="flex items-center gap-2">
-                              <div className="icon-box-sm">
-                                <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
-                              </div>
-                              {rx.medication}
-                            </div>
-                          </td>
-                          <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>{rx.dose} {rx.frequency} {rx.duration ? `x ${rx.duration}` : ''}</td>
-                          <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{rx.prescribedBy}</td>
-                          <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{rx.createdAt ? new Date(rx.createdAt).toLocaleDateString('en-GB') : '—'}</td>
-                          <td>
-                            <span className={`badge text-[10px] ${rx.status === 'pending' ? 'badge-warning' : 'badge-normal'}`}>
-                              {rx.status === 'pending' ? t('pharmacy.pending') : t('pharmacy.dispensed')}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          ) : (
             patientResults.length === 0 ? (
               <p className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
                 {q ? t('pharmacy.noPatientsFound', { query: q }) : t('pharmacy.searchPatientPlaceholder')}
@@ -923,7 +1067,7 @@ export default function PharmacyPage() {
               <div className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
                 {patientResults.map(p => {
                   const rxs = rxFor(p);
-                  const pending = rxs.filter(r => r.status === 'pending').length;
+                  const pending = rxs.filter(r => isActivePharmacyStage(pharmacyStage(r)) && r.status !== 'discontinued').length;
                   return (
                     <button key={p._id} onClick={() => setSelectedPatient(p._id)}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--table-row-hover)]">
@@ -942,9 +1086,97 @@ export default function PharmacyPage() {
                 })}
               </div>
             )
-          )
         )}
       </div>
+
+      {activeTab === 'patients' && activePatient && (
+        <Modal onClose={() => setSelectedPatient(null)} width={720} labelledBy="pharmacy-patient-med-history-title">
+          <div className="modal-content card-elevated w-full overflow-hidden" style={{ maxHeight: 'calc(100vh - 48px)' }}>
+            <div className="flex items-start justify-between gap-4 p-5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div className="min-w-0">
+                <h3 id="pharmacy-patient-med-history-title" className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  {patientName(activePatient)}
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  {activePatient.hospitalNumber} · {t('pharmacy.prescriptionsOnRecord', { count: activeRxs.length })}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button className="btn btn-secondary btn-sm" onClick={() => router.push(`/patients/${activePatient._id}`)}>{t('pharmacy.viewAll')}</button>
+                <button onClick={() => setSelectedPatient(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label={t('action.close')}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {activeRxs.length === 0 ? (
+              <p className="text-center py-10 px-5 text-sm" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.noPrescriptionsFound')}</p>
+            ) : (
+              <div className="overflow-auto" style={{ maxHeight: 'min(62vh, 520px)' }}>
+                <table className="data-table" style={{ minWidth: 640 }}>
+                  <thead>
+                    <tr>
+                      <th>{t('pharmacy.medication')}</th>
+                      <th>{t('pharmacy.dosage')}</th>
+                      <th>{t('pharmacy.prescribedBy')}</th>
+                      <th>{t('pharmacy.time')}</th>
+                      <th>{t('pharmacy.statusLabel')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeRxs.map(rx => {
+                      const stage = pharmacyStage(rx);
+                      return (
+                        <tr key={rx._id}>
+                          <td className="font-medium text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="icon-box-sm">
+                                <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
+                              </div>
+                              {rx.medication}
+                            </div>
+                          </td>
+                          <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>{rx.dose} {rx.frequency} {rx.duration ? `x ${rx.duration}` : ''}</td>
+                          <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{rx.prescribedBy}</td>
+                          <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{rx.createdAt ? new Date(rx.createdAt).toLocaleDateString('en-GB') : '—'}</td>
+                          <td>
+                            <span className={`badge text-[10px] ${stage === 'dispensed' || stage === 'counseled' || stage === 'complete' ? 'badge-normal' : 'badge-warning'}`}>
+                              {pharmacyStageLabel(stage)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {workflowRx && (
+        <Modal onClose={() => setWorkflowRxId(null)} width={520} labelledBy="pharmacy-workflow-title">
+          <div className="modal-content card-elevated w-full overflow-hidden" style={{ maxHeight: 'calc(100vh - 48px)' }}>
+            <div className="flex items-start justify-between gap-4 p-5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div className="min-w-0">
+                <h3 id="pharmacy-workflow-title" className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  {workflowRx.patientName}
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  {workflowRx.medication} · {workflowRx.dose} {workflowRx.frequency}{workflowRx.duration ? ` x ${workflowRx.duration}` : ''}
+                </p>
+              </div>
+              <button onClick={() => setWorkflowRxId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label={t('action.close')}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 overflow-auto" style={{ maxHeight: 'min(70vh, 620px)' }}>
+              {renderWorkflowPopup(workflowRx)}
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Stock-in modal */}
       {showStockInModal && (

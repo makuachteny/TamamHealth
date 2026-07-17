@@ -413,15 +413,11 @@ export default function LabPage() {
 
           {/* Result Entry Modal */}
           {resultDraft && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center"
-              style={{ background: 'rgba(0,0,0,0.55)', padding: 24 }}
-              onClick={(e) => { if (e.target === e.currentTarget && !submitting) setResultDraft(null); }}
-            >
+            <Modal onClose={() => !submitting && setResultDraft(null)} width={520}>
               <div
                 className="card-elevated"
                 style={{
-                  width: '100%', maxWidth: 520, padding: 28, borderRadius: 16,
+                  width: '100%', padding: 28, borderRadius: 16,
                   background: 'var(--bg-card)', position: 'relative',
                   boxShadow: '0 24px 64px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.1)',
                   maxHeight: '90vh', overflowY: 'auto',
@@ -559,20 +555,16 @@ export default function LabPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
 
           {/* Critical-Result Confirmation Modal */}
           {resultDraft && criticalConfirmOpen && (
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center"
-              style={{ background: 'rgba(0,0,0,0.65)', padding: 24 }}
-              onClick={(e) => { if (e.target === e.currentTarget && !submitting) setCriticalConfirmOpen(false); }}
-            >
+            <Modal onClose={() => !submitting && setCriticalConfirmOpen(false)} width={460}>
               <div
                 className="card-elevated"
                 style={{
-                  width: '100%', maxWidth: 460, padding: 24, borderRadius: 16,
+                  width: '100%', padding: 24, borderRadius: 16,
                   background: 'var(--bg-card)',
                   boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
                   border: '1px solid var(--color-danger)',
@@ -611,7 +603,7 @@ export default function LabPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
 
           {/* Lab Orders Table */}

@@ -1,24 +1,27 @@
 'use client';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useMessagingDock } from '@/lib/messaging-dock-context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { usePharmacyInventory } from '@/lib/hooks/usePharmacyInventory';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
+import Modal from '@/components/Modal';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
 import { checkNewPrescription, type DrugInteraction, type InteractionSeverity } from '@/lib/services/drug-interaction-service';
+import { formatMoney } from '@/lib/format-utils';
+import { isFinanciallyCleared, pharmacyStage, pharmacyStageLabel, pharmacyStageTone } from '@/lib/pharmacy-workflow';
 import type { PrescriptionDoc, PharmacyInventoryDoc, UserDoc } from '@/lib/db-types';
+import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 import EhrCareDashboard, {
   type EhrCareDashboardRow,
   type EhrCareDashboardAction,
   type EhrCareDashboardChecklistItem,
 } from '@/components/ehr/EhrCareDashboard';
 import {
-  Pill, Package, ShieldCheck, MessageSquare, ClipboardList,
+  Pill, Package, ShieldCheck, ClipboardList,
   Activity, AlertTriangle, Clock, CheckCircle2, ChevronRight,
   AlertOctagon, X, Check, Plus, Users, BarChart3, Loader2,
 } from '@/components/icons/lucide';
@@ -66,8 +69,8 @@ function DispenseModal({
   const canConfirm = !confirming && (!requiresWitness || !!witnessId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="dash-card rounded-2xl p-5 w-full max-w-md mx-4" style={{
+    <Modal onClose={onCancel} width={448}>
+      <div className="dash-card rounded-2xl p-5 w-full" style={{
         boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
       }}>
         <div className="flex items-center gap-2 mb-4">
@@ -158,7 +161,7 @@ function DispenseModal({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -180,8 +183,8 @@ function ReceiveStockModal({ items, onConfirm, onClose, saving }: {
   const canSave = !saving && name.trim().length > 0 && qtyNum > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="dash-card rounded-2xl p-5 w-full max-w-md mx-4" style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+    <Modal onClose={onClose} width={448}>
+      <div className="dash-card rounded-2xl p-5 w-full" style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5" style={{ color: ACCENT }} />
@@ -242,7 +245,7 @@ function ReceiveStockModal({ items, onConfirm, onClose, saving }: {
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -252,13 +255,12 @@ export default function PharmacyDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
-  const { openDock } = useMessagingDock();
-  const { canDispense } = usePermissions();
+  const { canDispense, canAccess } = usePermissions();
   const { showToast } = useToast();
   const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
 
   // ── Real data sources ──
-  const { prescriptions: rxQueue, loading: rxLoading, dispense } = usePrescriptions();
+  const { prescriptions: rxQueue, loading: rxLoading, dispense, advance } = usePrescriptions();
   const { items: rawInventory, create: createInventory, update: updateInventory } = usePharmacyInventory();
   const { users } = useUsers();
 
@@ -270,12 +272,13 @@ export default function PharmacyDashboardPage() {
   const [showReceiveStock, setShowReceiveStock] = useState(false);
   const [receivingStock, setReceivingStock] = useState(false);
   // Prescription queue status filter
-  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'dispensed' | 'controlled'>('all');
+  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'review' | 'payment' | 'ready' | 'dispensed' | 'controlled'>('all');
   // Which stat panel (header toggles) occupies the center instead of the Rx
   // queue; null = normal queue view.
   const [centerPanel, setCenterPanel] = useState<'pipeline' | 'stock' | null>(null);
   // Queue text search (bound to the shared shell's left-rail search).
   const [queueSearch, setQueueSearch] = useState('');
+  const [balanceByPatient, setBalanceByPatient] = useState<Map<string, number>>(new Map());
 
   // Inventory augmented with a live status classification (same helper the
   // real /pharmacy page uses), so stock badges/percentages stay accurate as
@@ -284,6 +287,27 @@ export default function PharmacyDashboardPage() {
     () => rawInventory.map(item => ({ ...item, status: classifyStockStatus(item) })),
     [rawInventory],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const patientIds = Array.from(new Set(rxQueue.map(rx => rx.patientId).filter(Boolean)));
+    if (patientIds.length === 0) {
+      setBalanceByPatient(new Map());
+      return;
+    }
+    (async () => {
+      const { getPatientBalance } = await import('@/lib/services/ledger-service');
+      const balances = await Promise.all(patientIds.map(async patientId => [patientId, await getPatientBalance(patientId)] as const));
+      if (!cancelled) setBalanceByPatient(new Map(balances));
+    })().catch(() => {
+      if (!cancelled) setBalanceByPatient(new Map());
+    });
+    return () => { cancelled = true; };
+  }, [rxQueue]);
+
+  const patientBalanceFor = useCallback((rx: PrescriptionDoc) =>
+    rx.patientId ? balanceByPatient.get(rx.patientId) ?? 0 : 0,
+  [balanceByPatient]);
   // Find the inventory row for a medication at the current facility (same
   // exact-name matching the real /pharmacy page uses for decrementStock).
   const findInventoryFor = useCallback((medication: string) =>
@@ -304,9 +328,13 @@ export default function PharmacyDashboardPage() {
     [inventory],
   );
 
-  // Computed values
-  const pendingRx = rxQueue.filter(r => r.status === 'pending').length;
-  const dispensedCount = rxQueue.filter(r => r.status === 'dispensed').length;
+  const reviewStages: PrescriptionStatus[] = ['received_in_pharmacy_queue', 'under_review', 'held_awaiting_clarification', 'stockout_partial_referred', 'clinician_consultation_in_progress'];
+  const pendingWorkflowCount = rxQueue.filter(r => r.status === 'pending').length;
+  const reviewCount = rxQueue.filter(r => r.status === 'pending' && reviewStages.includes(pharmacyStage(r))).length;
+  const paymentDueCount = rxQueue.filter(r => pharmacyStage(r) === 'cleared_for_dispensing' && !isFinanciallyCleared(patientBalanceFor(r))).length;
+  const readyCount = rxQueue.filter(r => pharmacyStage(r) === 'cleared_for_dispensing' && isFinanciallyCleared(patientBalanceFor(r))).length;
+  const dispensedCount = rxQueue.filter(r => ['dispensed', 'counseled', 'complete'].includes(pharmacyStage(r))).length;
+  const pendingRx = pendingWorkflowCount;
   const lowStockCount = inventory.filter(i => i.status === 'low').length;
   const criticalCount = inventory.filter(i => i.status === 'critical').length;
   const expiredCount = inventory.filter(i => i.status === 'expired').length;
@@ -316,10 +344,17 @@ export default function PharmacyDashboardPage() {
   // Queue filtered by the selected status chip and the inline search query.
   const queueQuery = queueSearch.trim().toLowerCase();
   const visibleQueue = rxQueue.filter(rx => {
+    const stage = pharmacyStage(rx);
+    const balance = patientBalanceFor(rx);
     const statusOk =
       queueFilter === 'all' ? true :
       queueFilter === 'controlled' ? isControlled(rx) :
-      rx.status === queueFilter;
+      queueFilter === 'pending' ? rx.status === 'pending' :
+      queueFilter === 'review' ? reviewStages.includes(stage) :
+      queueFilter === 'payment' ? stage === 'cleared_for_dispensing' && !isFinanciallyCleared(balance) :
+      queueFilter === 'ready' ? stage === 'cleared_for_dispensing' && isFinanciallyCleared(balance) :
+      queueFilter === 'dispensed' ? ['dispensed', 'counseled', 'complete'].includes(stage) :
+      true;
     if (!statusOk) return false;
     if (!queueQuery) return true;
     return (
@@ -339,9 +374,62 @@ export default function PharmacyDashboardPage() {
     return checkNewPrescription(rx.medication, currentMeds).interactions;
   };
 
+  const advanceRx = async (rx: PrescriptionDoc, to: PrescriptionStatus, successMessage: string) => {
+    try {
+      await advance(rx._id, to);
+      showToast(successMessage, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not update prescription workflow.', 'error');
+    }
+  };
+
+  const handleStartReview = (rx: PrescriptionDoc) => {
+    const stage = pharmacyStage(rx);
+    const next: PrescriptionStatus = stage === 'prescribed' ? 'received_in_pharmacy_queue' : 'under_review';
+    advanceRx(rx, next, `${rx.medication} moved to pharmacist review.`);
+  };
+
+  const handleClearForDispense = (rx: PrescriptionDoc) => {
+    const qty = rx.quantityToDispense || 1;
+    const inv = findInventoryFor(rx.medication);
+    const interactions = getInteractionsForRx(rx);
+    if (interactions.some(i => i.severity === 'contraindicated' || i.severity === 'serious')) {
+      advanceRx(rx, 'held_awaiting_clarification', 'Held for prescriber clarification because of a serious interaction.');
+      return;
+    }
+    if (!inv || inv.stockLevel < qty) {
+      advanceRx(rx, 'stockout_partial_referred', `Stockout recorded: ${inv?.stockLevel ?? 0} ${inv?.unit || 'unit(s)'} available.`);
+      return;
+    }
+    advanceRx(rx, 'cleared_for_dispensing', `${rx.medication} cleared. Send patient for payment if a balance remains.`);
+  };
+
+  const handlePaymentStep = (rx: PrescriptionDoc) => {
+    if (canAccess('/payments') && rx.patientId) {
+      router.push(`/payments?patientId=${rx.patientId}`);
+      return;
+    }
+    showToast(`Payment due for ${rx.patientName}: ${formatMoney(patientBalanceFor(rx))}. Send the patient to cashier before dispensing.`, 'error');
+  };
+
+  const handleCounsel = (rx: PrescriptionDoc) =>
+    advanceRx(rx, 'counseled', `Counseling recorded for ${rx.patientName}.`);
+
+  const handleComplete = (rx: PrescriptionDoc) =>
+    advanceRx(rx, 'complete', `${rx.medication} workflow completed.`);
+
   // Dispense handler — gates on real stock availability before opening the
   // confirm modal, exactly like the real /pharmacy page's handleDispense.
   const handleDispense = (rx: PrescriptionDoc) => {
+    const stage = pharmacyStage(rx);
+    if (stage !== 'cleared_for_dispensing') {
+      showToast('Check and clear the medication order before dispensing.', 'error');
+      return;
+    }
+    if (!isFinanciallyCleared(patientBalanceFor(rx))) {
+      handlePaymentStep(rx);
+      return;
+    }
     const qty = rx.quantityToDispense || 1;
     const inv = findInventoryFor(rx.medication);
     if (!inv || inv.stockLevel < qty) {
@@ -463,14 +551,130 @@ export default function PharmacyDashboardPage() {
     }
   };
 
+  const workflowActionFor = (rx: PrescriptionDoc): { label?: string; onClick?: () => void } => {
+    if (!canDispense) return {};
+    const stage = pharmacyStage(rx);
+    const balance = patientBalanceFor(rx);
+    if (stage === 'prescribed') {
+      return { label: 'Receive order', onClick: () => handleStartReview(rx) };
+    }
+    if (stage === 'received_in_pharmacy_queue') {
+      return { label: 'Check order', onClick: () => handleStartReview(rx) };
+    }
+    if (stage === 'under_review' || stage === 'held_awaiting_clarification' || stage === 'stockout_partial_referred' || stage === 'clinician_consultation_in_progress') {
+      return { label: 'Clear', onClick: () => handleClearForDispense(rx) };
+    }
+    if (stage === 'cleared_for_dispensing' && !isFinanciallyCleared(balance)) {
+      return { label: canAccess('/payments') ? 'Collect payment' : 'Send to cashier', onClick: () => handlePaymentStep(rx) };
+    }
+    if (stage === 'cleared_for_dispensing') {
+      return { label: t('pharmacy.dispense'), onClick: () => handleDispense(rx) };
+    }
+    if (stage === 'dispensed') {
+      return { label: 'Counsel', onClick: () => handleCounsel(rx) };
+    }
+    if (stage === 'counseled') {
+      return { label: 'Complete', onClick: () => handleComplete(rx) };
+    }
+    return {};
+  };
+
+  const renderWorkflowPopup = (rx: PrescriptionDoc) => {
+    const stage = pharmacyStage(rx);
+    const balance = patientBalanceFor(rx);
+    const inv = findInventoryFor(rx.medication);
+    const qty = rx.quantityToDispense || 1;
+    const stockOk = !!inv && inv.stockLevel >= qty;
+    const paymentClear = isFinanciallyCleared(balance);
+    const action = workflowActionFor(rx);
+    const completed = {
+      received: stage !== 'prescribed',
+      review: !['prescribed', 'received_in_pharmacy_queue'].includes(stage),
+      checked: ['cleared_for_dispensing', 'dispensed', 'counseled', 'complete'].includes(stage),
+      payment: ['dispensed', 'counseled', 'complete'].includes(stage) || (stage === 'cleared_for_dispensing' && paymentClear),
+      dispensed: ['dispensed', 'counseled', 'complete'].includes(stage),
+      counseled: ['counseled', 'complete'].includes(stage),
+      cleared: stage === 'complete',
+    };
+    const currentKey =
+      !completed.received ? 'received' :
+      !completed.review ? 'review' :
+      !completed.checked ? 'checked' :
+      !completed.payment ? 'payment' :
+      !completed.dispensed ? 'dispensed' :
+      !completed.counseled ? 'counseled' :
+      !completed.cleared ? 'cleared' :
+      '';
+    const steps = [
+      { key: 'received', label: 'Medication order received', note: rx.prescribedBy ? `Ordered by ${rx.prescribedBy}` : 'Waiting in pharmacy queue', done: completed.received },
+      { key: 'review', label: 'Check medication order', note: 'Confirm dose, frequency, patient, allergies and interactions.', done: completed.review },
+      { key: 'checked', label: 'Stock and safety clearance', note: stockOk ? `${qty} ${inv?.unit || 'unit(s)'} available` : `Stock issue: ${inv?.stockLevel ?? 0} available, ${qty} needed`, done: completed.checked },
+      { key: 'payment', label: 'Receive / confirm payment', note: paymentClear ? 'Payment clear or no charge' : `${formatMoney(balance)} outstanding`, done: completed.payment },
+      { key: 'dispensed', label: 'Dispense medication', note: 'Issue the full course and update inventory.', done: completed.dispensed },
+      { key: 'counseled', label: 'Counsel patient', note: 'Explain dose, timing, side effects and return precautions.', done: completed.counseled },
+      { key: 'cleared', label: 'Clear patient from pharmacy', note: 'Medication workflow complete.', done: completed.cleared },
+    ];
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Ordered</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{rx.medication}</strong>
+            </div>
+            <div>
+              <span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dose</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{rx.dose} {rx.frequency}{rx.duration ? ` x ${rx.duration}` : ''}</strong>
+            </div>
+            <div>
+              <span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Payment</span>
+              <strong style={{ color: paymentClear ? 'var(--color-success)' : 'var(--color-warning)' }}>{paymentClear ? 'Clear' : formatMoney(balance)}</strong>
+            </div>
+            <div>
+              <span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Stage</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{pharmacyStageLabel(stage)}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {steps.map((step, index) => {
+            const isCurrent = step.key === currentKey;
+            return (
+              <div key={step.key} className="flex items-start gap-3 rounded-xl p-3" style={{
+                background: isCurrent ? 'var(--bg-card)' : 'var(--overlay-subtle)',
+                border: `1px solid ${isCurrent ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+              }}>
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{
+                  background: step.done ? 'var(--color-success)' : isCurrent ? 'var(--accent-primary)' : 'var(--overlay-medium)',
+                  color: step.done || isCurrent ? '#fff' : 'var(--text-muted)',
+                }}>
+                  {step.done ? <Check className="w-3.5 h-3.5" /> : index + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{step.note}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {action.label && action.onClick && (
+          <button type="button" className="btn btn-primary w-full" onClick={action.onClick}>
+            {action.label}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   const headerActions: EhrCareDashboardAction[] = [];
   if (canDispense) {
     headerActions.push({ label: t('pharmacy.receiveStock'), icon: Package, onClick: () => setShowReceiveStock(true), tone: 'primary' });
   }
   headerActions.push({ label: t('pharmacy.kpiControlled'), icon: ShieldCheck, onClick: () => router.push('/controlled-substances') });
-  headerActions.push({ label: t('pharmacy.message'), icon: MessageSquare, onClick: () => openDock() });
-  // Stat panels — each toggle swaps the center from the Rx queue to that card.
-  headerActions.push({ label: t('pharmacy.dispensingPipeline'), icon: Activity, onClick: () => setCenterPanel(p => (p === 'pipeline' ? null : 'pipeline')), active: centerPanel === 'pipeline', tone: centerPanel === 'pipeline' ? 'primary' : 'neutral' });
   headerActions.push({ label: t('pharmacy.stockAlerts'), icon: AlertTriangle, onClick: () => setCenterPanel(p => (p === 'stock' ? null : 'stock')), active: centerPanel === 'stock', tone: centerPanel === 'stock' ? 'primary' : 'neutral' });
 
   const checklist: EhrCareDashboardChecklistItem[] = [
@@ -503,31 +707,28 @@ export default function PharmacyDashboardPage() {
           filters={[]}
           actions={headerActions}
           hideRowList={centerPanel !== null}
-          actionStrip={[
-            { label: t('pharmacy.inventory'), icon: Package, onClick: () => router.push('/pharmacy') },
-            { label: t('pharmacy.checkStock'), icon: ClipboardList, onClick: () => router.push('/pharmacy') },
-            { label: t('nav.reports'), icon: BarChart3, onClick: () => router.push('/reports') },
-            { label: t('nav.patients'), icon: Users, onClick: () => router.push('/patients') },
-          ]}
-          rows={visibleQueue.map((rx): EhrCareDashboardRow => ({
-            id: rx._id,
-            title: rx.patientName,
-            subtitle: `${rx.medication} · ${rx.dose} ${rx.frequency}${rx.duration ? ` x ${rx.duration}` : ''}`,
-            meta: `${rx.prescribedBy} · ${formatTime(rx.createdAt)}`,
-            compactMeta: formatTime(rx.createdAt),
-            time: formatTime(rx.createdAt),
-            status: rx.status === 'discontinued' ? 'Discontinued' : t(`pharmacy.status_${rx.status}`),
-            statusTone: rx.status === 'dispensed' ? 'done' : rx.status === 'discontinued' ? 'danger' : rx.urgency === 'immediate' ? 'warning' : 'scheduled',
-            priority: rx.urgency === 'immediate' ? t('pharmacy.urgent') : undefined,
-            // "Undo" is not offered: there is no real service to reverse a
-            // dispense (it would require un-recording controlled-substance
-            // movements and re-crediting stock with a full audit trail), so
-            // dispensed rows simply carry no action rather than faking one.
-            actionLabel: rx.status === 'pending' && canDispense ? t('pharmacy.dispense') : undefined,
-            onAction: rx.status === 'pending' && canDispense ? () => handleDispense(rx) : undefined,
-          }))}
+          rows={visibleQueue.map((rx): EhrCareDashboardRow => {
+            const stage = pharmacyStage(rx);
+            const balance = patientBalanceFor(rx);
+            const paymentDue = stage === 'cleared_for_dispensing' && !isFinanciallyCleared(balance);
+            return {
+              id: rx._id,
+              title: rx.patientName,
+              subtitle: `${rx.medication} · ${rx.dose} ${rx.frequency}${rx.duration ? ` x ${rx.duration}` : ''}`,
+              meta: `${rx.prescribedBy} · ${formatTime(rx.createdAt)} · ${isFinanciallyCleared(balance) ? 'Payment clear' : `Payment due ${formatMoney(balance)}`}`,
+              compactMeta: formatTime(rx.createdAt),
+              time: formatTime(rx.createdAt),
+              status: rx.status === 'discontinued' ? 'Discontinued' : paymentDue ? 'Payment due' : pharmacyStageLabel(stage),
+              statusTone: paymentDue ? 'warning' : rx.status === 'discontinued' ? 'danger' : rx.urgency === 'immediate' ? 'warning' : pharmacyStageTone(stage),
+              priority: paymentDue ? formatMoney(balance) : rx.urgency === 'immediate' ? t('pharmacy.urgent') : undefined,
+              room: paymentDue ? 'Cashier' : undefined,
+              popupDetail: renderWorkflowPopup(rx),
+            };
+          })}
           metrics={[
             { label: t('pharmacy.kpiPendingRx'), value: pendingRx },
+            { label: 'Payment due', value: paymentDueCount, tone: paymentDueCount > 0 ? 'warning' : 'neutral' },
+            { label: 'Ready', value: readyCount, tone: 'success' },
             { label: t('pharmacy.kpiDispensed'), value: dispensedCount },
             { label: t('pharmacy.kpiLowStock'), value: lowStockCount, tone: 'warning' },
             { label: 'Critical Stock', value: criticalCount + expiredCount, tone: 'danger' },
@@ -555,8 +756,9 @@ export default function PharmacyDashboardPage() {
                 <div className="flex items-center gap-1 min-w-[600px]">
                   {[
                     { key: 'stock', label: t('pharmacy.inStock'), icon: Package, color: ACCENT, count: inStockCount },
-                    { key: 'received', label: t('pharmacy.stageReceived'), icon: ClipboardList, color: ACCENT, count: rxQueue.length },
-                    { key: 'pending', label: t('pharmacy.pending'), icon: Clock, color: 'var(--color-warning)', count: pendingRx },
+                    { key: 'received', label: t('pharmacy.stageReceived'), icon: ClipboardList, color: ACCENT, count: reviewCount },
+                    { key: 'payment', label: 'Payment', icon: Clock, color: 'var(--color-warning)', count: paymentDueCount },
+                    { key: 'ready', label: 'Ready', icon: CheckCircle2, color: 'var(--color-success)', count: readyCount },
                     { key: 'dispensed', label: t('pharmacy.kpiDispensed'), icon: CheckCircle2, color: 'var(--color-success)', count: dispensedCount },
                     { key: 'reorder', label: t('pharmacy.reorderNeeded'), icon: AlertTriangle, color: 'var(--color-danger)', count: criticalCount + lowStockCount + expiredCount },
                   ].map((stage, idx, arr) => (

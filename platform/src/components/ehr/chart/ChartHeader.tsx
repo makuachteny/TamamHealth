@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Icon as DuotoneIcon } from '@/components/icons';
+import { Stethoscope } from '@/components/icons/lucide';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { patientFullName, patientInitials, patientAgeLabel, avatarColor } from '@/lib/patient-utils';
 import type { PatientDoc } from '@/lib/db-types';
@@ -41,11 +42,12 @@ interface ChartHeaderProps {
   onExchange: () => void;
   onEdit: () => void;
   onStickyNote: () => void;
+  onAssignProvider?: () => void;
 }
 
 export default function ChartHeader({
   patient, triageBadge, pregnancyPill, hasActiveVisit, patientBalance,
-  onCollectPayment, onMessage, onPrint, onPatientEd, onNote, onScripts, onOrders, onExchange, onEdit, onStickyNote,
+  onCollectPayment, onMessage, onPrint, onPatientEd, onNote, onScripts, onOrders, onExchange, onEdit, onStickyNote, onAssignProvider,
 }: ChartHeaderProps) {
   const [showMore, setShowMore] = useState(true);
 
@@ -117,6 +119,11 @@ export default function ChartHeader({
         </button>
         {canSendMessages && (
           <button type="button" className="omrs-header-actions-btn" onClick={onMessage}><DuotoneIcon name="message" size={15} /> Pt. Msg</button>
+        )}
+        {onAssignProvider && (
+          <button type="button" className="omrs-header-actions-btn" onClick={onAssignProvider}>
+            <Stethoscope className="w-3.5 h-3.5" /> {patient.assignedDoctor ? 'Reassign' : 'Assign'}
+          </button>
         )}
         <button type="button" className="omrs-header-actions-btn" onClick={onPrint}><DuotoneIcon name="printer" size={15} /> Print</button>
         {canViewClinical && (

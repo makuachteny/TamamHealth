@@ -17,6 +17,16 @@ const ACCENT = 'var(--accent-primary)';
 
 const MODALITIES = ['X-Ray', 'Ultrasound', 'CT Scan', 'MRI', 'Fluoroscopy', 'Mammography'];
 
+function radiologyStatusLabel(status: string): string {
+  if (status === 'completed') return 'Complete';
+  if (status === 'in_progress') return 'In Progress';
+  return 'Pending';
+}
+
+function radiologyPriorityLabel(priority: string): string {
+  return priority.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // Demo data — only shown when NEXT_PUBLIC_DEMO_MODE !== 'false' AND no real
 // studies exist yet. Production with the env var unset/false renders an
 // empty-state instead so staff never mistake fake studies for real orders.
@@ -38,7 +48,6 @@ export default function RadiologyDashboard() {
   const { currentUser } = useApp();
   const { patients } = usePatients();
   const { results: labResults, update: updateLabResult } = useLabResults();
-  const [selectedStudy, setSelectedStudy] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   // Which stat panel (header toggles) currently occupies the center instead
   // of the worklist; null = normal queue view.
@@ -51,6 +60,7 @@ export default function RadiologyDashboard() {
   // The radiology backend isn't wired yet, so we keep edits in memory
   // rather than letting the Submit button do nothing.
   const [submittedFindings, setSubmittedFindings] = useState<Record<string, string>>({});
+  const [studyStatusOverrides, setStudyStatusOverrides] = useState<Record<string, 'in_progress'>>({});
   const [submitToast, setSubmitToast] = useState<string | null>(null);
 
   // Attached imaging files per study (session-scoped object URLs, same
@@ -161,12 +171,13 @@ export default function RadiologyDashboard() {
       ...realStudies,
       ...(IS_DEMO ? SAMPLE_STUDIES : []).map(s => {
         const override = submittedFindings[s.id];
+        const statusOverride = studyStatusOverrides[s.id];
         return override
           ? { ...s, status: 'completed', findings: override, isReal: false }
-          : { ...s, isReal: false };
+          : { ...s, status: statusOverride || s.status, isReal: false };
       }),
     ],
-    [realStudies, submittedFindings],
+    [realStudies, submittedFindings, studyStatusOverrides],
   );
 
   const filtered = useMemo(() => {
@@ -197,6 +208,15 @@ export default function RadiologyDashboard() {
     window.setTimeout(() => setSubmitToast(null), 3000);
   };
 
+  const handleStartStudy = async (studyId: string) => {
+    const isReal = realStudies.some(s => s.id === studyId);
+    if (isReal) {
+      await updateLabResult(studyId, { status: 'in_progress' });
+    } else {
+      setStudyStatusOverrides(prev => ({ ...prev, [studyId]: 'in_progress' }));
+    }
+  };
+
   // Undo a report submitted in this session: drop the in-memory override so the
   // study reverts to its prior (pending / in-progress) status and the findings
   // box reappears. Only applies to findings entered here, not pre-existing ones.
@@ -221,11 +241,52 @@ export default function RadiologyDashboard() {
 
   const dateLabel = formatDateTitle(toIsoDate(new Date()));
 
-  // Expandable per-study detail (ordered-by / notes / findings entry / image
-  // attachments). Rendered inline beneath the row via EhrCareDashboard's
-  // `row.detail` slot, so clicks inside it don't collapse the row.
-  const renderStudyDetail = (study: (typeof filtered)[number]) => (
-    <div style={{ margin: '0 0 8px', padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
+  const renderRadiologyWorkflowPopup = (study: (typeof filtered)[number]) => {
+    const isPending = study.status === 'pending';
+    const isProcessing = study.status === 'in_progress';
+    const isComplete = study.status === 'completed';
+    const steps = [
+      { label: 'Imaging Order Received', note: study.orderedBy ? `${t('radiology.orderedBy')}: ${study.orderedBy}` : study.notes || study.bodyPart, done: true },
+      { label: 'Protocol And Patient Scheduled', note: `${study.modality} · ${study.bodyPart}`, done: true, current: isPending },
+      { label: 'Image Acquisition In Progress', note: 'Perform the study using the correct protocol and patient identifiers.', done: isProcessing || isComplete, current: isProcessing },
+      { label: 'Image Quality Checked', note: (attachments[study.id] || []).length ? `${(attachments[study.id] || []).length} image(s) attached` : 'Attach images or confirm acquisition quality.', done: (attachments[study.id] || []).length > 0 || isComplete },
+      { label: 'Radiologist Interpretation Entered', note: study.findings || 'Waiting for findings.', done: isComplete },
+      { label: 'Report Verified And Sent', note: isComplete ? 'Report available to the clinical team.' : 'Pending verification.', done: isComplete },
+      { label: 'Complete', note: isComplete ? 'Imaging order closed.' : 'Close after verified reporting.', done: isComplete },
+    ];
+
+    return (
+    <div className="space-y-4">
+      <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('radiology.modality')}</span><strong>{study.modality}</strong></div>
+          <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Body part</span><strong>{study.bodyPart}</strong></div>
+          <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Status</span><strong>{radiologyStatusLabel(study.status)}</strong></div>
+          <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Priority</span><strong>{radiologyPriorityLabel(study.priority)}</strong></div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {steps.map((step, index) => (
+          <div key={step.label} className="flex items-start gap-3 rounded-xl p-3" style={{
+            background: step.current ? 'var(--bg-card)' : 'var(--overlay-subtle)',
+            border: `1px solid ${step.current ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+          }}>
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{
+              background: step.done ? 'var(--color-success)' : step.current ? 'var(--accent-primary)' : 'var(--overlay-medium)',
+              color: step.done || step.current ? '#fff' : 'var(--text-muted)',
+            }}>
+              {step.done ? <CheckCircle2 className="w-3.5 h-3.5" /> : index + 1}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{step.note}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.orderedBy')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.orderedBy}</p></div>
         <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.modality')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.modality}</p></div>
@@ -314,8 +375,16 @@ export default function RadiologyDashboard() {
           </div>
         </div>
       )}
+      </div>
+
+      {isPending && (
+        <button type="button" className="btn btn-primary w-full" onClick={() => handleStartStudy(study.id)}>
+          Start study
+        </button>
+      )}
     </div>
-  );
+    );
+  };
 
   if (!currentUser) return null;
 
@@ -355,9 +424,9 @@ export default function RadiologyDashboard() {
         onSearchChange={setQueueSearch}
         filters={[
           { label: t('radiology.filter_all'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
-          { label: t('radiology.filter_pending'), value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
-          { label: t('radiology.filter_in_progress'), value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
-          { label: t('radiology.filter_completed'), value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
+          { label: 'Pending', value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
+          { label: 'In Progress', value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
+          { label: 'Complete', value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
         ]}
         actions={[
           { label: t('radiology.byModality'), icon: BarChart3, onClick: () => togglePanel('modality'), active: centerPanel === 'modality', tone: centerPanel === 'modality' ? 'primary' : 'neutral' },
@@ -366,37 +435,35 @@ export default function RadiologyDashboard() {
         ]}
         hideRowList={centerPanel !== null}
         rows={filtered.map((study): EhrCareDashboardRow => {
-          const isOpen = selectedStudy === study.id;
           return {
             id: study.id,
             title: study.patientName,
             subtitle: `${study.modality} · ${study.bodyPart}`,
             compactMeta: study.date,
             date: study.date,
-            status: t(`radiology.status_${study.status}`),
+            status: radiologyStatusLabel(study.status),
             statusTone: study.status === 'completed' ? 'done'
               : study.status === 'in_progress' ? 'active'
               : study.priority === 'emergency' ? 'danger'
               : study.priority === 'urgent' ? 'warning'
               : 'scheduled',
-            priority: study.priority !== 'routine' ? t(`radiology.priority_${study.priority}`) : undefined,
-            onClick: () => setSelectedStudy(isOpen ? null : study.id),
-            detail: isOpen ? renderStudyDetail(study) : undefined,
+            priority: study.priority !== 'routine' ? radiologyPriorityLabel(study.priority) : undefined,
+            popupDetail: renderRadiologyWorkflowPopup(study),
           };
         })}
         metrics={[
-          { label: t('radiology.filter_pending'), value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
-          { label: t('radiology.filter_in_progress'), value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
-          { label: t('radiology.filter_completed'), value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
+          { label: 'Pending', value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
+          { label: 'In Progress', value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
+          { label: 'Complete', value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
           { label: t('radiology.kpiUrgentEmergency'), value: stats.urgent, tone: 'danger' },
           { label: t('radiology.kpiXrays'), value: stats.xray },
           { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound },
         ]}
         metricsTitle={t('radiology.title')}
         checklist={[
-          { label: t('radiology.kpiPending'), done: stats.pending === 0, onClick: () => setFilterStatus('pending') },
-          { label: t('radiology.kpiInProgress'), done: stats.inProgress === 0, onClick: () => setFilterStatus('in_progress') },
-          { label: t('radiology.kpiCompleted'), done: stats.pending === 0 && stats.inProgress === 0, onClick: () => setFilterStatus('completed') },
+          { label: 'Pending', done: stats.pending === 0, onClick: () => setFilterStatus('pending') },
+          { label: 'In Progress', done: stats.inProgress === 0, onClick: () => setFilterStatus('in_progress') },
+          { label: 'Complete', done: stats.pending === 0 && stats.inProgress === 0, onClick: () => setFilterStatus('completed') },
         ]}
         checklistTitle={t('radiology.imagingWorklist')}
         missionTitle={t('radiology.title')}
