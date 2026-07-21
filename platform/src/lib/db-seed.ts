@@ -142,6 +142,14 @@ const defaultUsers: SeedUserProfile[] = [
   { username: 'admin', name: 'Ministry of Health', role: 'government', orgId: PUBLIC_ORG_ID },
   { username: 'dr.wani', name: 'Dr. James Wani Igga', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'dr.achol', name: 'Dr. Achol Mayen Deng', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'dr.abuk', name: 'Dr. Abuk Ayen Malual', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'dr.ajang', name: 'Dr. Ajang Kuol Deng', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'dr.alier', name: 'Dr. Alier Chol Wol', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'dr.awut', name: 'Dr. Awut Mayom Jok', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'dr.bol', name: 'Dr. Bol Garang Akech', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'dr.chol', name: 'Dr. Chol Atem Puok', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'dr.nyamal', name: 'Dr. Nyamal Koang Lado', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'clinician.akech', name: 'Dr. Akech Deng Mawien', role: 'clinician', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'co.deng', name: 'CO Deng Mabior Kuol', role: 'clinical_officer', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'dr.wau', name: 'Dr. Mary Akuol Deng', role: 'doctor', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'nurse.wau', name: 'Nurse Grace Achai Lual', role: 'nurse', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
@@ -498,6 +506,15 @@ const malakalPatients: (Partial<PatientDoc> & Record<string, unknown>)[] = [
   { _id: 'pat-00205', type: 'patient', firstName: 'Nyaluak', middleName: 'Tut', surname: 'Deng', gender: 'Female', dateOfBirth: '1992-09-29', age: 33, phone: '+211915300205', bloodType: 'B+', allergies: ['Sulfa drugs'], chronicConditions: ['Asthma'], nokName: 'Tut Deng', nokRelationship: 'Spouse', nokPhone: '+211915300215', registrationHospital: 'hosp-003', registrationHospitalName: 'Malakal Teaching Hospital', hospitalNumber: 'MTH-000015', state: 'Upper Nile', county: 'Malakal', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-09', lastVisitHospital: 'hosp-003', lastConsultedAt: '2026-06-09T14:15:00.000Z', assignedDoctor: MIDWIFE_ID, assignedDoctorName: MIDWIFE_NAME, isActive: true, createdAt: '2025-03-19T08:00:00Z', updatedAt: '2026-06-09T14:15:00Z' },
   { _id: 'pat-00206', type: 'patient', firstName: 'Riek', middleName: 'Kang', surname: 'Wal', gender: 'Male', dateOfBirth: '1961-01-15', age: 65, phone: '+211915300206', bloodType: 'O+', allergies: ['Aspirin'], chronicConditions: ['Hypertension', 'Osteoarthritis'], nokName: 'Kang Wal', nokRelationship: 'Son', nokPhone: '+211915300216', registrationHospital: 'hosp-003', registrationHospitalName: 'Malakal Teaching Hospital', hospitalNumber: 'MTH-000016', state: 'Upper Nile', county: 'Malakal', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-05', lastVisitHospital: 'hosp-003', lastConsultedAt: '2026-06-05T09:25:00.000Z', isActive: true, createdAt: '2024-09-08T08:00:00Z', updatedAt: '2026-06-05T09:25:00Z' },
   { _id: 'pat-00207', type: 'patient', firstName: 'Adhieu', middleName: 'Nyok', surname: 'Lia', gender: 'Female', dateOfBirth: '2005-12-03', age: 20, phone: '+211915300207', bloodType: 'A-', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Nyok Lia', nokRelationship: 'Father', nokPhone: '+211915300217', registrationHospital: 'hosp-003', registrationHospitalName: 'Malakal Teaching Hospital', hospitalNumber: 'MTH-000017', state: 'Upper Nile', county: 'Malakal', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-08', lastVisitHospital: 'hosp-003', lastConsultedAt: '2026-06-08T15:40:00.000Z', assignedDoctor: MIDWIFE_ID, assignedDoctorName: MIDWIFE_NAME, isActive: true, createdAt: '2025-07-26T08:00:00Z', updatedAt: '2026-06-08T15:40:00Z' },
+];
+
+const workflowShowcasePatients: (Partial<PatientDoc> & Record<string, unknown>)[] = [
+  { _id: 'pat-00300', type: 'patient', firstName: 'Akello', middleName: 'Nyakong', surname: 'Ladu', gender: 'Female', dateOfBirth: '1998-04-18', age: 28, phone: '+211915400300', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['Pregnancy - third trimester'], nokName: 'Ladu Moro', nokRelationship: 'Spouse', nokPhone: '+211915400310', registrationHospital: 'hosp-001', registrationHospitalName: 'Juba Teaching Hospital', hospitalNumber: 'JTH-003000', state: 'Central Equatoria', county: 'Juba', payam: 'Munuki', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-001', assignedDoctor: 'user-dr.achol', assignedDoctorName: 'Dr. Achol Mayen Deng', assignedAt: daysAgo(0), assignedBy: 'user-triage.mary', assignedByName: 'Mary Nyaruai Gai', assignmentNote: 'High-risk ANC: headache, oedema, raised BP. Needs labs, obstetric ultrasound, payment clearance, pharmacy and review.', isActive: true, createdAt: daysAgo(20), updatedAt: daysAgo(0) },
+  { _id: 'pat-00301', type: 'patient', firstName: 'Chol', middleName: 'Deng', surname: 'Ater', gender: 'Male', dateOfBirth: '1984-09-21', age: 41, phone: '+211915400301', bloodType: 'A+', allergies: ['None known'], chronicConditions: ['HIV'], nokName: 'Ater Bol', nokRelationship: 'Brother', nokPhone: '+211915400311', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-003001', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-002', assignedDoctor: 'user-co.deng', assignedDoctorName: 'CO Deng Mabior Kuol', assignedAt: daysAgo(0), assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual', assignmentNote: 'Cough, weight loss and night sweats. Needs sputum testing, chest imaging and TB referral workflow.', isActive: true, createdAt: daysAgo(55), updatedAt: daysAgo(0) },
+  { _id: 'pat-00302', type: 'patient', firstName: 'Yar', middleName: 'Nyibol', surname: 'Koang', gender: 'Female', dateOfBirth: '2019-02-07', age: 7, phone: '', bloodType: 'B+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Nyibol Koang', nokRelationship: 'Mother', nokPhone: '+211915400312', registrationHospital: 'hosp-003', registrationHospitalName: 'Malakal Teaching Hospital', hospitalNumber: 'MTH-003002', state: 'Upper Nile', county: 'Malakal', payam: '', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-003', assignedDoctor: 'user-midwife.nyakong', assignedDoctorName: 'Midwife Nyakong Gatkuoth', assignedAt: daysAgo(0), assignedBy: 'user-nurse.stella', assignedByName: 'Nurse Stella Keji Lemi', assignmentNote: 'Child with fever, cough and poor intake. Demonstrates paediatric triage, malaria lab, CXR and pharmacy.', isActive: true, createdAt: daysAgo(95), updatedAt: daysAgo(0) },
+  { _id: 'pat-00303', type: 'patient', firstName: 'Garang', middleName: 'Mayen', surname: 'Deng', gender: 'Male', dateOfBirth: '1970-12-10', age: 55, phone: '+211915400303', bloodType: 'O-', allergies: ['Penicillin'], chronicConditions: ['Diabetes Mellitus', 'Hypertension'], nokName: 'Mayen Deng', nokRelationship: 'Son', nokPhone: '+211915400313', registrationHospital: 'hosp-001', registrationHospitalName: 'Juba Teaching Hospital', hospitalNumber: 'JTH-003003', state: 'Central Equatoria', county: 'Juba', payam: 'Kator', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-001', assignedDoctor: 'user-clinician.peter', assignedDoctorName: 'Dr. Peter Garang Deng', assignedAt: daysAgo(0), assignedBy: 'user-rooming.sara', assignedByName: 'Sara Aluel Bol', assignmentNote: 'Diabetic foot ulcer. Needs wound care, glucose/HbA1c, foot X-ray, payment plan and pharmacy.', isActive: true, createdAt: daysAgo(400), updatedAt: daysAgo(0) },
+  { _id: 'pat-00304', type: 'patient', firstName: 'Nyanut', middleName: 'Gatwech', surname: 'Chuol', gender: 'Female', dateOfBirth: '1991-05-06', age: 35, phone: '+211915400304', bloodType: 'AB+', allergies: ['Sulfa drugs'], chronicConditions: ['Sickle cell disease'], nokName: 'Gatwech Chuol', nokRelationship: 'Father', nokPhone: '+211915400314', registrationHospital: 'hosp-004', registrationHospitalName: 'Bentiu State Hospital', hospitalNumber: 'BSH-003004', state: 'Unity', county: 'Rubkona', payam: '', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-004', assignedDoctor: 'user-dr.wani', assignedDoctorName: 'Dr. James Wani Igga', assignedAt: daysAgo(0), assignedBy: 'user-lab.gatluak', assignedByName: 'Lab Tech Gatluak Puok', assignmentNote: 'Critical anaemia from Bentiu lab queue. Demonstrates critical result, referral, transfusion billing and pharmacy.', isActive: true, createdAt: daysAgo(160), updatedAt: daysAgo(0) },
+  { _id: 'pat-00305', type: 'patient', firstName: 'Peter', middleName: 'Lokiri', surname: 'Lado', gender: 'Male', dateOfBirth: '1993-08-14', age: 32, phone: '+211915400305', bloodType: 'A-', allergies: ['Iodine contrast'], chronicConditions: ['None'], nokName: 'Lokiri Lado', nokRelationship: 'Father', nokPhone: '+211915400315', registrationHospital: 'hosp-001', registrationHospitalName: 'Juba Teaching Hospital', hospitalNumber: 'JTH-003005', state: 'Central Equatoria', county: 'Juba', payam: 'Gudele', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-001', assignedDoctor: 'user-dr.wani', assignedDoctorName: 'Dr. James Wani Igga', assignedAt: daysAgo(0), assignedBy: 'user-triage.mary', assignedByName: 'Mary Nyaruai Gai', assignmentNote: 'Road traffic trauma. Demonstrates urgent imaging, theatre referral, payment due and controlled medication review.', isActive: true, createdAt: daysAgo(8), updatedAt: daysAgo(0) },
 ];
 
 // Helper: put a doc, silently skip if it already exists (409 conflict)
@@ -1487,6 +1504,13 @@ async function seedDatabaseExclusive(): Promise<void> {
     await safePut(pDB, withSampleChart({ ...mp, ...assignment, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>));
   }
 
+  // Seed named end-to-end workflow cases across facilities. These are not just
+  // registry fillers: downstream blocks below attach appointments, triage,
+  // lab/imaging, pharmacy, referrals and billing to these same patients.
+  for (const wp of workflowShowcasePatients) {
+    await safePut(pDB, withSampleChart({ ...wp, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>));
+  }
+
   // ── Bentiu State Hospital (hosp-004) lab queue ──────────────────────────
   // lab.gatluak is the lab tech at Bentiu; every seeded lab_result otherwise
   // lands at hosp-001/002/003, so his Lab Command Center opened on an empty
@@ -1801,19 +1825,23 @@ async function seedDatabaseExclusive(): Promise<void> {
   const daDB = diseaseAlertsDB();
   // Offsets (in days) for 8 distinct weekly buckets, newest first.
   const alertWeekOffsets = [2, 9, 16, 23, 30, 37, 44, 51];
+  const risingSigmoidWave = [1.38, 1.28, 1.12, 1.18, 1.02, 0.78, 0.63, 0.56];
+  const fallingSigmoidWave = [...risingSigmoidWave].reverse();
+  const stableWave = [1.06, 0.96, 1.08, 0.99, 1.04, 0.94, 1.02, 0.98];
   let alertSeq = 0;
   for (const a of diseaseAlerts) {
-    // Replicate each base alert across 4 recent weeks with varied counts.
-    const weeks = [0, 1, 2, 3];
-    for (const w of weeks) {
+    for (let w = 0; w < alertWeekOffsets.length; w++) {
       alertSeq += 1;
       const offset = alertWeekOffsets[w] + (alertSeq % 3); // small jitter within the week
-      // Trend the counts: older weeks lower, recent weeks reflect the alert's trend.
-      const factor = a.trend === 'increasing'
-        ? 0.6 + (3 - w) * 0.18
+      // Trend the counts as a wavy sigmoid: older weeks start flatter, the
+      // mid-weeks bend upward, one week dips, then the latest weeks accelerate.
+      const baseFactor = a.trend === 'increasing'
+        ? risingSigmoidWave[w]
         : a.trend === 'decreasing'
-          ? 0.6 + w * 0.18
-          : 0.85 + ((alertSeq + w) % 3) * 0.08;
+          ? fallingSigmoidWave[w]
+          : stableWave[w];
+      const phase = 1 + (((alertSeq % 5) - 2) * 0.015);
+      const factor = baseFactor * phase;
       const cases = Math.max(1, Math.round(a.cases * factor));
       const deaths = Math.round(a.deaths * factor);
       const doc: DiseaseAlertDoc = {
@@ -2761,6 +2789,235 @@ async function seedDatabaseExclusive(): Promise<void> {
     await safePut(blDB, b as unknown as Record<string, unknown>);
   }
 
+  // ── Named workflow showcase cases ───────────────────────────────────────
+  // A compact set of recognizable patient journeys that prove the operational
+  // handoffs: reception -> triage -> clinician -> lab/radiology -> billing ->
+  // pharmacy/referral/ward. These intentionally span facilities and states so
+  // scoped role dashboards all have concrete work to inspect.
+  {
+    const addMinutes = (hhmm: string, minutes: number): string => {
+      const [h, m] = hhmm.split(':').map(Number);
+      const total = h * 60 + m + minutes;
+      return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+    };
+    const wfCases = [
+      {
+        id: 'pat-00300', name: 'Akello Nyakong Ladu', hospitalNumber: 'JTH-003000',
+        facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', state: 'Central Equatoria', county: 'Juba',
+        providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng',
+        appointmentTime: '08:05', complaint: 'High-risk ANC: headache, oedema, raised BP',
+        triage: { priority: 'YELLOW', temp: '36.9', pulse: '96', rr: '20', sys: '154', dia: '98', spo2: '98' },
+        labs: [
+          { testName: 'Urine Protein', specimen: 'Urine', status: 'completed', result: 'Protein +++', ref: 'Negative', abnormal: true, critical: false },
+          { testName: 'Platelet Count', specimen: 'Blood (EDTA)', status: 'in_progress', result: '', ref: '150-450 x10^9/L', abnormal: false, critical: false },
+          { testName: 'Ultrasound - Obstetric', specimen: 'Imaging', status: 'pending', result: '', ref: '', abnormal: false, critical: false },
+        ],
+        meds: [{ medication: 'Nifedipine', dose: '10mg stat then review', frequency: 'STAT', duration: '1 dose', status: 'pending' }],
+        bill: { status: 'partial', paid: 6000, total: 19500 },
+        referral: { toHospital: 'Juba Teaching Hospital', toHospitalId: 'hosp-001', department: 'Obstetrics', urgency: 'urgent', status: 'received', reason: 'High-risk ANC with suspected pre-eclampsia' },
+      },
+      {
+        id: 'pat-00301', name: 'Chol Deng Ater', hospitalNumber: 'WSH-003001',
+        facilityId: 'hosp-002', facilityName: 'Wau State Hospital', state: 'Western Bahr el Ghazal', county: 'Wau',
+        providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol',
+        appointmentTime: '08:25', complaint: 'Chronic cough, weight loss and night sweats',
+        triage: { priority: 'YELLOW', temp: '38.2', pulse: '104', rr: '24', sys: '112', dia: '70', spo2: '94' },
+        labs: [
+          { testName: 'Sputum AFB', specimen: 'Sputum', status: 'pending', result: '', ref: 'Negative', abnormal: false, critical: false },
+          { testName: 'GeneXpert MTB/RIF', specimen: 'Sputum', status: 'in_progress', result: '', ref: 'MTB not detected', abnormal: false, critical: false },
+          { testName: 'X-Ray - Chest', specimen: 'Imaging', status: 'in_progress', result: '', ref: '', abnormal: false, critical: false },
+        ],
+        meds: [{ medication: 'Cotrimoxazole', dose: '960mg OD', frequency: 'OD', duration: '14 days', status: 'pending' }],
+        bill: { status: 'pending', paid: 0, total: 22500 },
+        referral: { toHospital: 'Juba Teaching Hospital', toHospitalId: 'hosp-001', department: 'TB Clinic', urgency: 'urgent', status: 'sent', reason: 'TB work-up and isolation review' },
+      },
+      {
+        id: 'pat-00302', name: 'Yar Nyibol Koang', hospitalNumber: 'MTH-003002',
+        facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', state: 'Upper Nile', county: 'Malakal',
+        providerId: 'user-midwife.nyakong', providerName: 'Midwife Nyakong Gatkuoth',
+        appointmentTime: '09:10', complaint: 'Child with fever, cough and poor intake',
+        triage: { priority: 'RED', temp: '39.5', pulse: '138', rr: '34', sys: '88', dia: '54', spo2: '91' },
+        labs: [
+          { testName: 'Malaria RDT', specimen: 'Blood', status: 'completed', result: 'Positive (P. falciparum)', ref: 'Negative', abnormal: true, critical: false },
+          { testName: 'Full Blood Count', specimen: 'Blood (EDTA)', status: 'completed', result: 'Hb 8.6 g/dL, WBC 16.1 x10^3/uL', ref: '', abnormal: true, critical: false },
+          { testName: 'X-Ray - Chest', specimen: 'Imaging', status: 'completed', result: 'Patchy right lower-zone infiltrate', ref: '', abnormal: true, critical: false },
+        ],
+        meds: [{ medication: 'Artemether-Lumefantrine (Coartem)', dose: '20/120mg BD by weight', frequency: 'BD', duration: '3 days', status: 'dispensed' }],
+        bill: { status: 'paid', paid: 18000, total: 18000 },
+        referral: { toHospital: 'Malakal Teaching Hospital', toHospitalId: 'hosp-003', department: 'Paediatrics', urgency: 'urgent', status: 'seen', reason: 'Severe malaria with suspected pneumonia' },
+      },
+      {
+        id: 'pat-00303', name: 'Garang Mayen Deng', hospitalNumber: 'JTH-003003',
+        facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', state: 'Central Equatoria', county: 'Juba',
+        providerId: 'user-clinician.peter', providerName: 'Dr. Peter Garang Deng',
+        appointmentTime: '09:45', complaint: 'Diabetic foot ulcer with swelling',
+        triage: { priority: 'YELLOW', temp: '37.8', pulse: '96', rr: '20', sys: '148', dia: '92', spo2: '97' },
+        labs: [
+          { testName: 'Blood Glucose (Random)', specimen: 'Blood', status: 'completed', result: '286 mg/dL', ref: '70-140', abnormal: true, critical: false },
+          { testName: 'HbA1c', specimen: 'Blood (EDTA)', status: 'pending', result: '', ref: '< 7%', abnormal: false, critical: false },
+          { testName: 'X-Ray - Limb/Skeletal', specimen: 'Imaging', status: 'pending', result: '', ref: '', abnormal: false, critical: false },
+        ],
+        meds: [{ medication: 'Metformin', dose: '500mg BD', frequency: 'BD', duration: '30 days', status: 'pending' }],
+        bill: { status: 'partial', paid: 8000, total: 26000 },
+        referral: { toHospital: 'Juba Teaching Hospital', toHospitalId: 'hosp-001', department: 'Surgery', urgency: 'urgent', status: 'received', reason: 'Diabetic foot debridement assessment' },
+      },
+      {
+        id: 'pat-00304', name: 'Nyanut Gatwech Chuol', hospitalNumber: 'BSH-003004',
+        facilityId: 'hosp-004', facilityName: 'Bentiu State Hospital', state: 'Unity', county: 'Rubkona',
+        providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga',
+        appointmentTime: '10:20', complaint: 'Sickle cell crisis with severe pallor',
+        triage: { priority: 'RED', temp: '37.4', pulse: '122', rr: '26', sys: '92', dia: '58', spo2: '93' },
+        labs: [
+          { testName: 'Hemoglobin', specimen: 'Blood', status: 'completed', result: '4.9 g/dL', ref: '12.0-16.0', abnormal: true, critical: true },
+          { testName: 'Blood Group and Crossmatch', specimen: 'Blood', status: 'in_progress', result: '', ref: 'Compatible units', abnormal: false, critical: false },
+          { testName: 'Ultrasound - Abdomen', specimen: 'Imaging', status: 'pending', result: '', ref: '', abnormal: false, critical: false },
+        ],
+        meds: [{ medication: 'Paracetamol', dose: '1g QDS PRN', frequency: 'QDS PRN', duration: '5 days', status: 'pending' }],
+        bill: { status: 'pending', paid: 0, total: 34000 },
+        referral: { toHospital: 'Juba Teaching Hospital', toHospitalId: 'hosp-001', department: 'Haematology', urgency: 'emergency', status: 'sent', reason: 'Critical anaemia and transfusion support' },
+      },
+      {
+        id: 'pat-00305', name: 'Peter Lokiri Lado', hospitalNumber: 'JTH-003005',
+        facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', state: 'Central Equatoria', county: 'Juba',
+        providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga',
+        appointmentTime: '10:55', complaint: 'Road traffic trauma, right leg pain',
+        triage: { priority: 'RED', temp: '36.8', pulse: '118', rr: '24', sys: '98', dia: '62', spo2: '96' },
+        labs: [
+          { testName: 'Full Blood Count', specimen: 'Blood (EDTA)', status: 'pending', result: '', ref: '', abnormal: false, critical: false },
+          { testName: 'X-Ray - Limb/Skeletal', specimen: 'Imaging', status: 'in_progress', result: '', ref: '', abnormal: false, critical: false },
+          { testName: 'X-Ray - Chest', specimen: 'Imaging', status: 'pending', result: '', ref: '', abnormal: false, critical: false },
+        ],
+        meds: [{ medication: 'Diazepam 5mg/mL injection', dose: '5mg IV if severe spasm', frequency: 'PRN', duration: '1 day', status: 'pending' }],
+        bill: { status: 'partial', paid: 12000, total: 42000 },
+        referral: { toHospital: 'Juba Teaching Hospital', toHospitalId: 'hosp-001', department: 'Orthopedics', urgency: 'emergency', status: 'received', reason: 'Suspected femur fracture after road traffic trauma' },
+      },
+    ] as const;
+
+    const wfApptDB = appointmentsDB();
+    const wfTriageDB = triageDB();
+    for (let i = 0; i < wfCases.length; i++) {
+      const c = wfCases[i];
+      const enc = `enc-wf-${c.id}`;
+      const today = dateAgo(0);
+      const created = daysAgo(i % 3);
+      const endTime = addMinutes(c.appointmentTime, 30);
+
+      await safePut(wfApptDB, {
+        _id: `appointment-wf-${c.id}`, type: 'appointment',
+        patientId: c.id, patientName: c.name, patientPhone: workflowShowcasePatients.find(p => p._id === c.id)?.phone || '',
+        providerId: c.providerId, providerName: c.providerName,
+        facilityId: c.facilityId, facilityName: c.facilityName, facilityLevel: c.facilityId === 'hosp-001' ? 'national' : 'state',
+        appointmentDate: today, appointmentTime: c.appointmentTime, endTime, duration: 30,
+        appointmentType: c.triage.priority === 'RED' ? 'emergency' : 'general',
+        priority: c.triage.priority === 'RED' ? 'emergency' : c.triage.priority === 'YELLOW' ? 'urgent' : 'routine',
+        department: c.referral.department, reason: c.complaint, status: i % 2 === 0 ? 'checked_in' : 'scheduled',
+        ...(i % 2 === 0 ? { checkedInAt: daysAgo(0) } : {}),
+        reminderSent: true, reminderChannel: 'sms', isRecurring: false,
+        bookedBy: c.facilityId === 'hosp-002' ? 'user-desk.wau' : 'user-desk.amira',
+        bookedByName: c.facilityId === 'hosp-002' ? 'Tabitha Nyandeng Kuol' : 'Amira Juma Hassan',
+        state: c.state, county: c.county, orgId: PUBLIC_ORG_ID, createdAt: created, updatedAt: daysAgo(0),
+      } as unknown as Record<string, unknown>);
+
+      await safePut(wfTriageDB, {
+        _id: `triage-wf-${c.id}`, type: 'triage',
+        patientId: c.id, patientName: c.name, hospitalNumber: c.hospitalNumber,
+        airway: 'clear', breathing: Number(c.triage.spo2) < 94 ? 'distressed' : 'normal',
+        circulation: Number(c.triage.sys) < 100 ? 'impaired' : 'normal', consciousness: 'alert',
+        priority: c.triage.priority, temperature: c.triage.temp, pulse: c.triage.pulse,
+        respiratoryRate: c.triage.rr, systolic: c.triage.sys, diastolic: c.triage.dia,
+        oxygenSaturation: c.triage.spo2, chiefComplaint: c.complaint,
+        triagedBy: c.facilityId === 'hosp-002' ? 'user-nurse.wau' : 'user-triage.mary',
+        triagedByName: c.facilityId === 'hosp-002' ? 'Nurse Grace Achai Lual' : 'Mary Nyaruai Gai',
+        triagedAt: daysAgo(0), facilityId: c.facilityId, facilityName: c.facilityName,
+        status: c.triage.priority === 'RED' ? 'pending' : 'seen',
+        orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0),
+      } as unknown as Record<string, unknown>);
+
+      for (let k = 0; k < c.labs.length; k++) {
+        const lab = c.labs[k];
+        const orderedAt = daysAgo(k % 2);
+        const completedAt = lab.status === 'completed' ? daysAgo(Math.max(0, (k % 2) - 0.02)) : '';
+        await safePut(lDB, {
+          _id: `lab-wf-${c.id}-${k + 1}`, type: 'lab_result',
+          patientId: c.id, patientName: c.name, hospitalNumber: c.hospitalNumber,
+          testName: lab.testName, specimen: lab.specimen, status: lab.status,
+          result: lab.status === 'completed' ? lab.result : '', unit: '', referenceRange: lab.ref,
+          abnormal: lab.status === 'completed' ? lab.abnormal : false,
+          critical: lab.status === 'completed' ? lab.critical : false,
+          orderedBy: c.providerName,
+          orderedAt: orderedAt.replace('T', ' ').slice(0, 16),
+          completedAt: completedAt ? completedAt.replace('T', ' ').slice(0, 16) : '',
+          hospitalId: c.facilityId, hospitalName: c.facilityName,
+          createdAt: orderedAt, updatedAt: completedAt || orderedAt, orgId: PUBLIC_ORG_ID,
+        } as unknown as Record<string, unknown>);
+      }
+
+      for (let k = 0; k < c.meds.length; k++) {
+        const med = c.meds[k];
+        const createdAt = daysAgo(k);
+        await safePut(rxDB, {
+          _id: `rx-wf-${c.id}-${k + 1}`, type: 'prescription',
+          patientId: c.id, patientName: c.name,
+          medication: med.medication, dose: med.dose, route: 'Oral',
+          frequency: med.frequency, duration: med.duration,
+          prescribedBy: c.providerName, status: med.status,
+          ...(med.status === 'dispensed' ? { dispensedAt: daysAgo(0) } : {}),
+          hospitalId: c.facilityId, hospitalName: c.facilityName,
+          createdAt, updatedAt: daysAgo(0), orgId: PUBLIC_ORG_ID,
+        } as unknown as Record<string, unknown>);
+      }
+
+      await safePut(rDB, {
+        _id: `ref-wf-${c.id}`, type: 'referral',
+        patientId: c.id, patientName: c.name,
+        fromHospital: c.facilityName, fromHospitalId: c.facilityId,
+        toHospital: c.referral.toHospital, toHospitalId: c.referral.toHospitalId,
+        referralDate: today, urgency: c.referral.urgency, reason: c.referral.reason,
+        department: c.referral.department, status: c.referral.status,
+        referringDoctor: c.providerName, notes: c.complaint,
+        createdBy: c.providerId, createdByName: c.providerName,
+        state: c.state, county: c.county, orgId: PUBLIC_ORG_ID,
+        createdAt: daysAgo(0), updatedAt: daysAgo(0),
+      } as unknown as Record<string, unknown>);
+
+      const consult = 5000;
+      const diagnostics = c.labs.reduce((sum, lab) => sum + (lab.specimen === 'Imaging' ? 15000 : 3000), 0);
+      const pharmacy = c.meds.length > 0 ? 2500 : 0;
+      const total = c.bill.total || consult + diagnostics + pharmacy;
+      const balance = Math.max(0, total - c.bill.paid);
+      const chargeIds = [
+        `chg-wf-${c.id}-consult`,
+        `chg-wf-${c.id}-diagnostics`,
+        `chg-wf-${c.id}-pharmacy`,
+      ];
+      await safePut(chgDB, { _id: chargeIds[0], type: 'charge', encounterId: enc, patientId: c.id, description: 'Clinical consultation', category: 'consultation', units: 1, billedAmount: consult, status: 'approved', serviceDate: today, providerId: c.providerId, providerName: c.providerName, facilityId: c.facilityId, orgId: PUBLIC_ORG_ID, createdAt: created, updatedAt: daysAgo(0) } as unknown as Record<string, unknown>);
+      await safePut(chgDB, { _id: chargeIds[1], type: 'charge', encounterId: enc, patientId: c.id, description: 'Diagnostics: lab and imaging orders', category: c.labs.some(lab => lab.specimen === 'Imaging') ? 'radiology' : 'laboratory', units: 1, billedAmount: diagnostics, status: 'approved', serviceDate: today, providerId: c.providerId, providerName: c.providerName, facilityId: c.facilityId, orgId: PUBLIC_ORG_ID, createdAt: created, updatedAt: daysAgo(0) } as unknown as Record<string, unknown>);
+      await safePut(chgDB, { _id: chargeIds[2], type: 'charge', encounterId: enc, patientId: c.id, description: 'Medication dispensing', category: 'pharmacy', units: 1, billedAmount: pharmacy, status: 'approved', serviceDate: today, providerId: 'user-pharma.rose', providerName: 'Pharmacist Rose Gbudue', facilityId: c.facilityId, orgId: PUBLIC_ORG_ID, createdAt: created, updatedAt: daysAgo(0) } as unknown as Record<string, unknown>);
+      await safePut(ledDB, { _id: `led-wf-${c.id}-charge`, type: 'ledger_entry', patientId: c.id, encounterId: enc, entryType: 'charge', amount: total, runningBalance: total, description: 'Workflow visit charges', referenceId: chargeIds[0], referenceType: 'charge', currency: 'SSP', facilityId: c.facilityId, orgId: PUBLIC_ORG_ID, createdAt: created, updatedAt: daysAgo(0) } as unknown as Record<string, unknown>);
+      if (c.bill.paid > 0) {
+        await safePut(payDB, { _id: `pay-wf-${c.id}`, type: 'payment', patientId: c.id, patientName: c.name, encounterId: enc, method: i % 2 === 0 ? 'cash' : 'm_gurush', amount: c.bill.paid, currency: 'SSP', reference: `RCT-WF-${String(i + 1).padStart(4, '0')}`, status: 'posted', processedAt: daysAgo(0), processedBy: 'user-cashier.deng', processedByName: 'Deng Akec Ring', allocations: [{ encounterId: enc, amount: c.bill.paid, chargeId: chargeIds[0] }], facilityId: c.facilityId, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) } as unknown as Record<string, unknown>);
+        await safePut(ledDB, { _id: `led-wf-${c.id}-payment`, type: 'ledger_entry', patientId: c.id, encounterId: enc, entryType: 'payment', amount: -c.bill.paid, runningBalance: balance, description: 'Payment received at cashier', referenceId: `pay-wf-${c.id}`, referenceType: 'payment', method: i % 2 === 0 ? 'cash' : 'm_gurush', currency: 'SSP', facilityId: c.facilityId, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) } as unknown as Record<string, unknown>);
+      }
+      await safePut(blDB, {
+        _id: `bill-wf-${c.id}`, type: 'billing',
+        patientId: c.id, patientName: c.name, hospitalNumber: c.hospitalNumber,
+        facilityId: c.facilityId, facilityName: c.facilityName, facilityLevel: c.facilityId === 'hosp-001' ? 'national' : 'state',
+        encounterDate: today, encounterId: enc,
+        items: [
+          { id: `li-wf-${c.id}-1`, category: 'consultation', description: 'Clinical consultation', quantity: 1, unitPrice: consult, totalPrice: consult },
+          { id: `li-wf-${c.id}-2`, category: c.labs.some(lab => lab.specimen === 'Imaging') ? 'radiology' : 'laboratory', description: 'Lab and imaging diagnostics', quantity: 1, unitPrice: diagnostics, totalPrice: diagnostics },
+          { id: `li-wf-${c.id}-3`, category: 'pharmacy', description: 'Medication dispensing', quantity: 1, unitPrice: pharmacy, totalPrice: pharmacy },
+        ],
+        subtotal: total, discount: 0, taxRate: 0, taxAmount: 0, totalAmount: total,
+        amountPaid: c.bill.paid, balanceDue: balance, currency: 'SSP', payments: [],
+        status: c.bill.status, generatedBy: 'user-cashier.deng', generatedByName: 'Deng Akec Ring',
+        invoiceNumber: `INV-WF-${String(i + 1).padStart(4, '0')}`,
+        state: c.state, county: c.county, orgId: PUBLIC_ORG_ID,
+        createdAt: daysAgo(0), updatedAt: daysAgo(0),
+      } as unknown as Record<string, unknown>);
+    }
+  }
+
   // Seed appointments
   const apptDB = appointmentsDB();
   for (const a of seedAppointments) {
@@ -2850,7 +3107,7 @@ async function seedDatabaseExclusive(): Promise<void> {
       hosp: (p as unknown as Record<string, unknown>).registrationHospital as string | undefined,
       hospName: (p as unknown as Record<string, unknown>).registrationHospitalName as string | undefined,
     })),
-    ...[...childPatients, ...motherPatients, ...wauPatients, ...malakalPatients].map((p) => ({
+    ...[...childPatients, ...motherPatients, ...wauPatients, ...malakalPatients, ...workflowShowcasePatients].map((p) => ({
       id: p._id as string,
       name: `${(p.firstName as string) ?? ''} ${(p.surname as string) ?? ''}`.replace(/\s+/g, ' ').trim(),
       hosp: p.registrationHospital as string | undefined,

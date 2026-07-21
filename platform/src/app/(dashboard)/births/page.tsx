@@ -11,8 +11,10 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import Modal from '@/components/Modal';
+import PopupSelect from '@/components/PopupSelect';
 import {
-  Baby, Plus, X, ChevronDown, ChevronUp,
+  Baby, Plus, X, ChevronDown,
 } from '@/components/icons/lucide';
 
 export default function BirthsPage() {
@@ -40,7 +42,7 @@ export default function BirthsPage() {
   const [tableSearch, setTableSearch] = useState('');
   const search = `${tableSearch} ${globalSearch}`.trim();
   const [showForm, setShowForm] = useState(false);
-  const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
+  const [selectedBirthId, setSelectedBirthId] = useState<string | null>(null);
   const [form, setForm] = useState({
     childFirstName: '', childSurname: '', childGender: 'Male' as 'Male' | 'Female',
     dateOfBirth: new Date().toISOString().slice(0, 10), placeOfBirth: '', facilityId: '', facilityName: '',
@@ -53,6 +55,10 @@ export default function BirthsPage() {
   const filtered = (births || []).filter(b =>
     (!search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
     (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase()))
+  );
+  const selectedBirth = useMemo(
+    () => (selectedBirthId ? (births || []).find(b => b._id === selectedBirthId) || null : null),
+    [births, selectedBirthId],
   );
 
   // Header stat chips — computed from data already loaded on this page,
@@ -129,7 +135,7 @@ export default function BirthsPage() {
               </thead>
               <tbody>
                 {filtered.map(b => (
-                  <tr key={b._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setExpandedBirth(expandedBirth === b._id ? null : b._id)}>
+                  <tr key={b._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setSelectedBirthId(b._id)}>
                     <td className="font-mono text-xs">{b.certificateNumber}</td>
                     <td className="font-medium text-sm">{b.childFirstName} {b.childSurname}</td>
                     <td><span className="badge text-[10px]" style={{ background: b.childGender === 'Male' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(229,46,66,0.12)', color: b.childGender === 'Male' ? 'var(--accent-primary)' : 'var(--color-danger)' }}>{b.childGender}</span></td>
@@ -154,49 +160,56 @@ export default function BirthsPage() {
                     <td className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       <div className="flex items-center gap-1">
                         {b.state}
-                        {expandedBirth === b._id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        <ChevronDown className="w-3 h-3" />
                       </div>
                     </td>
                   </tr>
                 ))}
-                {expandedBirth && (() => {
-                  const b = filtered.find(x => x._id === expandedBirth);
-                  if (!b) return null;
-                  return (
-                    <tr>
-                      <td colSpan={9} style={{ background: 'var(--overlay-subtle)', padding: 0 }}>
-                        <div className="p-4 data-row-divider-sm">
-                          {/* Birth Details */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Certificate #</span>{b.certificateNumber}</div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Birth Type</span><span className="capitalize">{b.birthType}</span></div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Delivery Type</span><span className="capitalize">{b.deliveryType}</span></div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Birth Weight</span>{b.birthWeight}g</div>
-                          </div>
-                          {/* Parents */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Mother</span>{b.motherName} (Age: {b.motherAge || 'N/A'})</div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Mother Nationality</span>{b.motherNationality || 'N/A'}</div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Father</span>{b.fatherName || 'N/A'}</div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Father Nationality</span>{b.fatherNationality || 'N/A'}</div>
-                          </div>
-                          {/* Location & Registration */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Place of Birth</span>{b.placeOfBirth || b.facilityName}</div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Attended By</span>{b.attendedBy || 'N/A'}</div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Registered By</span>{b.registeredBy || 'N/A'}</div>
-                            <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>County</span>{b.county || 'N/A'}, {b.state}</div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })()}
               </tbody>
             </table>
           )}
           </div>
         </div>
+
+        {selectedBirth && (
+          <Modal onClose={() => setSelectedBirthId(null)} width={720} labelledBy="birth-certificate-details-title">
+            <div className="modal-content card-elevated w-full overflow-hidden">
+              <div className="flex items-start justify-between gap-4 p-5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <div className="min-w-0">
+                  <h3 id="birth-certificate-details-title" className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    Birth Certificate · {selectedBirth.certificateNumber}
+                  </h3>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                    {selectedBirth.childFirstName} {selectedBirth.childSurname} · {selectedBirth.dateOfBirth}
+                  </p>
+                </div>
+                <button onClick={() => setSelectedBirthId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label="Close birth certificate details">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-5 space-y-5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Certificate #</span>{selectedBirth.certificateNumber}</div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Birth Type</span><span className="capitalize">{selectedBirth.birthType}</span></div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Delivery Type</span><span className="capitalize">{selectedBirth.deliveryType}</span></div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Birth Weight</span>{selectedBirth.birthWeight}g</div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Mother</span>{selectedBirth.motherName} (Age: {selectedBirth.motherAge || 'N/A'})</div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Mother Nationality</span>{selectedBirth.motherNationality || 'N/A'}</div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Father</span>{selectedBirth.fatherName || 'N/A'}</div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Father Nationality</span>{selectedBirth.fatherNationality || 'N/A'}</div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Place of Birth</span>{selectedBirth.placeOfBirth || selectedBirth.facilityName}</div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Attended By</span>{selectedBirth.attendedBy || 'N/A'}</div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Registered By</span>{selectedBirth.registeredBy || 'N/A'}</div>
+                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>County</span>{selectedBirth.county || 'N/A'}, {selectedBirth.state}</div>
+                </div>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {/* Registration Form Modal */}
         {showForm && (
@@ -219,9 +232,7 @@ export default function BirthsPage() {
                   </div>
                   <div>
                     <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Gender</label>
-                    <select value={form.childGender} onChange={e => setForm({ ...form, childGender: e.target.value as 'Male' | 'Female' })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-                      <option value="Male">Male</option><option value="Female">Female</option>
-                    </select>
+                    <PopupSelect label="Gender" value={form.childGender} onChange={value => setForm({ ...form, childGender: value as 'Male' | 'Female' })} options={['Male', 'Female']} />
                   </div>
                   <div>
                     <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Date of Birth</label>
@@ -239,21 +250,15 @@ export default function BirthsPage() {
                   </div>
                   <div>
                     <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Delivery Type</label>
-                    <select value={form.deliveryType} onChange={e => setForm({ ...form, deliveryType: e.target.value as 'normal' | 'caesarean' | 'assisted' })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-                      <option value="normal">Normal</option><option value="caesarean">Caesarean</option><option value="assisted">Assisted</option>
-                    </select>
+                    <PopupSelect label="Delivery Type" value={form.deliveryType} onChange={value => setForm({ ...form, deliveryType: value as 'normal' | 'caesarean' | 'assisted' })} options={[{ value: 'normal', label: 'Normal' }, { value: 'caesarean', label: 'Caesarean' }, { value: 'assisted', label: 'Assisted' }]} />
                   </div>
                   <div>
                     <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Birth Type</label>
-                    <select value={form.birthType} onChange={e => setForm({ ...form, birthType: e.target.value as 'single' | 'twin' | 'multiple' })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-                      <option value="single">Single</option><option value="twin">Twin</option><option value="multiple">Multiple</option>
-                    </select>
+                    <PopupSelect label="Birth Type" value={form.birthType} onChange={value => setForm({ ...form, birthType: value as 'single' | 'twin' | 'multiple' })} options={[{ value: 'single', label: 'Single' }, { value: 'twin', label: 'Twin' }, { value: 'multiple', label: 'Multiple' }]} />
                   </div>
                   <div>
                     <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Attended By</label>
-                    <select value={form.attendedBy} onChange={e => setForm({ ...form, attendedBy: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-                      <option value="">Select...</option><option value="Doctor">Doctor</option><option value="Midwife">Midwife</option><option value="Nurse">Nurse</option><option value="TBA">TBA</option><option value="None">None</option>
-                    </select>
+                    <PopupSelect label="Attended By" value={form.attendedBy} onChange={value => setForm({ ...form, attendedBy: value })} placeholder="Select..." options={[{ value: '', label: 'Select...' }, 'Doctor', 'Midwife', 'Nurse', 'TBA', 'None']} />
                   </div>
                 </div>
 
@@ -275,10 +280,16 @@ export default function BirthsPage() {
                   </div>
                   <div>
                     <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Facility</label>
-                    <select value={form.facilityId} onChange={e => { const h = hospitals.find(h => h._id === e.target.value); setForm({ ...form, facilityId: e.target.value, facilityName: h?.name || '', state: h?.state || '' }); }} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-                      <option value="">Current facility</option>
-                      {hospitals.map(h => <option key={h._id} value={h._id}>{h.name}</option>)}
-                    </select>
+                    <PopupSelect
+                      label="Facility"
+                      value={form.facilityId}
+                      onChange={value => {
+                        const h = hospitals.find(hospital => hospital._id === value);
+                        setForm({ ...form, facilityId: value, facilityName: h?.name || '', state: h?.state || '' });
+                      }}
+                      placeholder="Current facility"
+                      options={[{ value: '', label: 'Current facility' }, ...hospitals.map(h => ({ value: h._id, label: h.name }))]}
+                    />
                   </div>
                 </div>
               </div>

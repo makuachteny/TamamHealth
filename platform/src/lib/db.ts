@@ -294,7 +294,14 @@ export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 // fixed-seed PRNG so browser-seeded patients match the server's demo-fallback
 // roster (portal login matches on hospital number + phone). Old profiles hold
 // the last random draw and must reseed to the deterministic identities.
-export const SEED_VERSION = 51;
+// Bumped to 52: added named workflow-showcase patients with linked appointments,
+// triage, lab/imaging, pharmacy, referrals, billing and ledger rows so module
+// dashboards visualize real handoffs instead of isolated sample records.
+// Bumped to 53: disease-alert seed replication now covers 8 recent weekly
+// buckets with wavy sigmoid-style case factors for surveillance trend charts.
+// Bumped to 54: added more Juba Teaching Hospital assignable doctors so the
+// Assign provider popup demonstrates fixed-height scrolling and A-Z sorting.
+export const SEED_VERSION = 54;
 
 export async function isSeeded(): Promise<boolean> {
   try {

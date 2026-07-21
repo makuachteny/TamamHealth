@@ -7,9 +7,10 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
-import type { AppointmentDoc, EncounterDoc } from '@/lib/db-types';
+import type { AppointmentDoc, EncounterDoc, PatientDoc } from '@/lib/db-types';
 import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
-import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel, initials, avatarColor } from '@/lib/patient-utils';
+import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel, initials } from '@/lib/patient-utils';
+import { avatarColor } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
@@ -38,6 +39,12 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
 // Exam rooms / bays a walk-in patient can be placed in to meet the provider.
 // Fallback used only when facility settings provide no rooms.
 const ROOM_OPTIONS = ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Bay A', 'Bay B', 'Bay C', 'Bay D'];
+
+// Half-hour clinic slots (07:00–18:30) offered when reception reschedules.
+const RESCHEDULE_SLOTS = Array.from({ length: 24 }, (_, i) => {
+  const hour = 7 + Math.floor(i / 2);
+  return `${String(hour).padStart(2, '0')}:${i % 2 ? '30' : '00'}`;
+});
 
 const COMPLAINT_DEPARTMENT_MAP: Record<string, string> = {
   fever: 'General Medicine', malaria: 'General Medicine', cough: 'General Medicine',
@@ -68,6 +75,18 @@ function splitDateTime(iso?: string | null): { date: string; time: string } {
   return { date, time };
 }
 
+// Combine an appointment's day with its "HH:MM" slot into one real moment, so
+// the schedule row can count down to it ("in 2h 15m"). Parsed without a zone
+// suffix on purpose: appointment slots are wall-clock times at the facility,
+// which is how the rest of the client reads "today".
+function appointmentMoment(appointmentDate?: string | null, appointmentTime?: string | null): string | undefined {
+  const slot = (appointmentTime || '').trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!slot) return undefined;
+  const day = isoDateKey(appointmentDate);
+  const at = new Date(`${day}T${slot[1].padStart(2, '0')}:${slot[2]}:00`);
+  return Number.isNaN(at.getTime()) ? undefined : at.toISOString();
+}
+
 function formatDayMonthYear(iso?: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -94,12 +113,16 @@ interface CheckoutTarget {
   triageId?: string;
 }
 
+function patientFacilityName(patient: PatientDoc | undefined, fallback = 'Facility'): string {
+  return (patient as (PatientDoc & { registrationHospitalName?: string }) | undefined)?.registrationHospitalName || fallback;
+}
+
 export default function FrontDeskDashboardPage() {
   const router = useRouter();
   const { currentUser } = useApp();
   const { canConsult } = usePermissions();
   const { patients } = usePatients();
-  const { appointments, updateStatus: updateAppointmentStatus } = useAppointments();
+  const { appointments, updateStatus: updateAppointmentStatus, reschedule: rescheduleAppointment } = useAppointments();
   const { triages, update: updateTriage } = useTriage();
   const { showToast } = useToast();
   const { t } = useTranslation();
@@ -111,6 +134,7 @@ export default function FrontDeskDashboardPage() {
   const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered' | 'waiting' | 'walkin' | 'completed'>('all');
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
+  const [recentSearch, setRecentSearch] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   // The queue entry backing the open detail popup (carries triage/room context);
   // null when a non-queue row (e.g. a registered patient) opened the popup.
@@ -118,6 +142,14 @@ export default function FrontDeskDashboardPage() {
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
   const [checkInTarget, setCheckInTarget] = useState<AppointmentDoc | null>(null);
+  // Reception can move an appointment to a new slot or mark it a no-show from
+  // the row itself — both are front-desk calls that shouldn't need the
+  // full appointments page.
+  const [rescheduleTarget, setRescheduleTarget] = useState<AppointmentDoc | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [reschedSaving, setReschedSaving] = useState(false);
+  const [noShowTarget, setNoShowTarget] = useState<AppointmentDoc | null>(null);
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [encounters, setEncounters] = useState<EncounterDoc[]>([]);
@@ -189,11 +221,15 @@ export default function FrontDeskDashboardPage() {
     age: string;
     date: string;
     time: string;
+    /** Full timestamp behind `time` — drives the row's "in 2h 15m" countdown. */
+    timeAt?: string;
     calendarDate: string;
     status: 'WAITING' | 'IN CONSULT' | 'DONE' | 'ADMITTED' | 'REFERRED';
     sourceId: string; // triage / appointment / patient ID
     encounterId?: string;
     assignedRoom?: string; // OPD exam room/bay (walk-in/triage entries only)
+    assignedDoctorName?: string;
+    location?: string;
     registeredAt?: string; // registration timestamp (registered entries only — for ordering)
   }
 
@@ -204,6 +240,11 @@ export default function FrontDeskDashboardPage() {
     const patientById = new Map(patients.map(p => [p._id, p]));
     const genderOf = (pid: string) => patientById.get(pid)?.gender || '—';
     const ageOf = (pid: string) => { const p = patientById.get(pid); return p ? patientAgeLabel(p) : '—'; };
+    const doctorOf = (pid: string) => patientById.get(pid)?.assignedDoctorName || '';
+    const locationOf = (pid: string, fallback?: string) => {
+      const p = patientById.get(pid);
+      return fallback || patientFacilityName(p, currentUser?.hospitalName || 'Facility');
+    };
     const checkoutStatuses = new Set<EncounterDoc['status']>([
       'ready_for_clinic_checkout',
       'in_clinic_checkout',
@@ -242,11 +283,14 @@ export default function FrontDeskDashboardPage() {
         gender: genderOf(t.patientId),
         age: ageOf(t.patientId),
         ...splitDateTime(t.triagedAt),
+        timeAt: t.triagedAt,
         calendarDate: isoDateKey(t.triagedAt),
         status,
         sourceId: t._id,
         encounterId: checkoutEncounter?._id,
         assignedRoom: t.assignedRoom,
+        assignedDoctorName: doctorOf(t.patientId),
+        location: locationOf(t.patientId, t.assignedRoom || (t.chiefComplaint ? suggestDepartment(t.chiefComplaint) : 'Triage')),
       });
     }
 
@@ -275,15 +319,16 @@ export default function FrontDeskDashboardPage() {
         age: ageOf(a.patientId),
         date: splitDateTime(a.appointmentDate).date,
         time: formatClockTime(a.appointmentTime),
+        timeAt: appointmentMoment(a.appointmentDate, a.appointmentTime),
         calendarDate: isoDateKey(a.appointmentDate),
         status,
         sourceId: a._id,
         encounterId: checkoutEncounter?._id,
+        assignedDoctorName: a.providerName || doctorOf(a.patientId),
+        location: a.department || a.facilityName || locationOf(a.patientId),
       });
     }
 
-    // Add recent registrations not already in the queue (replaces the old
-    // "Recent Registrations" card — every registered patient awaiting a visit).
     const queuedPatientIds = new Set(items.map(it => it.patientId));
     for (const enc of checkoutEncounterByPatient.values()) {
       if (queuedPatientIds.has(enc.patientId)) continue;
@@ -299,38 +344,15 @@ export default function FrontDeskDashboardPage() {
         gender: genderOf(enc.patientId),
         age: ageOf(enc.patientId),
         ...splitDateTime(enc.updatedAt || enc.closedAt || enc.startedAt),
+        timeAt: enc.updatedAt || enc.closedAt || enc.startedAt,
         calendarDate: isoDateKey(enc.updatedAt || enc.closedAt || enc.startedAt),
         status: 'DONE',
         sourceId: enc._id,
         encounterId: enc._id,
+        assignedDoctorName: doctorOf(enc.patientId),
+        location: 'Checkout',
       });
       queuedPatientIds.add(enc.patientId);
-    }
-    const recent = [...patients].sort((a, b) =>
-      patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)));
-    for (const p of recent) {
-      if (queuedPatientIds.has(p._id)) continue;
-      // A patient with a today's appointment is handled by the check-in flow
-      // above — don't also list them as a generic "registered" walk-in.
-      if (apptPatientIds.has(p._id)) continue;
-      const registeredAt = patientRegisteredAt(p);
-      if (isoDateKey(registeredAt) !== today) continue;
-      items.push({
-        id: `patient-${p._id}`,
-        patientId: p._id,
-        patientName: patientFullName(p),
-        type: 'registered',
-        priority: 'normal',
-        complaint: 'Newly registered',
-        department: patientGenderAge(p),
-        gender: p.gender || '—',
-        age: patientAgeLabel(p),
-        ...splitDateTime(registeredAt),
-        calendarDate: isoDateKey(registeredAt),
-        status: 'WAITING',
-        sourceId: p._id,
-        registeredAt,
-      });
     }
 
     // Sort: RED → YELLOW → GREEN → normal, then registered last (recent first).
@@ -346,7 +368,7 @@ export default function FrontDeskDashboardPage() {
     });
 
     return items;
-  }, [encounters, patients, today, todaysAppointments, todaysTriages]);
+  }, [currentUser?.hospitalName, encounters, patients, today, todaysAppointments, todaysTriages]);
 
   const filteredQueue = useMemo(() => {
     let items = queueFilter === 'all' ? queue : queue.filter(q => q.type === queueFilter);
@@ -386,12 +408,15 @@ export default function FrontDeskDashboardPage() {
     });
   }, [patients, queueSearch]);
 
-  const [recentSearch, setRecentSearch] = useState('');
   const recentPatients = useMemo(() => {
     const q = recentSearch.trim().toLowerCase();
     const sorted = [...patients].sort((a, b) => patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)));
     const filtered = q
-      ? sorted.filter(p => `${patientFullName(p)} ${p.hospitalNumber || ''} ${p.phone || ''} ${p.county || ''} ${p.state || ''}`.toLowerCase().includes(q))
+      ? sorted.filter(patient =>
+          `${patientFullName(patient)} ${patient.hospitalNumber || ''} ${patient.phone || ''} ${patient.county || ''} ${patient.state || ''}`
+            .toLowerCase()
+            .includes(q)
+        )
       : sorted;
     return filtered.slice(0, q ? 25 : 6);
   }, [patients, recentSearch]);
@@ -494,6 +519,41 @@ export default function FrontDeskDashboardPage() {
     setCheckInTarget(null);
   }, [updateAppointmentStatus, showToast]);
 
+  // ── Mark an appointment a no-show. Confirmed first: a mistaken no-show
+  //    hides the patient from the arrivals list, so reception gets one beat to
+  //    check the waiting room before it lands. ──
+  const handleNoShow = useCallback(async (appt: AppointmentDoc) => {
+    try {
+      await updateAppointmentStatus(appt._id, 'no_show');
+      showToast(`${appt.patientName} marked as no-show`, 'success');
+    } catch {
+      showToast('Failed to mark no-show', 'error');
+    } finally {
+      setNoShowTarget(null);
+    }
+  }, [updateAppointmentStatus, showToast]);
+
+  // ── Move an appointment to a new date/time without leaving the desk. ──
+  const openReschedule = useCallback((appt: AppointmentDoc) => {
+    setRescheduleDate(isoDateKey(appt.appointmentDate));
+    setRescheduleTime(appt.appointmentTime || '09:00');
+    setRescheduleTarget(appt);
+  }, []);
+
+  const submitReschedule = useCallback(async () => {
+    if (!rescheduleTarget || !rescheduleDate || !rescheduleTime) return;
+    setReschedSaving(true);
+    try {
+      await rescheduleAppointment(rescheduleTarget._id, rescheduleDate, rescheduleTime);
+      showToast(`${rescheduleTarget.patientName} moved to ${formatDayMonthYear(rescheduleDate)} ${formatClockTime(rescheduleTime)}`, 'success');
+      setRescheduleTarget(null);
+    } catch {
+      showToast('Failed to reschedule appointment', 'error');
+    } finally {
+      setReschedSaving(false);
+    }
+  }, [rescheduleTarget, rescheduleDate, rescheduleTime, rescheduleAppointment, showToast]);
+
   // ── Reverse an appointment check-in: send the patient back to scheduled so
   //    a mistaken "arrived" can be corrected. Appointment status has no
   //    forward-only guard, so this round-trips cleanly. (Triage check-in has
@@ -587,22 +647,40 @@ export default function FrontDeskDashboardPage() {
   ]), [canUseRoute, router]);
 
   const frontDeskRows = useMemo<EhrCareDashboardRow[]>(() => {
-    const appointmentRows: EhrCareDashboardRow[] = visiblePendingAppointments.map(appointment => ({
-      id: `pending-appt-${appointment._id}`,
-      title: appointment.patientName,
-      subtitle: appointment.reason || 'Scheduled visit',
-      meta: `${formatClockTime(appointment.appointmentTime) || 'No time'} · ${appointment.providerName || 'Unassigned'} · ${appointment.facilityName || currentUser?.hospitalName || 'Facility'}`,
-      compactMeta: formatClockTime(appointment.appointmentTime) || 'No time',
-      status: appointment.status === 'requested' ? 'requested' : 'scheduled',
-      statusTone: 'scheduled',
-      priority: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
-      date: isoDateKey(appointment.appointmentDate),
-      onClick: () => openPatientDetail(appointment.patientId, null),
-      actionLabel: 'Check in',
-      onAction: () => setCheckInTarget(appointment),
-      secondaryActionLabel: 'Record',
-      onSecondaryAction: () => router.push(`/patients/${appointment.patientId}`),
-    }));
+    const patientById = new Map(patients.map(patient => [patient._id, patient]));
+    const appointmentRows: EhrCareDashboardRow[] = visiblePendingAppointments.map(appointment => {
+      const patient = patientById.get(appointment.patientId);
+      const patientMeta = patient
+        ? `${patientAgeLabel(patient)}${patient.gender ? ` · ${String(patient.gender).charAt(0).toUpperCase()}` : ''}`
+        : '';
+      return {
+        id: `pending-appt-${appointment._id}`,
+        title: appointment.patientName,
+        subtitle: [appointment.reason || 'Scheduled visit', patientMeta].filter(Boolean).join(' · '),
+        meta: `${formatClockTime(appointment.appointmentTime) || 'No time'} · ${appointment.providerName || patient?.assignedDoctorName || 'Unassigned'} · ${appointment.facilityName || currentUser?.hospitalName || 'Facility'}`,
+        compactMeta: formatClockTime(appointment.appointmentTime) || 'No time',
+        time: formatClockTime(appointment.appointmentTime) || undefined,
+        timeAt: appointmentMoment(appointment.appointmentDate, appointment.appointmentTime),
+        careTeam: appointment.providerName || patient?.assignedDoctorName || 'Unassigned',
+        careTeamLabel: 'Care team',
+        location: appointment.department || appointment.facilityName || patientFacilityName(patient, currentUser?.hospitalName || 'Facility'),
+        locationLabel: appointment.department ? 'Department' : 'Location',
+        status: appointment.status === 'requested' ? 'requested' : 'scheduled',
+        statusLabel: appointment.status === 'confirmed' ? 'Confirmed' : appointment.status === 'requested' ? 'Requested' : 'Scheduled',
+        statusTone: 'scheduled',
+        priority: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
+        date: isoDateKey(appointment.appointmentDate),
+        onClick: () => openPatientDetail(appointment.patientId, null),
+        actionLabel: 'Check in',
+        onAction: () => setCheckInTarget(appointment),
+        secondaryActionLabel: 'Record',
+        onSecondaryAction: () => router.push(`/patients/${appointment.patientId}`),
+        extraActions: [
+          { label: 'Reschedule', onClick: () => openReschedule(appointment) },
+          { label: 'No show', onClick: () => setNoShowTarget(appointment), tone: 'danger' as const },
+        ],
+      };
+    });
 
     const queueRows = filteredQueue.map(entry => {
       const patient = patients.find(pp => pp._id === entry.patientId);
@@ -629,10 +707,17 @@ export default function FrontDeskDashboardPage() {
         subtitle: `${entry.complaint} · ${entry.department}`,
         meta: `${entry.gender} · ${entry.age} · ${entry.date}${entry.time ? ` · ${entry.time}` : ''}`,
         compactMeta: entry.time || entry.date,
+        time: entry.time || undefined,
+        timeAt: entry.timeAt,
         status: entry.status.toLowerCase(),
+        statusLabel: entry.status === 'IN CONSULT' ? 'In consult' : entry.status === 'DONE' ? 'Done' : entry.status.charAt(0) + entry.status.slice(1).toLowerCase(),
         statusTone,
         priority: pLabel,
         room: entry.assignedRoom,
+        careTeam: entry.assignedDoctorName || patient?.assignedDoctorName || 'Unassigned',
+        careTeamLabel: 'Care team',
+        location: entry.location || entry.assignedRoom || entry.department || patientFacilityName(patient, currentUser?.hospitalName || 'Facility'),
+        locationLabel: entry.assignedRoom ? 'Room' : entry.type === 'registered' ? 'Location' : 'Department',
         date: entry.calendarDate,
         onClick: () => openPatientDetail(entry.patientId, entry),
         actionLabel: checkoutReady ? t('frontDesk.checkout') : activeForCare ? t('frontDesk.assign') : 'Record',
@@ -679,7 +764,7 @@ export default function FrontDeskDashboardPage() {
       };
     });
 
-    const registeredRows: EhrCareDashboardRow[] = filteredRegisteredPatients.map(patient => {
+    const makeRegisteredRow = (patient: PatientDoc): EhrCareDashboardRow => {
       const registered = splitDateTime(patientRegisteredAt(patient));
       return {
         id: `registered-${patient._id}`,
@@ -687,7 +772,14 @@ export default function FrontDeskDashboardPage() {
         subtitle: patient.hospitalNumber || patientGenderAge(patient),
         meta: `${patientGenderAge(patient)} · ${registered.date}${registered.time ? ` · ${registered.time}` : ''}`,
         compactMeta: registered.time || registered.date,
+        time: registered.time || undefined,
+        timeAt: registered.time ? patientRegisteredAt(patient) : undefined,
+        careTeam: patient.assignedDoctorName || 'Unassigned',
+        careTeamLabel: 'Assigned physician',
+        location: patientFacilityName(patient, currentUser?.hospitalName || 'Registration'),
+        locationLabel: 'Location',
         status: 'registered',
+        statusLabel: 'Registered',
         statusTone: 'ready',
         priority: 'Registered',
         date: isoDateKey(patientRegisteredAt(patient)),
@@ -695,7 +787,9 @@ export default function FrontDeskDashboardPage() {
         actionLabel: 'Record',
         onAction: () => router.push(`/patients/${patient._id}`),
       };
-    });
+    };
+
+    const registeredRows: EhrCareDashboardRow[] = filteredRegisteredPatients.map(makeRegisteredRow);
 
     if (panelView === 'pending') return appointmentRows;
     if (panelView === 'waiting') return queueRows.filter(row => row.status === 'waiting');
@@ -713,6 +807,7 @@ export default function FrontDeskDashboardPage() {
     openPatientDetail,
     patients,
     panelView,
+    openReschedule,
     router,
     t,
     visiblePendingAppointments,
@@ -875,6 +970,10 @@ export default function FrontDeskDashboardPage() {
           filters={[]}
           actions={actions}
           actionStrip={actionStrip}
+          // Rows now carry `time`; the done→series1 default already matches
+          // this queue (checked-out visits are 'done', everything still
+          // scheduled/waiting/in consult is not).
+          chartSeriesNames={['Active', 'Completed']}
           rows={frontDeskRows}
           metrics={metrics}
           checklist={checklist}
@@ -887,6 +986,9 @@ export default function FrontDeskDashboardPage() {
           missionTitle="Keep the desk moving"
           missionDescription="Show the next action clearly so reception can register, check in, route, and close visits."
           showMissionCard
+          // Reception rows already open the patient detail on click, so the
+          // per-row pencil is redundant.
+          showRowOpenAction={false}
           footerContent={(
             <section className="ehr-worklist-panel" style={{ minWidth: 0 }}>
               <div>
@@ -1112,6 +1214,54 @@ export default function FrontDeskDashboardPage() {
                     setRegisterOpen(true);
                   }}
                 />
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {rescheduleTarget && (
+          <Modal onClose={() => !reschedSaving && setRescheduleTarget(null)} width={420} labelledBy="reschedule-dialog-title">
+            <div className="card-elevated" style={{ padding: 24, borderRadius: 16, background: 'var(--bg-card)' }}>
+              <h2 id="reschedule-dialog-title" className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
+                Reschedule appointment
+              </h2>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                {rescheduleTarget.patientName} · currently {formatDayMonthYear(rescheduleTarget.appointmentDate)} {formatClockTime(rescheduleTarget.appointmentTime)}
+              </p>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>New date</label>
+                  <input type="date" value={rescheduleDate} min={today} onChange={e => setRescheduleDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>New time</label>
+                  <select value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}>
+                    {RESCHEDULE_SLOTS.map(slot => <option key={slot} value={slot}>{formatClockTime(slot)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-5">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRescheduleTarget(null)} disabled={reschedSaving}>
+                  {t('action.cancel')}
+                </button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={submitReschedule} disabled={reschedSaving || !rescheduleDate || !rescheduleTime}>
+                  {reschedSaving ? 'Saving…' : 'Reschedule'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {noShowTarget && (
+          <Modal onClose={() => setNoShowTarget(null)} width={380} labelledBy="no-show-dialog-title">
+            <div className="card-elevated" style={{ padding: 24, borderRadius: 16, background: 'var(--bg-card)' }}>
+              <h2 id="no-show-dialog-title" className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>Mark as no-show?</h2>
+              <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
+                {noShowTarget.patientName} — {formatClockTime(noShowTarget.appointmentTime)}. Check the waiting room first; this removes them from today&apos;s arrivals.
+              </p>
+              <div className="flex justify-end gap-2 mt-5">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setNoShowTarget(null)}>{t('action.cancel')}</button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => handleNoShow(noShowTarget)}>Mark no-show</button>
               </div>
             </div>
           </Modal>

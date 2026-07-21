@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { LabResultDoc, OrderSetDoc } from '@/lib/db-types';
+import type { LabResultDoc, OrderSetDoc, PatientDoc } from '@/lib/db-types';
 import { labTier, specimenFor } from '@/lib/clinical-flow/lab-catalog';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { estimateDispenseQuantity } from '@/lib/clinical-flow/dispense-quantity';
@@ -20,6 +20,7 @@ import { FavoritesBar, FavoriteStar } from '@/components/consultation/FavoritesB
 import SearchInput from '@/components/filters/SearchInput';
 import SearchAddField from '@/components/consultation/SearchAddField';
 import CodedSearchField from '@/components/CodedSearchField';
+import type { CodedOption } from '@/components/CodedSearchField';
 import { medications } from '@/data/mock';
 import type { Attachment } from '@/data/mock';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
@@ -64,12 +65,137 @@ import PageInstructionCard from '@/components/PageInstructionCard';
 // formal ICD title text.
 const icdCodes = COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title, keywords: c.keywords }));
 
-// The symptom / exam-finding catalogues flattened for the CodedSearchField
-// dropdowns. The group label rides along as `code` (searchable — typing
-// "respiratory" surfaces that whole group) and as `meta` (shown under each
-// row); the code badge itself is hidden since these aren't coded entries.
-const symptomOptions = SYMPTOM_CATALOG.flatMap(g =>
-  g.options.map(name => ({ code: g.label, name, meta: g.label })));
+type VitalField = 'temperature' | 'systolic' | 'diastolic' | 'pulse' | 'respRate' | 'o2Sat' | 'bloodGlucose' | 'gcs' | 'painScore' | 'muac';
+type VitalBand = { low?: number; high?: number; label: string; severeHigh?: number; severeLow?: number };
+type ConsultationProfile = { label: string; ageYears: number | null; isChild: boolean; isPregnant: boolean };
+const VITAL_RANGE_FIELDS = new Set<string>(['temperature', 'systolic', 'diastolic', 'pulse', 'respRate', 'o2Sat', 'bloodGlucose', 'gcs', 'painScore', 'muac']);
+
+function isVitalField(field: string): field is VitalField {
+  return VITAL_RANGE_FIELDS.has(field);
+}
+
+function ageFromPatient(patient: PatientDoc | null): number | null {
+  if (!patient) return null;
+  const explicitAge = (patient as PatientDoc & { age?: number }).age;
+  if (typeof explicitAge === 'number' && Number.isFinite(explicitAge)) return explicitAge;
+  if (!patient.dateOfBirth) return null;
+  const dob = new Date(patient.dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const beforeBirthday = now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate());
+  if (beforeBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}
+
+function consultationProfile(patient: PatientDoc | null): ConsultationProfile {
+  const ageYears = ageFromPatient(patient);
+  const conditionText = ((patient?.chronicConditions || []) as string[]).join(' ').toLowerCase();
+  const isPregnant = patient?.gender === 'Female' && /\b(pregnan|antenatal|anc|gravida|trimester)\b/.test(conditionText);
+  const isChild = ageYears != null && ageYears < 18;
+  const childLabel = ageYears == null ? 'Child' : ageYears < 1 ? 'Infant' : ageYears < 3 ? 'Toddler' : ageYears < 6 ? 'Preschool child' : ageYears < 13 ? 'School-age child' : 'Adolescent';
+  return {
+    label: isPregnant ? 'Pregnancy' : isChild ? childLabel : 'Adult',
+    ageYears,
+    isChild,
+    isPregnant,
+  };
+}
+
+function vitalBandFor(field: VitalField, profile: ConsultationProfile): VitalBand | null {
+  if (field === 'temperature') return { low: 36, high: 37.9, label: '36.0-37.9 C', severeLow: 35, severeHigh: 38 };
+  if (field === 'o2Sat') return { low: 94, label: '>=94%', severeLow: 90 };
+  if (field === 'bloodGlucose') return { low: 3.9, high: 11, label: '3.9-11 mmol/L' };
+  if (field === 'gcs') return { low: 15, high: 15, label: '15', severeLow: 9 };
+  if (field === 'painScore') return { low: 0, high: 3, label: '0-3 target' };
+  if (field === 'muac') {
+    if (profile.isChild) return { low: 12.5, label: '>=12.5 cm; SAM <11.5', severeLow: 11.5 };
+    if (profile.isPregnant) return { low: 23, label: '>=23 cm' };
+    return null;
+  }
+
+  if (profile.isPregnant) {
+    if (field === 'systolic') return { low: 90, high: 139, label: '90-139 mmHg; alert >=140', severeHigh: 160 };
+    if (field === 'diastolic') return { low: 60, high: 89, label: '60-89 mmHg; alert >=90', severeHigh: 110 };
+    if (field === 'pulse') return { low: 60, high: 110, label: '60-110 bpm' };
+    if (field === 'respRate') return { low: 12, high: 22, label: '12-22/min' };
+  }
+
+  if (profile.isChild) {
+    const age = profile.ageYears ?? 6;
+    if (age < 1) {
+      if (field === 'systolic') return { low: 72, high: 104, label: '72-104 mmHg' };
+      if (field === 'diastolic') return { low: 37, high: 56, label: '37-56 mmHg' };
+      if (field === 'pulse') return { low: 100, high: 170, label: '100-170 bpm' };
+      if (field === 'respRate') return { low: 30, high: 60, label: '30-60/min' };
+    } else if (age < 3) {
+      if (field === 'systolic') return { low: 86, high: 106, label: '86-106 mmHg' };
+      if (field === 'diastolic') return { low: 41, high: 62, label: '41-62 mmHg' };
+      if (field === 'pulse') return { low: 80, high: 150, label: '80-150 bpm' };
+      if (field === 'respRate') return { low: 24, high: 40, label: '24-40/min' };
+    } else if (age < 6) {
+      if (field === 'systolic') return { low: 90, high: 110, label: '90-110 mmHg' };
+      if (field === 'diastolic') return { low: 47, high: 70, label: '47-70 mmHg' };
+      if (field === 'pulse') return { low: 70, high: 130, label: '70-130 bpm' };
+      if (field === 'respRate') return { low: 20, high: 34, label: '20-34/min' };
+    } else if (age < 13) {
+      if (field === 'systolic') return { low: 90, high: 121, label: '90-121 mmHg' };
+      if (field === 'diastolic') return { low: 59, high: 78, label: '59-78 mmHg' };
+      if (field === 'pulse') return { low: 65, high: 120, label: '65-120 bpm' };
+      if (field === 'respRate') return { low: 15, high: 30, label: '15-30/min' };
+    } else {
+      if (field === 'systolic') return { low: 102, high: 124, label: '102-124 mmHg' };
+      if (field === 'diastolic') return { low: 64, high: 80, label: '64-80 mmHg' };
+      if (field === 'pulse') return { low: 55, high: 90, label: '55-90 bpm' };
+      if (field === 'respRate') return { low: 12, high: 20, label: '12-20/min' };
+    }
+  }
+
+  if (field === 'systolic') return { low: 90, high: 139, label: '90-139 mmHg' };
+  if (field === 'diastolic') return { low: 60, high: 89, label: '60-89 mmHg' };
+  if (field === 'pulse') return { low: 60, high: 100, label: '60-100 bpm' };
+  if (field === 'respRate') return { low: 12, high: 20, label: '12-20/min' };
+  return null;
+}
+
+// Chief complaints are not final diagnoses. ICD-11 MMS usually represents
+// undifferentiated presenting complaints in Chapter 21 (symptoms/signs) or
+// system-specific symptom sections, so this picker favors symptom codes and
+// keeps diagnosis coding in the diagnosis step below.
+const ICD11_CHIEF_COMPLAINT_OPTIONS: CodedOption[] = [
+  { code: 'MG26', name: 'Fever', meta: 'ICD-11 Chapter 21 · General symptoms', keywords: ['pyrexia', 'fever of unknown origin', 'high temperature'] },
+  { code: 'MG22', name: 'Fatigue / weakness', meta: 'ICD-11 Chapter 21 · General symptoms', keywords: ['tiredness', 'lethargy', 'weakness'] },
+  { code: 'MG21', name: 'Chills and rigors', meta: 'ICD-11 Chapter 21 · General symptoms', keywords: ['chills', 'rigors', 'shivering'] },
+  { code: 'MG25', name: 'Feeling ill', meta: 'ICD-11 Chapter 21 · General symptoms', keywords: ['malaise', 'unwell', 'feeling sick'] },
+  { code: 'MG29', name: 'Swelling / oedema', meta: 'ICD-11 Chapter 21 · General symptoms', keywords: ['edema', 'leg swelling', 'body swelling'] },
+  { code: 'MG45', name: 'Fainting / collapse', meta: 'ICD-11 Chapter 21 · General symptoms', keywords: ['syncope', 'passed out', 'collapse'] },
+  { code: 'MG41', name: 'Sleep disturbance', meta: 'ICD-11 Chapter 21 · General symptoms', keywords: ['insomnia', 'sleep problems'] },
+  { code: 'MB4D', name: 'Headache', meta: 'ICD-11 Chapter 21 · Nervous system symptoms', keywords: ['migraine', 'severe headache'] },
+  { code: 'MG2Y', name: 'Dizziness / giddiness', meta: 'ICD-11 Chapter 21 · Nervous system symptoms', keywords: ['dizzy', 'vertigo', 'lightheaded'] },
+  { code: 'MB20.2', name: 'Confusion / altered consciousness', meta: 'ICD-11 Chapter 21 · Nervous system symptoms', keywords: ['altered mental status', 'clouding of consciousness', 'obtunded'] },
+  { code: 'MD12', name: 'Cough', meta: 'ICD-11 Chapter 21 · Respiratory symptoms', keywords: ['coughing'] },
+  { code: 'MD11.5', name: 'Shortness of breath', meta: 'ICD-11 Chapter 21 · Respiratory symptoms', keywords: ['dyspnea', 'dyspnoea', 'breathlessness'] },
+  { code: 'MD11.C', name: 'Wheezing', meta: 'ICD-11 Chapter 21 · Respiratory symptoms', keywords: ['wheeze'] },
+  { code: 'MD81.4', name: 'Abdominal pain', meta: 'ICD-11 Chapter 21 · Digestive symptoms', keywords: ['stomach pain', 'belly pain', 'lower abdominal pain'] },
+  { code: 'Digestive symptoms', name: 'Nausea or vomiting', meta: 'ICD-11 Chapter 21 · Search precise symptom code during diagnosis', keywords: ['nausea', 'vomiting', 'vomiting everything'] },
+  { code: 'Digestive symptoms', name: 'Diarrhoea', meta: 'ICD-11 Chapter 21 · Search precise symptom code during diagnosis', keywords: ['diarrhea', 'watery stool', 'bloody diarrhoea', 'dysentery'] },
+  { code: 'Circulatory symptoms', name: 'Chest pain', meta: 'ICD-11 Chapter 21 · Search precise symptom code during diagnosis', keywords: ['central chest pain', 'chest tightness'] },
+  { code: 'MC81.0', name: 'Palpitations / fast heartbeat', meta: 'ICD-11 Chapter 21 · Circulatory symptoms', keywords: ['tachycardia', 'rapid pulse', 'heart racing'] },
+  { code: 'Pain symptoms', name: 'Pain', meta: 'ICD-11 Chapter 21 · Select site and acuity during diagnosis', keywords: ['acute pain', 'chronic pain', 'body pain', 'severe pain'] },
+  { code: 'Genitourinary symptoms', name: 'Painful urination', meta: 'ICD-11 Chapter 21 · Search precise symptom code during diagnosis', keywords: ['dysuria', 'burning urine'] },
+  { code: 'Skin symptoms', name: 'Skin rash / itching', meta: 'ICD-11 Chapter 21 · Search precise symptom code during diagnosis', keywords: ['rash', 'itch', 'measles-like rash'] },
+];
+
+const symptomOptions: CodedOption[] = [
+  ...ICD11_CHIEF_COMPLAINT_OPTIONS,
+  ...SYMPTOM_CATALOG.flatMap(g =>
+    g.options.map(name => ({
+      code: g.label,
+      name,
+      meta: `Local complaint list · ${g.label}`,
+      keywords: [g.label],
+    }))),
+];
 const examFindingOptions = Object.fromEntries(
   Object.entries(EXAM_FINDINGS_CATALOG).map(([system, groups]) => [
     system,
@@ -318,28 +444,6 @@ export default function ConsultationPage() {
     bloodGlucose: '',
     gcs: '',
   });
-
-  // Adult screening ranges for the inline "recheck" hints on the intake form.
-  // Informational only — they never block the wizard (paediatric/pregnancy
-  // norms differ; the clinician judges).
-  const vitalHint = (field: string, raw: string): string | null => {
-    if (!raw.trim()) return null;
-    const v = parseFloat(raw);
-    if (!Number.isFinite(v)) return null;
-    switch (field) {
-      case 'temperature': return v >= 38 ? 'Fever' : v < 35 ? 'Hypothermia — recheck' : null;
-      case 'systolic': return v >= 180 ? 'Severely high' : v >= 140 ? 'High' : v < 90 ? 'Low' : null;
-      case 'diastolic': return v >= 110 ? 'Severely high' : v >= 90 ? 'High' : v < 60 ? 'Low' : null;
-      case 'pulse': return v > 120 ? 'Tachycardic' : v < 50 ? 'Bradycardic' : null;
-      case 'respRate': return v > 24 ? 'Tachypnoeic' : v < 10 ? 'Low — recheck' : null;
-      case 'o2Sat': return v < 90 ? 'Critical — act now' : v < 94 ? 'Low' : null;
-      case 'bloodGlucose': return v > 11 ? 'High' : v < 3 ? 'Hypoglycaemia' : null;
-      case 'gcs': return v < 9 ? 'Severe — airway risk' : v < 15 ? 'Reduced' : null;
-      case 'painScore': return v >= 7 ? 'Severe pain' : null;
-      case 'muac': return v > 0 && v < 11.5 ? 'SAM range (child)' : null;
-      default: return null;
-    }
-  };
   const bmiValue = vitals.weight && vitals.height && parseFloat(vitals.height) > 0
     ? parseFloat(vitals.weight) / ((parseFloat(vitals.height) / 100) ** 2)
     : null;
@@ -440,6 +544,51 @@ export default function ConsultationPage() {
     () => patients.find(p => p._id === selectedPatient) || null,
     [patients, selectedPatient]
   );
+  const activeConsultationProfile = useMemo(
+    () => consultationProfile(selectedPatientData),
+    [selectedPatientData]
+  );
+
+  const vitalRangeLabel = (field: VitalField): string | null => {
+    const band = vitalBandFor(field, activeConsultationProfile);
+    return band ? `${activeConsultationProfile.label} limits: ${band.label}` : null;
+  };
+
+  // Inline screening hints use the selected patient's consultation profile.
+  // They are advisory only: clinicians still interpret vitals in context.
+  const vitalHint = (field: VitalField, raw: string): string | null => {
+    if (!raw.trim()) return null;
+    const value = parseFloat(raw);
+    if (!Number.isFinite(value)) return null;
+    const band = vitalBandFor(field, activeConsultationProfile);
+    if (!band) return null;
+
+    if (field === 'temperature') {
+      if (value >= 38) return 'Fever';
+      if (value < 35) return 'Hypothermia - recheck';
+    }
+    if (field === 'o2Sat') {
+      if (value < 90) return 'Critical low - act now';
+      if (value < 94) return 'Low oxygen saturation';
+    }
+    if ((field === 'systolic' || field === 'diastolic') && activeConsultationProfile.isPregnant && band.severeHigh != null && value >= band.severeHigh) {
+      return 'Severe pregnancy BP - act now';
+    }
+    if (field === 'muac' && activeConsultationProfile.isChild && value > 0 && value < 11.5) {
+      return 'Severe acute malnutrition range';
+    }
+    if (field === 'gcs') {
+      if (value < 9) return 'Severe - airway risk';
+      if (value < 15) return 'Reduced';
+    }
+    if (field === 'painScore' && value >= 7) return 'Severe pain';
+
+    if (band.severeLow != null && value < band.severeLow) return `Critical low (<${band.severeLow})`;
+    if (band.severeHigh != null && value >= band.severeHigh) return `Critical high (>=${band.severeHigh})`;
+    if (band.low != null && value < band.low) return `Below lower limit (${band.low})`;
+    if (band.high != null && value > band.high) return `Above upper limit (${band.high})`;
+    return null;
+  };
 
   // Today's triage for the selected patient (priority + captured vitals), used
   // to link the encounter, warn when triage was skipped, and prefill vitals.
@@ -1670,7 +1819,7 @@ export default function ConsultationPage() {
   };
 
   const sectionHeaders: { icon: React.ElementType; label: string }[] = [
-    { icon: ClipboardList, label: 'History' },
+    { icon: ClipboardList, label: t('consultation.sectionChiefComplaint') },
     { icon: Thermometer, label: 'Intake' },
     { icon: Stethoscope, label: t('consultation.sectionPhysicalExam') },
     { icon: Brain, label: 'Summary' },
@@ -1708,6 +1857,7 @@ export default function ConsultationPage() {
   };
 
   const WORKFLOW_PANEL = {
+    chiefComplaint: 0,
     intake: 1,
     exam: 2,
     assessment: 3,
@@ -1736,10 +1886,10 @@ export default function ConsultationPage() {
     hasPlanInput()
   );
 
-  // The consultation wizard is intentionally linear: intake (vitals) first,
-  // then the physical examination — which OPENS with the chief complaint /
-  // presenting symptoms — and summary last as a read-only review step.
+  // The consultation wizard is intentionally linear: chief complaint first,
+  // then intake/vitals, exam, assessment, orders, plan, and read-only summary.
   const workflowStages: { label: string; sections: number[] }[] = [
+    { label: 'Chief complaint', sections: [WORKFLOW_PANEL.chiefComplaint] },
     { label: 'Intake', sections: [WORKFLOW_PANEL.intake] },
     { label: 'Examination', sections: [WORKFLOW_PANEL.exam] },
     { label: 'Assessment', sections: [WORKFLOW_PANEL.assessment] },
@@ -1748,6 +1898,7 @@ export default function ConsultationPage() {
     { label: 'Summary', sections: [WORKFLOW_PANEL.summary] },
   ];
   const workflowStageIcons: React.ElementType[] = [
+    ClipboardList,
     Thermometer,
     Stethoscope,
     AlertTriangle,
@@ -1764,12 +1915,13 @@ export default function ConsultationPage() {
   // every gate fire one step late). A merged stage validates all its sections.
   const validateStep = (currentStep: number): string | null => {
     const sections = workflowStages[currentStep]?.sections ?? [];
+    if (sections.includes(WORKFLOW_PANEL.chiefComplaint)) {
+      if (!hasChiefComplaint()) return t('consultation.chiefComplaintRequired');
+    }
     if (sections.includes(WORKFLOW_PANEL.intake)) {
       if (!hasVitalsInput() && !todaysTriage) return 'Capture vitals or complete triage before moving to examination.';
     }
     if (sections.includes(WORKFLOW_PANEL.exam)) {
-      // The examination step opens with the chief complaint, so both gate here.
-      if (!hasChiefComplaint()) return t('consultation.chiefComplaintRequired');
       if (!hasExamInput()) return 'Document the physical examination before moving to assessment.';
     }
     if (sections.includes(WORKFLOW_PANEL.assessment) && diagnoses.length === 0) {
@@ -1799,9 +1951,8 @@ export default function ConsultationPage() {
   // both the stage rail and the progress checklist — progress is driven by what
   // has been filled in, not by which section happens to be open.
   const workflowPanelFilled = (i: number): boolean => (
-    // Intake is vitals-only now — the chief complaint lives at the top of the
-    // Examination step (intakeReady still spans both for overall completeness).
-    i === WORKFLOW_PANEL.intake ? (hasVitalsInput() || !!todaysTriage)
+    i === WORKFLOW_PANEL.chiefComplaint ? hasChiefComplaint()
+    : i === WORKFLOW_PANEL.intake ? (hasVitalsInput() || !!todaysTriage)
     : i === WORKFLOW_PANEL.exam ? hasExamInput()
     : i === WORKFLOW_PANEL.assessment ? diagnoses.length > 0
     : i === WORKFLOW_PANEL.orders ? hasOrdersInput()
@@ -1963,6 +2114,35 @@ export default function ConsultationPage() {
                 margin utility would also fire on cards after display:none
                 siblings and push the first visible card out of line. */}
             <div className="pr-1 ehr-soap-scroll">
+            {/* Section 0: Chief Complaint */}
+            <div className="card-elevated overflow-hidden ehr-card-fit" style={{ display: stepHas(0) ? undefined : 'none' }}>
+              <SectionHeader index={0} />
+              {openSections[0] && (
+                <div className="p-5 space-y-4">
+                  <div>
+                    <div className="chief-complaint-search">
+                      <CodedSearchField
+                        label={t('consultation.chiefComplaintLabel')}
+                        placeholder="Search ICD-11 signs & symptoms..."
+                        options={symptomOptions}
+                        value={symptomSearch}
+                        onChange={setSymptomSearch}
+                        onSelect={c => { addSymptom(c.name); setSymptomSearch(''); }}
+                        onAddCustom={text => { addSymptom(text); setSymptomSearch(''); }}
+                        maxResults={12}
+                      />
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={chiefComplaint}
+                      onChange={e => setChiefComplaint(e.target.value)}
+                      placeholder={t('consultation.chiefComplaintPlaceholder')}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Section 1: Intake + Vital Signs */}
             <div className="card-elevated overflow-hidden ehr-card-fit ehr-consult-fill-card" style={{ display: stepHas(1) ? undefined : 'none' }}>
               <SectionHeader index={1} />
@@ -1986,6 +2166,11 @@ export default function ConsultationPage() {
                   )}
                   {/* Vitals grouped into clinical clusters. Each field shows a
                       live, non-blocking range hint when the value looks off. */}
+                  <div className="ehr-vitals-profile">
+                    <span>{activeConsultationProfile.label} consultation limits</span>
+                    {activeConsultationProfile.ageYears != null && <span>Age {activeConsultationProfile.ageYears}</span>}
+                    {activeConsultationProfile.isPregnant && <span>Pregnancy BP alert starts at 140/90</span>}
+                  </div>
                   {([
                     {
                       title: 'Core vital signs',
@@ -2019,7 +2204,8 @@ export default function ConsultationPage() {
                       <div className="ehr-vitals-group-title">{group.title}</div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {group.fields.map(f => {
-                          const hint = vitalHint(f.key, vitals[f.key]);
+                          const range = isVitalField(f.key) ? vitalRangeLabel(f.key) : null;
+                          const hint = isVitalField(f.key) ? vitalHint(f.key, vitals[f.key]) : null;
                           return (
                             <div key={f.key}>
                               <label>{f.label}</label>
@@ -2033,6 +2219,7 @@ export default function ConsultationPage() {
                                 placeholder={f.placeholder}
                                 className={hint ? 'ehr-vital-flagged' : undefined}
                               />
+                              {range && <span className="ehr-vitals-range">{range}</span>}
                               {hint && <span className="ehr-vitals-flag">{hint}</span>}
                             </div>
                           );
@@ -2057,34 +2244,11 @@ export default function ConsultationPage() {
               )}
             </div>
 
-            {/* Section 2: Physical Examination — OPENS with the chief
-                complaint / presenting symptoms (moved out of Intake so the
-                story of the visit starts where the examination starts). */}
+            {/* Section 2: Physical Examination */}
             <div className="card-elevated overflow-hidden ehr-card-fit" style={{ display: stepHas(2) ? undefined : 'none' }}>
               <SectionHeader index={2} />
               {openSections[2] && (
                 <div className="p-5 space-y-4">
-                  <div>
-                    <CodedSearchField
-                      label={t('consultation.chiefComplaintLabel')}
-                      placeholder="Search signs & symptoms…"
-                      options={symptomOptions}
-                      value={symptomSearch}
-                      onChange={setSymptomSearch}
-                      onSelect={c => { addSymptom(c.name); setSymptomSearch(''); }}
-                      onAddCustom={text => { addSymptom(text); setSymptomSearch(''); }}
-                      showCodeBadge={false}
-                      maxResults={10}
-                    />
-                    {/* One editable box — picked symptoms append here and can
-                        be reworded, reordered, or deleted freely. */}
-                    <textarea
-                      rows={3}
-                      value={chiefComplaint}
-                      onChange={e => setChiefComplaint(e.target.value)}
-                      placeholder="e.g. Fever, watery diarrhoea, vomiting — or pick from the symptom list"
-                    />
-                  </div>
                   {([
                     { key: 'general', label: t('consultation.examGeneral'), placeholder: t('consultation.examGeneralPlaceholder') },
                     { key: 'cardiovascular', label: t('consultation.examCardiovascular'), placeholder: t('consultation.examCardiovascularPlaceholder') },

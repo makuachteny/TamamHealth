@@ -18,11 +18,19 @@ export interface RoleRouteConfig {
   readonly defaultDashboard: string;
 }
 
+const NURSE_MODULE_ROUTES = [
+  '/dashboard/nurse', '/patients', '/messages',
+  '/lab', '/immunizations', '/anc', '/births', '/deaths',
+  '/settings', '/appointments', '/patient-intake',
+  '/wards',
+] as const;
+
 export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   super_admin: {
     allowed: [
       '/facility-management',
       '/admin', '/admin/organizations', '/admin/users', '/admin/system',
+      '/it', '/system-admin',
       '/admin/billing', '/admin/analytics',
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
@@ -46,6 +54,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/org-admin', '/org-admin/users', '/org-admin/hospitals',
       '/org-admin/branding', '/org-admin/settings', '/org-admin/analytics', '/org-admin/pricing',
       '/facility-settings',
+      '/it', '/system-admin',
       '/hospitals', '/reports', '/settings',
       // Facility-management sidebar destinations (see FACILITY_NAV in permissions.ts).
       '/patients', '/pharmacy', '/messages',
@@ -85,12 +94,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   nurse: {
     // Ward & bedside care, immunisation, ANC support, vital-event documentation.
     // Not payment processing (cashier/biller).
-    allowed: [
-      '/dashboard/nurse', '/patients', '/messages',
-      '/lab', '/immunizations', '/anc', '/births', '/deaths',
-      '/settings', '/appointments', '/patient-intake',
-      '/wards',
-    ],
+    allowed: NURSE_MODULE_ROUTES,
     defaultDashboard: '/dashboard/nurse',
   },
 
@@ -191,6 +195,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/hospitals', '/settings',
       '/facility-settings',
+      '/it', '/system-admin',
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/telehealth', '/facility-assessments', '/data-quality',
       '/payments', '/payments/claims', '/patient-intake',
@@ -208,7 +213,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard/data-entry', '/patients', '/facility-assessments',
       '/data-quality', '/reports', '/vital-statistics',
       '/immunizations', '/anc', '/births', '/deaths',
-      '/hospitals', '/messages', '/settings',
+      '/hospitals', '/messages', '/settings', '/it', '/system-admin',
       '/dhis2-export',
     ],
     defaultDashboard: '/dashboard/data-entry',
@@ -243,6 +248,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       // Network & facility
       '/hospitals', '/my-facility', '/facility-overview', '/facility-assessments',
       '/facility-settings',
+      '/it', '/system-admin',
       // Reporting
       '/reports', '/data-quality', '/vital-statistics', '/dhis2-export', '/public-stats',
       // Facility operations
@@ -286,21 +292,14 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   },
 
   triage_nurse: {
-    // Triage station: records presenting complaint, vitals, and acuity, then
-    // routes the patient. No lab operations page — orders are placed by the
-    // clinician downstream.
-    allowed: [
-      '/patients', '/messages', '/settings',
-      '/dashboard/nurse', '/wards',
-    ],
+    // Specialized nurse login, same complete nurse station module.
+    allowed: NURSE_MODULE_ROUTES,
     defaultDashboard: '/dashboard/nurse',
   },
 
   rooming_nurse: {
-    allowed: [
-      '/patients', '/messages', '/settings',
-      '/dashboard/nurse', '/immunizations', '/anc', '/lab',
-    ],
+    // Specialized nurse login, same complete nurse station module.
+    allowed: NURSE_MODULE_ROUTES,
     defaultDashboard: '/dashboard/nurse',
   },
 
@@ -318,7 +317,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard/data-entry', '/patients', '/facility-assessments', '/data-quality',
       '/reports', '/vital-statistics', '/immunizations', '/anc', '/births', '/deaths',
-      '/hospitals', '/messages', '/settings', '/dhis2-export',
+      '/hospitals', '/messages', '/settings', '/dhis2-export', '/system-admin',
     ],
     defaultDashboard: '/dashboard/data-entry',
   },
@@ -335,6 +334,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/facility-assessments', '/data-quality', '/patient-intake',
       '/facility-settings',
+      '/it', '/system-admin',
       '/payments', '/payments/claims',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',

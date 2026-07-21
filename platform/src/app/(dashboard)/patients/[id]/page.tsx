@@ -12,7 +12,7 @@ import {
   CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
   User as UserIcon, Building2, Search, X, Wallet, Syringe,
   Heart, Printer, History, Calendar, Stethoscope,
-  Bandage, Layers,
+  Bandage, Layers, Plus, Pencil,
 } from '@/components/icons/lucide';
 import Badge from '@/components/Badge';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -100,6 +100,16 @@ const FACESHEET_PANEL_OPTIONS: Array<{ id: FacesheetPanelId; label: string }> = 
 
 const DEFAULT_FACESHEET_PANELS = FACESHEET_PANEL_OPTIONS.map(panel => panel.id);
 
+/** Primary write-action per facesheet card, keyed by panel id. An entry is
+ *  omitted when the current role can't perform it, in which case no action
+ *  button renders for that card. */
+type FacesheetActions = Partial<Record<FacesheetPanelId, {
+  label: string;
+  onClick: () => void;
+  /** Defaults to a "+" — override for actions that aren't additive (Edit, Review). */
+  icon?: typeof Plus;
+}>>;
+
 // Tab ids that a `?tab=` deep-link is allowed to open. Mirrors `allTabs` (in the
 // component) plus the other reachable `activeTab` targets (`referrals`, `sbar`).
 // Clinical-permission gating still runs in the effect below, so a non-clinical
@@ -157,6 +167,9 @@ export default function PatientDetailPage() {
   // One-shot request for the chart shell to open a workspace drawer panel
   // (e.g. header "+ Note" → the persisting visit-note panel).
   const [chartPanelRequest, setChartPanelRequest] = useState<string | null>(null);
+  // One-shot request for a tab's ChartSection to pop its own "Add" form open
+  // (e.g. the Facesheet Problems card's "Add" → Conditions tab + add modal).
+  const [sectionAddRequest, setSectionAddRequest] = useState<'problems' | 'allergies' | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSignature, setPrintSignature] = useState('');
   const [printSigned, setPrintSigned] = useState(false);
@@ -309,6 +322,26 @@ export default function PatientDetailPage() {
   const openPaymentFromHeader = () => {
     setActiveTab('billing');
     setShowPaymentPanel(true);
+  };
+
+  // Facesheet card actions. Each one performs the real write action the card
+  // represents, reusing the flows the header/tabs already use: the prescribe
+  // and lab-order modals, the visit-note drawer, the consultation vitals form,
+  // and the Conditions/Allergies tabs' own "Add" modals (opened via
+  // sectionAddRequest so the card's action lands directly in the add form).
+  const openSectionAdd = (section: 'problems' | 'allergies') => {
+    setActiveTab(section);
+    setSectionAddRequest(section);
+  };
+  const facesheetActions: FacesheetActions = {
+    ...(canPrescribe ? { medications: { label: 'Prescribe', onClick: () => setShowPrescribeModal(true) } } : {}),
+    ...(canConsult ? { problems: { label: 'Add', onClick: () => openSectionAdd('problems') } } : {}),
+    ...(canConsult ? { allergies: { label: 'Add', onClick: () => openSectionAdd('allergies') } } : {}),
+    ...(canConsult && patient ? { vitals: { label: 'Record', onClick: () => router.push(`/consultation?patientId=${patient._id}`) } } : {}),
+    ...(canConsult ? { history: { label: 'Note', onClick: () => setChartPanelRequest('visit-note') } } : {}),
+    ...(canOrderLabs ? { labs: { label: 'Order', onClick: () => setShowOrderLabModal(true) } } : {}),
+    ...(canConsult ? { recommendations: { label: 'Review', onClick: () => setActiveTab('careChecklist'), icon: ClipboardList } } : {}),
+    demographics: { label: 'Edit', onClick: openEditModal, icon: Pencil },
   };
 
   const handleEditSubmit = async () => {
@@ -1195,6 +1228,7 @@ export default function PatientDetailPage() {
               records={records}
               canViewClinical={canViewClinical}
               onOpenTab={setActiveTab}
+              actions={facesheetActions}
               visiblePanelIds={facesheetPanels}
               customizeOpen={showCustomizeView}
               onToggleCustomize={() => setShowCustomizeView(open => !open)}
@@ -1616,7 +1650,12 @@ export default function PatientDetailPage() {
               lives on the legacy facesheet view. */}
           {activeTab === 'problems' && patient && (
             <div className="space-y-4">
-              <ConditionsSection patientId={patient._id} patientName={patientFullName(patient)} />
+              <ConditionsSection
+                patientId={patient._id}
+                patientName={patientFullName(patient)}
+                autoOpenAdd={sectionAddRequest === 'problems'}
+                onAutoOpenHandled={() => setSectionAddRequest(null)}
+              />
             </div>
           )}
 
@@ -1624,7 +1663,11 @@ export default function PatientDetailPage() {
               stay reachable here since they don't have their own rail slot. */}
           {activeTab === 'allergies' && patient && (
             <div className="space-y-4">
-              <AllergiesSection patient={patient} />
+              <AllergiesSection
+                patient={patient}
+                autoOpenAdd={sectionAddRequest === 'allergies'}
+                onAutoOpenHandled={() => setSectionAddRequest(null)}
+              />
               <div className="card-elevated p-5">
                 <DirectiveList patient={patient} />
               </div>
@@ -2646,6 +2689,38 @@ export default function PatientDetailPage() {
   );
 }
 
+/**
+ * Facesheet card header — icon + title on the left, the card's primary write
+ * action on the right. The action button stops propagation so it never also
+ * fires the card's "open this tab" click handler.
+ */
+function FacesheetPanelHead({
+  icon: Icon,
+  title,
+  action,
+}: {
+  icon: typeof Pill;
+  title: string;
+  action?: FacesheetActions[FacesheetPanelId];
+}) {
+  const ActionIcon = action?.icon || Plus;
+  return (
+    <div className="tebra-panel__head">
+      <h2><Icon className="tebra-panel-icon" aria-hidden /> {title}</h2>
+      {action && (
+        <button
+          type="button"
+          className="tebra-panel-action"
+          onClick={event => { event.stopPropagation(); action.onClick(); }}
+          aria-label={`${action.label} — ${title}`}
+        >
+          <ActionIcon aria-hidden /> {action.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PatientFacesheetView({
   patient,
   latestVitals,
@@ -2656,6 +2731,7 @@ function PatientFacesheetView({
   records,
   canViewClinical,
   onOpenTab,
+  actions,
   visiblePanelIds,
   customizeOpen,
   onToggleCustomize,
@@ -2671,6 +2747,9 @@ function PatientFacesheetView({
   records: MedicalRecordDoc[];
   canViewClinical: boolean;
   onOpenTab: (tab: string) => void;
+  /** Per-panel primary actions. A missing entry hides that panel's action
+   *  button (the role lacks the permission); the card itself stays clickable. */
+  actions: FacesheetActions;
   visiblePanelIds: Set<FacesheetPanelId>;
   customizeOpen: boolean;
   onToggleCustomize: () => void;
@@ -2734,7 +2813,7 @@ function PatientFacesheetView({
 
       {showPanel('medications') && (
       <section className="tebra-panel" onClick={() => onOpenTab('prescriptions')}>
-        <h2><Pill className="tebra-panel-icon" aria-hidden /> Medications</h2>
+        <FacesheetPanelHead icon={Pill} title="Medications" action={actions.medications} />
         {currentMeds.length ? (
           <div className="tebra-list">
             {currentMeds.map(rx => (
@@ -2750,7 +2829,7 @@ function PatientFacesheetView({
 
       {showPanel('problems') && (
       <section className="tebra-panel" onClick={() => onOpenTab('problems')}>
-        <h2><AlertTriangle className="tebra-panel-icon" aria-hidden /> Problems</h2>
+        <FacesheetPanelHead icon={AlertTriangle} title="Problems" action={actions.problems} />
         {activeProblems.length ? (
           <div className="tebra-list">
             {activeProblems.slice(0, 5).map(problem => (
@@ -2775,7 +2854,7 @@ function PatientFacesheetView({
               .map(a => ({ name: a, detail: undefined as string | undefined }));
         return (
       <section className="tebra-panel" onClick={() => onOpenTab('allergies')}>
-        <h2><ShieldAlert className="tebra-panel-icon" aria-hidden /> Allergies</h2>
+        <FacesheetPanelHead icon={ShieldAlert} title="Allergies" action={actions.allergies} />
         {activeAllergies.length ? (
           <div className="tebra-list">
             {activeAllergies.slice(0, 6).map((a, i) => (
@@ -2796,7 +2875,7 @@ function PatientFacesheetView({
         const spo2Low = !!(latestVitals?.oxygenSaturation && latestVitals.oxygenSaturation < 94);
         return (
       <section className="tebra-panel tebra-panel--highlight" onClick={() => onOpenTab('vitals')}>
-        <h2><Activity className="tebra-panel-icon" aria-hidden /> Vitals</h2>
+        <FacesheetPanelHead icon={Activity} title="Vitals" action={actions.vitals} />
         {latestVitals ? (
           <div className="tebra-vitals">
             <span className={bpElevated ? 'is-out-of-range' : ''}>BP <strong>{latestVitals.systolic && latestVitals.diastolic ? `${latestVitals.systolic}/${latestVitals.diastolic}` : '-'}</strong></span>
@@ -2811,7 +2890,7 @@ function PatientFacesheetView({
 
       {showPanel('history') && (
       <section className="tebra-panel" onClick={() => onOpenTab('history')}>
-        <h2><History className="tebra-panel-icon" aria-hidden /> History</h2>
+        <FacesheetPanelHead icon={History} title="History" action={actions.history} />
         {latestHistory ? (
           <div className="tebra-list-row">
             <strong>{latestHistory.chiefComplaint || 'Recent encounter'}</strong>
@@ -2823,7 +2902,7 @@ function PatientFacesheetView({
 
       {showPanel('labs') && (
       <section className="tebra-panel" onClick={() => onOpenTab('labs')}>
-        <h2><FlaskConical className="tebra-panel-icon" aria-hidden /> Labs/Studies</h2>
+        <FacesheetPanelHead icon={FlaskConical} title="Labs/Studies" action={actions.labs} />
         {recentLabs.length ? (
           <div className="tebra-list">
             {recentLabs.map(lab => {
@@ -2851,7 +2930,7 @@ function PatientFacesheetView({
 
       {showPanel('recommendations') && (
       <section className="tebra-panel tebra-recommendations" onClick={() => onOpenTab('careChecklist')}>
-        <h2><ClipboardList className="tebra-panel-icon" aria-hidden /> Clinical Recommendations</h2>
+        <FacesheetPanelHead icon={ClipboardList} title="Clinical Recommendations" action={actions.recommendations} />
         <div className="tebra-reco-list">
           {recommendations.map(item => (
             <div key={item.title} className="tebra-reco-row">
@@ -2868,7 +2947,7 @@ function PatientFacesheetView({
 
       {showPanel('demographics') && (
       <section className="tebra-panel" onClick={() => onOpenTab('demographics')}>
-        <h2><UserIcon className="tebra-panel-icon" aria-hidden /> Demographics</h2>
+        <FacesheetPanelHead icon={UserIcon} title="Demographics" action={actions.demographics} />
         <div className="tebra-list">
           {[
             { label: 'Patient ID', value: patient.hospitalNumber || patient.geocodeId || '—' },

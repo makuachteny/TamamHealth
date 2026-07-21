@@ -513,6 +513,11 @@ export default function LabDashboardPage() {
             { label: 'Results', icon: CheckCircle2, onClick: () => setLabPanel(p => (p === 'recent' ? null : 'recent')), active: labPanel === 'recent', tone: labPanel === 'recent' ? 'primary' : 'neutral' },
           ]}
           hideRowList={labPanel !== null}
+          // Critical/abnormal results still count as "resulted" for the day chart —
+          // statusTone flags severity, not completion, so chartSeries is set
+          // explicitly from order.status rather than relying on the done→series1
+          // default (which would otherwise misfile a flagged result as "awaiting").
+          chartSeriesNames={['Awaiting', 'Resulted']}
           rows={queueFilter === 'completed' ? visibleCompletedDiseaseRows.map((row): EhrCareDashboardRow => {
             const lab = row.lab;
             const time = lab.completedAt ? new Date(lab.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined;
@@ -521,10 +526,13 @@ export default function LabDashboardPage() {
               title: row.disease,
               subtitle: `${lab.patientName} · ${row.detail}`,
               meta: `${lab.hospitalNumber || ''}${lab.orderedBy ? ` · ${t('lab.orderedBy', { name: lab.orderedBy })}` : ''}`.replace(/^ · /, ''),
+              careTeam: lab.orderedBy,
+              careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
               status: row.severity === 'critical' ? 'Critical' : 'Complete',
               statusTone: row.severity === 'critical' ? 'danger' : row.severity === 'abnormal' ? 'warning' : 'done',
+              chartSeries: 1,
               priority: row.severity === 'critical' ? 'Critical' : undefined,
               popupDetail: renderLabWorkflowPopup(lab),
             };
@@ -537,35 +545,26 @@ export default function LabDashboardPage() {
               title: order.patientName,
               subtitle: `${order.testName} · ${order.specimen}`,
               meta: order.orderedBy ? t('lab.orderedBy', { name: order.orderedBy }) : undefined,
+              careTeam: order.orderedBy,
+              careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
               status: order.critical ? 'Critical' : labStatusLabel(order.status),
               statusTone: order.critical ? 'danger' : order.abnormal ? 'warning' : order.status === 'completed' ? 'done' : order.status === 'in_progress' ? 'active' : 'scheduled',
+              chartSeries: order.status === 'completed' ? 1 : 0,
               priority: order.critical ? t('lab.critical') : undefined,
               popupDetail: renderLabWorkflowPopup(order),
             };
           })}
           metrics={[
-            { label: 'Pending', value: kpis.pending },
-            { label: 'Processing', value: kpis.inProgress },
-            { label: 'Complete', value: completedDiseaseRows.length },
             { label: t('lab.abnormalBadge'), value: completedDiseaseRows.filter(row => row.severity === 'abnormal').length, tone: 'warning' },
             { label: t('lab.critical'), value: completedDiseaseRows.filter(row => row.severity === 'critical').length, tone: 'danger' },
-            // Click-through to the Specimen Pipeline / Recent
-            // Completed panels, which used to sit in the center but now open
-            // from here on demand.
-            { label: t('lab.specimenPipeline'), value: kpis.total, onClick: () => setLabPanel('specimen') },
-            { label: 'Results', value: results.filter(r => r.status === 'completed').length, onClick: () => setLabPanel('recent') },
           ]}
           metricsTitle={t('lab.laboratory')}
           checklist={[
-            { label: t('lab.enterResult'), done: kpis.pending === 0, onClick: () => setShowResultModal(true) },
-            { label: t('lab.batchEntry'), done: kpis.inProgress === 0, onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
             { label: t('lab.criticalResult'), done: kpis.unacknowledgedCritical === 0, onClick: () => setQueueFilter('completed') },
           ]}
           checklistTitle={t('lab.quickActions')}
-          missionTitle={t('lab.laboratory')}
-          missionDescription={t('lab.ordersQueue')}
           emptyTitle={t('lab.noPendingOrders')}
         >
         {/* --- Feature 2: Critical Result Alert Banner --- */}

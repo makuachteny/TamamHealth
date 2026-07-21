@@ -16,10 +16,11 @@ import {
 import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
 import {
   Stethoscope, Users, HeartPulse, BedDouble, ChevronRight,
-  Edit3, Trash2, Eye, ChevronDown,
+  Eye,
 } from '@/components/icons/lucide';
-import { formatMoney, formatClockTime } from '@/lib/format-utils';
+import { formatMoney } from '@/lib/format-utils';
 import type { MessageDoc } from '@/lib/db-types';
+import { ROLE_LABEL } from '@/lib/role-display';
 
 const TEAL = 'var(--color-brand-400)';
 const PURPLE = 'var(--accent-primary)';
@@ -41,11 +42,12 @@ export default function FacilityManagementDashboard() {
   const { currentUser } = useApp();
   const router = useRouter();
   const scope = useDataScope();
+  const currentUserId = currentUser?._id;
 
   const { users } = useUsers();
   const { patients } = usePatients();
   const { availableBeds } = useWards();
-  const { appointments, updateStatus: updateApptStatus } = useAppointments();
+  const { appointments } = useAppointments();
 
   const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [enquiries, setEnquiries] = useState<MessageDoc[]>([]);
@@ -118,35 +120,50 @@ export default function FacilityManagementDashboard() {
     return rows;
   }, [patients, appointments]);
 
-  // ─── Upcoming appointments (real) ───
-  const ageOf = useMemo(() => {
-    const byId = new Map(patients.map(p => [p._id, (p as { age?: number }).age]));
-    return (patientId: string) => byId.get(patientId);
-  }, [patients]);
+  const unreadEnquiries = useMemo(
+    () => enquiries.filter(message => !currentUserId || !message.readBy?.includes(currentUserId)),
+    [currentUserId, enquiries],
+  );
 
-  const upcoming = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return appointments
-      .filter(a => (a.appointmentDate || '') >= today && a.status !== 'cancelled' && a.status !== 'completed')
-      .sort((x, y) => (x.appointmentDate + x.appointmentTime).localeCompare(y.appointmentDate + y.appointmentTime))
-      .slice(0, 6);
-  }, [appointments]);
+  const lastInquiryLabel = useMemo(() => {
+    const latest = enquiries[0];
+    if (!latest?.sentAt && !latest?.createdAt) return 'No inquiries';
+    const timestamp = latest.sentAt || latest.createdAt;
+    return new Date(timestamp).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, [enquiries]);
+
+  const userInquiryRows = useMemo(() => {
+    const priorityRoles = new Set(['front_desk', 'clinic_clerk', 'central_registration_clerk', 'doctor', 'clinician', 'clinical_officer', 'nurse', 'pharmacist', 'lab_tech']);
+    return users
+      .filter(user => priorityRoles.has(user.role) || user.isActive)
+      .sort((a, b) => {
+        const activeDelta = Number(b.isActive !== false) - Number(a.isActive !== false);
+        if (activeDelta) return activeDelta;
+        const availableDelta = Number(availableProviderIds.has(b._id)) - Number(availableProviderIds.has(a._id));
+        if (availableDelta) return availableDelta;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 6)
+      .map(user => ({
+        user,
+        available: availableProviderIds.has(user._id),
+        active: user.isActive !== false,
+      }));
+  }, [availableProviderIds, users]);
 
   if (!currentUser) return null;
 
   const statusPill = (status: string) => {
-    const ok = /approved|confirmed|scheduled|booked/i.test(status);
-    const bad = /cancel/i.test(status);
+    const ok = /approved|confirmed|scheduled|booked|available|active/i.test(status);
+    const bad = /cancel|inactive/i.test(status);
     const color = bad ? 'var(--color-danger)' : ok ? 'var(--color-success)' : 'var(--text-muted)';
     const bg = bad ? 'rgba(229,46,66,0.10)' : ok ? 'rgba(21,121,92,0.10)' : 'var(--overlay-subtle)';
     return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize" style={{ color, background: bg }}>{status}</span>;
-  };
-
-  // Row action: cancel an appointment from the dashboard (confirm first).
-  const cancelAppointment = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (!window.confirm('Cancel this appointment?')) return;
-    try { await updateApptStatus(id, 'cancelled'); } catch { /* surfaced elsewhere */ }
   };
 
   const stat = (icon: React.ReactNode, label: React.ReactNode, value: number) => (
@@ -271,58 +288,73 @@ export default function FacilityManagementDashboard() {
             </ChartCard>
           </div>
 
-          {/* ═══ ROW 2 — Upcoming Appointments ═══ */}
+          {/* ═══ ROW 2 — Users & Inquiries ═══ */}
           <div className="dash-card overflow-hidden">
             <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Appointments</h3>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Users & Inquiries</h3>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {users.length} users · {unreadEnquiries.length} open inquiries · Last {lastInquiryLabel}
+                </p>
+              </div>
               <div className="flex items-center gap-3">
-                <span className="text-[11px] font-medium inline-flex items-center gap-1 px-2.5 py-1 rounded-lg" style={{ color: 'var(--text-secondary)', background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>Sort by <ChevronDown className="w-3 h-3" /></span>
-                <button onClick={() => router.push('/appointments')} className="text-[12px] font-medium inline-flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                  View all <ChevronRight className="w-3 h-3" />
+                <button onClick={() => router.push('/messages')} className="text-[12px] font-medium inline-flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
+                  Inquiries <ChevronRight className="w-3 h-3" />
+                </button>
+                <button onClick={() => router.push('/hr')} className="text-[12px] font-medium inline-flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
+                  Users <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table className="w-full" style={{ minWidth: 820 }}>
+              <table className="w-full" style={{ minWidth: 900 }}>
                 <thead>
                   <tr>
-                    {['Id', 'Patient Name', 'Age', 'Date', 'Time', 'Doctors', 'Status', 'Action'].map(h => (
+                    {['User', 'Role', 'Department', 'Availability', 'Facility Inbox', 'Last Inquiry', 'Action'].map(h => (
                       <th key={h} className={`px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider ${h === 'Action' ? 'text-right' : 'text-left'}`} style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {upcoming.length === 0 && (
-                    <tr><td colSpan={8} className="px-5 py-8 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No upcoming appointments.</td></tr>
+                  {userInquiryRows.length === 0 && (
+                    <tr><td colSpan={7} className="px-5 py-8 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No users available for this facility.</td></tr>
                   )}
-                  {upcoming.map((a, i) => (
-                    <tr key={a._id} role="button" tabIndex={0}
+                  {userInquiryRows.map(({ user, available, active }, i) => (
+                    <tr key={user._id} role="button" tabIndex={0}
                       className="cursor-pointer hover:bg-[var(--table-row-hover)]"
-                      onClick={() => router.push(`/patients/${a.patientId}`)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${a.patientId}`); } }}
+                      onClick={() => router.push('/hr')}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push('/hr'); } }}
                       style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td className="px-5 py-2.5 text-[12px] font-mono tabular-nums" style={{ color: 'var(--text-secondary)' }}>APT{String(i + 1).padStart(3, '0')}</td>
-                      <td className="px-5 py-2.5 text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{a.patientName}</td>
-                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{ageOf(a.patientId) ?? '—'}</td>
-                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{a.appointmentDate}</td>
-                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{formatClockTime(a.appointmentTime)}{a.endTime ? ` – ${formatClockTime(a.endTime)}` : ''}</td>
-                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{a.providerName || '—'}</td>
-                      <td className="px-5 py-2.5">{statusPill(a.status)}</td>
+                      <td className="px-5 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[12px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{String(i + 1).padStart(2, '0')}</span>
+                          <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: active ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                            {(user.name || '?').split(' ').map(part => part[0]).slice(0, 2).join('')}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{user.name}</span>
+                            <span className="block text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.username}</span>
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{ROLE_LABEL[user.role] || user.role}</td>
+                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{user.department || user.specialty || user.hospitalName || 'General'}</td>
+                      <td className="px-5 py-2.5">{statusPill(!active ? 'Inactive' : available ? 'Available' : 'Active')}</td>
+                      <td className="px-5 py-2.5">
+                        <span className="text-[12px] font-semibold" style={{ color: unreadEnquiries.length > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                          {unreadEnquiries.length}
+                        </span>
+                      </td>
+                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{lastInquiryLabel}</td>
                       <td className="px-5 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={(e) => { e.stopPropagation(); router.push('/appointments'); }}
+                            onClick={(e) => { e.stopPropagation(); router.push(unreadEnquiries.length > 0 ? '/messages' : '/hr'); }}
                             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--overlay-medium)]"
-                            title="Edit appointment" aria-label="Edit appointment"
+                            title={unreadEnquiries.length > 0 ? 'View inquiries' : 'View users'}
+                            aria-label={unreadEnquiries.length > 0 ? 'View inquiries' : 'View users'}
                           >
-                            <Edit3 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                          </button>
-                          <button
-                            onClick={(e) => cancelAppointment(e, a._id)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--overlay-medium)]"
-                            title="Cancel appointment" aria-label="Cancel appointment"
-                          >
-                            <Trash2 className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
+                            <Eye className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                           </button>
                         </div>
                       </td>

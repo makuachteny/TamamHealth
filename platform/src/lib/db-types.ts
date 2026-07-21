@@ -1591,8 +1591,32 @@ export interface AppointmentDoc extends BaseDoc {
   status: AppointmentStatus;
   cancelledReason?: string;
   cancelledBy?: string;
+  cancelledByName?: string;
+  cancelledAt?: string;
+  confirmedAt?: string;
+  confirmedBy?: string;
+  confirmedByName?: string;
   checkedInAt?: string;
+  checkedInBy?: string;
+  checkedInByName?: string;
+  startedAt?: string;
+  startedBy?: string;
+  startedByName?: string;
   completedAt?: string;
+  completedBy?: string;
+  completedByName?: string;
+  noShowAt?: string;
+  noShowBy?: string;
+  noShowByName?: string;
+  statusHistory?: Array<{
+    from: AppointmentStatus;
+    to: AppointmentStatus;
+    at: string;
+    by?: string;
+    byName?: string;
+    note?: string;
+    automated?: boolean;
+  }>;
   // Reminders
   reminderSent: boolean;
   reminderChannel?: 'sms' | 'app' | 'both';

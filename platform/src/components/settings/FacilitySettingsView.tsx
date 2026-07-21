@@ -5,20 +5,75 @@ import TopBar from '@/components/TopBar';
 import { useToast } from '@/components/Toast';
 import {
   Settings, Building2, Stethoscope, FlaskConical, Wallet, ShieldCheck,
-  Trash2, Plus, Save, X, Clock,
+  Trash2, Plus, Save, X, Clock, ClipboardCheck, Database, Server,
 } from '@/components/icons/lucide';
 import { useSettings, useSettingsContext } from '@/lib/settings/SettingsProvider';
 import { saveFacilitySettings } from '@/lib/settings/settings-service';
 import {
   type FacilitySettings,
+  type EncounterStationKey,
   type LabTestDef,
   type PaymentMethodKey,
+  type PatientProfileKey,
   type PayorKey,
   PAYMENT_METHOD_LABELS,
   PAYOR_LABELS,
   ALL_PAYMENT_METHODS,
   ALL_PAYORS,
 } from '@/lib/settings/facility-settings';
+
+const STATION_LABELS: Record<EncounterStationKey, string> = {
+  registration: 'Registration',
+  triage: 'Triage',
+  rooming: 'Rooming',
+  consultation: 'Consultation',
+  lab: 'Laboratory',
+  radiology: 'Radiology',
+  pharmacy: 'Pharmacy',
+  cashier: 'Cashier',
+  clinic_checkout: 'Clinic checkout',
+  facility_checkout: 'Facility checkout',
+};
+
+const PATIENT_PROFILE_LABELS: Record<PatientProfileKey, string> = {
+  child: 'Child',
+  adult: 'Adult',
+  pregnant: 'Pregnant',
+  postnatal: 'Postnatal',
+  emergency: 'Emergency',
+};
+
+const CHECKOUT_GATE_LABELS: Record<string, string> = {
+  all_clinic_visits_closed: 'All clinic visits closed',
+  prescriptions_dispensed: 'Prescriptions dispensed or deferred',
+  critical_labs_reviewed: 'Critical labs reviewed',
+  in_clinic_procedures_complete: 'Procedures complete',
+  required_documentation_generated: 'Required documentation generated',
+  payment_status_determined: 'Payment status determined',
+  pending_items_flagged: 'Pending items flagged',
+};
+
+const ALL_STATIONS = Object.keys(STATION_LABELS) as EncounterStationKey[];
+const ALL_PATIENT_PROFILES = Object.keys(PATIENT_PROFILE_LABELS) as PatientProfileKey[];
+const ALL_CHECKOUT_GATES = Object.keys(CHECKOUT_GATE_LABELS);
+const ALL_REPORTING_SOURCES = ['encounters', 'diagnoses', 'lab_results', 'pharmacy_dispenses', 'vital_events', 'payments'] as const;
+const REPORTING_SOURCE_LABELS: Record<(typeof ALL_REPORTING_SOURCES)[number], string> = {
+  encounters: 'Encounters',
+  diagnoses: 'Diagnoses',
+  lab_results: 'Lab results',
+  pharmacy_dispenses: 'Pharmacy dispenses',
+  vital_events: 'Vital events',
+  payments: 'Payments',
+};
+const ALL_INTEGRATIONS = ['dhis2', 'sms', 'email', 'payments', 'lab_devices', 'barcode_printers'] as const;
+const INTEGRATION_LABELS: Record<(typeof ALL_INTEGRATIONS)[number], string> = {
+  dhis2: 'DHIS2',
+  sms: 'SMS',
+  email: 'Email',
+  payments: 'Payment provider',
+  lab_devices: 'Lab devices',
+  barcode_printers: 'Barcode / label printers',
+};
 
 // `embedded` renders just the settings body (no TopBar / page-container) so the
 // main Settings page can host it as its "Facility" tab. The standalone route
@@ -230,6 +285,212 @@ export function FacilitySettingsView({ embedded = false }: { embedded?: boolean 
             />
           </SectionCard>
 
+          {/* ── Workflow ────────────────────────────────────────────── */}
+          <SectionCard icon={ClipboardCheck} title="Workflow">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <p className="fs-grouplabel">Default station sequence</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {ALL_STATIONS.map(key => (
+                    <CheckRow
+                      key={key}
+                      label={STATION_LABELS[key]}
+                      checked={draft.stationSequence.includes(key)}
+                      onToggle={() => toggleKey<EncounterStationKey>(draft.stationSequence, key, v => setDraft({ ...draft, stationSequence: orderByReference(v, ALL_STATIONS) }))}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="fs-grouplabel">Facility checkout gates</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {ALL_CHECKOUT_GATES.map(key => (
+                    <CheckRow
+                      key={key}
+                      label={CHECKOUT_GATE_LABELS[key]}
+                      checked={draft.checkoutGateKeys.includes(key)}
+                      onToggle={() => toggleKey<string>(draft.checkoutGateKeys, key, v => setDraft({ ...draft, checkoutGateKeys: v }))}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <p className="fs-grouplabel" style={{ marginTop: 16 }}>Triage required for</p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {ALL_PATIENT_PROFILES.map(key => (
+                <CheckRow
+                  key={key}
+                  label={PATIENT_PROFILE_LABELS[key]}
+                  checked={draft.triageRequiredFor.includes(key)}
+                  onToggle={() => toggleKey<PatientProfileKey>(draft.triageRequiredFor, key, v => setDraft({ ...draft, triageRequiredFor: v }))}
+                />
+              ))}
+            </div>
+
+            <p className="fs-grouplabel" style={{ marginTop: 16 }}>Default routing</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {(['appointment', 'walkIn', 'referral', 'emergency', 'maternity', 'child'] as const).map(key => (
+                <Field key={key} label={key.replace(/([A-Z])/g, ' $1')}>
+                  <input
+                    className="fs-input"
+                    value={draft.routingDefaults[key]}
+                    onChange={e => setDraft({ ...draft, routingDefaults: { ...draft.routingDefaults, [key]: e.target.value } })}
+                  />
+                </Field>
+              ))}
+            </div>
+
+            <p className="fs-grouplabel" style={{ marginTop: 16 }}>Direct service access</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <CheckRow label="Direct lab orders" checked={draft.directServiceAccess.lab} onToggle={() => setDraft({ ...draft, directServiceAccess: { ...draft.directServiceAccess, lab: !draft.directServiceAccess.lab } })} />
+              <CheckRow label="Direct radiology orders" checked={draft.directServiceAccess.radiology} onToggle={() => setDraft({ ...draft, directServiceAccess: { ...draft.directServiceAccess, radiology: !draft.directServiceAccess.radiology } })} />
+              <CheckRow label="Pharmacy refill without consult" checked={draft.directServiceAccess.pharmacyRefill} onToggle={() => setDraft({ ...draft, directServiceAccess: { ...draft.directServiceAccess, pharmacyRefill: !draft.directServiceAccess.pharmacyRefill } })} />
+            </div>
+            <SaveBar
+              saving={saving === 'workflow'}
+              onSave={() => saveSection({
+                stationSequence: draft.stationSequence,
+                checkoutGateKeys: draft.checkoutGateKeys,
+                triageRequiredFor: draft.triageRequiredFor,
+                routingDefaults: draft.routingDefaults,
+                directServiceAccess: draft.directServiceAccess,
+              }, 'workflow')}
+            />
+          </SectionCard>
+
+          {/* ── Consultation Profiles ───────────────────────────────── */}
+          <SectionCard icon={Stethoscope} title="Consultation Profiles">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {ALL_PATIENT_PROFILES.map(profile => {
+                const p = draft.consultationProfiles[profile];
+                return (
+                  <div key={profile} className="p-3 rounded-xl" style={{ border: '1px solid var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{PATIENT_PROFILE_LABELS[profile]}</p>
+                      <CheckRow
+                        label="Chief complaint"
+                        checked={p.chiefComplaintRequired}
+                        onToggle={() => setDraft({
+                          ...draft,
+                          consultationProfiles: {
+                            ...draft.consultationProfiles,
+                            [profile]: { ...p, chiefComplaintRequired: !p.chiefComplaintRequired },
+                          },
+                        })}
+                      />
+                    </div>
+                    <TextareaListEditor
+                      label="Required vitals"
+                      values={p.vitalsRequired}
+                      onChange={v => setDraft({ ...draft, consultationProfiles: { ...draft.consultationProfiles, [profile]: { ...p, vitalsRequired: v } } })}
+                    />
+                    <TextareaListEditor
+                      label="History prompts"
+                      values={p.historyPrompts}
+                      onChange={v => setDraft({ ...draft, consultationProfiles: { ...draft.consultationProfiles, [profile]: { ...p, historyPrompts: v } } })}
+                    />
+                    <TextareaListEditor
+                      label="Red flags"
+                      values={p.redFlagPrompts}
+                      onChange={v => setDraft({ ...draft, consultationProfiles: { ...draft.consultationProfiles, [profile]: { ...p, redFlagPrompts: v } } })}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <SaveBar
+              saving={saving === 'consultation-profiles'}
+              onSave={() => saveSection({ consultationProfiles: draft.consultationProfiles }, 'consultation-profiles')}
+            />
+          </SectionCard>
+
+          {/* ── Reporting / HMIS ───────────────────────────────────── */}
+          <SectionCard icon={Database} title="Reporting / HMIS">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label="DHIS2 organisation unit ID">
+                <input
+                  className="fs-input"
+                  value={draft.reporting.dhis2OrgUnitId}
+                  onChange={e => setDraft({ ...draft, reporting: { ...draft.reporting, dhis2OrgUnitId: e.target.value } })}
+                  placeholder="Optional"
+                />
+              </Field>
+              <Field label="Monthly reporting deadline day">
+                <input
+                  type="number" min={1} max={31} className="fs-input"
+                  value={draft.reporting.monthlyDeadlineDay}
+                  onChange={e => setDraft({ ...draft, reporting: { ...draft.reporting, monthlyDeadlineDay: Number(e.target.value) } })}
+                />
+              </Field>
+              <CheckRow
+                label="Require completeness signoff"
+                checked={draft.reporting.requireCompletenessSignoff}
+                onToggle={() => setDraft({ ...draft, reporting: { ...draft.reporting, requireCompletenessSignoff: !draft.reporting.requireCompletenessSignoff } })}
+              />
+            </div>
+            <p className="fs-grouplabel" style={{ marginTop: 16 }}>Aggregate sources</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {ALL_REPORTING_SOURCES.map(key => (
+                <CheckRow
+                  key={key}
+                  label={REPORTING_SOURCE_LABELS[key]}
+                  checked={draft.reporting.aggregateSources.includes(key)}
+                  onToggle={() => toggleKey<(typeof ALL_REPORTING_SOURCES)[number]>(draft.reporting.aggregateSources, key, v => setDraft({ ...draft, reporting: { ...draft.reporting, aggregateSources: v } }))}
+                />
+              ))}
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <TextareaListEditor
+                label="Disease reporting buckets"
+                values={draft.reporting.diseaseBuckets}
+                onChange={v => setDraft({ ...draft, reporting: { ...draft.reporting, diseaseBuckets: v } })}
+              />
+            </div>
+            <SaveBar
+              saving={saving === 'reporting'}
+              onSave={() => saveSection({ reporting: draft.reporting }, 'reporting')}
+            />
+          </SectionCard>
+
+          {/* ── IT Operations ───────────────────────────────────────── */}
+          <SectionCard icon={Server} title="IT Operations">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <Field label="Backup frequency (hours)">
+                <input type="number" min={1} className="fs-input" value={draft.itOperations.backupFrequencyHours} onChange={e => setDraft({ ...draft, itOperations: { ...draft.itOperations, backupFrequencyHours: Number(e.target.value) } })} />
+              </Field>
+              <Field label="Sync failure alert (minutes)">
+                <input type="number" min={1} className="fs-input" value={draft.itOperations.syncFailureAlertMinutes} onChange={e => setDraft({ ...draft, itOperations: { ...draft.itOperations, syncFailureAlertMinutes: Number(e.target.value) } })} />
+              </Field>
+              <Field label="Device review (days)">
+                <input type="number" min={1} className="fs-input" value={draft.itOperations.deviceReviewDays} onChange={e => setDraft({ ...draft, itOperations: { ...draft.itOperations, deviceReviewDays: Number(e.target.value) } })} />
+              </Field>
+              <Field label="Audit retention (days)">
+                <input type="number" min={30} className="fs-input" value={draft.itOperations.auditRetentionDays} onChange={e => setDraft({ ...draft, itOperations: { ...draft.itOperations, auditRetentionDays: Number(e.target.value) } })} />
+              </Field>
+            </div>
+            <p className="fs-grouplabel" style={{ marginTop: 16 }}>Controls</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <CheckRow label="Require device registration" checked={draft.itOperations.requireDeviceRegistration} onToggle={() => setDraft({ ...draft, itOperations: { ...draft.itOperations, requireDeviceRegistration: !draft.itOperations.requireDeviceRegistration } })} />
+              <CheckRow label="Allow offline mode" checked={draft.itOperations.allowOfflineMode} onToggle={() => setDraft({ ...draft, itOperations: { ...draft.itOperations, allowOfflineMode: !draft.itOperations.allowOfflineMode } })} />
+            </div>
+            <p className="fs-grouplabel" style={{ marginTop: 16 }}>Integrations</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {ALL_INTEGRATIONS.map(key => (
+                <CheckRow
+                  key={key}
+                  label={INTEGRATION_LABELS[key]}
+                  checked={draft.itOperations.integrations.includes(key)}
+                  onToggle={() => toggleKey<(typeof ALL_INTEGRATIONS)[number]>(draft.itOperations.integrations, key, v => setDraft({ ...draft, itOperations: { ...draft.itOperations, integrations: v } }))}
+                />
+              ))}
+            </div>
+            <SaveBar
+              saving={saving === 'it'}
+              onSave={() => saveSection({ itOperations: draft.itOperations }, 'it')}
+            />
+          </SectionCard>
+
           {/* ── Billing ──────────────────────────────────────────────── */}
           <SectionCard icon={Wallet} title="Billing">
             <p className="fs-grouplabel">Accepted payment methods</p>
@@ -364,6 +625,10 @@ function toggleKey<K extends string>(list: K[], key: K, set: (v: K[]) => void) {
   set(list.includes(key) ? list.filter(k => k !== key) : [...list, key]);
 }
 
+function orderByReference<K extends string>(list: K[], reference: readonly K[]): K[] {
+  return reference.filter(key => list.includes(key));
+}
+
 // ── Presentational pieces ────────────────────────────────────────────────────
 
 function SectionCard({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; title: string; children: React.ReactNode }) {
@@ -403,6 +668,23 @@ function CheckRow({ label, checked, onToggle }: { label: string; checked: boolea
       <input type="checkbox" checked={checked} onChange={onToggle} />
       {label}
     </label>
+  );
+}
+
+function TextareaListEditor({ label, values, onChange }: {
+  label: string;
+  values: string[];
+  onChange: (v: string[]) => void;
+}) {
+  return (
+    <Field label={label}>
+      <textarea
+        className="fs-input"
+        rows={3}
+        value={values.join('\n')}
+        onChange={e => onChange(e.target.value.split('\n').map(v => v.trim()).filter(Boolean))}
+      />
+    </Field>
   );
 }
 

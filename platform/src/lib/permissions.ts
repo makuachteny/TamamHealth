@@ -43,7 +43,6 @@ import {
   ShieldAlert,
   Eye,
   TrendingUp,
-  ChartNoAxesCombined,
 } from '@/components/icons/lucide';
 import { BRAND_DARKER, BRAND_PRIMARY, BRAND_SECONDARY } from './theme-colors';
 
@@ -123,11 +122,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'PLATFORM' },
       { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, section: 'PLATFORM' },
       { href: '/admin/system', label: 'System Config', icon: Server, section: 'PLATFORM' },
+      { href: '/it', label: 'IT Operations', icon: Server, section: 'PLATFORM' },
+      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'PLATFORM' },
     ],
     color: BRAND_SECONDARY,
     gradientFrom: BRAND_DARKER,
     gradientTo: BRAND_SECONDARY,
-    badgeLabel: 'Super Admin',
+    badgeLabel: 'Admin User',
   },
 
   org_admin: {
@@ -147,6 +148,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/org-admin/analytics', label: 'Analytics', icon: BarChart3, section: 'ORGANIZATION' },
       { href: '/payments', label: 'Bills', icon: Wallet, section: 'ORGANIZATION' },
       { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'ORGANIZATION' },
+      { href: '/it', label: 'IT Operations', icon: Server, section: 'ORGANIZATION' },
+      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'ORGANIZATION' },
       { href: '/org-admin/settings', label: 'Settings', icon: Settings, section: 'ORGANIZATION' },    ],
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
@@ -179,7 +182,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Doctor',
+    badgeLabel: 'Med. Doctor',
   },
 
   clinical_officer: {
@@ -207,7 +210,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Clinical Officer',
+    badgeLabel: 'Clin. Officer',
   },
 
   nurse: {
@@ -234,7 +237,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Nurse',
+    badgeLabel: 'Staff Nurse',
   },
 
   midwife: {
@@ -256,7 +259,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Midwife',
+    badgeLabel: 'Staff Midwife',
   },
 
   lab_tech: {
@@ -288,7 +291,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Pharmacist',
+    badgeLabel: 'Pharmacy',
   },
 
   front_desk: {
@@ -307,7 +310,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Medical Receptionist',
+    badgeLabel: 'Reception',
   },
 
   cashier: {
@@ -323,7 +326,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Cashier',
+    badgeLabel: 'Cashier Desk',
   },
 
   government: {
@@ -350,7 +353,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_SECONDARY,
     gradientFrom: BRAND_DARKER,
     gradientTo: BRAND_SECONDARY,
-    badgeLabel: 'Super Admin',
+    badgeLabel: 'Gov Admin',
   },
 
   county_health_director: {
@@ -378,7 +381,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'County Director',
+    badgeLabel: 'County Dir.',
   },
 
   data_entry_clerk: {
@@ -399,7 +402,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Data Entry',
+    badgeLabel: 'Data Clerk',
   },
 
   medical_superintendent: {
@@ -416,6 +419,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/emergency-preparedness', label: 'Emergency Prep', icon: ShieldAlert, section: 'ADMINISTRATION' },
       { href: '/controlled-substances', label: 'Controlled Substances', icon: ClipboardCheck, section: 'SERVICES' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'ADMINISTRATION' },
+      { href: '/it', label: 'IT Operations', icon: Server, section: 'ADMINISTRATION' },
+      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'ADMINISTRATION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: Stethoscope, section: 'CLINICAL' },
@@ -447,6 +452,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/dashboard/data-entry', label: 'Records Dashboard', icon: LayoutDashboard, section: 'RECORDS' },
       { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECORDS' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'RECORDS' },
+      { href: '/it', label: 'IT Operations', icon: Server, section: 'RECORDS' },
+      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'RECORDS' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'RECORDS' },
       { href: '/vital-statistics', label: 'Vital Statistics', icon: TrendingUp, section: 'VITAL EVENTS' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'VITAL EVENTS' },
@@ -461,7 +468,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'HRIO',
+    badgeLabel: 'HMIS Officer',
   },
 
   nutritionist: {
@@ -477,7 +484,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Nutritionist',
+    badgeLabel: 'Nutrition',
   },
 
   radiologist: {
@@ -514,6 +521,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/payments/claims', label: 'Insurance Claims', icon: Receipt, section: 'FINANCE' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'REPORTING' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'REPORTING' },
+      { href: '/it', label: 'IT Operations', icon: Server, section: 'REPORTING' },
+      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'REPORTING' },
       { href: '/vital-statistics', label: 'Vital Statistics', icon: TrendingUp, section: 'REPORTING' },
       { href: '/dhis2-export', label: 'DHIS2 Export', icon: Download, section: 'REPORTING' },
       { href: '/public-stats', label: 'Public Statistics', icon: Globe, section: 'REPORTING' },
@@ -525,7 +534,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_SECONDARY,
     gradientFrom: BRAND_DARKER,
     gradientTo: BRAND_SECONDARY,
-    badgeLabel: 'Hospital Manager',
+    badgeLabel: 'Hosp. Mgr.',
   },
 
   medical_biller: {
@@ -542,7 +551,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
-    badgeLabel: 'Medical Biller',
+    badgeLabel: 'Med. Biller',
   },
 
   // ───────── Clinical-flow workflow stations (EHR Clinical Flow doc §4) ─────────
@@ -558,7 +567,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/payments', label: 'Checkout Payments', icon: Wallet, section: 'CHECKOUT' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
-    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Registration',
+    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Reg. Clerk',
   },
 
   clinic_clerk: {
@@ -579,12 +588,23 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.triage_nurse.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.triage_nurse.allowed],
     navItems: [
-      { href: '/dashboard/nurse', label: 'Triage Station', icon: LayoutDashboard, section: 'TRIAGE' },
-      { href: '/patients', label: 'Patients', icon: Users, section: 'TRIAGE' },
-      { href: '/wards', label: 'Wards', icon: BedDouble, section: 'TRIAGE' },
-      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
+      { href: '/dashboard/nurse', label: 'Nurse Station', icon: LayoutDashboard, section: 'CLINICAL' },
+      { href: '/dashboard/nurse/ward', label: 'Ward Patients', icon: BedDouble, section: 'STATION' },
+      { href: '/dashboard/nurse/mar', label: 'Medication Admin', icon: Pill, section: 'STATION' },
+      { href: '/dashboard/nurse/triage', label: 'Triage (ETAT)', icon: Siren, section: 'STATION' },
+      { href: '/dashboard/nurse/handoff', label: 'Shift Handoff', icon: ClipboardPen, section: 'STATION' },
+      { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
+      { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardPen, section: 'CLINICAL' },
+      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'CLINICAL' },
+      { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'CARE PROGRAMS' },
+      { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'CARE PROGRAMS' },
+      { href: '/births', label: 'Births', icon: Baby, section: 'VITAL EVENTS' },
+      { href: '/deaths', label: 'Deaths', icon: UserX, section: 'VITAL EVENTS' },
+      { href: '/lab', label: 'Lab Results', icon: Microscope, section: 'MORE' },
     ],
-    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Triage',
+    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Triage RN',
   },
 
   rooming_nurse: {
@@ -592,14 +612,23 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.rooming_nurse.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.rooming_nurse.allowed],
     navItems: [
-      { href: '/dashboard/nurse', label: 'Rooming Station', icon: LayoutDashboard, section: 'CLINIC' },
+      { href: '/dashboard/nurse', label: 'Nurse Station', icon: LayoutDashboard, section: 'CLINICAL' },
+      { href: '/dashboard/nurse/ward', label: 'Ward Patients', icon: BedDouble, section: 'STATION' },
+      { href: '/dashboard/nurse/mar', label: 'Medication Admin', icon: Pill, section: 'STATION' },
+      { href: '/dashboard/nurse/triage', label: 'Triage (ETAT)', icon: Siren, section: 'STATION' },
+      { href: '/dashboard/nurse/handoff', label: 'Shift Handoff', icon: ClipboardPen, section: 'STATION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINIC' },
+      { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINIC' },
+      { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINIC' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardPen, section: 'CLINIC' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'CARE' },
       { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'CARE' },
+      { href: '/births', label: 'Births', icon: Baby, section: 'VITAL EVENTS' },
+      { href: '/deaths', label: 'Deaths', icon: UserX, section: 'VITAL EVENTS' },
       { href: '/lab', label: 'Lab', icon: Microscope, section: 'MORE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
-    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Rooming',
+    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Rooming RN',
   },
 
   clinician: {
@@ -623,7 +652,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/deaths', label: 'Deaths', icon: UserX, section: 'VITAL EVENTS' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
-    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Doctor',
+    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Med. Doctor',
   },
 
   records_hmis_officer: {
@@ -636,11 +665,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'RECORDS' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'RECORDS' },
       { href: '/dhis2-export', label: 'DHIS2 Export', icon: Download, section: 'GOVERNANCE' },
+      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'GOVERNANCE' },
       { href: '/vital-statistics', label: 'Vital Statistics', icon: TrendingUp, section: 'VITAL EVENTS' },
       { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'GOVERNANCE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
-    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'HMIS',
+    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'HMIS Off.',
   },
 
   facility_administrator: {
@@ -662,9 +692,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/payments', label: 'Bills', icon: Wallet, section: 'FINANCE' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'REPORTING' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'REPORTING' },
+      { href: '/it', label: 'IT Operations', icon: Server, section: 'REPORTING' },
+      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'REPORTING' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
-    color: BRAND_SECONDARY, gradientFrom: BRAND_DARKER, gradientTo: BRAND_SECONDARY, badgeLabel: 'Facility Admin',
+    color: BRAND_SECONDARY, gradientFrom: BRAND_DARKER, gradientTo: BRAND_SECONDARY, badgeLabel: 'Facility Admin'
   },
 };
 

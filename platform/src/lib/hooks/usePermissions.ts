@@ -61,8 +61,15 @@ export function usePermissions() {
   // Referrals — clinical staff + front desk + supervisors + midwife (obstetric)
   const canManageReferrals = role === 'doctor' || role === 'clinical_officer' || isClinician || isMidwife || isRegistrationClerk || role === 'front_desk' || isSuperAdmin;
 
-  // Appointments — clinical staff + front desk + workflow clerks can book/manage
+  // Appointments — route visibility is broad, but workflow actions are split
+  // by duty: reception schedules/checks in, clinicians advance visits, HMIS
+  // and management can export operational lists.
   const canBookAppointments = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isRegistrationClerk || isClinicClerk || role === 'front_desk' || isMedSupt || isSuperAdmin;
+  const canConfirmAppointments = isRegistrationClerk || isClinicClerk || role === 'front_desk' || isMedSupt || isFacilityAdmin || isOrgAdmin || isSuperAdmin;
+  const canManageAppointmentSchedule = canConfirmAppointments;
+  const canCheckInAppointments = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || role === 'front_desk' || isMedSupt || isSuperAdmin;
+  const canAdvanceAppointments = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isMedSupt || isSuperAdmin;
+  const canExportAppointments = isRegistrationClerk || isClinicClerk || role === 'front_desk' || role === 'hrio' || isRecordsHmis || isFacilityAdmin || isHospitalManager || isMedSupt || isOrgAdmin || isSuperAdmin;
 
   // Messages — any clinical/CHW role can send (view is broader via nav config)
   const canSendMessages = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || isRecordsHmis || isFacilityAdmin || role === 'front_desk' || isCashier || role === 'pharmacist' || role === 'lab_tech' || isCountyDirector || role === 'hrio' || role === 'nutritionist' || role === 'radiologist' || isMedSupt || isOrgAdmin || isSuperAdmin;
@@ -124,6 +131,11 @@ export function usePermissions() {
     canDoTelehealth,
     canManageReferrals,
     canBookAppointments,
+    canConfirmAppointments,
+    canManageAppointmentSchedule,
+    canCheckInAppointments,
+    canAdvanceAppointments,
+    canExportAppointments,
     canSendMessages,
     canAssessFacility,
     canViewEpidemicIntel,

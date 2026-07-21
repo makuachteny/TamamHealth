@@ -645,7 +645,7 @@ export default function GovernmentDashboardPage() {
         <AreaChart {...commonProps}>
           <CartesianGrid {...gridProps} /><XAxis {...xProps} /><YAxis {...yProps} />
           <Tooltip content={<ChartTooltip />} /><Legend {...legendProps} />
-          {activeKeys.map(d => <Area key={d} type="monotone" dataKey={d} name={d.charAt(0).toUpperCase() + d.slice(1)} stroke={DISEASE_COLORS[d]} fill={DISEASE_COLORS[d]} fillOpacity={0.15} strokeWidth={2} />)}
+          {activeKeys.map(d => <Area key={d} type="natural" dataKey={d} name={d.charAt(0).toUpperCase() + d.slice(1)} stroke={DISEASE_COLORS[d]} fill={DISEASE_COLORS[d]} fillOpacity={0.15} strokeWidth={2} />)}
         </AreaChart>
       );
     }
@@ -666,8 +666,8 @@ export default function GovernmentDashboardPage() {
           {activeKeys.map((d, i) => {
             const name = d.charAt(0).toUpperCase() + d.slice(1);
             if (i === 0) return <Bar key={d} dataKey={d} name={name} fill={DISEASE_COLORS[d]} radius={[3, 3, 0, 0]} barSize={12} fillOpacity={0.7} />;
-            if (i === 1) return <Area key={d} type="monotone" dataKey={d} name={name} stroke={DISEASE_COLORS[d]} fill={DISEASE_COLORS[d]} fillOpacity={0.1} strokeWidth={2} />;
-            return <Line key={d} type="monotone" dataKey={d} name={name} stroke={DISEASE_COLORS[d]} strokeWidth={2} dot={{ r: 3 }} />;
+            if (i === 1) return <Area key={d} type="natural" dataKey={d} name={name} stroke={DISEASE_COLORS[d]} fill={DISEASE_COLORS[d]} fillOpacity={0.1} strokeWidth={2} />;
+            return <Line key={d} type="natural" dataKey={d} name={name} stroke={DISEASE_COLORS[d]} strokeWidth={2} dot={{ r: 3 }} />;
           })}
         </ComposedChart>
       );
@@ -677,7 +677,7 @@ export default function GovernmentDashboardPage() {
       <LineChart {...commonProps}>
         <CartesianGrid {...gridProps} /><XAxis {...xProps} /><YAxis {...yProps} />
         <Tooltip content={<ChartTooltip />} /><Legend {...legendProps} />
-        {activeKeys.map(d => <Line key={d} type="monotone" dataKey={d} name={d.charAt(0).toUpperCase() + d.slice(1)} stroke={DISEASE_COLORS[d]} strokeWidth={d === 'malaria' ? 2.5 : 2} dot={{ r: 3 }} />)}
+        {activeKeys.map(d => <Line key={d} type="natural" dataKey={d} name={d.charAt(0).toUpperCase() + d.slice(1)} stroke={DISEASE_COLORS[d]} strokeWidth={d === 'malaria' ? 2.5 : 2} dot={{ r: 3 }} />)}
       </LineChart>
     );
   };

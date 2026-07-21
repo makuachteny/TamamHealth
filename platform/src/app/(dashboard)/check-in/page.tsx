@@ -6,7 +6,7 @@ import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useToast } from '@/components/Toast';
-import { patientFullName } from '@/lib/patient-utils';
+import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
 import PatientAvatar from '@/components/patients/PatientAvatar';
 import { ClipboardCheck, Search, X, UserPlus } from '@/components/icons/lucide';
 import type { CheckInAcuity } from '@/lib/services/check-in-service';
@@ -23,6 +23,10 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--bg-secondary)', border: '1px solid var(--border-light)',
   color: 'var(--text-primary)', borderRadius: 10, padding: '9px 12px', fontSize: 13, width: '100%',
 };
+
+function patientFacilityName(patient: PatientDoc | undefined, fallback = 'Facility'): string {
+  return (patient as (PatientDoc & { registrationHospitalName?: string }) | undefined)?.registrationHospitalName || fallback;
+}
 
 export default function CheckInPage() {
   const router = useRouter();
@@ -115,13 +119,17 @@ export default function CheckInPage() {
               <ClipboardCheck className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> Patient
             </h3>
             {selected ? (
-              <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+              <div className="checkin-patient-summary">
                 <PatientAvatar patient={selected} size={36} />
                 <div className="flex-1 min-w-0">
                   <p className="text-[14px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(selected)}</p>
                   <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {selected.hospitalNumber || '—'}{(selected as { age?: number }).age != null ? ` · ${(selected as { age?: number }).age} yrs` : ''}{selected.gender ? ` · ${selected.gender}` : ''}
+                    {selected.hospitalNumber || '—'} · {patientAgeLabel(selected)}{selected.gender ? ` · ${selected.gender}` : ''}
                   </p>
+                  <div className="checkin-patient-context">
+                    <span><b>{selected.assignedDoctorName || 'Unassigned'}</b><small>Assigned physician</small></span>
+                    <span><b>{patientFacilityName(selected, currentUser?.hospitalName || 'Facility')}</b><small>Location</small></span>
+                  </div>
                 </div>
                 <button onClick={() => { setSelected(null); setQuery(''); }} className="btn btn-sm btn-secondary"><X className="w-3.5 h-3.5" /> Change</button>
               </div>
@@ -135,7 +143,10 @@ export default function CheckInPage() {
                     {matches.map(p => (
                       <button key={p._id} onClick={() => { setSelected(p); }} className="w-full text-left px-3 py-2 flex items-center gap-2.5 hover:bg-[var(--table-row-hover)]" style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <PatientAvatar patient={p} size={26} />
-                        <span className="flex-1 text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+                          <span className="block text-[10.5px] truncate" style={{ color: 'var(--text-muted)' }}>{p.assignedDoctorName || 'Unassigned'} · {patientFacilityName(p, currentUser?.hospitalName || 'Facility')}</span>
+                        </span>
                         <span className="text-[11px] font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber}</span>
                       </button>
                     ))}

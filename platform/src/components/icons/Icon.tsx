@@ -62,6 +62,7 @@ const ICON_COMPONENTS: Record<string, keyof typeof Lucide> = {
   chevronRight: 'ChevronRight',
   chevronUp: 'ChevronUp',
   claim: 'ClipboardCheck',
+  clock: 'Clock',
   close: 'X',
   cloudOff: 'CloudOff',
   code: 'Code2',

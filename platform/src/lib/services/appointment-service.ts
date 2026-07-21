@@ -1,12 +1,32 @@
 import { appointmentsDB } from '../db';
 import { findByType } from './db-query';
-import type { AppointmentDoc, AppointmentStatus } from '../db-types';
+import type { AppointmentDoc, AppointmentStatus, UserRole } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
+
+export type AppointmentStatusUpdateExtra = {
+  cancelledReason?: string;
+  cancelledBy?: string;
+  cancelledByName?: string;
+  actorId?: string;
+  actorName?: string;
+  actorRole?: UserRole;
+  note?: string;
+};
+
+const APPOINTMENT_CONFIRM_ROLES: UserRole[] = [
+  'central_registration_clerk',
+  'clinic_clerk',
+  'front_desk',
+  'medical_superintendent',
+  'facility_administrator',
+  'org_admin',
+  'super_admin',
+];
 
 export async function getAllAppointments(scope?: DataScope): Promise<AppointmentDoc[]> {
   const db = appointmentsDB();
@@ -98,23 +118,99 @@ export async function createAppointment(
 export async function updateAppointmentStatus(
   id: string,
   status: AppointmentStatus,
-  extra?: { cancelledReason?: string; cancelledBy?: string }
+  extra?: AppointmentStatusUpdateExtra
 ): Promise<AppointmentDoc | null> {
   const db = appointmentsDB();
   try {
     const existing = await db.get(id) as AppointmentDoc;
     const now = new Date().toISOString();
+    const actorId = extra?.actorId;
+    const actorName = extra?.actorName || extra?.cancelledByName || extra?.cancelledBy;
+    if (status === 'confirmed' && extra?.actorRole && !APPOINTMENT_CONFIRM_ROLES.includes(extra.actorRole)) {
+      throw new Error('Only reception, scheduling, or administrator roles can confirm appointments');
+    }
+    const actorPatch = {
+      ...(actorId ? { by: actorId } : {}),
+      ...(actorName ? { byName: actorName } : {}),
+    };
+    const statusPatch: Partial<AppointmentDoc> = {};
+    const automationNotes: string[] = [];
+
+    if ((status === 'checked_in' || status === 'in_progress' || status === 'completed') && !existing.confirmedAt) {
+      statusPatch.confirmedAt = now;
+      if (actorId) statusPatch.confirmedBy = actorId;
+      if (actorName) statusPatch.confirmedByName = actorName;
+      if (existing.status !== 'confirmed') automationNotes.push('Auto-confirmed before arrival workflow');
+    }
+
+    if ((status === 'checked_in' || status === 'in_progress' || status === 'completed') && !existing.checkedInAt) {
+      statusPatch.checkedInAt = now;
+      if (actorId) statusPatch.checkedInBy = actorId;
+      if (actorName) statusPatch.checkedInByName = actorName;
+      if (status !== 'checked_in') automationNotes.push('Auto-checked in before clinical workflow');
+    }
+
+    if ((status === 'in_progress' || status === 'completed') && !existing.startedAt) {
+      statusPatch.startedAt = now;
+      if (actorId) statusPatch.startedBy = actorId;
+      if (actorName) statusPatch.startedByName = actorName;
+      if (status !== 'in_progress') automationNotes.push('Auto-started before completion');
+    }
+
+    if (status === 'confirmed') {
+      statusPatch.confirmedAt = existing.confirmedAt || now;
+      if (actorId && !existing.confirmedBy) statusPatch.confirmedBy = actorId;
+      if (actorName && !existing.confirmedByName) statusPatch.confirmedByName = actorName;
+    }
+
+    if (status === 'cancelled') {
+      statusPatch.cancelledAt = now;
+      if (actorId) statusPatch.cancelledBy = actorId;
+      if (actorName) statusPatch.cancelledByName = actorName;
+    }
+
+    if (status === 'completed') {
+      statusPatch.completedAt = now;
+      if (actorId) statusPatch.completedBy = actorId;
+      if (actorName) statusPatch.completedByName = actorName;
+    }
+
+    if (status === 'no_show') {
+      statusPatch.noShowAt = now;
+      if (actorId) statusPatch.noShowBy = actorId;
+      if (actorName) statusPatch.noShowByName = actorName;
+    }
+
     const updated: AppointmentDoc = {
       ...existing,
       status,
       updatedAt: now,
-      ...(status === 'checked_in' ? { checkedInAt: now } : {}),
-      ...(status === 'completed' ? { completedAt: now } : {}),
-      ...(extra || {}),
+      ...statusPatch,
+      ...(extra?.cancelledReason ? { cancelledReason: extra.cancelledReason } : {}),
+      ...(extra?.cancelledBy ? { cancelledBy: extra.cancelledBy } : {}),
+      ...(extra?.cancelledByName ? { cancelledByName: extra.cancelledByName } : {}),
+      statusHistory: [
+        ...(existing.statusHistory || []),
+        {
+          from: existing.status,
+          to: status,
+          at: now,
+          ...actorPatch,
+          ...(extra?.note ? { note: extra.note } : {}),
+        },
+        ...automationNotes.map(note => ({
+          from: existing.status,
+          to: status,
+          at: now,
+          ...actorPatch,
+          note,
+          automated: true,
+        })),
+      ].slice(-30),
     };
     const resp = await db.put(updated);
     updated._rev = resp.rev;
-    await logAuditSafe('UPDATE_APPOINTMENT', undefined, undefined, `Appointment ${id} status changed to ${status}`);
+    await logAuditSafe('UPDATE_APPOINTMENT', actorId, actorName, `Appointment ${id} status changed from ${existing.status} to ${status}`);
     emitSyncEvent({
       resourceType: 'appointment',
       resourceId: updated._id,

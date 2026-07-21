@@ -18,3 +18,4 @@ export * from './patient-identity';
 export * from './capabilities';
 export * from './encounter-types';
 export * from './encounter-engine';
+export * from './workflow-policy';

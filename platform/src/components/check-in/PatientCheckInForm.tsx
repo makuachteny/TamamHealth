@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useToast } from '@/components/Toast';
-import { patientFullName } from '@/lib/patient-utils';
+import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
 import PatientAvatar from '@/components/patients/PatientAvatar';
 import { ClipboardCheck, Search, X, UserPlus } from '@/components/icons/lucide';
 import type { CheckInAcuity } from '@/lib/services/check-in-service';
@@ -60,6 +60,10 @@ const initialForm: CheckInFormState = {
   oxygenSaturation: '',
   weight: '',
 };
+
+function patientFacilityName(patient: PatientDoc | undefined, fallback = 'Facility'): string {
+  return (patient as (PatientDoc & { registrationHospitalName?: string }) | undefined)?.registrationHospitalName || fallback;
+}
 
 /**
  * Shared patient check-in form.
@@ -184,28 +188,40 @@ export default function PatientCheckInForm({
           <ClipboardCheck className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> Patient
         </h3>
         {selected ? (
-          <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+          <div className="checkin-patient-summary">
             <PatientAvatar patient={selected} size={36} />
             <div className="flex-1 min-w-0">
               <p className="text-[14px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(selected)}</p>
               <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                {selected.hospitalNumber || '-'}{(selected as { age?: number }).age != null ? ` - ${(selected as { age?: number }).age} yrs` : ''}{selected.gender ? ` - ${selected.gender}` : ''}
+                {selected.hospitalNumber || '-'} - {patientAgeLabel(selected)}{selected.gender ? ` - ${selected.gender}` : ''}
               </p>
+              <div className="checkin-patient-context">
+                <span><b>{selected.assignedDoctorName || 'Unassigned'}</b><small>Assigned physician</small></span>
+                <span><b>{patientFacilityName(selected, currentUser?.hospitalName || 'Facility')}</b><small>Location</small></span>
+              </div>
             </div>
             <button type="button" onClick={() => { setSelected(null); setQuery(''); }} className="btn btn-sm btn-secondary">
               <X className="w-3.5 h-3.5" /> Change
             </button>
           </div>
         ) : (
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-            <input
-              autoFocus
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search by name, patient ID, or phone..."
-              style={{ ...inputStyle, paddingLeft: 40 }}
-            />
+          <div className="checkin-patient-search-wrap">
+            <div className={`checkin-patient-search ${query ? 'has-value' : ''}`}>
+              <Search className="checkin-patient-search-icon w-4 h-4" aria-hidden="true" />
+              <input
+                autoFocus
+                type="search"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search by name, patient ID, or phone..."
+                aria-label="Search patient to check in"
+              />
+              {query && (
+                <button type="button" onClick={() => setQuery('')} aria-label="Clear patient search">
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              )}
+            </div>
             {matches.length > 0 && (
               <div className="mt-1 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
                 {matches.map(p => (
@@ -217,7 +233,10 @@ export default function PatientCheckInForm({
                     style={{ borderBottom: '1px solid var(--border-light)' }}
                   >
                     <PatientAvatar patient={p} size={26} />
-                    <span className="flex-1 text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+                      <span className="block text-[10.5px] truncate" style={{ color: 'var(--text-muted)' }}>{p.assignedDoctorName || 'Unassigned'} · {patientFacilityName(p, currentUser?.hospitalName || 'Facility')}</span>
+                    </span>
                     <span className="text-[11px] font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber}</span>
                   </button>
                 ))}

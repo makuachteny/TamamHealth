@@ -10,7 +10,7 @@
  * views; this tab is the OpenMRS-shaped read+add view.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import AddAllergyModal from '@/components/patients/AddAllergyModal';
 import { isNoAllergySentinel } from '@/lib/clinical-roles';
@@ -24,11 +24,22 @@ const SEVERITY_LABEL: Record<string, string> = {
 
 interface AllergiesSectionProps {
   patient: PatientDoc;
+  /** One-shot request from the chart (e.g. the Facesheet Allergies card's
+   *  "Add") to open the add-allergy modal as soon as this tab mounts. */
+  autoOpenAdd?: boolean;
+  onAutoOpenHandled?: () => void;
 }
 
-export default function AllergiesSection({ patient }: AllergiesSectionProps) {
+export default function AllergiesSection({ patient, autoOpenAdd, onAutoOpenHandled }: AllergiesSectionProps) {
   const { currentUser } = useApp();
   const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    if (autoOpenAdd) {
+      setAdding(true);
+      onAutoOpenHandled?.();
+    }
+  }, [autoOpenAdd, onAutoOpenHandled]);
 
   const entries = useMemo<AllergyEntry[]>(() => {
     if (patient.structuredAllergies !== undefined) return patient.structuredAllergies;

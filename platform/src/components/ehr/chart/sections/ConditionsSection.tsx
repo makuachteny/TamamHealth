@@ -9,7 +9,7 @@
  * lives on the Facesheet view; this tab is the OpenMRS-shaped read+add view.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import CodedSearchField from '@/components/CodedSearchField';
 import Modal from '@/components/Modal';
@@ -33,9 +33,13 @@ const STATUS_BADGE: Record<ProblemStatus, string> = {
 interface ConditionsSectionProps {
   patientId: string;
   patientName: string;
+  /** One-shot request from the chart (e.g. the Facesheet Problems card's
+   *  "Add") to open the add-condition modal as soon as this tab mounts. */
+  autoOpenAdd?: boolean;
+  onAutoOpenHandled?: () => void;
 }
 
-export default function ConditionsSection({ patientId, patientName }: ConditionsSectionProps) {
+export default function ConditionsSection({ patientId, patientName, autoOpenAdd, onAutoOpenHandled }: ConditionsSectionProps) {
   const { currentUser } = useApp();
   const { showToast } = useToast();
   const { problems, create } = useProblems(patientId);
@@ -45,6 +49,13 @@ export default function ConditionsSection({ patientId, patientName }: Conditions
   const [pickedCode, setPickedCode] = useState<{ code: string; title: string; chapter: string } | null>(null);
   const [onsetDate, setOnsetDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (autoOpenAdd) {
+      setAdding(true);
+      onAutoOpenHandled?.();
+    }
+  }, [autoOpenAdd, onAutoOpenHandled]);
 
   const icdOptions = useMemo(() => COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title, meta: c.chapter, keywords: c.keywords })), []);
 

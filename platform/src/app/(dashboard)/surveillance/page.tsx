@@ -562,7 +562,7 @@ export default function SurveillancePage() {
                           <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
                           <Tooltip {...chartTooltipStyle} />
                           <Legend {...legendProps} />
-                          {diseaseLines.map(d => <Area key={d.key} type="monotone" dataKey={d.key} name={d.name} stroke={d.color} fill={d.color} fillOpacity={0.12} strokeWidth={2} />)}
+                          {diseaseLines.map(d => <Area key={d.key} type="natural" dataKey={d.key} name={d.name} stroke={d.color} fill={d.color} fillOpacity={0.12} strokeWidth={2} />)}
                         </AreaChart>
                       </ResponsiveContainer>
                     );
@@ -589,7 +589,7 @@ export default function SurveillancePage() {
                         <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
                         <Tooltip content={<CustomTooltip />} />
                         <Legend {...legendProps} />
-                        {diseaseLines.map(d => <Line key={d.key} type="monotone" dataKey={d.key} name={d.name} stroke={d.color} strokeWidth={d.key === 'malaria' ? 2.5 : 2} dot={{ r: 3, fill: d.color }} activeDot={{ r: 5 }} />)}
+                        {diseaseLines.map(d => <Line key={d.key} type="natural" dataKey={d.key} name={d.name} stroke={d.color} strokeWidth={d.key === 'malaria' ? 2.5 : 2} dot={{ r: 3, fill: d.color }} activeDot={{ r: 5 }} />)}
                       </LineChart>
                     </ResponsiveContainer>
                   );

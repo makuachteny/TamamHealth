@@ -1,6 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -12,7 +12,7 @@ import Modal from '@/components/Modal';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
 import { checkNewPrescription, type DrugInteraction, type InteractionSeverity } from '@/lib/services/drug-interaction-service';
 import { formatMoney } from '@/lib/format-utils';
-import { isFinanciallyCleared, pharmacyStage, pharmacyStageLabel, pharmacyStageTone } from '@/lib/pharmacy-workflow';
+import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel, pharmacyStageTone } from '@/lib/pharmacy-workflow';
 import type { PrescriptionDoc, PharmacyInventoryDoc, UserDoc } from '@/lib/db-types';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 import EhrCareDashboard, {
@@ -27,6 +27,15 @@ import {
 } from '@/components/icons/lucide';
 
 const ACCENT = 'var(--accent-primary)';
+type WorkflowStepKey = 'received' | 'review' | 'checked' | 'payment' | 'dispensed' | 'counseled' | 'cleared';
+type WorkflowStepAction = { label: string; onClick: () => void };
+type WorkflowStep = {
+  key: WorkflowStepKey;
+  label: string;
+  note: string;
+  done: boolean;
+  action?: WorkflowStepAction;
+};
 
 // Interaction severities coming out of drug-interaction-service.checkInteractions().
 const SEVERITY_STYLE: Record<InteractionSeverity, { bg: string; border: string; text: string; label: string }> = {
@@ -254,6 +263,7 @@ function ReceiveStockModal({ items, onConfirm, onClose, saving }: {
 export default function PharmacyDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentUser } = useApp();
   const { canDispense, canAccess } = usePermissions();
   const { showToast } = useToast();
@@ -279,6 +289,16 @@ export default function PharmacyDashboardPage() {
   // Queue text search (bound to the shared shell's left-rail search).
   const [queueSearch, setQueueSearch] = useState('');
   const [balanceByPatient, setBalanceByPatient] = useState<Map<string, number>>(new Map());
+  const deepLinkPatientId = searchParams?.get('patientId') || '';
+  const deepLinkPatientName = searchParams?.get('patient') || '';
+  const deepLinkRxId = searchParams?.get('rxId') || '';
+
+  useEffect(() => {
+    if (!deepLinkPatientId && !deepLinkPatientName && !deepLinkRxId) return;
+    setCenterPanel(null);
+    setQueueFilter('all');
+    setQueueSearch('');
+  }, [deepLinkPatientId, deepLinkPatientName, deepLinkRxId]);
 
   // Inventory augmented with a live status classification (same helper the
   // real /pharmacy page uses), so stock badges/percentages stay accurate as
@@ -346,6 +366,12 @@ export default function PharmacyDashboardPage() {
   const visibleQueue = rxQueue.filter(rx => {
     const stage = pharmacyStage(rx);
     const balance = patientBalanceFor(rx);
+    const deepLinkOk =
+      deepLinkRxId ? rx._id === deepLinkRxId :
+      deepLinkPatientId ? rx.patientId === deepLinkPatientId :
+      deepLinkPatientName ? rx.patientName.toLowerCase() === deepLinkPatientName.toLowerCase() :
+      true;
+    if (!deepLinkOk) return false;
     const statusOk =
       queueFilter === 'all' ? true :
       queueFilter === 'controlled' ? isControlled(rx) :
@@ -363,6 +389,12 @@ export default function PharmacyDashboardPage() {
       (rx.prescribedBy || '').toLowerCase().includes(queueQuery)
     );
   });
+  const autoOpenRxId = useMemo(() => {
+    if (deepLinkRxId && visibleQueue.some(rx => rx._id === deepLinkRxId)) return deepLinkRxId;
+    if (!deepLinkPatientId && !deepLinkPatientName) return null;
+    const activeRx = visibleQueue.find(rx => isActivePharmacyStage(pharmacyStage(rx)) && rx.status !== 'discontinued');
+    return (activeRx || visibleQueue[0])?._id || null;
+  }, [deepLinkPatientId, deepLinkPatientName, deepLinkRxId, visibleQueue]);
 
   // Drug interaction check for the dispense modal — compare against the
   // patient's other active (non-discontinued) prescriptions in the real queue.
@@ -551,34 +583,6 @@ export default function PharmacyDashboardPage() {
     }
   };
 
-  const workflowActionFor = (rx: PrescriptionDoc): { label?: string; onClick?: () => void } => {
-    if (!canDispense) return {};
-    const stage = pharmacyStage(rx);
-    const balance = patientBalanceFor(rx);
-    if (stage === 'prescribed') {
-      return { label: 'Receive order', onClick: () => handleStartReview(rx) };
-    }
-    if (stage === 'received_in_pharmacy_queue') {
-      return { label: 'Check order', onClick: () => handleStartReview(rx) };
-    }
-    if (stage === 'under_review' || stage === 'held_awaiting_clarification' || stage === 'stockout_partial_referred' || stage === 'clinician_consultation_in_progress') {
-      return { label: 'Clear', onClick: () => handleClearForDispense(rx) };
-    }
-    if (stage === 'cleared_for_dispensing' && !isFinanciallyCleared(balance)) {
-      return { label: canAccess('/payments') ? 'Collect payment' : 'Send to cashier', onClick: () => handlePaymentStep(rx) };
-    }
-    if (stage === 'cleared_for_dispensing') {
-      return { label: t('pharmacy.dispense'), onClick: () => handleDispense(rx) };
-    }
-    if (stage === 'dispensed') {
-      return { label: 'Counsel', onClick: () => handleCounsel(rx) };
-    }
-    if (stage === 'counseled') {
-      return { label: 'Complete', onClick: () => handleComplete(rx) };
-    }
-    return {};
-  };
-
   const renderWorkflowPopup = (rx: PrescriptionDoc) => {
     const stage = pharmacyStage(rx);
     const balance = patientBalanceFor(rx);
@@ -586,7 +590,6 @@ export default function PharmacyDashboardPage() {
     const qty = rx.quantityToDispense || 1;
     const stockOk = !!inv && inv.stockLevel >= qty;
     const paymentClear = isFinanciallyCleared(balance);
-    const action = workflowActionFor(rx);
     const completed = {
       received: stage !== 'prescribed',
       review: !['prescribed', 'received_in_pharmacy_queue'].includes(stage),
@@ -605,7 +608,16 @@ export default function PharmacyDashboardPage() {
       !completed.counseled ? 'counseled' :
       !completed.cleared ? 'cleared' :
       '';
-    const steps = [
+    const stepActions: Partial<Record<WorkflowStepKey, WorkflowStepAction>> = {
+      received: { label: 'Receive order', onClick: () => handleStartReview(rx) },
+      review: { label: 'Check order', onClick: () => handleStartReview(rx) },
+      checked: { label: 'Clear stock and safety', onClick: () => handleClearForDispense(rx) },
+      payment: { label: canAccess('/payments') ? 'Collect payment' : 'Send to cashier', onClick: () => handlePaymentStep(rx) },
+      dispensed: { label: t('pharmacy.dispense'), onClick: () => handleDispense(rx) },
+      counseled: { label: 'Record counseling', onClick: () => handleCounsel(rx) },
+      cleared: { label: 'Complete pharmacy visit', onClick: () => handleComplete(rx) },
+    };
+    const steps: WorkflowStep[] = [
       { key: 'received', label: 'Medication order received', note: rx.prescribedBy ? `Ordered by ${rx.prescribedBy}` : 'Waiting in pharmacy queue', done: completed.received },
       { key: 'review', label: 'Check medication order', note: 'Confirm dose, frequency, patient, allergies and interactions.', done: completed.review },
       { key: 'checked', label: 'Stock and safety clearance', note: stockOk ? `${qty} ${inv?.unit || 'unit(s)'} available` : `Stock issue: ${inv?.stockLevel ?? 0} available, ${qty} needed`, done: completed.checked },
@@ -614,6 +626,10 @@ export default function PharmacyDashboardPage() {
       { key: 'counseled', label: 'Counsel patient', note: 'Explain dose, timing, side effects and return precautions.', done: completed.counseled },
       { key: 'cleared', label: 'Clear patient from pharmacy', note: 'Medication workflow complete.', done: completed.cleared },
     ];
+    const actionableSteps = steps.map(step => ({
+      ...step,
+      action: step.key === currentKey ? stepActions[step.key] : undefined,
+    }));
 
     return (
       <div className="space-y-4">
@@ -639,7 +655,7 @@ export default function PharmacyDashboardPage() {
         </div>
 
         <div className="space-y-2">
-          {steps.map((step, index) => {
+          {actionableSteps.map((step, index) => {
             const isCurrent = step.key === currentKey;
             return (
               <div key={step.key} className="flex items-start gap-3 rounded-xl p-3" style={{
@@ -653,19 +669,25 @@ export default function PharmacyDashboardPage() {
                   {step.done ? <Check className="w-3.5 h-3.5" /> : index + 1}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</p>
+                    {step.done && (
+                      <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-bold" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+                        Done
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{step.note}</p>
+                  {isCurrent && step.action && (
+                    <button type="button" className="btn btn-primary btn-sm mt-3" onClick={step.action.onClick}>
+                      {step.action.label}
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
-
-        {action.label && action.onClick && (
-          <button type="button" className="btn btn-primary w-full" onClick={action.onClick}>
-            {action.label}
-          </button>
-        )}
       </div>
     );
   };
@@ -677,10 +699,7 @@ export default function PharmacyDashboardPage() {
   headerActions.push({ label: t('pharmacy.kpiControlled'), icon: ShieldCheck, onClick: () => router.push('/controlled-substances') });
   headerActions.push({ label: t('pharmacy.stockAlerts'), icon: AlertTriangle, onClick: () => setCenterPanel(p => (p === 'stock' ? null : 'stock')), active: centerPanel === 'stock', tone: centerPanel === 'stock' ? 'primary' : 'neutral' });
 
-  const checklist: EhrCareDashboardChecklistItem[] = [
-    { label: t('pharmacy.pending'), done: pendingRx === 0, onClick: () => setQueueFilter('pending') },
-    { label: t('pharmacy.kpiControlled'), done: controlledCount === 0, onClick: () => setQueueFilter('controlled') },
-  ];
+  const checklist: EhrCareDashboardChecklistItem[] = [];
   if (canDispense) {
     checklist.push({ label: t('pharmacy.receiveStock'), done: criticalCount === 0 && expiredCount === 0, onClick: () => setShowReceiveStock(true) });
   }
@@ -707,6 +726,10 @@ export default function PharmacyDashboardPage() {
           filters={[]}
           actions={headerActions}
           hideRowList={centerPanel !== null}
+          // Rows already carry `time` (order.createdAt); the default done→series1
+          // split matches this pipeline exactly (dispensed/counseled/complete are
+          // 'done', everything still moving through review/payment is not).
+          chartSeriesNames={['Pending', 'Dispensed']}
           rows={visibleQueue.map((rx): EhrCareDashboardRow => {
             const stage = pharmacyStage(rx);
             const balance = patientBalanceFor(rx);
@@ -718,6 +741,8 @@ export default function PharmacyDashboardPage() {
               meta: `${rx.prescribedBy} · ${formatTime(rx.createdAt)} · ${isFinanciallyCleared(balance) ? 'Payment clear' : `Payment due ${formatMoney(balance)}`}`,
               compactMeta: formatTime(rx.createdAt),
               time: formatTime(rx.createdAt),
+              careTeam: rx.prescribedBy,
+              careTeamLabel: 'Prescriber',
               status: rx.status === 'discontinued' ? 'Discontinued' : paymentDue ? 'Payment due' : pharmacyStageLabel(stage),
               statusTone: paymentDue ? 'warning' : rx.status === 'discontinued' ? 'danger' : rx.urgency === 'immediate' ? 'warning' : pharmacyStageTone(stage),
               priority: paymentDue ? formatMoney(balance) : rx.urgency === 'immediate' ? t('pharmacy.urgent') : undefined,
@@ -725,20 +750,16 @@ export default function PharmacyDashboardPage() {
               popupDetail: renderWorkflowPopup(rx),
             };
           })}
+          autoOpenRowId={autoOpenRxId}
           metrics={[
-            { label: t('pharmacy.kpiPendingRx'), value: pendingRx },
             { label: 'Payment due', value: paymentDueCount, tone: paymentDueCount > 0 ? 'warning' : 'neutral' },
             { label: 'Ready', value: readyCount, tone: 'success' },
-            { label: t('pharmacy.kpiDispensed'), value: dispensedCount },
             { label: t('pharmacy.kpiLowStock'), value: lowStockCount, tone: 'warning' },
             { label: 'Critical Stock', value: criticalCount + expiredCount, tone: 'danger' },
-            { label: t('pharmacy.kpiControlled'), value: controlledCount, tone: 'danger' },
           ]}
           metricsTitle={t('pharmacy.operations')}
           checklist={checklist}
           checklistTitle={t('pharmacy.quickActions')}
-          missionTitle={t('pharmacy.operations')}
-          missionDescription={t('pharmacy.dispensingPipeline')}
           emptyTitle={rxLoading ? '' : t('pharmacy.noPrescriptionsFound')}
         >
           {/* Stat panels — opened from the header toggles; the active one

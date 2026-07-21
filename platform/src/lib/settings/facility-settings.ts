@@ -22,6 +22,12 @@ export interface LabTestDef {
   loinc?: string;
 }
 
+export type EncounterStationKey =
+  | 'registration' | 'triage' | 'rooming' | 'consultation' | 'lab' | 'radiology'
+  | 'pharmacy' | 'cashier' | 'clinic_checkout' | 'facility_checkout';
+
+export type PatientProfileKey = 'child' | 'adult' | 'pregnant' | 'postnatal' | 'emergency';
+
 /** Accepted payment method keys (kept as stable keys; labels live in the UI). */
 export type PaymentMethodKey =
   | 'cash' | 'mobile_money' | 'voucher' | 'partial_payment' | 'bank_transfer' | 'card';
@@ -53,6 +59,58 @@ export interface FacilitySettings {
   rooms: string[];
   /** Departments / clinics offered (drives routing + reporting buckets). */
   departments: string[];
+
+  // ── Workflow ────────────────────────────────────────────────────────────
+  /** Ordered stations in the facility's default outpatient journey. */
+  stationSequence: EncounterStationKey[];
+  /** Encounter gates that must be closed before routine facility checkout. */
+  checkoutGateKeys: string[];
+  /** Which patient groups require triage before consultation. */
+  triageRequiredFor: PatientProfileKey[];
+  /** Appointment, walk-in, referral, and emergency routing defaults. */
+  routingDefaults: {
+    appointment: string;
+    walkIn: string;
+    referral: string;
+    emergency: string;
+    maternity: string;
+    child: string;
+  };
+  /** Whether direct service orders can skip consultation. */
+  directServiceAccess: {
+    lab: boolean;
+    radiology: boolean;
+    pharmacyRefill: boolean;
+  };
+
+  // ── Consultation ────────────────────────────────────────────────────────
+  /** Profiles drive age/pregnancy-aware consult templates and normal ranges. */
+  consultationProfiles: Record<PatientProfileKey, {
+    chiefComplaintRequired: boolean;
+    vitalsRequired: string[];
+    historyPrompts: string[];
+    redFlagPrompts: string[];
+  }>;
+
+  // ── Reporting / HMIS ───────────────────────────────────────────────────
+  reporting: {
+    dhis2OrgUnitId: string;
+    monthlyDeadlineDay: number;
+    requireCompletenessSignoff: boolean;
+    diseaseBuckets: string[];
+    aggregateSources: Array<'encounters' | 'diagnoses' | 'lab_results' | 'pharmacy_dispenses' | 'vital_events' | 'payments'>;
+  };
+
+  // ── IT Operations ──────────────────────────────────────────────────────
+  itOperations: {
+    backupFrequencyHours: number;
+    syncFailureAlertMinutes: number;
+    deviceReviewDays: number;
+    auditRetentionDays: number;
+    requireDeviceRegistration: boolean;
+    allowOfflineMode: boolean;
+    integrations: Array<'dhis2' | 'sms' | 'email' | 'payments' | 'lab_devices' | 'barcode_printers'>;
+  };
 
   // ── Billing ─────────────────────────────────────────────────────────────
   /** Accepted payment methods. */
@@ -126,6 +184,66 @@ export const DEFAULT_FACILITY_SETTINGS: FacilitySettings = {
   ],
   rooms: ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Bay A', 'Bay B', 'Bay C', 'Bay D'],
   departments: ['General Medicine', 'Maternity', 'Emergency', 'Pediatrics', 'Ophthalmology', 'Dental', 'Dermatology', 'OPD'],
+  stationSequence: ['registration', 'triage', 'rooming', 'consultation', 'lab', 'radiology', 'cashier', 'pharmacy', 'clinic_checkout', 'facility_checkout'],
+  checkoutGateKeys: ['all_clinic_visits_closed', 'prescriptions_dispensed', 'critical_labs_reviewed', 'in_clinic_procedures_complete', 'required_documentation_generated', 'payment_status_determined', 'pending_items_flagged'],
+  triageRequiredFor: ['child', 'pregnant', 'emergency'],
+  routingDefaults: {
+    appointment: 'clinic',
+    walkIn: 'triage',
+    referral: 'clinic',
+    emergency: 'emergency',
+    maternity: 'maternity',
+    child: 'triage',
+  },
+  directServiceAccess: { lab: false, radiology: false, pharmacyRefill: true },
+  consultationProfiles: {
+    child: {
+      chiefComplaintRequired: true,
+      vitalsRequired: ['temperature', 'weight', 'respiratoryRate', 'pulse', 'oxygenSaturation'],
+      historyPrompts: ['duration of illness', 'feeding or drinking', 'vomiting/diarrhea', 'immunization status', 'caregiver concerns'],
+      redFlagPrompts: ['danger signs', 'seizures', 'lethargy', 'severe dehydration', 'respiratory distress'],
+    },
+    adult: {
+      chiefComplaintRequired: true,
+      vitalsRequired: ['temperature', 'bloodPressure', 'pulse', 'respiratoryRate', 'oxygenSaturation'],
+      historyPrompts: ['onset and duration', 'associated symptoms', 'medications', 'allergies', 'past medical history'],
+      redFlagPrompts: ['chest pain', 'shortness of breath', 'altered mental state', 'severe pain', 'bleeding'],
+    },
+    pregnant: {
+      chiefComplaintRequired: true,
+      vitalsRequired: ['temperature', 'bloodPressure', 'pulse', 'respiratoryRate', 'fetalHeartRate'],
+      historyPrompts: ['gestational age', 'fetal movement', 'bleeding', 'fluid leakage', 'headache/visual symptoms'],
+      redFlagPrompts: ['severe hypertension', 'convulsions', 'heavy bleeding', 'severe abdominal pain', 'reduced fetal movement'],
+    },
+    postnatal: {
+      chiefComplaintRequired: true,
+      vitalsRequired: ['temperature', 'bloodPressure', 'pulse', 'bleedingAssessment'],
+      historyPrompts: ['delivery date', 'bleeding', 'fever', 'breastfeeding', 'newborn concerns'],
+      redFlagPrompts: ['postpartum hemorrhage', 'sepsis signs', 'severe headache', 'convulsions', 'newborn danger signs'],
+    },
+    emergency: {
+      chiefComplaintRequired: true,
+      vitalsRequired: ['airway', 'breathing', 'circulation', 'consciousness', 'oxygenSaturation'],
+      historyPrompts: ['time of onset', 'mechanism or trigger', 'first aid already given', 'known conditions', 'medications/allergies'],
+      redFlagPrompts: ['airway compromise', 'shock', 'unconsciousness', 'major trauma', 'severe respiratory distress'],
+    },
+  },
+  reporting: {
+    dhis2OrgUnitId: '',
+    monthlyDeadlineDay: 5,
+    requireCompletenessSignoff: true,
+    diseaseBuckets: ['Malaria', 'Cholera', 'Measles', 'Pneumonia', 'Diarrhea', 'Tuberculosis', 'HIV', 'Maternal complications'],
+    aggregateSources: ['encounters', 'diagnoses', 'lab_results', 'pharmacy_dispenses', 'vital_events', 'payments'],
+  },
+  itOperations: {
+    backupFrequencyHours: 24,
+    syncFailureAlertMinutes: 30,
+    deviceReviewDays: 30,
+    auditRetentionDays: 2555,
+    requireDeviceRegistration: true,
+    allowOfflineMode: true,
+    integrations: ['dhis2', 'sms', 'payments', 'barcode_printers'],
+  },
   paymentMethods: ['cash', 'mobile_money', 'card', 'bank_transfer', 'voucher', 'partial_payment'],
   payors: ['out_of_pocket', 'gov_moh', 'ngo_donor', 'pepfar', 'global_fund', 'private_insurance', 'cbhi', 'exemption_waiver', 'sliding_scale'],
   collectionStageDays: { followUp: 30, warning: 60, preWriteOff: 90 },
@@ -150,6 +268,29 @@ export function mergeFacilitySettings(partial?: Partial<FacilitySettings> | null
     labCatalog: partial.labCatalog?.length ? partial.labCatalog : [...d.labCatalog],
     rooms: partial.rooms?.length ? partial.rooms : [...d.rooms],
     departments: partial.departments?.length ? partial.departments : [...d.departments],
+    stationSequence: partial.stationSequence?.length ? partial.stationSequence : [...d.stationSequence],
+    checkoutGateKeys: partial.checkoutGateKeys?.length ? partial.checkoutGateKeys : [...d.checkoutGateKeys],
+    triageRequiredFor: partial.triageRequiredFor?.length ? partial.triageRequiredFor : [...d.triageRequiredFor],
+    routingDefaults: { ...d.routingDefaults, ...(partial.routingDefaults ?? {}) },
+    directServiceAccess: { ...d.directServiceAccess, ...(partial.directServiceAccess ?? {}) },
+    consultationProfiles: {
+      child: { ...d.consultationProfiles.child, ...(partial.consultationProfiles?.child ?? {}) },
+      adult: { ...d.consultationProfiles.adult, ...(partial.consultationProfiles?.adult ?? {}) },
+      pregnant: { ...d.consultationProfiles.pregnant, ...(partial.consultationProfiles?.pregnant ?? {}) },
+      postnatal: { ...d.consultationProfiles.postnatal, ...(partial.consultationProfiles?.postnatal ?? {}) },
+      emergency: { ...d.consultationProfiles.emergency, ...(partial.consultationProfiles?.emergency ?? {}) },
+    },
+    reporting: {
+      ...d.reporting,
+      ...(partial.reporting ?? {}),
+      diseaseBuckets: partial.reporting?.diseaseBuckets?.length ? partial.reporting.diseaseBuckets : [...d.reporting.diseaseBuckets],
+      aggregateSources: partial.reporting?.aggregateSources?.length ? partial.reporting.aggregateSources : [...d.reporting.aggregateSources],
+    },
+    itOperations: {
+      ...d.itOperations,
+      ...(partial.itOperations ?? {}),
+      integrations: partial.itOperations?.integrations?.length ? partial.itOperations.integrations : [...d.itOperations.integrations],
+    },
     paymentMethods: partial.paymentMethods?.length ? partial.paymentMethods : [...d.paymentMethods],
     payors: partial.payors?.length ? partial.payors : [...d.payors],
     collectionStageDays: { ...d.collectionStageDays, ...(partial.collectionStageDays ?? {}) },

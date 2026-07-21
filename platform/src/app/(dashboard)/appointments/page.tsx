@@ -17,7 +17,7 @@ import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader'
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
-import { patientFullName } from '@/lib/patient-utils';
+import { initials, patientAgeLabel, patientFullName, stateColor } from '@/lib/patient-utils';
 import { useApp } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -81,23 +81,44 @@ const timeSlots = Array.from({ length: 24 }, (_, h) =>
   ['00', '30'].map(m => `${h.toString().padStart(2, '0')}:${m}`)
 ).flat().filter(t => { const h = parseInt(t.split(':')[0]); return h >= 7 && h <= 18; });
 
-// "Today, 05:10 AM" for the current day, otherwise "12-Jul-2026, 09:02 PM".
-function formatWhen(dateStr: string, timeStr: string, today: string) {
-  const d = new Date(`${dateStr}T${(timeStr || '00:00')}:00`);
-  if (Number.isNaN(d.getTime())) return `${dateStr} ${timeStr}`;
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  if (dateStr === today) return `Today, ${time}`;
-  const day = String(d.getDate()).padStart(2, '0');
-  const mon = d.toLocaleDateString('en-US', { month: 'short' });
-  return `${day}-${mon}-${d.getFullYear()}, ${time}`;
+function statusSlug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-// Visit start = the checked-in timestamp, shown as a time; "--" until check-in.
-function formatVisitStart(iso?: string) {
-  if (!iso) return '--';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '--';
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+function appointmentTimeMinutes(time?: string): number {
+  if (!time) return Number.MAX_SAFE_INTEGER;
+  const value = time.trim();
+  const match12 = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match12) {
+    let hour = Number(match12[1]);
+    const minute = Number(match12[2]);
+    const period = match12[3].toUpperCase();
+    if (period === 'PM' && hour < 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    return hour * 60 + minute;
+  }
+  const match24 = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) return Number(match24[1]) * 60 + Number(match24[2]);
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function appointmentOperationalCue(apt: { appointmentType: AppointmentType; appointmentDate: string; appointmentTime: string; status: AppointmentStatus; checkedInAt?: string }) {
+  if (apt.status === 'checked_in') return 'Checked in';
+  if (apt.status === 'in_progress') return 'With clinician';
+  if (apt.status === 'completed') return 'Visit complete';
+  if (apt.status === 'cancelled') return 'Cancelled';
+  if (apt.status === 'no_show') return 'No show';
+  if (apt.appointmentType === 'walk_in') return apt.checkedInAt ? 'Walk-in arrived' : 'Walk-in waiting';
+
+  const minutesOfDay = appointmentTimeMinutes(apt.appointmentTime);
+  const scheduled = new Date(`${apt.appointmentDate}T00:00:00`);
+  if (minutesOfDay !== Number.MAX_SAFE_INTEGER) scheduled.setMinutes(minutesOfDay);
+  if (Number.isNaN(scheduled.getTime())) return 'Appointment';
+  const minutes = Math.round((scheduled.getTime() - Date.now()) / 60000);
+  if (minutes > 0) return minutes <= 60 ? `Appt. in ${minutes} mins` : `Appt. in ${Math.round(minutes / 60)}h`;
+  if (minutes === 0) return 'Appointment now';
+  const overdue = Math.abs(minutes);
+  return overdue <= 60 ? `${overdue} mins late` : `${Math.round(overdue / 60)}h late`;
 }
 
 /* ─── Page ─── */
@@ -105,7 +126,15 @@ export default function AppointmentsPage() {
   const { appointments, create, updateStatus, reschedule, update } = useAppointments();
   const { patients } = usePatients();
   const { currentUser, globalSearch } = useApp();
-  const { canBookAppointments, canDoTelehealth } = usePermissions();
+  const {
+    canBookAppointments,
+    canConfirmAppointments,
+    canDoTelehealth,
+    canManageAppointmentSchedule,
+    canCheckInAppointments,
+    canAdvanceAppointments,
+    canExportAppointments,
+  } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
   const { departments: facilityDepartments } = useSettings();
@@ -164,12 +193,12 @@ export default function AppointmentsPage() {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('new') === '1') {
-      setShowNewForm(true);
+      if (canBookAppointments) setShowNewForm(true);
       params.delete('new');
       const qs = params.toString();
       window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
     }
-  }, []);
+  }, [canBookAppointments]);
 
   // Deep link: a patient chart's "Appointments" quick action / front-desk
   // checkout routes here with ?patientId= to land already filtered to that
@@ -407,7 +436,7 @@ export default function AppointmentsPage() {
 
   const handleCancel = async () => {
     if (!cancelId) return;
-    try { await updateStatus(cancelId, 'cancelled', { cancelledReason: cancelReason, cancelledBy: currentUser?.name }); showToast(t('appointments.toastCancelled'), 'success'); setCancelId(null); setCancelReason(''); }
+    try { await updateStatus(cancelId, 'cancelled', { cancelledReason: cancelReason, cancelledByName: currentUser?.name }); showToast(t('appointments.toastCancelled'), 'success'); setCancelId(null); setCancelReason(''); }
     catch { showToast(t('appointments.toastFailedCancel'), 'error'); }
   };
 
@@ -445,7 +474,13 @@ export default function AppointmentsPage() {
         return a.patientName.toLowerCase().includes(q) || a.reason.toLowerCase().includes(q) ||
           identifier.toLowerCase().includes(q) || a.department.toLowerCase().includes(q);
       })
-      .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
+      .sort((a, b) => {
+        const byTime = appointmentTimeMinutes(a.appointmentTime) - appointmentTimeMinutes(b.appointmentTime);
+        if (byTime !== 0) return byTime;
+        const byStatus = a.status.localeCompare(b.status);
+        if (byStatus !== 0) return byStatus;
+        return a.patientName.localeCompare(b.patientName);
+      });
   }, [dayList, listStatus, listSearch, patientById]);
 
   const dayLabel = listDate === today
@@ -517,9 +552,11 @@ export default function AppointmentsPage() {
                         ))}
                       </select>
                     </div>
-                    <button type="button" className="listpage-icon-btn" onClick={handleDownloadCsv} title="Download" aria-label="Download">
-                      <Download size={16} />
-                    </button>
+                    {canExportAppointments && (
+                      <button type="button" className="listpage-icon-btn" onClick={handleDownloadCsv} title="Download" aria-label="Download">
+                        <Download size={16} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="listpage-icon-btn"
@@ -538,65 +575,82 @@ export default function AppointmentsPage() {
                 }
               />
 
-              <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-                <table className="data-table listpage-table" style={{ minWidth: 980 }}>
-                  <thead>
-                    <tr>
-                      {['Patient name', 'Identifier', 'Location', 'Service type', 'Appointment time', 'Visit start time', 'Status', 'Actions'].map(h => (
-                        <th key={h} className="text-left px-4 py-2.5" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableRows.length === 0 ? (
-                      <tr><td colSpan={8} className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)', fontSize: 13 }}>No appointments for {dayLabel.toLowerCase()}.</td></tr>
-                    ) : tableRows.map(apt => {
-                      const sc = statusConfig[apt.status];
-                      const svc = appointmentTypes.find(ti => ti.value === apt.appointmentType);
-                      const identifier = patientById.get(apt.patientId)?.hospitalNumber;
-                      const canCheckIn = apt.status === 'scheduled' || apt.status === 'confirmed' || apt.status === 'requested';
-                      const canCheckOut = apt.status === 'checked_in' || apt.status === 'in_progress';
-                      return (
-                        <tr
-                          key={apt._id}
-                          className="cursor-pointer hover:bg-[var(--table-row-hover)]"
-                          onClick={() => setEventApt(apt)}
-                          style={{ borderBottom: '1px solid var(--border-light)' }}
-                        >
-                          <td className="px-4 py-3">
-                            {apt.patientId ? (
-                              <Link href={`/patients/${apt.patientId}`} onClick={e => e.stopPropagation()} className="hover:underline" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-primary)' }}>{apt.patientName}</Link>
-                            ) : (
-                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.patientName}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3" style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-platform-mono)' }}>{identifier || '—'}</td>
-                          <td className="px-4 py-3" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{apt.department || '—'}</td>
-                          <td className="px-4 py-3">
-                            {svc ? (
-                              <span style={{ fontSize: 11, fontWeight: 600, color: svc.color, background: svc.bg, borderRadius: 6, padding: '2px 8px' }}>{svc.label}</span>
-                            ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
-                          </td>
-                          <td className="px-4 py-3" style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{formatWhen(apt.appointmentDate, apt.appointmentTime, today)}</td>
-                          <td className="px-4 py-3" style={{ fontSize: 13, color: apt.checkedInAt ? 'var(--text-primary)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatVisitStart(apt.checkedInAt)}</td>
-                          <td className="px-4 py-3">
-                            <span style={{ fontSize: 11, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 6, padding: '2px 8px', whiteSpace: 'nowrap' }}>{t(statusLabelKey[apt.status])}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                              {canCheckIn && (
-                                <button onClick={() => handleStatusChange(apt._id, 'checked_in')} className="btn btn-sm btn-secondary" style={{ fontSize: 11, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}>Check In</button>
-                              )}
-                              {canCheckOut && (
-                                <button onClick={() => handleStatusChange(apt._id, 'completed')} className="btn btn-sm btn-secondary" style={{ fontSize: 11, color: 'var(--color-danger)', borderColor: 'color-mix(in srgb, var(--color-danger) 35%, transparent)' }}>Check out</button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
+              <div className="appointment-card-list">
+                {tableRows.length === 0 ? (
+                  <div className="appointment-card-empty">
+                    No appointments for {dayLabel.toLowerCase()}.
+                  </div>
+                ) : (
+                  <>
+                    <div className="appointment-card-head" aria-hidden="true">
+                      <span>Patient</span>
+                      <span>Time</span>
+                      <span>Care team</span>
+                      <span>Department</span>
+                      <span>Status</span>
+                    </div>
+                    {tableRows.map(apt => {
+                  const svc = appointmentTypes.find(ti => ti.value === apt.appointmentType);
+                  const patient = patientById.get(apt.patientId);
+                  const patientMeta = patient
+                    ? `${patientAgeLabel(patient)}${patient.gender ? ` · ${String(patient.gender).charAt(0).toUpperCase()}` : ''}`
+                    : '';
+                  const subtitle = [apt.reason, patientMeta].filter(Boolean).join(' · ');
+                  return (
+                    <div
+                      key={apt._id}
+                      className="ehr-appointment-row appointment-card-row"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setEventApt(apt)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setEventApt(apt);
+                        }
+                      }}
+                    >
+                      <div className="ehr-appointment-identity">
+                        <div className="ehr-patient-icon" style={{ background: stateColor(apt.priority), color: '#fff' }}>
+                          {initials(apt.patientName)}
+                        </div>
+                        <div className="ehr-appointment-main appointment-card-patient">
+                          {apt.patientId ? (
+                            <Link href={`/patients/${apt.patientId}`} onClick={e => e.stopPropagation()}>{apt.patientName}</Link>
+                          ) : (
+                            <button type="button" onClick={() => setEventApt(apt)}>{apt.patientName}</button>
+                          )}
+                          <p>{subtitle || svc?.label || apt.department || 'Appointment'}</p>
+                        </div>
+                      </div>
+
+                      <div className="ehr-appointment-time">
+                        <strong>{formatClockTime(apt.appointmentTime)}</strong>
+                        <span>{apt.appointmentType === 'walk_in' ? 'Walk-in' : 'Appointment'}</span>
+                      </div>
+
+                      <div className="appointment-card-provider">
+                        <strong>{apt.providerName || 'Unassigned'}</strong>
+                        <span>Care team</span>
+                      </div>
+
+                      <div className="ehr-appointment-department">
+                        <span className={`ehr-department-pill appointment-service-pill type-${apt.appointmentType}`}>
+                          {apt.department || svc?.label || 'Service'}
+                        </span>
+                      </div>
+
+                      <div className="appointment-card-status">
+                        <span className={`appointment-status-pill status-${statusSlug(apt.status)}`}>
+                          {t(statusLabelKey[apt.status])}
+                        </span>
+                        <small>{appointmentOperationalCue(apt)}</small>
+                      </div>
+                    </div>
+                  );
                     })}
-                  </tbody>
-                </table>
+                  </>
+                )}
               </div>
             </div>
           </>
@@ -650,6 +704,7 @@ export default function AppointmentsPage() {
               onView={(v) => setCalView(v)}
               onSelectEvent={(apt) => setEventApt(apt)}
               onSelectSlot={(slot) => {
+                if (!canBookAppointments) return;
                 const d = slot.start;
                 const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 setFormDate(iso);
@@ -667,7 +722,7 @@ export default function AppointmentsPage() {
         {/* ═══ Modals ═══ */}
 
         {/* Book Appointment */}
-        {showNewForm && (
+        {showNewForm && canBookAppointments && (
           <Modal onClose={() => { setShowNewForm(false); resetForm(); }} title={t('appointments.bookAppointment')} size="lg">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
@@ -704,7 +759,7 @@ export default function AppointmentsPage() {
         )}
 
         {/* Walk-In */}
-        {showWalkIn && (
+        {showWalkIn && canBookAppointments && (
           <Modal onClose={() => setShowWalkIn(false)} title={t('appointments.registerWalkIn')} icon={<UserPlus size={34} style={{ color: 'var(--accent-primary)' }} />}>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
               {t('appointments.walkInIntro')}
@@ -812,15 +867,31 @@ export default function AppointmentsPage() {
                 <button onClick={() => { const id = eventApt.patientId; setEventApt(null); router.push(`/patients/${id}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
                   <User size={14} /> Open patient record
                 </button>
-                <button onClick={() => { loadEditForm(eventApt); setEditingApt(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
-                <button onClick={() => { setRescheduleId(eventApt._id); setRescheduleDate(eventApt.appointmentDate); setRescheduleTime(eventApt.appointmentTime); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
-                {PRIOR_STATUS[eventApt.status] && (
+                {canConfirmAppointments && (eventApt.status === 'requested' || eventApt.status === 'scheduled') && (
+                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'confirmed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionApprove')}</button>
+                )}
+                {canCheckInAppointments && (eventApt.status === 'requested' || eventApt.status === 'scheduled' || eventApt.status === 'confirmed') && (
+                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'checked_in'); }} className="btn btn-secondary btn-sm">{t('appointments.actionCheckIn')}</button>
+                )}
+                {canAdvanceAppointments && eventApt.status === 'checked_in' && (
+                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'in_progress'); }} className="btn btn-secondary btn-sm">{t('appointments.actionStart')}</button>
+                )}
+                {canAdvanceAppointments && (eventApt.status === 'checked_in' || eventApt.status === 'in_progress') && (
+                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'completed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionComplete')}</button>
+                )}
+                {canManageAppointmentSchedule && (
+                  <button onClick={() => { loadEditForm(eventApt); setEditingApt(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
+                )}
+                {canManageAppointmentSchedule && (
+                  <button onClick={() => { setRescheduleId(eventApt._id); setRescheduleDate(eventApt.appointmentDate); setRescheduleTime(eventApt.appointmentTime); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
+                )}
+                {(canManageAppointmentSchedule || canCheckInAppointments || canAdvanceAppointments) && PRIOR_STATUS[eventApt.status] && (
                   <button onClick={() => { const id = eventApt._id; const to = PRIOR_STATUS[eventApt.status]!; setEventApt(null); handleStatusChange(id, to); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
                 )}
-                {(eventApt.status === 'completed' || eventApt.status === 'cancelled' || eventApt.status === 'no_show') && (
+                {canManageAppointmentSchedule && (eventApt.status === 'completed' || eventApt.status === 'cancelled' || eventApt.status === 'no_show') && (
                   <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
                 )}
-                {eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
+                {canManageAppointmentSchedule && eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
                   <button onClick={() => { setCancelId(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger)' }}>{t('appointments.actionCancel')}</button>
                 )}
               </div>
@@ -829,7 +900,7 @@ export default function AppointmentsPage() {
         })()}
 
         {/* Reschedule */}
-        {rescheduleId && (
+        {rescheduleId && canManageAppointmentSchedule && (
           <Modal onClose={() => setRescheduleId(null)} title={t('appointments.rescheduleTitle')} size="sm">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div><label>{t('appointments.labelNewDate')}</label><input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)} min={today} /></div>
@@ -840,7 +911,7 @@ export default function AppointmentsPage() {
         )}
 
         {/* Cancel */}
-        {cancelId && (
+        {cancelId && canManageAppointmentSchedule && (
           <Modal onClose={() => { setCancelId(null); setCancelReason(''); }} title={t('appointments.cancelTitle')} titleColor="#EF4444" icon={<AlertTriangle size={34} style={{ color: 'var(--color-danger)' }} />} size="sm">
             <div><label>{t('appointments.labelCancelReason')}</label><textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={3} placeholder={t('appointments.cancelReasonPlaceholder')} /></div>
             <ModalActions onCancel={() => { setCancelId(null); setCancelReason(''); }} onConfirm={handleCancel} confirmLabel={t('appointments.cancelTitle')} confirmColor="#EF4444" cancelLabel={t('appointments.goBack')} />
@@ -918,21 +989,30 @@ export default function AppointmentsPage() {
                         <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, color: sc.color, background: sc.bg }}>{t(statusLabelKey[apt.status])}</span>
                         {/* Action buttons */}
                         <div style={{ display: 'flex', gap: 4 }}>
-                          {apt.status === 'scheduled' && (
+                          {canConfirmAppointments && apt.status === 'scheduled' && (
                             <button onClick={() => { handleStatusChange(apt._id, 'confirmed'); }} title={t('appointments.actionApprove')} style={miniBtn('var(--accent-primary)')}>
                               <CheckCircle2 size={12} />
                             </button>
                           )}
-                          <button onClick={() => { setShowDayPopup(false); setEditingApt(apt._id); loadEditForm(apt); }} title={t('action.edit')} style={miniBtn('var(--accent-primary)')}>
-                            <ClipboardList size={12} />
-                          </button>
-                          <button onClick={() => { setShowDayPopup(false); setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); }} title={t('appointments.actionReschedule')} style={miniBtn('var(--color-warning)')}>
-                            <RefreshCw size={12} />
-                          </button>
-                          {(apt.status !== 'completed' && apt.status !== 'cancelled') && (
-                            <button onClick={() => { setShowDayPopup(false); setCancelId(apt._id); }} title={t('appointments.actionCancel')} style={miniBtn('var(--color-danger)')}>
-                              <X size={12} />
+                          {canCheckInAppointments && (apt.status === 'requested' || apt.status === 'scheduled' || apt.status === 'confirmed') && (
+                            <button onClick={() => { handleStatusChange(apt._id, 'checked_in'); }} title={t('appointments.actionCheckIn')} style={miniBtn('var(--accent-primary)')}>
+                              <UserPlus size={12} />
                             </button>
+                          )}
+                          {canManageAppointmentSchedule && (
+                            <>
+                              <button onClick={() => { setShowDayPopup(false); setEditingApt(apt._id); loadEditForm(apt); }} title={t('action.edit')} style={miniBtn('var(--accent-primary)')}>
+                                <ClipboardList size={12} />
+                              </button>
+                              <button onClick={() => { setShowDayPopup(false); setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); }} title={t('appointments.actionReschedule')} style={miniBtn('var(--color-warning)')}>
+                                <RefreshCw size={12} />
+                              </button>
+                              {(apt.status !== 'completed' && apt.status !== 'cancelled') && (
+                                <button onClick={() => { setShowDayPopup(false); setCancelId(apt._id); }} title={t('appointments.actionCancel')} style={miniBtn('var(--color-danger)')}>
+                                  <X size={12} />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -945,7 +1025,7 @@ export default function AppointmentsPage() {
         )}
 
         {/* Edit Appointment */}
-        {editingApt && (() => {
+        {editingApt && canManageAppointmentSchedule && (() => {
           const apt = appointments.find(a => a._id === editingApt);
           if (!apt) return null;
           return (

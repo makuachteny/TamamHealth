@@ -6,12 +6,12 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Pill, FileText, BedDouble, AlertTriangle,
-  Syringe, Users, Calendar,
+  Syringe, Users, Calendar, Activity, Baby, UserX,
 } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useWards } from '@/lib/hooks/useWards';
-import { patientAgeLabel, patientFullName, patientGenderAge } from '@/lib/patient-utils';
+import { patientAgeLabel, patientFullName, patientGenderAge, patientRegisteredAt } from '@/lib/patient-utils';
 import { getRoleConfig } from '@/lib/permissions';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import WardWorkflow from './WardWorkflow';
@@ -20,6 +20,15 @@ import TriageWorkflow from './TriageWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
 
 type StationTab = 'ward' | 'mar' | 'triage' | 'handoff';
+
+// Only plots a time when the source field is a full timestamp (contains a
+// clock component) — registration/admission dates are sometimes date-only,
+// and an invented hour would misreport when the work actually happened.
+function rowTime(iso?: string): string | undefined {
+  if (!iso || !/T\d{2}:\d{2}/.test(iso)) return undefined;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? undefined : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function NurseDashboard() {
   const { t } = useTranslation();
@@ -58,24 +67,12 @@ export default function NurseDashboard() {
   const allowedRoutes = useMemo(() => roleConfig?.allowedRoutes ?? [], [roleConfig]);
   const canUseRoute = useCallback((href: string) => allowedRoutes.includes(href), [allowedRoutes]);
 
-  const stationTabs = useMemo(() => {
-    const tabs: { key: StationTab; label: string; count: number }[] = [];
-    if (currentUser?.role === 'triage_nurse') {
-      tabs.push({ key: 'triage', label: stationLabel.triage, count: triageToday.length });
-      tabs.push({ key: 'ward', label: stationLabel.ward, count: patients.length });
-      return tabs;
-    }
-    if (currentUser?.role === 'rooming_nurse') {
-      tabs.push({ key: 'ward', label: 'Rooming', count: patients.length });
-      tabs.push({ key: 'triage', label: stationLabel.triage, count: triageToday.length });
-      return tabs;
-    }
-    tabs.push({ key: 'ward', label: stationLabel.ward, count: activeAdmissions.length || patients.length });
-    tabs.push({ key: 'mar', label: stationLabel.mar, count: activeAdmissions.length });
-    tabs.push({ key: 'triage', label: stationLabel.triage, count: triageToday.length });
-    tabs.push({ key: 'handoff', label: stationLabel.handoff, count: 0 });
-    return tabs;
-  }, [activeAdmissions.length, currentUser?.role, patients.length, stationLabel.handoff, stationLabel.mar, stationLabel.triage, stationLabel.ward, triageToday.length]);
+  const stationTabs = useMemo(() => ([
+    { key: 'ward' as const, label: stationLabel.ward, count: activeAdmissions.length || patients.length },
+    { key: 'mar' as const, label: stationLabel.mar, count: activeAdmissions.length },
+    { key: 'triage' as const, label: stationLabel.triage, count: triageToday.length },
+    { key: 'handoff' as const, label: stationLabel.handoff },
+  ]), [activeAdmissions.length, patients.length, stationLabel.handoff, stationLabel.mar, stationLabel.triage, stationLabel.ward, triageToday.length]);
 
   useEffect(() => {
     if (!stationTabs.some(tab => tab.key === activeTab) && stationTabs[0]) {
@@ -96,75 +93,91 @@ export default function NurseDashboard() {
 
   const rows = useMemo<EhrCareDashboardRow[]>(() => {
     if (activeTab === 'triage') {
-      return triageToday.slice(0, 10).map(triage => ({
-        id: triage._id,
-        title: triage.patientName,
-        subtitle: triage.chiefComplaint || 'ETAT assessment',
-        meta: `${triage.modeOfArrival || 'walk-in'} · ${triage.triagedAt ? new Date(triage.triagedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'No time'}`,
-        status: triage.status,
-        statusTone: triage.priority === 'RED' ? 'danger' : triage.priority === 'YELLOW' ? 'warning' : 'ready',
-        priority: triage.priority,
-        room: triage.assignedRoom,
-        date: (triage.triagedAt || today).slice(0, 10),
-        onClick: () => router.push(`/patients/${triage.patientId}`),
-        actionLabel: 'Open',
-        onAction: () => router.push(`/patients/${triage.patientId}`),
-      }));
+      return triageToday.slice(0, 10).map(triage => {
+        const time = rowTime(triage.triagedAt);
+        return {
+          id: triage._id,
+          title: triage.patientName,
+          subtitle: triage.chiefComplaint || 'ETAT assessment',
+          meta: `${triage.modeOfArrival || 'walk-in'} · ${time || 'No time'}`,
+          time,
+          status: triage.status,
+          statusTone: triage.priority === 'RED' ? 'danger' : triage.priority === 'YELLOW' ? 'warning' : 'ready',
+          // RED/YELLOW need attention now (Urgent); GREEN is routine — a more
+          // useful split for this station than the done-based default, which
+          // would never place a still-open triage in the second series.
+          chartSeries: (triage.priority === 'RED' || triage.priority === 'YELLOW' ? 0 : 1) as 0 | 1,
+          priority: triage.priority,
+          room: triage.assignedRoom,
+          date: (triage.triagedAt || today).slice(0, 10),
+          onClick: () => router.push(`/patients/${triage.patientId}`),
+          actionLabel: 'Open',
+          onAction: () => router.push(`/patients/${triage.patientId}`),
+        };
+      });
     }
 
     if (activeTab === 'mar') {
-      return activeAdmissions.slice(0, 10).map(admission => ({
-        id: admission._id,
-        title: admission.patientName,
-        subtitle: `${admission.wardName}${admission.bedNumber ? ` · Bed ${admission.bedNumber}` : ''}`,
-        meta: `${admission.hospitalNumber || 'No MRN'} · ${admission.admittingDiagnosis || 'No diagnosis'} · ${admission.attendingPhysicianName || 'No physician'}`,
-        status: 'admitted',
-        statusTone: admission.severity === 'critical' ? 'danger' : admission.severity === 'severe' ? 'warning' : 'ready',
-        priority: admission.severity,
-        room: admission.nurseAssignedName,
-        date: (admission.admissionDate || today).slice(0, 10),
-        onClick: () => router.push(`/wards/mar/${admission._id}`),
-        actionLabel: 'MAR',
-        onAction: () => router.push(`/wards/mar/${admission._id}`),
-      }));
+      return activeAdmissions.slice(0, 10).map(admission => {
+        const time = rowTime(admission.admissionDate);
+        return {
+          id: admission._id,
+          title: admission.patientName,
+          subtitle: `${admission.wardName}${admission.bedNumber ? ` · Bed ${admission.bedNumber}` : ''}`,
+          meta: `${admission.hospitalNumber || 'No MRN'} · ${admission.admittingDiagnosis || 'No diagnosis'} · ${admission.attendingPhysicianName || 'No physician'}`,
+          time,
+          status: 'admitted',
+          statusTone: admission.severity === 'critical' ? 'danger' : admission.severity === 'severe' ? 'warning' : 'ready',
+          chartSeries: (admission.severity === 'critical' || admission.severity === 'severe' ? 0 : 1) as 0 | 1,
+          priority: admission.severity,
+          room: admission.nurseAssignedName,
+          date: (admission.admissionDate || today).slice(0, 10),
+          onClick: () => router.push(`/wards/mar/${admission._id}`),
+          actionLabel: 'MAR',
+          onAction: () => router.push(`/wards/mar/${admission._id}`),
+        };
+      });
     }
 
-    return patients.slice(0, 10).map(patient => ({
-      id: patient._id,
-      title: patientFullName(patient),
-      subtitle: patientGenderAge(patient),
-      meta: `${patient.hospitalNumber || 'No MRN'} · ${patient.phone || 'No phone'} · ${patient.county || 'No location'}`,
-      status: patient.assignedDoctor ? 'assigned' : 'needs routing',
-      statusTone: patient.assignedDoctor ? 'ready' : 'warning',
-      priority: patientAgeLabel(patient),
-      room: patient.assignedDoctorName,
-      date: (patient.registeredAt || patient.registrationDate || today).slice(0, 10),
-      onClick: () => router.push(`/patients/${patient._id}`),
-      actionLabel: 'Open',
-      onAction: () => router.push(`/patients/${patient._id}`),
-    }));
+    return patients.slice(0, 10).map(patient => {
+      const time = rowTime(patientRegisteredAt(patient));
+      return {
+        id: patient._id,
+        title: patientFullName(patient),
+        subtitle: patientGenderAge(patient),
+        meta: `${patient.hospitalNumber || 'No MRN'} · ${patient.phone || 'No phone'} · ${patient.county || 'No location'}`,
+        time,
+        status: patient.assignedDoctor ? 'assigned' : 'needs routing',
+        statusTone: patient.assignedDoctor ? 'ready' : 'warning',
+        // Already routed to a doctor is "Routine"; still needing routing is "Urgent".
+        chartSeries: (patient.assignedDoctor ? 1 : 0) as 0 | 1,
+        priority: patientAgeLabel(patient),
+        room: patient.assignedDoctorName,
+        date: (patient.registeredAt || patient.registrationDate || today).slice(0, 10),
+        onClick: () => router.push(`/patients/${patient._id}`),
+        actionLabel: 'Open',
+        onAction: () => router.push(`/patients/${patient._id}`),
+      };
+    });
   }, [activeAdmissions, activeTab, patients, router, today, triageToday]);
 
   const dateLabel = useMemo(() => (
     new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date())
   ), []);
 
+  // Critical/Urgent/Waiting/In consult are acuity signals not already surfaced
+  // by a tab count — Patients/Active admissions/Triage today were dropped as
+  // they just echoed the Ward/MAR/Triage tab counts above.
   const metrics = useMemo(() => ([
-    { label: 'Patients', value: patients.length },
-    { label: 'Active admissions', value: activeAdmissions.length },
-    { label: 'Triage today', value: triageToday.length },
     { label: 'Critical', value: criticalTriage, tone: criticalTriage > 0 ? 'danger' as const : 'neutral' as const },
     { label: 'Urgent', value: urgentTriage, tone: urgentTriage > 0 ? 'warning' as const : 'neutral' as const },
     { label: 'Waiting', value: waitingTriage },
     { label: 'In consult', value: inConsultTriage },
-  ]), [activeAdmissions.length, criticalTriage, urgentTriage, waitingTriage, inConsultTriage, patients.length, triageToday.length]);
+  ]), [criticalTriage, urgentTriage, waitingTriage, inConsultTriage]);
 
   const checklist = useMemo(() => ([
-    { label: 'Review assigned patients', done: patients.length === 0, onClick: () => setActiveTab('ward') },
     { label: 'Complete triage queue', done: triageToday.length === 0, onClick: () => setActiveTab('triage') },
-    { label: 'Medication administration', done: activeTab === 'mar', onClick: () => setActiveTab('mar') },
-    { label: 'Shift handoff', done: activeTab === 'handoff', onClick: () => setActiveTab('handoff') },
-  ].filter(item => stationTabs.some(tab => item.label === 'Review assigned patients' && tab.key === 'ward' || item.label === 'Complete triage queue' && tab.key === 'triage' || item.label === 'Medication administration' && tab.key === 'mar' || item.label === 'Shift handoff' && tab.key === 'handoff'))), [activeTab, patients.length, stationTabs, triageToday.length]);
+  ]), [triageToday.length]);
 
   if (!currentUser) return null;
 
@@ -172,7 +185,7 @@ export default function NurseDashboard() {
     <>
       <main className="page-container page-enter">
         <EhrCareDashboard
-          title={currentUser.role === 'triage_nurse' ? 'Triage station' : currentUser.role === 'rooming_nurse' ? 'Rooming station' : t('nurse.title')}
+          title={t('nurse.title')}
           eyebrow={roleConfig?.label || 'Nursing'}
           greetingName={currentUser.name || 'nurse'}
           dateLabel={dateLabel}
@@ -184,10 +197,19 @@ export default function NurseDashboard() {
           searchPlaceholder={t('nurse.searchPatientPlaceholder')}
           filters={[]}
           actions={actions}
+          // Meaning shifts with the active station (triage acuity, admission
+          // severity, or routing status), so chartSeries is set explicitly per
+          // row rather than relying on the done-based default — none of these
+          // three stations' rows ever reach a 'done' statusTone.
+          chartSeriesNames={['Urgent', 'Routine']}
           actionStrip={[
             ...(canUseRoute('/patients') ? [{ label: 'Patient search', icon: Users, onClick: () => router.push('/patients') }] : []),
             ...(canUseRoute('/wards') ? [{ label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') }] : []),
+            ...(canUseRoute('/lab') ? [{ label: 'Lab results', icon: Activity, onClick: () => router.push('/lab') }] : []),
             ...(canUseRoute('/immunizations') ? [{ label: 'Immunizations', icon: Syringe, onClick: () => router.push('/immunizations') }] : []),
+            ...(canUseRoute('/anc') ? [{ label: 'ANC', icon: Baby, onClick: () => router.push('/anc') }] : []),
+            ...(canUseRoute('/births') ? [{ label: 'Births', icon: Baby, onClick: () => router.push('/births') }] : []),
+            ...(canUseRoute('/deaths') ? [{ label: 'Deaths', icon: UserX, onClick: () => router.push('/deaths') }] : []),
             ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
           ]}
           rows={rows}
@@ -200,14 +222,11 @@ export default function NurseDashboard() {
           metricsTitle="Nursing station"
           checklistTitle="Nursing checklist"
           checklistDescription="Ward care, triage, medications, and handoff."
-          missionTitle="Bedside care"
-          missionDescription="Keep assigned patients, urgent triage, and medication work visible."
-          showMissionCard
           emptyTitle="No patients in this station"
           hideRowList
         >
           <div className="flex flex-col" style={{ minHeight: 0 }}>
-            {activeTab === 'ward' && <WardWorkflow search={railSearch} />}
+            {activeTab === 'ward' && <WardWorkflow search={railSearch} showHeader={false} />}
             {activeTab === 'mar' && <MarWorkflow />}
             {activeTab === 'triage' && <TriageWorkflow />}
             {activeTab === 'handoff' && <HandoffWorkflow variant="page" />}

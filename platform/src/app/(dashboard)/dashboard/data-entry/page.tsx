@@ -78,6 +78,17 @@ interface CensusData {
   urgentNeeds: string;
 }
 
+// A saved report as displayed in the worklist: the census payload plus the
+// real submission timestamp from the wrapping FacilityCensusDoc (the census
+// payload itself is just numbers/text — no time of its own).
+type SavedCensusReport = CensusData & { _submittedAt?: string };
+
+function formatTime(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? undefined : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
 const emptyCensus = (date: string): CensusData => ({
   date,
   inpatientsTotal: 0, inpatientsMale: 0, inpatientsFemale: 0, inpatientsChildren: 0,
@@ -103,7 +114,7 @@ export default function DataEntryDashboard() {
   const today = new Date().toISOString().slice(0, 10);
   const [showForm, setShowForm] = useState(false);
   const [census, setCensus] = useState<CensusData>(() => emptyCensus(today));
-  const [savedReports, setSavedReports] = useState<CensusData[]>([]);
+  const [savedReports, setSavedReports] = useState<SavedCensusReport[]>([]);
   const [saving, setSaving] = useState(false);
   // Which saved report row is expanded to show its full census breakdown,
   // rendered inline via EhrCareDashboard's `row.detail` slot.
@@ -146,7 +157,7 @@ export default function DataEntryDashboard() {
         submittedByName: currentUser?.name,
       });
       const updated = await getFacilityCensusByFacility(facilityId);
-      setSavedReports(updated.map(r => r.census as unknown as CensusData).slice(0, 30));
+      setSavedReports(updated.map(r => ({ ...(r.census as unknown as CensusData), _submittedAt: r.createdAt })).slice(0, 30));
       showToast(t('dataEntry.toastSaved'), 'success');
       setShowForm(false);
     } catch {
@@ -168,7 +179,7 @@ export default function DataEntryDashboard() {
         const { getFacilityCensusByFacility } = await import('@/lib/services/facility-census-service');
         const facilityId = currentUser?.hospitalId || 'unknown';
         const existing = await getFacilityCensusByFacility(facilityId);
-        if (!cancelled) setSavedReports(existing.map(r => r.census as unknown as CensusData).slice(0, 30));
+        if (!cancelled) setSavedReports(existing.map(r => ({ ...(r.census as unknown as CensusData), _submittedAt: r.createdAt })).slice(0, 30));
       } catch {
         if (!cancelled) setSavedReports([]);
       }
@@ -430,6 +441,10 @@ export default function DataEntryDashboard() {
           { label: t('dataEntry.births'), icon: Baby, onClick: () => router.push('/births') },
           { label: t('dataEntry.deaths'), icon: Skull, onClick: () => router.push('/deaths') },
         ]}
+        // Reports carry a real submission time (the census payload's `date`
+        // is just the reporting day); high-occupancy reports stay open,
+        // matching the done→series1 default for everything else.
+        chartSeriesNames={['High Occupancy', 'Normal']}
         rows={filteredReports.map((r, i): EhrCareDashboardRow => {
           const id = `${r.date}-${i}`;
           const isOpen = selectedReport === id;
@@ -440,6 +455,7 @@ export default function DataEntryDashboard() {
             subtitle: `${t('dataEntry.inpatientsCount', { count: r.inpatientsTotal })} · ${t('dataEntry.opdCount', { count: r.opdVisitsToday })}`,
             compactMeta: t('dataEntry.bedsCount', { occupied: r.occupiedBeds, total: r.totalBeds }),
             date: r.date,
+            time: formatTime(r._submittedAt),
             status: `${occ}%`,
             statusTone: occ > 90 ? 'danger' : occ > 70 ? 'warning' : 'done',
             onClick: () => setSelectedReport(isOpen ? null : id),
@@ -451,9 +467,6 @@ export default function DataEntryDashboard() {
           { label: t('dashboard.bedOccupancy'), value: latest ? `${bedOccupancy}%` : '--', tone: bedOccupancy > 90 ? 'danger' : bedOccupancy > 70 ? 'warning' : 'success' },
           { label: t('dataEntry.kpiMedicineAvail'), value: latest ? `${medAvailability}%` : '--', tone: medAvailability >= 80 ? 'success' : medAvailability >= 50 ? 'warning' : 'danger' },
           { label: t('dataEntry.kpiReportsFiled'), value: savedReports.length },
-          { label: 'Beds', value: myHospital?.totalBeds ?? 0 },
-          { label: 'Doctors', value: myHospital?.doctors ?? 0 },
-          { label: 'Nurses', value: myHospital?.nurses ?? 0 },
         ]}
         metricsTitle={t('dataEntry.title')}
         checklist={[

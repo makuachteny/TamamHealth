@@ -3,14 +3,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AppointmentDoc, AppointmentStatus } from '../db-types';
 import { appointmentsDB } from '../db';
+import { useApp } from '../context';
 import { makeCoalescer } from './live-reload';
 import { useDataScope } from './useDataScope';
+import type { AppointmentStatusUpdateExtra } from '../services/appointment-service';
 
 export function useAppointments() {
   const [appointments, setAppointments] = useState<AppointmentDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const scope = useDataScope();
+  const { currentUser } = useApp();
 
   const load = useCallback(async () => {
     try {
@@ -52,12 +55,18 @@ export function useAppointments() {
   const updateStatus = useCallback(async (
     id: string,
     status: AppointmentStatus,
-    extra?: { cancelledReason?: string; cancelledBy?: string }
+    extra?: AppointmentStatusUpdateExtra
   ) => {
     const { updateAppointmentStatus } = await import('../services/appointment-service');
-    await updateAppointmentStatus(id, status, extra);
+    const updated = await updateAppointmentStatus(id, status, {
+      ...extra,
+      actorId: extra?.actorId || currentUser?._id,
+      actorName: extra?.actorName || currentUser?.name,
+      actorRole: extra?.actorRole || currentUser?.role,
+    });
+    if (!updated) throw new Error('Failed to update appointment status');
     await load();
-  }, [load]);
+  }, [currentUser?._id, currentUser?.name, currentUser?.role, load]);
 
   const reschedule = useCallback(async (id: string, newDate: string, newTime: string) => {
     const { rescheduleAppointment } = await import('../services/appointment-service');

@@ -1126,6 +1126,33 @@
   --color-danger-border: #F87171;
   --color-info-border: var(--tb-blue-700);
 
+  /* Workflow semantics — use these in shared rows, pills, queues, and admin
+     surfaces so color carries the same meaning across departments. */
+  --semantic-active: var(--color-info-text);
+  --semantic-active-bg: var(--color-info-bg);
+  --semantic-active-border: #8FC1DF;
+  --semantic-success: #167755;
+  --semantic-success-bg: #E8F7F1;
+  --semantic-success-border: #9FD8C5;
+  --semantic-warning: #B55E13;
+  --semantic-warning-bg: #FFF4E9;
+  --semantic-warning-border: #F5C38E;
+  --semantic-danger: #C24135;
+  --semantic-danger-bg: #FFF0EF;
+  --semantic-danger-border: #F4B4AC;
+  --semantic-request: #6D45C2;
+  --semantic-request-bg: #F6F1FF;
+  --semantic-request-border: #CBB9FF;
+  --semantic-it: #0E7490;
+  --semantic-it-bg: #EDF8FB;
+  --semantic-it-border: #A9DDEB;
+  --semantic-neutral: #3D5967;
+  --semantic-neutral-bg: #EEF4F6;
+  --semantic-neutral-border: #C8DDEA;
+  --semantic-inactive: #607385;
+  --semantic-inactive-bg: #EEF1F4;
+  --semantic-inactive-border: #D8E3EC;
+
   /* Chart colors — brand-aligned series */
   --color-chart-1: var(--color-brand-500);
   --color-chart-2: var(--color-blue-400);
@@ -4172,9 +4199,10 @@ thead th {
 
 .ehr-avatar--labeled {
   width: auto !important;
-  min-width: 0;
+  min-width: 104px;
+  max-width: 170px;
   height: 40px !important;
-  padding: 3px 14px 3px 3px !important;
+  padding: 3px 10px 3px 3px !important;
 }
 
 .ehr-avatar:hover,
@@ -4184,13 +4212,15 @@ thead th {
 }
 
 .ehr-avatar-role {
+  flex: 0 1 auto;
   color: var(--ehr-text);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
-  max-width: 130px;
+  max-width: 112px;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: left;
 }
 
 .ehr-avatar-mark {
@@ -5126,8 +5156,8 @@ thead th {
 }
 
 .ehr-care-footer {
-  /* Top gap only — no horizontal margin, so "Recently registered" spans the
-     same width as the appointment card above it. */
+  /* Top gap only; no horizontal margin, so footer content aligns with the
+     center list above it. */
   margin: 10px 0 0;
   flex: 1 1 auto;
   display: flex;
@@ -5143,8 +5173,7 @@ thead th {
 }
 
 /* The footer already supplies the 10px gutter; drop the panel's own margin so
-   the "Recently registered" card lines up to the same width as the appointment
-   list above it (which insets its rows by 10px of padding). */
+   footer panels line up to the same width as the center list above them. */
 .ehr-care-footer .ehr-worklist-panel {
   margin: 0;
 }
@@ -5290,35 +5319,41 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   padding: 11px 16px;
 }
 
+/* Worklists read as cards like every other dashboard list, so the column
+   header strip is dropped — the values carry their own meaning. */
 .ehr-worklist-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  min-height: 42px;
-  border-top: 1px solid var(--ehr-border);
-  border-bottom: 1px solid var(--ehr-border);
-  background: #fbfdff;
-  color: #72839a;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: none !important;
+}
+
+.ehr-worklist-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 6px;
+  border-radius: 16px;
+  background: var(--bg-secondary);
 }
 
 .ehr-worklist-row {
   width: 100%;
-  border: 0;
-  border-bottom: 1px solid #e5edf5;
+  min-height: 64px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 14px;
   background: #fff;
+  box-shadow: none;
   color: var(--ehr-text);
   font-size: 13px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
+  transition: box-shadow 140ms ease;
 }
 
-.ehr-worklist-row:hover {
-  background: #F5FBFE;
+.ehr-worklist-row:hover,
+.ehr-worklist-row:focus-visible {
+  border-color: var(--ehr-blue, var(--accent-primary));
+  box-shadow: none;
+  outline: none;
 }
 
 .ehr-worklist-row strong,
@@ -5682,14 +5717,14 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   justify-content: flex-end;
 }
 
-.ehr-care-dashboard .ehr-schedule-actions {
-  flex-wrap: nowrap;
-}
-
 .ehr-care-dashboard .ehr-segmented {
   /* Span the full rail column so the toggle matches the "Go to today" width. */
   width: 100%;
   max-width: 100%;
+}
+
+.ehr-care-dashboard .ehr-schedule-actions {
+  flex-wrap: nowrap;
 }
 
 .ehr-care-dashboard .ehr-schedule-actions {
@@ -5708,11 +5743,15 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 0 10px;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 12px;
   border: 1px solid var(--ehr-border);
   border-radius: 999px;
   background: #fff;
+  overflow: hidden;
 }
 
 .ehr-care-search:focus-within {
@@ -5721,19 +5760,32 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-care-search svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
   color: var(--ehr-blue);
 }
 
 .ehr-care-search input {
+  appearance: none;
   width: 100%;
   min-width: 0;
-  height: 32px;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
   border: 0;
+  border-radius: 0;
   outline: none;
   background: transparent;
   color: var(--ehr-text);
   font-size: 13px;
   font-weight: 700;
+  line-height: 1.2;
+}
+
+.ehr-care-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .ehr-care-header-search {
@@ -5798,12 +5850,48 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   max-height: none;
 }
 
+/* Care rows share the queue-card look: free-standing white cards on a soft
+   backdrop, no header strip. `--care-cols` is set per dashboard by
+   EhrCareDashboard so roles that don't fill a column don't render it — the
+   compact (<640px) treatment further down still overrides the template. */
+.ehr-appointment-list.ehr-care-list {
+  gap: 8px;
+  border-radius: 16px;
+  background: var(--bg-secondary);
+}
+
 .ehr-care-row {
-  grid-template-columns: 42px minmax(0, 1fr) max-content;
+  grid-template-columns: var(--care-cols, 42px minmax(220px, 1.8fr) repeat(4, minmax(112px, 1fr)) 44px);
+  column-gap: 16px;
+  min-height: 64px;
+  padding: 9px 14px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: none !important;
+  transition: box-shadow 140ms ease;
+}
+
+.ehr-care-row:hover,
+.ehr-care-row:focus-visible {
+  border-color: var(--ehr-blue, var(--accent-primary));
+  box-shadow: none !important;
+  outline: none;
+}
+
+.ehr-care-row-blank {
+  color: var(--ehr-muted);
+  font-weight: 600;
+}
+
+.ehr-care-row-open {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .ehr-care-row.ready {
-  background: transparent;
+  background: #fff;
 }
 
 .ehr-care-row.active,
@@ -5865,18 +5953,18 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-care-status.done {
-  background: #EEF2F6;
-  color: #53687A;
+  background: var(--semantic-success-bg);
+  color: var(--semantic-success);
 }
 
 .ehr-care-status.warning {
-  background: #FFF3D9;
-  color: #9A5B00;
+  background: var(--semantic-warning-bg);
+  color: var(--semantic-warning);
 }
 
 .ehr-care-status.danger {
-  background: #FFE0D8;
-  color: #B43921;
+  background: var(--semantic-danger-bg);
+  color: var(--semantic-danger);
 }
 
 .ehr-care-row-actions {
@@ -5886,6 +5974,113 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   align-items: stretch;
   gap: 6px;
   min-width: 124px;
+}
+
+.ehr-care-row-team,
+.ehr-care-row-location {
+  width: 100%;
+  min-width: 0;
+  align-self: center;
+}
+
+.ehr-care-row-team strong {
+  display: block;
+  overflow: hidden;
+  color: var(--ehr-text, var(--text-primary));
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-care-row-team span,
+.ehr-care-row-location span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ehr-muted, var(--text-muted));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.ehr-care-row-location {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ehr-care-row-location .ehr-department-pill {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ehr-care-row-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  min-width: 0;
+}
+
+.ehr-care-row-status b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 108px;
+  min-height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--ehr-table-head);
+  color: var(--ehr-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ehr-care-row-status .status-priority,
+.ehr-care-row-status .status-urgent,
+.ehr-care-row-status .status-payment-due,
+.ehr-care-row-status .status-processing,
+.ehr-care-row-status .status-abnormal {
+  background: var(--semantic-warning-bg);
+  color: var(--semantic-warning);
+}
+
+.ehr-care-row-status .status-emergency,
+.ehr-care-row-status .status-critical,
+.ehr-care-row-status .status-held,
+.ehr-care-row-status .status-stockout-referred {
+  background: var(--semantic-danger-bg);
+  color: var(--semantic-danger);
+}
+
+.ehr-care-row-status .status-appointment,
+.ehr-care-row-status .status-scheduled {
+  background: var(--semantic-neutral-bg);
+  color: var(--semantic-neutral);
+}
+
+.ehr-care-row-status .status-checked-in,
+.ehr-care-row-status .status-in-progress,
+.ehr-care-row-status .status-in-consult,
+.ehr-care-row-status .status-ready,
+.ehr-care-row-status .status-waiting,
+.ehr-care-row-status .status-received {
+  background: var(--semantic-active-bg);
+  color: var(--semantic-active);
+}
+
+.ehr-care-row-status .status-done,
+.ehr-care-row-status .status-complete,
+.ehr-care-row-status .status-completed,
+.ehr-care-row-status .status-cleared,
+.ehr-care-row-status .status-dispensed,
+.ehr-care-row-status .status-registered {
+  background: var(--semantic-success-bg);
+  color: var(--semantic-success);
 }
 
 .ehr-care-action {
@@ -6074,6 +6269,44 @@ button.ward-stat-chip:focus:not(:focus-visible) {
    avoid doubling it. */
 .ehr-care-workflow--bare .ehr-worklist-panel {
   margin: 0;
+}
+
+.ehr-center-panel:has(.ward-workflow-panel--merged) > .ehr-daybar {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.ehr-care-workflow--bare .ward-workflow-panel--merged {
+  margin-top: -10px;
+  border-top: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+.ehr-care-workflow--bare .ward-workflow-panel--merged > .ehr-worklist-table {
+  display: block;
+  align-items: initial;
+  justify-content: initial;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  border-bottom: 0;
+}
+
+.ehr-care-workflow--bare .ward-workflow-panel--merged .ehr-worklist-head,
+.ehr-care-workflow--bare .ward-workflow-panel--merged .ehr-worklist-row {
+  width: 100%;
+}
+
+.ward-workflow-panel .ward-appointment-time {
+  min-width: 0;
+}
+
+.ward-workflow-panel .ward-appointment-time strong,
+.ward-workflow-panel .ward-appointment-time span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ehr-mission-card {
@@ -6935,10 +7168,33 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   margin-bottom: 10px;
   border-bottom: 1px solid var(--border-light);
 }
+.ehr-vitals-profile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.ehr-vitals-profile span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: var(--overlay-subtle);
+}
 /* Non-blocking out-of-range hint under a vital input. */
 .ehr-soap-scroll input.ehr-vital-flagged {
   border-color: var(--color-warning) !important;
   background: rgba(217, 119, 6, 0.05) !important;
+}
+.ehr-vitals-range {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 .ehr-vitals-flag {
   display: block;
@@ -7106,6 +7362,33 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 .ehr-consult-history-card .search-icon-input {
   min-height: 42px;
+}
+
+.chief-complaint-search {
+  width: min(100%, 440px);
+  max-width: 440px;
+}
+
+.chief-complaint-search label {
+  margin-bottom: 6px;
+}
+
+.chief-complaint-search .search-icon-input {
+  min-height: 38px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-size: 13px;
+}
+
+.chief-complaint-search + textarea {
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .chief-complaint-search {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 .ehr-consult-subcard {
@@ -8721,7 +9004,8 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-care-dashboard .ehr-care-row.warning,
 .ehr-care-dashboard .ehr-care-row.danger {
   border-left: 0 !important;
-  background: transparent !important;
+  /* Cards stay white on the soft list backdrop; tone lives in the status pill. */
+  background: #fff !important;
 }
 
 .ehr-checkin-form-actions .btn {
@@ -9967,6 +10251,22 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   border-radius: 3px;
 }
 
+.assign-doctor-search {
+  width: 100%;
+  min-width: 0;
+}
+
+.assign-doctor-search input {
+  min-width: 0;
+}
+
+.assign-doctor-provider-list {
+  height: min(14rem, 38vh);
+  max-height: min(14rem, 38vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 @keyframes modalFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -10730,6 +11030,77 @@ span:has(> svg:only-child) {
   box-shadow: -8px 0 24px rgba(15, 31, 29, 0.14);
   animation: none;
 }
+.appointment-detail-panel--clinical {
+  height: auto;
+  max-height: min(680px, calc(100vh - 32px));
+  border-radius: 10px;
+  background: var(--bg-card-solid);
+  box-shadow: 0 24px 60px rgba(15, 31, 29, 0.28);
+}
+.appointment-detail-panel--clinical .appointment-detail-modal__header {
+  padding: 18px 20px 16px;
+}
+.appointment-detail-panel--clinical .appointment-detail-modal__time {
+  font-size: 22px;
+}
+.appointment-detail-modal__reason {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 13px;
+  font-weight: 700;
+}
+.appointment-detail-panel--clinical .appointment-detail-modal__subrow {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  font-weight: 800;
+}
+.appointment-detail-panel--clinical .appointment-detail-modal__body {
+  flex: 0 1 auto;
+  padding: 16px 20px 18px;
+  overflow: auto;
+}
+.appointment-detail-modal__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+}
+.appointment-doctor-next {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--ehr-border-soft);
+  border-radius: 8px;
+  background: var(--ehr-panel-soft);
+}
+.appointment-doctor-next h3 {
+  margin: 0 0 10px;
+  color: var(--ehr-text-title);
+  font-size: 13px;
+  font-weight: 800;
+}
+.appointment-doctor-next ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.appointment-doctor-next li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--ehr-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.appointment-doctor-next svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--color-success);
+}
+.appointment-detail-panel--clinical .appointment-detail-modal__actions {
+  border-top-color: var(--ehr-border-soft);
+}
 /* Calendar view has no right rail — the panel then rides inside a full-height
    drawer Modal, so let it stretch to fill that. */
 .modal-panel.appointment-detail-panel {
@@ -11401,8 +11772,10 @@ span:has(> svg:only-child) {
 
 .ehr-avatar--labeled {
   width: auto !important;
+  min-width: 92px;
+  max-width: 154px;
   height: 34px !important;
-  padding: 2px 12px 2px 2px !important;
+  padding: 2px 9px 2px 2px !important;
 }
 
 .ehr-avatar-mark {
@@ -12524,6 +12897,7 @@ span:has(> svg:only-child) {
 
   .ehr-appointment-row,
   .ehr-care-row {
+    grid-template-columns: 30px minmax(0, 1fr) minmax(76px, auto);
     min-height: 44px;
     padding: 7px 9px;
     gap: 7px;
@@ -12553,6 +12927,28 @@ span:has(> svg:only-child) {
     width: 92px;
     height: 26px;
     font-size: 10px;
+  }
+
+  .ehr-care-row-status {
+    display: none;
+  }
+
+  .ehr-care-row-team,
+  .ehr-care-row-location {
+    grid-column: 2 / -1;
+    display: block;
+    padding-top: 2px;
+  }
+
+  .ehr-care-row-team strong,
+  .ehr-care-row-location .ehr-department-pill {
+    max-width: 100%;
+    font-size: 10.5px;
+  }
+
+  .ehr-care-row-team span,
+  .ehr-care-row-location span {
+    font-size: 9.5px;
   }
 
   .ehr-right-rail {
@@ -12906,6 +13302,62 @@ span:has(> svg:only-child) {
   height: 17px !important;
   flex: 0 0 auto;
   color: var(--ehr-blue-strong, var(--accent-primary));
+}
+
+/* Facesheet card header row — icon+title on the left, the card's primary
+   write action (Prescribe / Add / Record / Order / Edit) on the right. The
+   h2's own bottom margin moves onto the row so card spacing is unchanged. */
+.tebra-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.tebra-panel__head h2 {
+  margin: 0 !important;
+  min-width: 0;
+}
+
+.tebra-panel-action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--ehr-ledger-border, #d7e2e1);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ehr-blue-strong, var(--accent-primary));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.tebra-panel-action:hover {
+  background: var(--accent-light, #eaf4fb);
+  border-color: var(--ehr-blue-strong, var(--accent-primary));
+}
+
+.tebra-panel-action:focus-visible {
+  outline: 2px solid var(--ehr-blue-strong, var(--accent-primary));
+  outline-offset: 1px;
+}
+
+.tebra-panel-action svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+/* The compact chart shell tightens card padding; keep the header row in step
+   with the h2 margin override it applies. */
+.ehr-chart-content .tebra-panel__head {
+  margin-bottom: 10px;
 }
 
 /* Problems / Labs row meta — holds a code/unit plus a status pill or
@@ -13285,15 +13737,22 @@ span:has(> svg:only-child) {
    `.ehr-appointment-row` rule above, or the main content and action buttons
    collide into the wrong grid tracks. */
 .ehr-appointment-row:not(.ehr-care-row) {
-  /* Same tracks, gap, and inline padding as .ehr-worklist-head/.ehr-worklist-row
-     (assigned-patients table) so the two lists read as one aligned grid:
-     identity · time · language · department · insurance line up under
-     Patient · Room · Department · Care team · Status. The hidden
-     .ehr-status-menu child takes no grid cell. */
-  grid-template-columns: minmax(220px, 1fr) minmax(130px, 1fr) minmax(160px, 1fr) minmax(190px, 1fr) minmax(132px, 1fr);
-  gap: 18px;
+  /* Doctor worklist columns: patient · time · care team · department · status. */
+  grid-template-columns: minmax(360px, 1.45fr) minmax(120px, 0.48fr) minmax(240px, 0.85fr) minmax(210px, 0.75fr) minmax(150px, 0.52fr);
+  gap: 22px;
   min-height: 60px;
   padding: 8px 18px;
+}
+
+.ehr-center-panel .ehr-appointment-row:not(.ehr-care-row) .ehr-status-menu {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.ehr-center-panel .ehr-appointment-row,
+.ehr-center-panel .ehr-worklist-row {
+  align-items: center;
 }
 
 .ehr-appointment-identity {
@@ -13310,7 +13769,14 @@ span:has(> svg:only-child) {
 .ehr-appointment-department {
   display: flex;
   align-items: center;
+  min-width: 0;
   justify-self: start;
+}
+
+.ehr-appointment-department .ehr-department-pill {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ehr-appointment-insurance {
@@ -13348,6 +13814,7 @@ span:has(> svg:only-child) {
 .ehr-appointment-time {
   align-self: center;
   min-width: 0;
+  justify-self: start;
 }
 
 .ehr-appointment-time strong {
@@ -13368,47 +13835,67 @@ span:has(> svg:only-child) {
   line-height: 1.1;
 }
 
+/* "in 2h 15m" / "20m ago" countdown under the clock time. Inherits the muted
+   caption styling above; only the tone changes — amber when the slot is due
+   within the next half hour, faded once it's in the past. */
+.ehr-appointment-countdown {
+  font-family: var(--font-platform-mono);
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.ehr-appointment-countdown.is-soon {
+  color: var(--semantic-warning) !important;
+}
+
+.ehr-appointment-countdown.is-past {
+  opacity: 0.65;
+}
+
 .ehr-appointment-time .ehr-appointment-status.status-received {
-  color: #2563eb;
+  color: var(--semantic-active);
 }
 
 .ehr-appointment-time .ehr-appointment-status.status-pending {
-  color: #2563eb;
+  color: var(--semantic-neutral);
 }
 
 .ehr-appointment-time .ehr-appointment-status.status-processing,
 .ehr-appointment-time .ehr-appointment-status.status-in-progress {
-  color: #0891b2;
+  color: var(--semantic-it);
 }
 
 .ehr-appointment-time .ehr-appointment-status.status-cleared,
 .ehr-appointment-time .ehr-appointment-status.status-ready {
-  color: #059669;
+  color: var(--semantic-success);
 }
 
 .ehr-appointment-time .ehr-appointment-status.status-dispensed,
 .ehr-appointment-time .ehr-appointment-status.status-complete,
 .ehr-appointment-time .ehr-appointment-status.status-completed,
 .ehr-appointment-time .ehr-appointment-status.status-completed-today {
-  color: #7c3aed;
+  color: var(--semantic-success);
 }
 
 .ehr-appointment-time .ehr-appointment-status.status-payment-due,
 .ehr-appointment-time .ehr-appointment-status.status-urgent {
-  color: #d97706;
+  color: var(--semantic-warning);
 }
 
 .ehr-appointment-time .ehr-appointment-status.status-held,
 .ehr-appointment-time .ehr-appointment-status.status-stockout-referred,
 .ehr-appointment-time .ehr-appointment-status.status-critical,
 .ehr-appointment-time .ehr-appointment-status.status-emergency {
-  color: #dc2626;
+  color: var(--semantic-danger);
 }
 
 /* Patient's preferred language — value + caption, mirroring the time column. */
 .ehr-appointment-language {
   align-self: center;
   min-width: 0;
+  justify-self: start;
 }
 
 .ehr-appointment-language strong {
@@ -13440,6 +13927,84 @@ span:has(> svg:only-child) {
 .ehr-appointment-main button {
   color: var(--ehr-text);
   text-decoration: none;
+}
+
+.ehr-center-panel .ehr-appointment-main {
+  display: block;
+}
+
+.ehr-center-panel .ehr-appointment-main p {
+  display: block;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--ehr-muted);
+  font-size: 13px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-center-panel .ehr-appointment-main p small {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ehr-muted);
+  font-size: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ehr-center-panel .ehr-care-row {
+  grid-template-columns: var(--care-cols, 42px minmax(220px, 1.8fr) repeat(4, minmax(112px, 1fr)) 44px);
+  column-gap: 10px;
+}
+
+.ehr-center-panel .ehr-care-row .ehr-appointment-main {
+  display: block;
+}
+
+.ehr-center-panel .ehr-care-row .ehr-appointment-main p {
+  margin-top: 3px;
+}
+
+.ehr-center-panel .ehr-care-row .ehr-appointment-time {
+  justify-self: start;
+  text-align: left;
+}
+
+.ehr-center-panel .ehr-worklist-head > span,
+.ehr-center-panel .ehr-worklist-row > span {
+  min-width: 0;
+}
+
+.ehr-center-panel .ehr-worklist-row > span:not(.ehr-worklist-name) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-center-panel .ehr-worklist-row > span:last-child,
+.ehr-center-panel .ehr-worklist-head > span:last-child {
+  justify-self: end;
+  text-align: right;
+}
+
+.ehr-center-panel .ehr-worklist-status,
+.ehr-center-panel .ehr-status-menu select {
+  min-width: 116px;
+}
+
+@media (max-width: 639px) {
+  .ehr-center-panel .ehr-worklist-status,
+  .ehr-center-panel .ehr-status-menu select {
+    min-width: 0;
+  }
+
+  .ehr-center-panel .ehr-status-menu select {
+    width: 92px;
+  }
 }
 
 .ehr-worklist-panel > div:first-child {
@@ -14394,15 +14959,18 @@ span:has(> svg:only-child) {
    ═══════════════════════════════════════════════════════════════════════════ */
 @media (min-width: 640px) {
   .ehr-care-row {
-    grid-template-columns: 42px minmax(0, 1fr) minmax(60px, 86px);
-    column-gap: 12px;
+    grid-template-columns: var(--care-cols, 42px minmax(220px, 1.8fr) repeat(4, minmax(112px, 1fr)) 44px);
+    column-gap: 10px;
   }
   .ehr-care-row .ehr-appointment-time {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-self: center;
+    width: 100%;
     min-width: 0;
+    justify-self: start;
+    text-align: left;
   }
   /* Name + subtitle sit left-aligned right after the time column. */
   .ehr-care-row .ehr-appointment-main {
@@ -14795,6 +15363,22 @@ span:has(> svg:only-child) {
   padding-inline: 9px;
 }
 
+@media (min-width: 640px) {
+  .ehr-center-panel .ehr-care-row {
+    grid-template-columns: var(--care-cols, 42px minmax(220px, 1.8fr) repeat(4, minmax(112px, 1fr)) 44px);
+    column-gap: 10px;
+  }
+
+  .ehr-center-panel .ehr-care-row .ehr-appointment-time {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .ehr-center-panel .ehr-care-row-status {
+    justify-self: end;
+  }
+}
+
 /* ── PopupSelect: popup-based dropdown replacement ─────────────────
    Trigger mimics the app's selects; the popup shows ten 44px rows
    before scrolling, with search on long lists and back/step header
@@ -15181,6 +15765,574 @@ span:has(> svg:only-child) {
   color: #fff;
 }
 
+/* ─── Patient queue (clinician station board) ─── */
+
+.ehr-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden auto;
+}
+
+.ehr-queue-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 16px;
+  background: var(--ehr-panel);
+}
+
+.ehr-queue-status-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ehr-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ehr-queue-status-filter select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px;
+  background: var(--ehr-panel);
+  color: var(--ehr-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ehr-queue-search {
+  flex: 1 1 220px;
+  margin-top: 0;
+}
+
+.ehr-queue-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--accent-primary);
+  border-radius: 999px;
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Wide list scrolls inside its own frame; the page never scrolls sideways. */
+.ehr-queue-scroll {
+  overflow-x: auto;
+}
+
+/* Queue rows are cards, matching the appointment card list: no header row,
+   each row carries its own surface and every column stays on one grid so the
+   values line up down the list. */
+.ehr-queue-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 880px;
+  /* Soft backdrop, like the appointment card list — it's what lets the row
+     shadows read instead of disappearing into a white-on-white panel. */
+  padding: 10px 6px;
+  border-radius: 16px;
+  background: var(--bg-secondary);
+}
+
+.ehr-queue-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.7fr) minmax(104px, 0.8fr) minmax(112px, 0.9fr) minmax(104px, 0.8fr) minmax(132px, 1fr) minmax(92px, 0.7fr) 84px;
+  gap: 20px;
+  align-items: center;
+  min-height: 64px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: #fff;
+  border-color: var(--ehr-border);
+  box-shadow: none !important;
+  color: var(--ehr-text);
+  cursor: pointer;
+  font-size: 13px;
+  transition: box-shadow 140ms ease;
+}
+
+.ehr-queue-card:hover,
+.ehr-queue-card:focus-visible {
+  border-color: var(--ehr-blue, var(--accent-primary));
+  box-shadow: none !important;
+  outline: none;
+}
+
+.ehr-queue-card:focus-visible {
+  border-color: var(--accent-primary);
+}
+
+.ehr-queue-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-queue-muted-cell {
+  color: var(--ehr-muted);
+}
+
+.ehr-queue-patient {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ehr-queue-patient .ehr-patient-icon {
+  flex: 0 0 auto;
+}
+
+.ehr-queue-patient-text {
+  min-width: 0;
+}
+
+.ehr-queue-patient p {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--ehr-muted);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-queue-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--accent-primary);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-queue-name:hover {
+  text-decoration: underline;
+}
+
+.ehr-queue-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ehr-queue-pill[data-tone='red'] {
+  background: var(--ward-rose-soft, #fde7ec);
+  color: #a5314b;
+}
+
+.ehr-queue-pill[data-tone='yellow'] {
+  background: var(--ward-gold-soft, #fdf1dc);
+  color: #8a5a12;
+}
+
+.ehr-queue-pill[data-tone='green'] {
+  background: var(--ward-green-soft, #e2f4e8);
+  color: #1f7a44;
+}
+
+.ehr-queue-status {
+  font-weight: 600;
+}
+
+.ehr-queue-num-col {
+  font-variant-numeric: tabular-nums;
+}
+
+.ehr-queue-wait-over {
+  color: var(--triage-red, #c0392b);
+  font-weight: 700;
+}
+
+.ehr-queue-wait-over small {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ehr-queue-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ehr-queue-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--ehr-muted);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.ehr-queue-action:hover,
+.ehr-queue-action:focus-visible {
+  border-color: var(--ehr-border);
+  background: var(--ehr-panel-soft);
+  color: var(--accent-primary);
+  outline: none;
+}
+
+/* Move dialog */
+
+.ehr-queue-move {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.ehr-queue-move-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ehr-queue-move-head h3 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.ehr-queue-move fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+}
+
+.ehr-queue-move legend,
+.ehr-queue-move-comment > span,
+.ehr-queue-move-room > span {
+  margin-bottom: 6px;
+  color: var(--ehr-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ehr-queue-move-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.ehr-queue-move-option em {
+  color: var(--ehr-muted);
+  font-style: normal;
+}
+
+.ehr-queue-move-priorities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ehr-queue-move-room {
+  display: flex;
+  flex-direction: column;
+  margin-left: 26px;
+}
+
+.ehr-queue-move-room input,
+.ehr-queue-move-comment textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px;
+  background: var(--ehr-panel);
+  color: var(--ehr-text);
+  font-size: 13px;
+}
+
+.ehr-queue-move-comment {
+  display: flex;
+  flex-direction: column;
+}
+
+.ehr-queue-move-note {
+  color: var(--ehr-muted);
+  font-size: 13px;
+}
+
+.ehr-queue-move-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.ehr-queue-move-footer button {
+  height: 38px;
+  padding: 0 18px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  background: var(--ehr-panel);
+  color: var(--ehr-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ehr-queue-move-footer button.primary {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.ehr-queue-move-footer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Visit popup — row click on the clinician worklist */
+
+.ehr-visit-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+
+.ehr-visit-pop-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ehr-border);
+}
+
+.ehr-visit-pop-head .ehr-patient-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.ehr-visit-pop-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: center;
+}
+
+.ehr-visit-pop-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--ehr-muted);
+}
+
+.ehr-visit-pop-close:hover {
+  background: var(--ehr-panel-soft);
+  color: var(--ehr-text);
+}
+
+.ehr-visit-pop-head h3 {
+  margin-bottom: 2px;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+/* Header right block: acuity + wait only. The rest of the visit context is a
+ * "Status" row in the card body. */
+.ehr-visit-pop-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-inline-start: auto;
+}
+
+/* Chip cluster inside a body row. */
+.ehr-visit-pop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ehr-visit-pop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  background: var(--ehr-panel-soft);
+  color: var(--ehr-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Wait time is the one number reception acts on — keep it at full contrast. */
+.ehr-visit-pop-chip.is-wait {
+  color: var(--ehr-text);
+  border-color: var(--ehr-border-strong, var(--ehr-border));
+}
+
+/* Too narrow for the acuity/wait block beside the name — drop it below. */
+@media (max-width: 560px) {
+  .ehr-visit-pop-head {
+    flex-wrap: wrap;
+  }
+
+  .ehr-visit-pop-tags {
+    width: 100%;
+    justify-content: flex-start;
+    margin-inline-start: 0;
+  }
+}
+
+.ehr-visit-pop-detail {
+  margin-top: 3px;
+  color: var(--ehr-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ehr-visit-pop-tabs {
+  display: flex;
+  gap: 18px;
+  border-bottom: 1px solid var(--ehr-border);
+}
+
+.ehr-visit-pop-tabs button {
+  padding: 6px 2px 10px;
+  border-bottom: 2px solid transparent;
+  color: var(--ehr-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ehr-visit-pop-tabs button.active {
+  border-bottom-color: var(--accent-primary);
+  color: var(--ehr-text);
+}
+
+.ehr-visit-pop-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.ehr-visit-pop-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ehr-border);
+  font-size: 13px;
+}
+
+.ehr-visit-pop-row:last-child {
+  border-bottom: 0;
+}
+
+.ehr-visit-pop-row p {
+  color: var(--ehr-muted);
+}
+
+.ehr-visit-pop-row strong {
+  font-weight: 700;
+}
+
+.ehr-visit-pop-label {
+  color: var(--ehr-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ehr-visit-pop-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--accent-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ehr-visit-pop-link:hover {
+  text-decoration: underline;
+}
+
+.ehr-visit-pop-vitals {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px 16px;
+}
+
+.ehr-visit-pop-vital span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ehr-muted);
+  font-size: 12px;
+}
+
+.ehr-visit-pop-vital strong {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 15px;
+}
+
+.ehr-visit-pop-vital small {
+  color: var(--ehr-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.ehr-visit-pop-vital b {
+  color: var(--triage-red, #c0392b);
+  font-size: 12px;
+}
+
+.ehr-visit-pop-flag {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--triage-red, #c0392b);
+}
+
+.ehr-visit-pop-stamp {
+  margin-top: 10px;
+  color: var(--ehr-muted);
+  font-size: 12px;
+}
+
+.ehr-visit-pop-footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--ehr-border);
+}
+
 .ehr-find-patient-input {
   display: flex;
   align-items: center;
@@ -15403,6 +16555,516 @@ span:has(> svg:only-child) {
 .listpage-table-toolbar .btn {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* Appointments list: same compact receptionist row language used in the
+   clinical/reception center queues. */
+.appointment-card-list {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 10px;
+  overflow: auto;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-secondary);
+}
+
+.appointment-card-empty {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.appointment-card-head {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.6fr) repeat(4, minmax(150px, 1fr));
+  gap: 24px;
+  align-items: center;
+  padding: 0 16px 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.appointment-card-head span:last-child {
+  justify-self: end;
+  padding-right: 6px;
+}
+
+.appointment-card-row.ehr-appointment-row {
+  grid-template-columns: minmax(320px, 1.6fr) repeat(4, minmax(150px, 1fr));
+  gap: 24px;
+  min-height: 64px;
+  padding: 9px 16px;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.appointment-card-row .ehr-appointment-identity {
+  min-width: 0;
+}
+
+.appointment-card-patient.ehr-appointment-main {
+  display: block;
+}
+
+.appointment-card-row .ehr-appointment-time strong {
+  color: var(--ehr-text, var(--text-primary));
+}
+
+.appointment-card-row .ehr-appointment-time span,
+.appointment-card-row .ehr-appointment-main p {
+  color: var(--ehr-muted, var(--text-muted));
+}
+
+.appointment-card-patient a,
+.appointment-card-patient button {
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ehr-text, var(--text-primary));
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: left;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-card-patient a:hover {
+  color: var(--ehr-blue, var(--accent-primary));
+}
+
+.appointment-card-provider {
+  width: 100%;
+  min-width: 0;
+}
+
+.appointment-card-provider strong {
+  display: block;
+  overflow: hidden;
+  color: var(--ehr-text, var(--text-primary));
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-card-provider span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ehr-muted, var(--text-muted));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.appointment-service-pill {
+  background: var(--semantic-neutral-bg);
+  color: var(--semantic-neutral);
+}
+
+.appointment-service-pill.type-anc {
+  background: var(--semantic-success-bg);
+  color: var(--semantic-success);
+}
+
+.appointment-service-pill.type-surgical,
+.appointment-service-pill.type-emergency {
+  background: var(--semantic-danger-bg);
+  color: var(--semantic-danger);
+}
+
+.appointment-service-pill.type-telehealth,
+.appointment-service-pill.type-specialist {
+  background: var(--semantic-active-bg);
+  color: var(--semantic-active);
+}
+
+.appointment-card-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.appointment-card-status small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 118px;
+  min-height: 30px;
+  padding: 0 18px;
+  border: 1px solid var(--ehr-border, var(--border-light));
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ehr-text, var(--text-primary));
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.appointment-status-pill.status-checked-in,
+.appointment-status-pill.status-in-progress {
+  border-color: var(--semantic-active-border);
+  background: var(--semantic-active-bg);
+  color: var(--semantic-active);
+}
+
+.appointment-status-pill.status-confirmed {
+  border-color: var(--semantic-active-border);
+  background: var(--semantic-active-bg);
+  color: var(--semantic-active);
+}
+
+.appointment-status-pill.status-completed {
+  border-color: var(--semantic-success-border);
+  background: var(--semantic-success-bg);
+  color: var(--semantic-success);
+}
+
+.appointment-status-pill.status-cancelled,
+.appointment-status-pill.status-no-show {
+  border-color: var(--semantic-danger-border);
+  background: var(--semantic-danger-bg);
+  color: var(--semantic-danger);
+}
+
+.appointment-status-pill.status-requested {
+  border-color: var(--semantic-request-border);
+  background: var(--semantic-request-bg);
+  color: var(--semantic-request);
+}
+
+.checkin-patient-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background: var(--overlay-subtle);
+}
+
+.checkin-patient-search-wrap {
+  position: relative;
+}
+
+.checkin-patient-search {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-card-solid);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.checkin-patient-search:focus-within {
+  border-color: var(--accent-primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--accent-light) !important;
+}
+
+.checkin-patient-search-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent-primary);
+  opacity: 1;
+  transition: opacity 0.14s ease;
+}
+
+.checkin-patient-search.has-value .checkin-patient-search-icon {
+  opacity: 0;
+}
+
+.checkin-patient-search input {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.checkin-patient-search input::placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.checkin-patient-search button {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.checkin-patient-search button:hover {
+  background: var(--overlay-subtle);
+  color: var(--text-primary);
+}
+
+.checkin-patient-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.checkin-patient-context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.checkin-patient-context span {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-card-solid);
+}
+
+.checkin-patient-context b,
+.checkin-patient-context small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkin-patient-context b {
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.checkin-patient-context small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .checkin-patient-summary {
+    align-items: flex-start;
+  }
+
+  .checkin-patient-context {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1100px) {
+  .appointment-card-head {
+    display: none;
+  }
+
+  .appointment-card-row.ehr-appointment-row {
+    grid-template-columns: 1fr minmax(110px, auto);
+    gap: 8px 14px;
+  }
+
+  .appointment-card-row .ehr-appointment-identity {
+    grid-column: 1;
+  }
+
+  .appointment-card-row .ehr-appointment-time,
+  .appointment-card-status {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .appointment-card-provider,
+  .appointment-card-row .ehr-appointment-department {
+    grid-column: 1 / -1;
+    padding-left: 54px;
+  }
+}
+
+@media (max-width: 640px) {
+  .appointment-card-list {
+    padding: 6px;
+  }
+
+  .appointment-card-row.ehr-appointment-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    align-items: start;
+  }
+
+  .appointment-card-row .ehr-appointment-identity,
+  .appointment-card-row .ehr-appointment-time,
+  .appointment-card-status,
+  .appointment-card-provider,
+  .appointment-card-row .ehr-appointment-department {
+    grid-column: 1;
+    justify-self: stretch;
+    padding-left: 0;
+    text-align: left;
+  }
+
+  .appointment-card-row .ehr-appointment-time {
+    text-align: left;
+  }
+
+  .appointment-card-status {
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  .appointment-status-pill {
+    min-width: 0;
+  }
+}
+
+/* Keep appointment/worklist cards separated by depth, not colored borders.
+   Status meaning stays in the pills/text; rows remain visually calm. */
+.ehr-center-panel .ehr-appointment-list,
+.appointment-card-list {
+  padding-inline: 6px;
+}
+
+.ehr-center-panel .ehr-appointment-row,
+.appointment-card-row.ehr-appointment-row {
+  border: 1px solid var(--ehr-border);
+  box-shadow: none !important;
+}
+
+.ehr-center-panel .ehr-appointment-row:hover,
+.appointment-card-row.ehr-appointment-row:hover {
+  border-color: var(--ehr-blue, var(--accent-primary));
+  box-shadow: none !important;
+}
+
+.ehr-center-panel .ehr-appointment-row:not(.ehr-care-row),
+.appointment-card-row.ehr-appointment-row {
+  padding-left: 10px;
+}
+
+.ehr-center-panel .ehr-care-row {
+  padding-left: 10px;
+}
+
+.ehr-center-panel .ehr-appointment-identity,
+.appointment-card-row .ehr-appointment-identity {
+  gap: 10px;
+}
+
+.ehr-center-panel .ehr-care-row.ready,
+.ehr-center-panel .ehr-care-row.done,
+.ehr-center-panel .ehr-care-row.complete,
+.ehr-center-panel .ehr-care-row.completed {
+  border-color: transparent;
+}
+
+.ehr-center-panel .ehr-care-row.scheduled,
+.ehr-center-panel .ehr-care-row.appointment,
+.ehr-center-panel .ehr-care-row.waiting {
+  border-color: transparent;
+}
+
+.ehr-center-panel .ehr-care-row.active,
+.ehr-center-panel .ehr-care-row.received,
+.ehr-center-panel .ehr-care-row.in-progress,
+.ehr-center-panel .ehr-care-row.checked-in {
+  border-color: transparent;
+}
+
+.ehr-center-panel .ehr-care-row.warning,
+.ehr-center-panel .ehr-care-row.urgent {
+  border-color: transparent;
+}
+
+.ehr-center-panel .ehr-care-row.danger,
+.ehr-center-panel .ehr-care-row.emergency,
+.ehr-center-panel .ehr-care-row.critical {
+  border-color: transparent;
+}
+
+/* Platform-wide list-card treatment. Patient/workflow lists should separate
+   with depth, while status color remains inside badges, icons, and text. */
+.tamam-ehr-app .ehr-appointment-row,
+.tamam-ehr-app .ehr-care-row,
+.tamam-ehr-app .ehr-worklist-row,
+.tamam-ehr-app .appointment-card-row.ehr-appointment-row,
+.tamam-ehr-app .mobile-appt-card,
+.tamam-ehr-app .mobile-patient-row,
+.tamam-ehr-app .mobile-outstanding-card,
+.tamam-ehr-app .ti-row:not(.ti-head),
+.tamam-ehr-app .ehr-outstanding-entry {
+  border: 1px solid var(--ehr-border) !important;
+  background: var(--bg-card-solid, #fff);
+  box-shadow: none !important;
+}
+
+.tamam-ehr-app .ehr-appointment-row:hover,
+.tamam-ehr-app .ehr-care-row:hover,
+.tamam-ehr-app .ehr-worklist-row:hover,
+.tamam-ehr-app .appointment-card-row.ehr-appointment-row:hover,
+.tamam-ehr-app .mobile-appt-card:hover,
+.tamam-ehr-app .mobile-patient-row:hover,
+.tamam-ehr-app .mobile-outstanding-card:hover,
+.tamam-ehr-app .ti-row:not(.ti-head):hover,
+.tamam-ehr-app .ehr-outstanding-entry:hover {
+  border-color: var(--ehr-blue, var(--accent-primary)) !important;
+  background: var(--bg-card-solid, #fff);
+  box-shadow: none !important;
+}
+
+.tamam-ehr-app .ehr-worklist-row {
+  border-bottom: 0 !important;
+  border-radius: 14px;
+  margin: 0 0 8px;
+}
+
+.tamam-ehr-app .ti-row:not(.ti-head) {
+  border-radius: 12px;
+  margin: 0 0 8px;
 }
 
 /* Compact date input on the table toolbar line — self-contained so it doesn't

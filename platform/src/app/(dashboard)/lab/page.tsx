@@ -318,6 +318,9 @@ export default function LabPage() {
     const slaHours = o.critical ? resultReviewSLA.criticalHours : resultReviewSLA.routineHours;
     return (Date.now() - resultedAt) / 3_600_000 > slaHours;
   });
+  // Rather than a banner above the table, the offending rows themselves glow
+  // red in the list — the alert stays attached to the patient it's about.
+  const overdueIds = new Set(overdueReviews.map(o => o._id));
 
   // When the user marks a result `critical`, we gate the submission through a
   // confirmation modal — typoing a Hb of 4 g/dL into a critical result is the
@@ -388,21 +391,6 @@ export default function LabPage() {
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <PageInstructionCard />
-
-          {overdueReviews.length > 0 && (
-            <div className="card-elevated p-3 mb-4 flex items-start gap-2" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid var(--color-danger)' }}>
-              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-danger)' }} />
-              <div>
-                <p className="text-xs font-semibold" style={{ color: 'var(--color-danger)' }}>
-                  {overdueReviews.length} result{overdueReviews.length === 1 ? '' : 's'} awaiting clinician review past SLA
-                  {overdueReviews.some(o => o.critical) ? ` (${overdueReviews.filter(o => o.critical).length} critical)` : ''}
-                </p>
-                <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  {overdueReviews.slice(0, 4).map(o => `${o.patientName} — ${o.testName}`).join('; ')}{overdueReviews.length > 4 ? '…' : ''}
-                </p>
-              </div>
-            </div>
-          )}
 
           {labLoading && (
             <div className="card-elevated p-4 mb-4 flex items-center gap-3" style={{ background: 'var(--overlay-subtle)' }}>
@@ -706,11 +694,24 @@ export default function LabPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(order => (
-                  <tr key={order._id} className="cursor-pointer hover:bg-white/[0.03]" onClick={() => { if (order.patientId) router.push(`/patients/${order.patientId}?tab=labs&focus=${order._id}`); }}>
-                    <td>
+                {filtered.map(order => {
+                  const overdue = overdueIds.has(order._id);
+                  return (
+                  <tr
+                    key={order._id}
+                    className="cursor-pointer hover:bg-white/[0.03]"
+                    style={overdue ? { background: 'rgba(229,46,66,0.08)' } : undefined}
+                    onClick={() => { if (order.patientId) router.push(`/patients/${order.patientId}?tab=labs&focus=${order._id}`); }}
+                  >
+                    <td style={overdue ? { boxShadow: 'inset 3px 0 0 var(--color-danger)' } : undefined}>
                       <PatientName patientId={order.patientId} name={order.patientName} nameClassName="font-medium text-sm" />
                       <p className="text-xs font-mono" style={{ color: 'var(--accent-primary)' }}>{order.hospitalNumber}</p>
+                      {overdue && (
+                        <p className="text-[10px] font-semibold flex items-center gap-1 mt-0.5" style={{ color: 'var(--color-danger)' }}>
+                          <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                          {order.critical ? 'Critical — review overdue' : 'Review overdue'}
+                        </p>
+                      )}
                     </td>
                     <td className="font-medium text-sm">
                       {order.testName}
@@ -819,7 +820,8 @@ export default function LabPage() {
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {!labLoading && filtered.length === 0 && (

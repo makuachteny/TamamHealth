@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, Plus, Clock, Calendar, Activity } from '@/components/icons/lucide';
+import { Users, Plus, Clock, Calendar, Activity, Wallet } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import EhrDayStatsChart, { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 import type { StaffScheduleDoc } from '@/lib/db-types';
@@ -18,6 +19,11 @@ import type { StaffScheduleDoc } from '@/lib/db-types';
  * a wall of charts. Rendered on the shared EhrCareDashboard shell so
  * it matches the Clinical Officer / Lab / Radiology look.
  */
+function formatClockTimeOrUndefined(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? undefined : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
 export default function HRDashboardPage() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -34,7 +40,6 @@ export default function HRDashboardPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   const facilityId = currentUser?.hospitalId;
-  const facilityName = currentUser?.hospitalName || t('common.facility');
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +90,23 @@ export default function HRDashboardPage() {
   }, [facilityUsers]);
 
   const dateLabel = formatDateTitle(toIsoDate(new Date()));
+  const todayIso = toIsoDate(new Date());
+
+  // Day statistics rail: the visible work list is pending-only (that's the
+  // point of the queue), so it can never show a Pending/Approved split on its
+  // own. Built instead from the full `leave` array — pending requests plotted
+  // at when they were submitted, approved ones at when the decision was made —
+  // so the widget reflects the real decision pipeline instead of an
+  // always-empty second series.
+  const hrChartItems = useMemo<DayStatsItem[]>(() => leave.flatMap((r): DayStatsItem[] => {
+    if (r.status === 'pending') {
+      return [{ date: r.requestedAt.slice(0, 10), time: formatClockTimeOrUndefined(r.requestedAt), series: 0 }];
+    }
+    if (r.status === 'approved' && r.decidedAt) {
+      return [{ date: r.decidedAt.slice(0, 10), time: formatClockTimeOrUndefined(r.decidedAt), series: 1 }];
+    }
+    return [];
+  }), [leave]);
 
   // Search filters the pending-decisions work list by staff name / role / type.
   const query = staffSearch.trim().toLowerCase();
@@ -139,6 +161,14 @@ export default function HRDashboardPage() {
           { label: t('hr.manageStaff'), icon: Users, onClick: () => router.push('/hr') },
           { label: t('hr.newLeaveRequest'), icon: Plus, onClick: () => router.push('/hr?tab=leave'), tone: 'primary' },
         ]}
+        chart={(
+          <EhrDayStatsChart
+            items={hrChartItems}
+            seriesNames={['Pending', 'Approved']}
+            selectedDate={todayIso}
+            todayIso={todayIso}
+          />
+        )}
         rows={filteredPending.map((r): EhrCareDashboardRow => {
           const isOpen = selectedLeave === r._id;
           return {
@@ -156,19 +186,14 @@ export default function HRDashboardPage() {
           { label: t('hr.kpiActiveStaff'), value: facilityUsers.length },
           { label: t('hr.kpiPresentToday'), value: presentToday, tone: 'success' },
           { label: t('hr.kpiOnLeaveToday'), value: onLeaveToday.length, tone: onLeaveToday.length > 0 ? 'warning' : 'neutral' },
-          { label: t('hr.kpiPendingDecisions'), value: pendingLeave.length, tone: pendingLeave.length > 0 ? 'danger' : 'neutral' },
           { label: t('hr.kpiOnCallToday'), value: onCallToday },
         ]}
         metricsTitle={t('hr.dashboardTitle')}
-        checklist={[
-          { label: `${t('hr.staffRoster')} · ${t('hr.staffCount', { count: facilityUsers.length })}`, done: facilityUsers.length > 0, href: '/hr?tab=roster' },
-          { label: `${t('hr.leaveQueue')} · ${t('hr.pendingCount', { count: pendingLeave.length })}`, done: pendingLeave.length === 0, href: '/hr?tab=leave' },
-          { label: `${t('hr.scheduleShifts')} · ${t('hr.todayCount', { count: schedules.length })}`, done: schedules.length > 0, href: '/hr?tab=schedule' },
-          { label: `${t('hr.payrollRegister')} · ${t('hr.monthlyPayroll')}`, done: false, href: '/hr?tab=payroll' },
+        metricsActions={[
+          { label: t('hr.scheduleShifts'), icon: Calendar, onClick: () => router.push('/hr?tab=schedule') },
+          { label: t('hr.payrollRegister'), icon: Wallet, onClick: () => router.push('/hr?tab=payroll') },
         ]}
-        checklistTitle={t('hr.quickActions')}
-        missionTitle={t('hr.dashboardTitle')}
-        missionDescription={t('hr.facilityWelcome', { facility: facilityName, name: currentUser?.name || t('hr.hrOfficer') })}
+        checklist={[]}
         emptyTitle={t('hr.noPendingLeave')}
         emptyActionLabel={t('hr.viewAll')}
         onEmptyAction={() => router.push('/hr?tab=leave')}

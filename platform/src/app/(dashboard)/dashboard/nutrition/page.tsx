@@ -23,7 +23,16 @@ type Screening = {
   id: string; name: string; age: string; sex: string;
   muac: number; weight: number; height: number; edema: boolean;
   status: string; date: string;
+  /** Full screening timestamp — only real (saved) screenings have one; demo
+   *  rows only ever carry a date, so they render without a plotted time. */
+  createdAt?: string;
 };
+
+function formatTime(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? undefined : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
 
 const EMPTY_FORM = { name: '', age: '', sex: 'F', muac: '', weight: '', height: '', edema: false, isAnc: false };
 
@@ -105,6 +114,7 @@ export default function NutritionDashboard() {
         edema: s.edema,
         status: s.status,
         date: s.screeningDate,
+        createdAt: s.createdAt,
       })),
       ...(IS_DEMO ? SAMPLE_SCREENINGS : []),
     ],
@@ -310,14 +320,19 @@ export default function NutritionDashboard() {
           { label: t('nutrition.supplies'), icon: Utensils, onClick: () => togglePanel('supplies'), active: centerPanel === 'supplies', tone: centerPanel === 'supplies' ? 'primary' : 'neutral' },
         ]}
         hideRowList={centerPanel !== null}
+        // "Normal" already matches the default done→series1 split; every
+        // flagged classification (SAM/MAM/At Risk/Underweight) stays open.
+        chartSeriesNames={['Flagged', 'Normal']}
         rows={filteredScreenings.map((s): EhrCareDashboardRow => {
           const isOpen = selectedScreening === s.id;
+          const time = formatTime(s.createdAt);
           return {
             id: s.id,
             title: s.name,
             subtitle: `${s.age} · ${s.sex}`,
             compactMeta: s.date,
             date: s.date,
+            time,
             status: s.status,
             statusTone: s.status === 'SAM' ? 'danger'
               : s.status === 'MAM' ? 'warning'
@@ -328,24 +343,16 @@ export default function NutritionDashboard() {
           };
         })}
         metrics={[
-          { label: t('nutrition.kpiScreenings'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
-          { label: t('nutrition.kpiSamCases'), value: stats.sam, tone: 'danger', active: filterStatus === 'sam', onClick: () => setFilterStatus(filterStatus === 'sam' ? 'all' : 'sam') },
-          { label: t('nutrition.kpiMamCases'), value: stats.mam, tone: 'warning', active: filterStatus === 'mam', onClick: () => setFilterStatus(filterStatus === 'mam' ? 'all' : 'mam') },
-          { label: t('nutrition.kpiAtRisk'), value: stats.atRisk, tone: 'warning', active: filterStatus === 'at_risk', onClick: () => setFilterStatus(filterStatus === 'at_risk' ? 'all' : 'at_risk') },
-          { label: t('nutrition.kpiNormal'), value: stats.normal, tone: 'success', active: filterStatus === 'normal', onClick: () => setFilterStatus(filterStatus === 'normal' ? 'all' : 'normal') },
           { label: t('nutrition.kpiChildrenUnder5'), value: stats.children },
           { label: t('nutrition.kpiAncMothers'), value: stats.anc },
           { label: t('nutrition.kpiSupplyAlerts'), value: stats.criticalSupply, tone: stats.criticalSupply > 0 ? 'danger' : 'success' },
         ]}
         metricsTitle={t('nutrition.title')}
         checklist={[
-          { label: t('nutrition.newScreening'), done: stats.total > 0, onClick: () => { setShowForm(true); setFormError(''); } },
           { label: t('nutrition.kpiSamCases'), done: stats.sam === 0, onClick: () => setFilterStatus('sam') },
           { label: t('nutrition.kpiSupplyAlerts'), done: stats.criticalSupply === 0 },
         ]}
         checklistTitle={t('nutrition.screenings')}
-        missionTitle={t('nutrition.title')}
-        missionDescription={t('nutrition.noScreeningsDesc')}
         emptyTitle={t('nutrition.noScreenings')}
       >
           {/* ── New screening entry form ── */}

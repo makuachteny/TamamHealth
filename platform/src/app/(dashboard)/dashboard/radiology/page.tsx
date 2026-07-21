@@ -3,7 +3,6 @@ import { useState, useMemo, useRef } from 'react';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { usePatients } from '@/lib/hooks/usePatients';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import { addPatientDocument } from '@/lib/services/patient-document-service';
@@ -27,6 +26,15 @@ function radiologyPriorityLabel(priority: string): string {
   return priority.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// Formats a turnaround-time average (in minutes) the way clinicians read it —
+// minutes below an hour, otherwise hours and minutes.
+function formatTurnaround(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+}
+
 // Demo data — only shown when NEXT_PUBLIC_DEMO_MODE !== 'false' AND no real
 // studies exist yet. Production with the env var unset/false renders an
 // empty-state instead so staff never mistake fake studies for real orders.
@@ -46,7 +54,6 @@ const SAMPLE_STUDIES = [
 export default function RadiologyDashboard() {
   const { t } = useTranslation();
   const { currentUser } = useApp();
-  const { patients } = usePatients();
   const { results: labResults, update: updateLabResult } = useLabResults();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   // Which stat panel (header toggles) currently occupies the center instead
@@ -158,6 +165,10 @@ export default function RadiologyDashboard() {
             priority: r.critical ? 'urgent' : 'routine',
             orderedBy: r.orderedBy,
             date: (r.orderedAt || '').slice(0, 10),
+            // Kept alongside `date` (which is truncated to a calendar day) so the
+            // Day statistics rail can bucket real orders by time of day.
+            orderedAt: r.orderedAt,
+            completedAt: r.completedAt,
             notes: r.clinicalNotes || '',
             findings: r.result || undefined,
             isReal: true,
@@ -169,12 +180,15 @@ export default function RadiologyDashboard() {
   const studies = useMemo(
     () => [
       ...realStudies,
+      // Demo studies only ever carry a date, never a time of day — the Day
+      // statistics rail leaves them unplotted rather than guessing an hour.
       ...(IS_DEMO ? SAMPLE_STUDIES : []).map(s => {
         const override = submittedFindings[s.id];
         const statusOverride = studyStatusOverrides[s.id];
+        const base = { ...s, orderedAt: undefined as string | undefined, completedAt: undefined as string | undefined, isReal: false as const };
         return override
-          ? { ...s, status: 'completed', findings: override, isReal: false }
-          : { ...s, status: statusOverride || s.status, isReal: false };
+          ? { ...base, status: 'completed', findings: override }
+          : { ...base, status: statusOverride || s.status };
       }),
     ],
     [realStudies, submittedFindings, studyStatusOverrides],
@@ -228,6 +242,17 @@ export default function RadiologyDashboard() {
     });
   };
 
+  // Real turnaround (orderedAt -> completedAt) computed from actual completed
+  // studies only — demo studies never carry timestamps. Null when there's
+  // nothing to average yet, so the Performance panel can drop the tile
+  // instead of showing a fabricated number.
+  const avgTurnaroundMinutes = useMemo(() => {
+    const timed = realStudies.filter(s => s.status === 'completed' && s.orderedAt && s.completedAt);
+    if (timed.length === 0) return null;
+    const totalMinutes = timed.reduce((sum, s) => sum + (new Date(s.completedAt as string).getTime() - new Date(s.orderedAt as string).getTime()) / 60000, 0);
+    return Math.round(totalMinutes / timed.length);
+  }, [realStudies]);
+
   const stats = useMemo(() => ({
     total: studies.length,
     pending: studies.filter(s => s.status === 'pending').length,
@@ -236,7 +261,6 @@ export default function RadiologyDashboard() {
     urgent: studies.filter(s => s.priority === 'urgent' || s.priority === 'emergency').length,
     xray: studies.filter(s => s.modality === 'X-Ray').length,
     ultrasound: studies.filter(s => s.modality === 'Ultrasound').length,
-    avgTAT: '45 min',
   }), [studies]);
 
   const dateLabel = formatDateTitle(toIsoDate(new Date()));
@@ -434,13 +458,23 @@ export default function RadiologyDashboard() {
           { label: t('radiology.performance'), icon: TrendingUp, onClick: () => togglePanel('performance'), active: centerPanel === 'performance', tone: centerPanel === 'performance' ? 'primary' : 'neutral' },
         ]}
         hideRowList={centerPanel !== null}
+        // Real studies carry a time (orderedAt/completedAt); demo studies never
+        // do, so they surface as "without a recorded time" instead of guessing.
+        // done→series1 lines up exactly with completed vs everything else.
+        chartSeriesNames={['Scheduled', 'Reported']}
         rows={filtered.map((study): EhrCareDashboardRow => {
+          const time = study.status === 'completed'
+            ? (study.completedAt ? new Date(study.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined)
+            : (study.orderedAt ? new Date(study.orderedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined);
           return {
             id: study.id,
             title: study.patientName,
             subtitle: `${study.modality} · ${study.bodyPart}`,
             compactMeta: study.date,
             date: study.date,
+            time,
+            careTeam: study.orderedBy,
+            careTeamLabel: 'Ordered by',
             status: radiologyStatusLabel(study.status),
             statusTone: study.status === 'completed' ? 'done'
               : study.status === 'in_progress' ? 'active'
@@ -452,22 +486,13 @@ export default function RadiologyDashboard() {
           };
         })}
         metrics={[
-          { label: 'Pending', value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
-          { label: 'In Progress', value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
-          { label: 'Complete', value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
           { label: t('radiology.kpiUrgentEmergency'), value: stats.urgent, tone: 'danger' },
           { label: t('radiology.kpiXrays'), value: stats.xray },
           { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound },
         ]}
         metricsTitle={t('radiology.title')}
-        checklist={[
-          { label: 'Pending', done: stats.pending === 0, onClick: () => setFilterStatus('pending') },
-          { label: 'In Progress', done: stats.inProgress === 0, onClick: () => setFilterStatus('in_progress') },
-          { label: 'Complete', done: stats.pending === 0 && stats.inProgress === 0, onClick: () => setFilterStatus('completed') },
-        ]}
+        checklist={[]}
         checklistTitle={t('radiology.imagingWorklist')}
-        missionTitle={t('radiology.title')}
-        missionDescription={t('radiology.imagingWorklist')}
         emptyTitle={t('radiology.noStudies')}
       >
         {/* Stat panels — opened from the header toggles; the active one
@@ -524,9 +549,9 @@ export default function RadiologyDashboard() {
             <div className="p-4 grid grid-cols-2 gap-3">
               {[
                 { label: t('radiology.completionRate'), value: `${studies.length > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%` },
-                { label: t('radiology.kpiAvgTat'), value: stats.avgTAT },
-                { label: t('radiology.totalPatients'), value: patients.length },
-                { label: t('radiology.labCrossRefs'), value: labResults.length },
+                // Only shown once there's a real completed study to average —
+                // no fabricated placeholder turnaround.
+                ...(avgTurnaroundMinutes !== null ? [{ label: t('radiology.kpiAvgTat'), value: formatTurnaround(avgTurnaroundMinutes) }] : []),
               ].map(s => (
                 <div key={s.label} className="p-2.5 rounded-md text-center" style={{ background: 'var(--overlay-subtle)' }}>
                   <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</div>

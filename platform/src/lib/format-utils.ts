@@ -101,6 +101,51 @@ export function formatMoney(
   return `${currency} ${num}`;
 }
 
+/**
+ * How far a moment is from now, phrased for a schedule row: "in 2h 15m",
+ * "in 45m", "20m ago", "Now", "Tomorrow", "in 3d". Coarse by design — the
+ * exact clock time is always shown next to it, so this only has to answer
+ * "how soon?" at a glance.
+ *
+ * - Returns '' for falsy/unparseable input, so callers can render nothing.
+ * - Anything inside ±1 minute reads "Now".
+ * - Past times get "… ago"; future times get "in …".
+ * - Beyond 24h it switches to whole days (and names the next day "Tomorrow"/
+ *   "Yesterday") rather than printing an unhelpful "in 53h".
+ *
+ * `now` is injectable so callers can drive many rows off one ticking clock
+ * (and so tests stay deterministic).
+ */
+export function formatTimeUntil(value?: string | Date | null, now: Date = new Date()): string {
+  if (!value) return '';
+  const target = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(target.getTime())) return '';
+
+  const diffMs = target.getTime() - now.getTime();
+  const past = diffMs < 0;
+  const totalMinutes = Math.floor(Math.abs(diffMs) / 60000);
+  if (totalMinutes < 1) return 'Now';
+
+  const days = Math.floor(totalMinutes / 1440);
+  if (days >= 1) {
+    // Calendar-day difference reads better than 24h buckets: an 8 AM slot
+    // tomorrow should say "Tomorrow", not "in 18h".
+    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const dayDiff = Math.round((startOfDay(target) - startOfDay(now)) / 86400000);
+    if (dayDiff === 1) return 'Tomorrow';
+    if (dayDiff === -1) return 'Yesterday';
+    const n = Math.abs(dayDiff) || days;
+    return past ? `${n}d ago` : `in ${n}d`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const label = hours > 0
+    ? (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`)
+    : `${minutes}m`;
+  return past ? `${label} ago` : `in ${label}`;
+}
+
 /** Part of day for greetings. Pure function of the hour (local time). */
 export function timeOfDay(date: Date = new Date()): 'morning' | 'afternoon' | 'evening' {
   const h = date.getHours();

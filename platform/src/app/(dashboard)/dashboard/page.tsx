@@ -13,7 +13,7 @@ import { useTriage } from '@/lib/hooks/useTriage';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { patientFullName, patientAge } from '@/lib/patient-utils';
-import { getDefaultDashboard, getRoleConfig } from '@/lib/permissions';
+import { getDefaultDashboard } from '@/lib/permissions';
 import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
@@ -114,7 +114,6 @@ export default function DashboardPage() {
 
   // Total documents awaiting the clinician's signature.
   const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length;
-  const myReferralsCount = (referrals || []).filter(r => r.createdBy === currentUser._id).length;
 
   // Upcoming appointments for this clinician (drives the schedule board).
   const apptKey = (a: { appointmentDate: string; appointmentTime?: string }) => `${a.appointmentDate}T${a.appointmentTime || '00:00'}`;
@@ -161,21 +160,17 @@ export default function DashboardPage() {
     href: '/messages',
   }));
 
-  const referralEntries = (referrals || [])
-    .filter(r => r.createdBy === currentUser._id)
-    .map(r => ({
-      id: r._id,
-      title: r.patientName,
-      subtitle: `${r.reason || 'Referral'} → ${r.toHospital || 'receiving facility'}`,
-      meta: r.status ? String(r.status).replace(/_/g, ' ') : '',
-      href: '/referrals',
-    }));
-
-  const intakeEntries = assignedRows.slice(0, 4).map(r => ({
+  // "Open" = submitted but not yet resolved — excludes completed/cancelled
+  // referrals, which don't need any more action from the referring clinician.
+  const OPEN_REFERRAL_STATUSES = new Set(['sent', 'received', 'seen']);
+  const myOpenReferrals = (referrals || [])
+    .filter(r => r.createdBy === currentUser._id && OPEN_REFERRAL_STATUSES.has(r.status));
+  const referralEntries = myOpenReferrals.map(r => ({
     id: r._id,
-    title: r.name,
-    subtitle: [r.id, r.ward].filter(Boolean).join(' · ') || 'Intake review pending',
-    href: '/patient-intake',
+    title: r.patientName,
+    subtitle: `${r.reason || 'Referral'} → ${r.toHospital || 'receiving facility'}`,
+    meta: r.status ? String(r.status).replace(/_/g, ' ') : '',
+    href: '/referrals',
   }));
 
   // Today's telehealth visits for this clinician — each row opens the visit room.
@@ -204,12 +199,10 @@ export default function DashboardPage() {
   const outstandingItems = [
     { label: 'Documents to sign', count: signCount, tone: signCount > 0 ? 'warning' as const : 'neutral' as const, href: '/consultation', entries: documentEntries },
     { label: 'Phone notes', count: phoneNotesInbox.length, tone: phoneNotesInbox.length > 0 ? 'warning' as const : 'neutral' as const, href: '/messages', entries: phoneNoteEntries },
-    { label: 'Open referrals', count: myReferralsCount, href: '/referrals', entries: referralEntries },
-    { label: 'Patient intake', count: Math.max(0, assignedRows.length ? Math.min(assignedRows.length, 4) : 0), href: '/patient-intake', entries: intakeEntries },
+    { label: 'Open referrals', count: myOpenReferrals.length, href: '/referrals', entries: referralEntries },
     { label: 'Awaiting labs', count: resumableEncounters.length, tone: resumableEncounters.length > 0 ? 'danger' as const : 'neutral' as const, href: '/lab', entries: labEntries },
     { label: 'Telehealth visits', count: telehealthToday.length, tone: telehealthToday.length > 0 ? 'warning' as const : 'neutral' as const, href: '/appointments', entries: telehealthEntries },
   ];
-  const canAccessBilling = !!getRoleConfig(currentUser.role)?.allowedRoutes.includes('/payments');
 
   return (
     <main className="page-container page-enter">
@@ -220,7 +213,6 @@ export default function DashboardPage() {
         appointments={myUpcomingAppts}
         outstanding={outstandingItems}
         onUpdateAppointmentStatus={updateApptStatus}
-        canAccessBilling={canAccessBilling}
       />
     </main>
   );

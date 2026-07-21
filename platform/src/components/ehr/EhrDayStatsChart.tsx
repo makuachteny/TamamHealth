@@ -1,0 +1,163 @@
+'use client';
+
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight } from '@/components/icons/lucide';
+import { addDays, parseIsoDate, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
+
+/** One unit of work plotted on the chart: a row, appointment or order. */
+export type DayStatsItem = {
+  /** ISO date (yyyy-mm-dd). Items without one are treated as today's work. */
+  date?: string;
+  /** Clock time ("08:20", "8:20 AM"). Untimed items are skipped — see below. */
+  time?: string;
+  /** Which of the two series this item belongs to. Defaults to the second. */
+  series?: 0 | 1;
+};
+
+/* ─── Day statistics (left rail) ───
+   The single day-activity widget shared by every EHR dashboard: a compact
+   grouped-bar chart of one day's work in two-hour blocks, split into two
+   series. The Clinical Officer dashboard names them Inpatient / Outpatient;
+   other stations pass their own pair (Dispensed / Pending, …) so the widget
+   reads the same everywhere while the data stays role-specific.
+
+   The ‹ › controls step the focused day and stay visible even when the day is
+   empty, so navigation is never dead-ended. Series colors come from the --viz-*
+   custom properties on .ehr-day-stats so dark mode swaps validated steps rather
+   than dimming the light ones.
+
+   Items with no clock time are skipped rather than bucketed at a guessed hour —
+   an invented 07:00 bar would misreport when the work actually happened. */
+export default function EhrDayStatsChart({
+  items,
+  seriesNames,
+  selectedDate,
+  todayIso,
+  title = 'Day statistics',
+}: {
+  items: DayStatsItem[];
+  seriesNames: [string, string];
+  selectedDate: string;
+  todayIso: string;
+  title?: string;
+}) {
+  // Chart-local focus day: follows the dashboard's selected date, but the
+  // ‹ › controls can step it independently without changing the work list.
+  // Re-synced during render rather than in an effect (React's "adjusting state
+  // when a prop changes" pattern) so picking a date doesn't cost a second pass.
+  const [focusDate, setFocusDate] = useState(selectedDate);
+  const [syncedDate, setSyncedDate] = useState(selectedDate);
+  if (selectedDate !== syncedDate) {
+    setSyncedDate(selectedDate);
+    setFocusDate(selectedDate);
+  }
+  const stepFocus = (days: number) => setFocusDate(current => toIsoDate(addDays(parseIsoDate(current), days)));
+
+  const dayLabel = focusDate === todayIso
+    ? 'Today'
+    : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(parseIsoDate(focusDate));
+
+  // Two-hour buckets covering the working day (07:00–19:00); earlier/later
+  // items clamp into the first/last block.
+  const buckets = [7, 9, 11, 13, 15, 17].map(start => ({ start, counts: [0, 0] }));
+  const totals = [0, 0];
+  let untimed = 0;
+  for (const item of items) {
+    if ((item.date || todayIso) !== focusDate) continue;
+    const hour = parseHour(item.time);
+    if (hour === null) { untimed += 1; continue; }
+    const seriesIndex = item.series === 0 ? 0 : 1;
+    const bucketIndex = Math.min(Math.max(Math.floor((hour - 7) / 2), 0), buckets.length - 1);
+    buckets[bucketIndex].counts[seriesIndex] += 1;
+    totals[seriesIndex] += 1;
+  }
+  const total = totals[0] + totals[1];
+  const peak = Math.max(...buckets.map(bucket => Math.max(bucket.counts[0], bucket.counts[1])));
+  // Even headroom so the midpoint gridline lands on a whole number.
+  const yMax = Math.max(4, Math.ceil(peak / 2) * 2);
+
+  // Geometry: 216×132 viewBox, plot from y=8 (top) to y=112 (baseline),
+  // x from 20 (after tick labels) in 32px groups of two 7px bars + 2px gap.
+  const plotTop = 8;
+  const baseline = 112;
+  const plotHeight = baseline - plotTop;
+  const barY = (value: number) => baseline - (value / yMax) * plotHeight;
+  const ticks = [0, yMax / 2, yMax];
+  const seriesFill = ['var(--viz-inpatient)', 'var(--viz-outpatient)'];
+  const summary = `${dayLabel} · ${totals[0]} ${seriesNames[0].toLowerCase()} · ${totals[1]} ${seriesNames[1].toLowerCase()}`;
+
+  return (
+    <div className="ehr-day-stats">
+      <div className="ehr-day-stats-head">
+        <h3>{title}</h3>
+        <div className="ehr-day-stats-nav">
+          <button type="button" aria-label="Previous day" onClick={() => stepFocus(-1)}>
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+          <button type="button" aria-label="Next day" onClick={() => stepFocus(1)}>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+      <p>{summary}</p>
+      {total === 0 ? (
+        <p className="ehr-day-stats-empty">
+          {untimed > 0
+            ? `${untimed} item${untimed === 1 ? '' : 's'} on this day without a recorded time.`
+            : 'No activity on this day.'}
+        </p>
+      ) : (
+        <>
+          <svg viewBox="0 0 216 132" role="img" aria-label={`${dayLabel} activity by time of day: ${summary}`}>
+            {ticks.map(tick => (
+              <g key={tick}>
+                <line x1={20} x2={212} y1={barY(tick)} y2={barY(tick)} stroke="var(--ehr-border)" strokeWidth={1} />
+                <text x={16} y={barY(tick) + 2.5} textAnchor="end" fontSize={8} fill="var(--ehr-muted)">{tick}</text>
+              </g>
+            ))}
+            {buckets.map((bucket, index) => {
+              const x0 = 20 + index * 32 + 8;
+              const hourLabel = `${String(bucket.start).padStart(2, '0')}:00`;
+              return (
+                <g key={bucket.start}>
+                  {bucket.counts.map((count, seriesIndex) => count > 0 && (
+                    <rect
+                      key={seriesIndex}
+                      className="ehr-day-stats-bar"
+                      x={x0 + seriesIndex * 9}
+                      y={barY(count)}
+                      width={7}
+                      height={baseline - barY(count)}
+                      rx={2}
+                      fill={seriesFill[seriesIndex]}
+                    >
+                      <title>{`${hourLabel} — ${count} ${seriesNames[seriesIndex].toLowerCase()}`}</title>
+                    </rect>
+                  ))}
+                  <text x={x0 + 8} y={126} textAnchor="middle" fontSize={8} fill="var(--ehr-muted)">{hourLabel}</text>
+                </g>
+              );
+            })}
+          </svg>
+          <div className="ehr-day-stats-legend">
+            <span><i style={{ background: seriesFill[0] }} /> {seriesNames[0]}</span>
+            <span><i style={{ background: seriesFill[1] }} /> {seriesNames[1]}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Hour-of-day from "08:20", "8:20 AM" or "20:05"; null when absent/unparseable. */
+function parseHour(time?: string): number | null {
+  if (!time) return null;
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i.exec(time.trim());
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  if (!Number.isFinite(hour)) return null;
+  const meridiem = match[3]?.toLowerCase();
+  if (meridiem === 'pm' && hour < 12) hour += 12;
+  if (meridiem === 'am' && hour === 12) hour = 0;
+  return hour;
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import {
@@ -134,7 +135,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         {/* ── Left: form ── */}
         <section className="pl-pane pl-form-pane">
           {/* Back to the marketing site — shown on small screens where the hero is hidden. */}
-          <a href="/" aria-label="Close" className="pl-form-close"><X size={18} /></a>
+          <Link href="/" aria-label="Close" className="pl-form-close"><X size={18} /></Link>
           <header className="pl-brand">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/tamamhealth-logo-full.svg" alt="Tamam Healthcare System" className="pl-brand-logo" />
@@ -188,7 +189,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         {/* ── Right: hero — same floating-chip treatment as the staff login
             (decorative copy hardcoded in English there too). ── */}
         <section className="pl-hero" style={{ backgroundImage: 'url(/assets/doctor-nurse-consultation.jpg)' }}>
-          <a href="/" aria-label="Close" className="pl-hero-close"><X size={18} /></a>
+          <Link href="/" aria-label="Close" className="pl-hero-close"><X size={18} /></Link>
 
           {/* Floating: next-visit chip */}
           <div className="pl-chip pl-chip-task">

@@ -72,7 +72,9 @@ export default function AssignDoctorModal({
     const filtered = q
       ? base.filter(u => u.name.toLowerCase().includes(q) || (u.specialty ?? '').toLowerCase().includes(q))
       : base;
-    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+    return [...filtered].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+    );
   }, [users, currentUser?.hospitalId, search, assignableRoles]);
 
   const handleAssign = async () => {
@@ -121,7 +123,7 @@ export default function AssignDoctorModal({
   return (
     <Modal onClose={onClose} width={480}>
       <div
-        className="modal-content card-elevated"
+        className="modal-content card-elevated assign-doctor-modal"
         style={{ width: '100%' }}
       >
         {/* Header */}
@@ -143,19 +145,26 @@ export default function AssignDoctorModal({
         {/* Body */}
         <div className="p-4 space-y-3">
           {/* Search */}
-          <div className="relative">
+          <div className="relative assign-doctor-search">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
             <input
+              type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={`Search ${providerLabel}s…`}
               className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm"
-              style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
+              style={{
+                borderColor: 'var(--border-medium)',
+                background: 'var(--bg-input, var(--bg-card-solid))',
+                color: 'var(--text-primary)',
+                paddingLeft: 38,
+                paddingRight: 12,
+              }}
             />
           </div>
 
           {/* Doctor list */}
-          <div className="max-h-64 overflow-y-auto rounded-lg border" style={{ borderColor: 'var(--border-light)' }}>
+          <div className="max-h-64 overflow-y-auto rounded-lg border assign-doctor-provider-list" style={{ borderColor: 'var(--border-light)' }}>
             {loading ? (
               <p className="p-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>Loading {providerLabel}s…</p>
             ) : doctors.length === 0 ? (
