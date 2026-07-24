@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
-import type { AppointmentDoc, EncounterDoc, PatientDoc } from '@/lib/db-types';
+import type { AppointmentDoc, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
 import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
-import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel, initials } from '@/lib/patient-utils';
-import { avatarColor } from '@/lib/patient-utils';
+import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
+import { buildQueueFromTriage, STAGE_LABELS, type QueueStage } from '@/lib/services/patient-queue-service';
+import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
 import PatientCheckInForm from '@/components/check-in/PatientCheckInForm';
@@ -20,12 +21,13 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { getRoleConfig } from '@/lib/permissions';
+import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMetric, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
   Calendar, ClipboardCheck, ArrowRightLeft,
-  UserPlus, ClipboardList, Search,
-  MapPin, LogOut, Wallet, CheckCircle, X, Maximize2,
-  SendHorizontal, Stethoscope,
+  UserPlus, ClipboardList,
+  MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
+  Send, Stethoscope,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
@@ -130,11 +132,10 @@ export default function FrontDeskDashboardPage() {
   // Reactive room list from facility settings; fall back to the static list.
   const roomOptions = rooms.length ? rooms : ROOM_OPTIONS;
 
-  const [queueFilter, setQueueFilter] = useState<'all' | 'walk-in' | 'appointment' | 'referral'>('all');
-  const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered' | 'waiting' | 'walkin' | 'completed'>('all');
+  const [queueFilter, setQueueFilter] = useState<'all' | 'walk-in' | 'appointment'>('all');
+  const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered'>('all');
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
-  const [recentSearch, setRecentSearch] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   // The queue entry backing the open detail popup (carries triage/room context);
   // null when a non-queue row (e.g. a registered patient) opened the popup.
@@ -155,6 +156,31 @@ export default function FrontDeskDashboardPage() {
   const [encounters, setEncounters] = useState<EncounterDoc[]>([]);
   const [roomDraft, setRoomDraft] = useState('');
   const [savingRoom, setSavingRoom] = useState(false);
+
+  // Capabilities card — each item latches checked forever the first time this
+  // receptionist does it (see useCapabilities). None of these have a cheap
+  // per-user "already done" signal from already-loaded data (the queue/roster
+  // don't record who registered/checked-in/roomed/assigned/checked-out a given
+  // patient), so every item is marked at its own action's success point below.
+  // Declared early (before the handlers below) since useCallback dependency
+  // arrays reference `markCapability` eagerly, unlike a lazy closure body.
+  const capabilityItems = useMemo(() => ([
+    { key: 'front-desk.register', label: 'Register a patient', onClick: () => setRegisterOpen(true) },
+    { key: 'front-desk.check-in', label: 'Check in an arrival', onClick: () => setCheckInOpen(true) },
+    { key: 'front-desk.room', label: 'Room a walk-in', onClick: () => { setQueueFilter('walk-in'); setPanelView('queue'); } },
+    { key: 'front-desk.assign-provider', label: 'Assign a provider', onClick: () => { setQueueFilter('walk-in'); setPanelView('queue'); } },
+    { key: 'front-desk.checkout', label: 'Check out a visit', onClick: () => { setQueueFilter('all'); setPanelView('queue'); } },
+  ]), []);
+  const { checklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
+  // Wall-clock sampled once for the initial render, then refreshed once a
+  // minute from the interval's own callback (render itself stays pure) so
+  // the queue's 24h triage cutoff and wait-time scores keep aging on screen
+  // — same pattern as EhrClinicalDashboard's live queue.
+  const [queueNowMs, setQueueNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setQueueNowMs(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -213,7 +239,7 @@ export default function FrontDeskDashboardPage() {
     id: string;
     patientId: string;
     patientName: string;
-    type: 'walk-in' | 'appointment' | 'referral' | 'registered';
+    type: 'walk-in' | 'appointment' | 'registered';
     priority: 'RED' | 'YELLOW' | 'GREEN' | 'normal';
     complaint: string;
     department: string;
@@ -224,13 +250,23 @@ export default function FrontDeskDashboardPage() {
     /** Full timestamp behind `time` — drives the row's "in 2h 15m" countdown. */
     timeAt?: string;
     calendarDate: string;
-    status: 'WAITING' | 'IN CONSULT' | 'DONE' | 'ADMITTED' | 'REFERRED';
+    status: 'WAITING' | 'IN CONSULT' | 'DONE';
+    /** Raw stage code from patient-queue-service (triage-sourced entries only) —
+     *  drives the Context column via STAGE_LABELS, the same vocabulary the
+     *  doctor's Queue column uses for this patient. */
+    stage?: QueueStage;
+    /** Stage-based label from patient-queue-service (triage-sourced entries only). */
+    stageLabel?: string;
+    waitMinutes?: number;
+    overTarget?: boolean;
+    /** Ordering weight — the service's acuity+wait score for triage-sourced
+     *  entries, an equivalent estimate for the rest. Higher sorts first. */
+    score: number;
     sourceId: string; // triage / appointment / patient ID
     encounterId?: string;
     assignedRoom?: string; // OPD exam room/bay (walk-in/triage entries only)
     assignedDoctorName?: string;
     location?: string;
-    registeredAt?: string; // registration timestamp (registered entries only — for ordering)
   }
 
   const queue = useMemo(() => {
@@ -263,34 +299,56 @@ export default function FrontDeskDashboardPage() {
       }
     }
 
-    // Add triaged patients (walk-ins and triaged appointments)
-    for (const t of todaysTriages) {
-      if (t.status === 'discharged') continue;
-      const checkoutEncounter = checkoutEncounterByPatient.get(t.patientId);
-      const status = checkoutEncounter ? 'DONE' :
-                     t.status === 'pending' ? 'WAITING' :
-                     t.status === 'seen' ? 'IN CONSULT' :
-                     t.status === 'admitted' ? 'ADMITTED' :
-                     t.status === 'referred' ? 'REFERRED' : 'DONE';
+    // Active triage per patient, driving the stage-based live queue — same
+    // 24h cutoff + newest-per-patient dedupe as the clinical dashboard's
+    // queue (older triage docs are unclosed visits, not still-waiting
+    // patients).
+    const activeTriageByPatient = new Map<string, TriageDoc>();
+    const triageCutoff = queueNowMs - 24 * 60 * 60 * 1000;
+    for (const doc of triages) {
+      if (new Date(doc.triagedAt).getTime() < triageCutoff) continue;
+      const held = activeTriageByPatient.get(doc.patientId);
+      if (!held || doc.triagedAt > held.triagedAt) activeTriageByPatient.set(doc.patientId, doc);
+    }
+
+    // Add triaged patients (walk-ins and triaged appointments) via the
+    // shared queue-stage service — no lab/pharmacy args since this page
+    // doesn't load prescriptions or lab results.
+    const stageEntries = buildQueueFromTriage([...activeTriageByPatient.values()]);
+    for (const entry of stageEntries) {
+      const triageDoc = activeTriageByPatient.get(entry.patientId);
+      const checkoutEncounter = checkoutEncounterByPatient.get(entry.patientId);
+      const isCheckout = Boolean(checkoutEncounter);
+      const room = triageDoc?.assignedRoom;
+      // A clinician has taken the patient when the triage records a handoff
+      // (entry.assignedToId) or was marked seen — the same "in service"
+      // signal the doctor/nurse boards derive from this engine, so reception
+      // can tell who is actually with a clinician vs still queued.
+      const inConsult = Boolean(entry.assignedToId) || triageDoc?.status === 'seen';
       items.push({
-        id: `triage-${t._id}`,
-        patientId: t.patientId,
-        patientName: t.patientName,
+        id: `triage-${entry.triageId}`,
+        patientId: entry.patientId,
+        patientName: entry.patientName,
         type: 'walk-in',
-        priority: t.priority as 'RED' | 'YELLOW' | 'GREEN',
-        complaint: t.chiefComplaint || 'ETAT Assessment',
-        department: t.chiefComplaint ? suggestDepartment(t.chiefComplaint) : 'Triage',
-        gender: genderOf(t.patientId),
-        age: ageOf(t.patientId),
-        ...splitDateTime(t.triagedAt),
-        timeAt: t.triagedAt,
-        calendarDate: isoDateKey(t.triagedAt),
-        status,
-        sourceId: t._id,
+        priority: entry.acuity,
+        complaint: entry.chiefComplaint || 'ETAT Assessment',
+        department: entry.chiefComplaint ? suggestDepartment(entry.chiefComplaint) : 'Triage',
+        gender: genderOf(entry.patientId),
+        age: ageOf(entry.patientId),
+        ...splitDateTime(entry.enteredStageAt),
+        timeAt: entry.enteredStageAt,
+        calendarDate: isoDateKey(entry.enteredStageAt),
+        status: isCheckout ? 'DONE' : inConsult ? 'IN CONSULT' : 'WAITING',
+        stage: entry.stage,
+        stageLabel: isCheckout ? 'Ready for checkout' : STAGE_LABELS[entry.stage],
+        waitMinutes: entry.minutesWaiting,
+        overTarget: entry.flaggedForReassessment,
+        score: entry.score,
+        sourceId: entry.triageId,
         encounterId: checkoutEncounter?._id,
-        assignedRoom: t.assignedRoom,
-        assignedDoctorName: doctorOf(t.patientId),
-        location: locationOf(t.patientId, t.assignedRoom || (t.chiefComplaint ? suggestDepartment(t.chiefComplaint) : 'Triage')),
+        assignedRoom: room,
+        assignedDoctorName: doctorOf(entry.patientId),
+        location: locationOf(entry.patientId, room || (entry.chiefComplaint ? suggestDepartment(entry.chiefComplaint) : 'Triage')),
       });
     }
 
@@ -298,8 +356,8 @@ export default function FrontDeskDashboardPage() {
     // Scheduled/confirmed appointments stay in the Today's Appointments card until
     // the receptionist checks them in via the check-in popup.
     const ARRIVED = new Set<AppointmentDoc['status']>(['checked_in', 'in_progress', 'completed']);
-    const apptPatientIds = new Set(todaysAppointments.map(a => a.patientId));
-    const triagedPatientIds = new Set(todaysTriages.map(t => t.patientId));
+    const triagedPatientIds = new Set(activeTriageByPatient.keys());
+    const APPT_SCORE: Record<string, number> = { emergency: 3, urgent: 2 };
     for (const a of todaysAppointments) {
       if (triagedPatientIds.has(a.patientId)) continue;
       if (!ARRIVED.has(a.status)) continue; // not checked in yet → not in the queue
@@ -322,6 +380,7 @@ export default function FrontDeskDashboardPage() {
         timeAt: appointmentMoment(a.appointmentDate, a.appointmentTime),
         calendarDate: isoDateKey(a.appointmentDate),
         status,
+        score: APPT_SCORE[a.priority ?? ''] ?? 1,
         sourceId: a._id,
         encounterId: checkoutEncounter?._id,
         assignedDoctorName: a.providerName || doctorOf(a.patientId),
@@ -347,6 +406,7 @@ export default function FrontDeskDashboardPage() {
         timeAt: enc.updatedAt || enc.closedAt || enc.startedAt,
         calendarDate: isoDateKey(enc.updatedAt || enc.closedAt || enc.startedAt),
         status: 'DONE',
+        score: 0,
         sourceId: enc._id,
         encounterId: enc._id,
         assignedDoctorName: doctorOf(enc.patientId),
@@ -355,20 +415,13 @@ export default function FrontDeskDashboardPage() {
       queuedPatientIds.add(enc.patientId);
     }
 
-    // Sort: RED → YELLOW → GREEN → normal, then registered last (recent first).
-    const pOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2, normal: 3 };
-    const rank = (it: QueueItem) => it.type === 'registered' ? 4 : (pOrder[it.priority] ?? 3);
-    items.sort((a, b) => {
-      const r = rank(a) - rank(b);
-      if (r) return r;
-      if (a.type === 'registered' && b.type === 'registered') {
-        return (b.registeredAt || '').localeCompare(a.registeredAt || '');
-      }
-      return a.time.localeCompare(b.time);
-    });
+    // Order by the queue-stage service's acuity+wait score (desc) — highest
+    // priority, longest-waiting patients surface first. Same-score rows keep
+    // a stable time-based tiebreak.
+    items.sort((a, b) => (b.score - a.score) || a.time.localeCompare(b.time));
 
     return items;
-  }, [currentUser?.hospitalName, encounters, patients, today, todaysAppointments, todaysTriages]);
+  }, [currentUser?.hospitalName, encounters, patients, queueNowMs, today, todaysAppointments, triages]);
 
   const filteredQueue = useMemo(() => {
     let items = queueFilter === 'all' ? queue : queue.filter(q => q.type === queueFilter);
@@ -408,19 +461,6 @@ export default function FrontDeskDashboardPage() {
     });
   }, [patients, queueSearch]);
 
-  const recentPatients = useMemo(() => {
-    const q = recentSearch.trim().toLowerCase();
-    const sorted = [...patients].sort((a, b) => patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)));
-    const filtered = q
-      ? sorted.filter(patient =>
-          `${patientFullName(patient)} ${patient.hospitalNumber || ''} ${patient.phone || ''} ${patient.county || ''} ${patient.state || ''}`
-            .toLowerCase()
-            .includes(q)
-        )
-      : sorted;
-    return filtered.slice(0, q ? 25 : 6);
-  }, [patients, recentSearch]);
-
   // ── Selected patient previous visit info (from real records) ──
   const selectedPatient = useMemo(() =>
     selectedPatientId ? patients.find(p => p._id === selectedPatientId) : null,
@@ -446,12 +486,14 @@ export default function FrontDeskDashboardPage() {
     try {
       await updateTriage(triageId, { assignedRoom: room || undefined });
       showToast(room ? `Room set to ${room}` : 'Room cleared', 'success');
+      // Only assigning a room (not clearing one) counts as "roomed a walk-in".
+      if (room) markCapability('front-desk.room');
     } catch {
       showToast('Failed to set room', 'error');
     } finally {
       setSavingRoom(false);
     }
-  }, [updateTriage, showToast]);
+  }, [updateTriage, showToast, markCapability]);
 
   // ── Final checkout: close out a completed visit ──
   const handleCompleteCheckout = useCallback(async (target: CheckoutTarget) => {
@@ -506,18 +548,45 @@ export default function FrontDeskDashboardPage() {
         await updateTriage(target.triageId, { status: 'discharged' });
       }
       showToast(`${target.patientName} checked out${gateNote}`, 'success');
+      markCapability('front-desk.checkout');
       setCheckoutTarget(null);
     } catch {
       showToast('Failed to complete checkout', 'error');
     }
-  }, [updateAppointmentStatus, updateTriage, showToast, currentUser]);
+  }, [updateAppointmentStatus, updateTriage, showToast, currentUser, markCapability]);
 
   // ── Appointment check-in: mark the patient as arrived → joins the queue ──
-  const handleCheckIn = useCallback(async (appt: AppointmentDoc) => {
+  // Also creates/joins the visit encounter (arrivalChannel: 'appointment',
+  // appointmentId threaded through, attendanceType captured) so this arrival
+  // door produces the same visit thread walk-ins get via checkInPatient —
+  // see docs/EMR-FIELD-AUDIT-2026-07.md §3. Best-effort: the appointment
+  // status flip is what actually gets the patient into the live queue, so an
+  // encounter-creation failure doesn't block check-in.
+  const handleCheckIn = useCallback(async (appt: AppointmentDoc, attendanceType: 'new' | 'repeat') => {
     await updateAppointmentStatus(appt._id, 'checked_in');
+    try {
+      const { findOpenEncounterForPatient, createArrivalEncounter } = await import('@/lib/services/encounter-service');
+      const existing = await findOpenEncounterForPatient(appt.patientId, currentUser?.hospitalId || '');
+      if (!existing) {
+        await createArrivalEncounter({
+          patientId: appt.patientId,
+          patientName: appt.patientName,
+          hospitalId: currentUser?.hospitalId || '',
+          hospitalName: currentUser?.hospitalName || '',
+          orgId: currentUser?.orgId,
+          arrivalChannel: 'appointment',
+          appointmentId: appt._id,
+          attendanceType,
+          actorId: currentUser?._id,
+        });
+      }
+    } catch {
+      // encounter creation is best-effort; the appointment check-in itself still succeeded
+    }
     showToast(`${appt.patientName} checked in — added to queue`, 'success');
+    markCapability('front-desk.check-in');
     setCheckInTarget(null);
-  }, [updateAppointmentStatus, showToast]);
+  }, [updateAppointmentStatus, showToast, markCapability, currentUser]);
 
   // ── Mark an appointment a no-show. Confirmed first: a mistaken no-show
   //    hides the patient from the arrivals list, so reception gets one beat to
@@ -601,7 +670,6 @@ export default function FrontDeskDashboardPage() {
     { key: 'all', label: 'All', count: queue.length + pendingAppointments.length },
     { key: 'walk-in', label: 'Walk-ins', count: queue.filter(q => q.type === 'walk-in').length },
     { key: 'appointment', label: 'Appointments', count: queue.filter(q => q.type === 'appointment').length + pendingAppointments.length },
-    { key: 'referral', label: 'Referrals', count: queue.filter(q => q.type === 'referral').length },
   ]), [queue, pendingAppointments.length]);
 
   const handleTabChange = useCallback((tab: string) => {
@@ -629,8 +697,8 @@ export default function FrontDeskDashboardPage() {
   }, [pendingAppointments, queueFilter, queueSearch]);
 
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
-    ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: ClipboardCheck, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
-    ...(canUseRoute('/patient-intake') ? [{ label: 'Send intake', icon: SendHorizontal, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
+    ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: LogIn, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
+    ...(canUseRoute('/patient-intake') ? [{ label: 'Send intake', icon: Send, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
   ]), [canUseRoute, router, t]);
 
@@ -643,7 +711,6 @@ export default function FrontDeskDashboardPage() {
     ...(canUseRoute('/patients') ? [{ label: 'Patient registry', icon: ClipboardList, onClick: () => router.push('/patients') }] : []),
     ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
     ...(canUseRoute('/referrals') ? [{ label: 'Referrals', icon: ArrowRightLeft, onClick: () => router.push('/referrals') }] : []),
-    ...(canUseRoute('/check-in') ? [{ label: 'Check-in queue', icon: ClipboardCheck, onClick: () => setCheckInOpen(true) }] : []),
   ]), [canUseRoute, router]);
 
   const frontDeskRows = useMemo<EhrCareDashboardRow[]>(() => {
@@ -668,7 +735,9 @@ export default function FrontDeskDashboardPage() {
         status: appointment.status === 'requested' ? 'requested' : 'scheduled',
         statusLabel: appointment.status === 'confirmed' ? 'Confirmed' : appointment.status === 'requested' ? 'Requested' : 'Scheduled',
         statusTone: 'scheduled',
-        priority: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
+        // Only a real acuity gets the RED/YELLOW pill — routine appointments
+        // show no priority pill rather than a free-text 'Appointment' label.
+        priority: appointment.priority === 'emergency' ? 'RED' : appointment.priority === 'urgent' ? 'YELLOW' : undefined,
         date: isoDateKey(appointment.appointmentDate),
         onClick: () => openPatientDetail(appointment.patientId, null),
         actionLabel: 'Check in',
@@ -684,40 +753,69 @@ export default function FrontDeskDashboardPage() {
 
     const queueRows = filteredQueue.map(entry => {
       const patient = patients.find(pp => pp._id === entry.patientId);
-      const pLabel = entry.priority === 'RED' ? t('appointments.priorityEmergency')
-        : entry.priority === 'YELLOW' ? t('appointments.priorityUrgent')
-        : entry.priority === 'GREEN' ? t('appointments.priorityRoutine')
-        : entry.type === 'registered' ? 'Registration' : t('lab.normal');
       const activeForCare = entry.status === 'WAITING' || entry.status === 'IN CONSULT';
       const checkoutReady = entry.status === 'DONE';
       const statusTone: EhrCareDashboardRow['statusTone'] = entry.status === 'DONE'
         ? 'done'
-        : entry.status === 'ADMITTED' || entry.status === 'REFERRED'
-          ? 'scheduled'
         : entry.status === 'IN CONSULT'
           ? 'active'
-          : entry.priority === 'RED'
-            ? 'danger'
-            : entry.priority === 'YELLOW'
-              ? 'warning'
-              : 'ready';
+          : entry.overTarget
+            ? 'warning'
+            : entry.priority === 'RED'
+              ? 'danger'
+              : entry.priority === 'YELLOW'
+                ? 'warning'
+                : 'ready';
+      // Where this row entered the queue from — the same doors every station
+      // recognizes a patient by. Encounter-only rows (a checkout with no
+      // same-day triage/appointment) are labeled as the checkout they are,
+      // not as a registration-flow row.
+      const source = entry.id.startsWith('triage-') ? 'Triage'
+        : entry.id.startsWith('appt-') ? 'Appointment'
+        : entry.id.startsWith('encounter-') ? 'Checkout'
+        : 'Registration';
+      // Triage-sourced rows carry the real acuity code, so they get the same
+      // RED/YELLOW/GREEN pill the doctor and nurse see for this patient.
+      // Appointment/registration rows have no acuity — the pill falls back
+      // to the status label instead (handled by the shared row renderer).
+      const acuity = entry.priority === 'RED' || entry.priority === 'YELLOW' || entry.priority === 'GREEN'
+        ? entry.priority
+        : undefined;
+      // Status column: the plain human state, distinct from the stage
+      // vocabulary now shown in Context.
+      const statusLabel = entry.status === 'DONE'
+        ? (entry.stageLabel || 'Done')
+        : entry.status === 'IN CONSULT'
+          ? 'In consult'
+          : 'Waiting';
+      // Context column: for triage-sourced rows, the same stage vocabulary
+      // (STAGE_LABELS) the doctor's Queue column shows for this patient;
+      // arrived-but-untriaged appointments show their department instead;
+      // checkout-only rows (no triage/appointment on file today) keep the
+      // honest 'Checkout' state already on the entry.
+      const context = entry.stage ? STAGE_LABELS[entry.stage]
+        : entry.type === 'appointment' ? entry.department
+        : entry.location || entry.department;
+      // Wait column: actual queue/slot time on the first line; the shared
+      // dashboard row renders hours/minutes underneath from `timeAt`.
+      const waitTime = entry.time || entry.date || undefined;
       return {
         id: entry.id,
         title: entry.patientName,
         subtitle: `${entry.complaint} · ${entry.department}`,
-        meta: `${entry.gender} · ${entry.age} · ${entry.date}${entry.time ? ` · ${entry.time}` : ''}`,
-        compactMeta: entry.time || entry.date,
-        time: entry.time || undefined,
+        meta: `${entry.gender} · ${entry.age}${entry.assignedDoctorName ? ` · ${entry.assignedDoctorName}` : ''}`,
+        compactMeta: entry.waitMinutes != null ? waitLabel(entry.waitMinutes) : (entry.time || entry.date),
+        time: waitTime,
         timeAt: entry.timeAt,
         status: entry.status.toLowerCase(),
-        statusLabel: entry.status === 'IN CONSULT' ? 'In consult' : entry.status === 'DONE' ? 'Done' : entry.status.charAt(0) + entry.status.slice(1).toLowerCase(),
+        statusLabel,
         statusTone,
-        priority: pLabel,
+        priority: acuity,
         room: entry.assignedRoom,
-        careTeam: entry.assignedDoctorName || patient?.assignedDoctorName || 'Unassigned',
-        careTeamLabel: 'Care team',
-        location: entry.location || entry.assignedRoom || entry.department || patientFacilityName(patient, currentUser?.hospitalName || 'Facility'),
-        locationLabel: entry.assignedRoom ? 'Room' : entry.type === 'registered' ? 'Location' : 'Department',
+        careTeam: source,
+        careTeamLabel: 'Source',
+        location: context,
+        locationLabel: entry.stage ? 'Stage' : entry.type === 'appointment' ? 'Department' : 'Location',
         date: entry.calendarDate,
         onClick: () => openPatientDetail(entry.patientId, entry),
         actionLabel: checkoutReady ? t('frontDesk.checkout') : activeForCare ? t('frontDesk.assign') : 'Record',
@@ -781,7 +879,6 @@ export default function FrontDeskDashboardPage() {
         status: 'registered',
         statusLabel: 'Registered',
         statusTone: 'ready',
-        priority: 'Registered',
         date: isoDateKey(patientRegisteredAt(patient)),
         onClick: () => openPatientDetail(patient._id, null),
         actionLabel: 'Record',
@@ -792,9 +889,6 @@ export default function FrontDeskDashboardPage() {
     const registeredRows: EhrCareDashboardRow[] = filteredRegisteredPatients.map(makeRegisteredRow);
 
     if (panelView === 'pending') return appointmentRows;
-    if (panelView === 'waiting') return queueRows.filter(row => row.status === 'waiting');
-    if (panelView === 'walkin') return queueRows;
-    if (panelView === 'completed') return queueRows.filter(row => row.status === 'done');
     if (panelView === 'queue') return queueRows;
     if (panelView === 'registered') return registeredRows;
     return [...appointmentRows, ...queueRows];
@@ -842,42 +936,7 @@ export default function FrontDeskDashboardPage() {
         setPanelView('queue');
       },
     },
-    {
-      label: 'Waiting',
-      value: queue.filter(item => item.status === 'WAITING').length,
-      active: panelView === 'waiting',
-      onClick: () => {
-        setQueueFilter('all');
-        setPanelView('waiting');
-      },
-    },
-    {
-      label: 'Walk-ins',
-      value: queue.filter(item => item.type === 'walk-in').length,
-      active: panelView === 'walkin',
-      onClick: () => {
-        setQueueFilter('walk-in');
-        setPanelView('walkin');
-      },
-    },
-    {
-      label: 'Completed',
-      value: queue.filter(item => item.status === 'DONE').length,
-      active: panelView === 'completed',
-      onClick: () => {
-        setQueueFilter('all');
-        setPanelView('completed');
-      },
-    },
-    {
-      label: 'Registered patients',
-      value: patients.length,
-      active: panelView === 'registered',
-      onClick: () => {
-        setPanelView('registered');
-      },
-    },
-  ]), [panelView, pendingAppointments.length, patients.length, queue, todaysAppointments.length]);
+  ]), [panelView, pendingAppointments.length, queue.length, todaysAppointments.length]);
 
   const centerCopy = useMemo(() => {
     if (panelView === 'appointments') {
@@ -904,30 +963,6 @@ export default function FrontDeskDashboardPage() {
         emptyActionLabel: 'Register patient',
       };
     }
-    if (panelView === 'waiting') {
-      return {
-        title: 'Waiting',
-        subtitle: `${frontDeskRows.length} patient${frontDeskRows.length === 1 ? '' : 's'} waiting to be seen`,
-        emptyTitle: 'No patients waiting',
-        emptyActionLabel: 'Register patient',
-      };
-    }
-    if (panelView === 'walkin') {
-      return {
-        title: 'Walk-ins',
-        subtitle: `${frontDeskRows.length} walk-in${frontDeskRows.length === 1 ? '' : 's'} in the queue`,
-        emptyTitle: 'No walk-ins',
-        emptyActionLabel: 'Register patient',
-      };
-    }
-    if (panelView === 'completed') {
-      return {
-        title: 'Completed',
-        subtitle: `${frontDeskRows.length} completed visit${frontDeskRows.length === 1 ? '' : 's'} today`,
-        emptyTitle: 'No completed visits',
-        emptyActionLabel: 'Register patient',
-      };
-    }
     if (panelView === 'registered') {
       return {
         title: 'Registered patients',
@@ -943,14 +978,6 @@ export default function FrontDeskDashboardPage() {
       emptyActionLabel: 'Register patient',
     };
   }, [dateLabel, frontDeskRows.length, panelView, t]);
-
-  const checklist = useMemo(() => ([
-    { label: 'Register patient', done: queue.some(item => item.type === 'registered') || patients.length > 0, onClick: () => setRegisterOpen(true) },
-    { label: 'Check in arrivals', done: pendingAppointments.length === 0, onClick: () => setCheckInOpen(true) },
-    { label: 'Assign provider', done: queue.every(item => item.status !== 'WAITING'), onClick: () => { setQueueFilter('all'); setPanelView('queue'); } },
-    { label: 'Room walk-ins', done: !queue.some(item => item.type === 'walk-in' && !item.assignedRoom), onClick: () => { setQueueFilter('walk-in'); setPanelView('queue'); } },
-    { label: 'Close completed visits', done: !queue.some(item => item.status === 'DONE'), onClick: () => { setQueueFilter('all'); setPanelView('queue'); } },
-  ]), [pendingAppointments.length, patients.length, queue]);
 
   if (!currentUser) return null;
 
@@ -981,7 +1008,7 @@ export default function FrontDeskDashboardPage() {
           metricsTitle="Reception today"
           centerTitle={centerCopy.title}
           centerSubtitle={centerCopy.subtitle}
-          checklistTitle="Front desk checklist"
+          checklistTitle="Capabilities"
           checklistDescription="Registration, arrivals, routing, and checkout."
           missionTitle="Keep the desk moving"
           missionDescription="Show the next action clearly so reception can register, check in, route, and close visits."
@@ -989,60 +1016,6 @@ export default function FrontDeskDashboardPage() {
           // Reception rows already open the patient detail on click, so the
           // per-row pencil is redundant.
           showRowOpenAction={false}
-          footerContent={(
-            <section className="ehr-worklist-panel" style={{ minWidth: 0 }}>
-              <div>
-                <h3>Recently registered</h3>
-                <label className="ehr-care-search ehr-worklist-search">
-                  <Search className="w-4 h-4" />
-                  <input
-                    type="search"
-                    value={recentSearch}
-                    onChange={(e) => setRecentSearch(e.target.value)}
-                    placeholder="Search patient, ID, phone, or location"
-                    aria-label="Search recently registered"
-                  />
-                </label>
-                <div className="ehr-worklist-meta">
-                  <span>{recentPatients.length} patients</span>
-                </div>
-              </div>
-              <div className="ehr-worklist-table" style={{ minWidth: 0 }}>
-                {recentPatients.length > 0 && (
-                  <div className="ehr-worklist-head" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }}>
-                    <span>Patient</span>
-                    <span>Phone</span>
-                    <span>Location</span>
-                    <span>Last Activity</span>
-                    <span>Status</span>
-                  </div>
-                )}
-                {recentPatients.length === 0 && (
-                  <div className="ehr-worklist-empty">
-                    No patients registered yet.
-                    <button type="button" onClick={() => setRegisterOpen(true)}>Register new patient</button>
-                  </div>
-                )}
-                {recentPatients.map(patient => (
-                  <button key={patient._id} type="button" className="ehr-worklist-row" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }} onClick={() => router.push(`/patients/${patient._id}`)}>
-                    <span className="ehr-worklist-name">
-                      <span className="ehr-patient-icon ehr-patient-icon--sm" style={{ background: avatarColor(patientFullName(patient)), color: '#fff' }}>{initials(patientFullName(patient))}</span>
-                      <span>
-                        <strong>{patientFullName(patient)}</strong>
-                        <small>{patient.hospitalNumber || 'No hospital number'} · {patientGenderAge(patient)}</small>
-                      </span>
-                    </span>
-                    <span className="ehr-worklist-room">{patient.phone ? formatPhoneDisplay(patient.phone) : 'Not recorded'}</span>
-                    <span className="ehr-worklist-room">{[patient.county, patient.state].filter(Boolean).join(', ') || 'Not recorded'}</span>
-                    <span className="ehr-worklist-care">
-                      <strong>{formatDayMonthYear(patient.lastConsultedAt || patient.lastVisitDate || patientRegisteredAt(patient))}</strong>
-                    </span>
-                    <span><b className="ehr-worklist-status active">Registered</b></span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
           emptyTitle={centerCopy.emptyTitle}
           emptyActionLabel={centerCopy.emptyActionLabel}
           onEmptyAction={() => {
@@ -1141,6 +1114,7 @@ export default function FrontDeskDashboardPage() {
           <AssignDoctorModal
             target={assignTarget}
             onClose={() => setAssignTarget(null)}
+            onAssigned={() => markCapability('front-desk.assign-provider')}
           />
         )}
 
@@ -1180,6 +1154,7 @@ export default function FrontDeskDashboardPage() {
                   onRegistered={() => {
                     setRegisterOpen(false);
                     setPanelView('registered');
+                    markCapability('front-desk.register');
                     router.refresh();
                   }}
                 />
@@ -1208,6 +1183,7 @@ export default function FrontDeskDashboardPage() {
                     setCheckInOpen(false);
                     setQueueFilter('all');
                     setPanelView('queue');
+                    markCapability('front-desk.check-in');
                   }}
                   onRegisterPatient={() => {
                     setCheckInOpen(false);
@@ -1426,7 +1402,7 @@ function CheckInModal({
 }: {
   appt: AppointmentDoc;
   onClose: () => void;
-  onCheckIn: (appt: AppointmentDoc) => Promise<void>;
+  onCheckIn: (appt: AppointmentDoc, attendanceType: 'new' | 'repeat') => Promise<void>;
   onUndoCheckIn: (appt: AppointmentDoc) => Promise<void>;
   onViewPatient: (patientId: string) => void;
 }) {
@@ -1437,6 +1413,24 @@ function CheckInModal({
   // Only a plain check-in (not yet in consult / completed) can be cleanly
   // reversed back to scheduled without stepping over later workflow state.
   const canReverseCheckIn = appt.status === 'checked_in';
+
+  // Visit type (new vs re-attendance) — auto-derived from the patient's
+  // history when the modal opens; the clerk can override before confirming.
+  const [attendanceType, setAttendanceType] = useState<'new' | 'repeat'>('new');
+  const attendanceTouchedRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { deriveAttendanceType } = await import('@/lib/services/check-in-service');
+        const derived = await deriveAttendanceType(appt.patientId);
+        if (!cancelled && !attendanceTouchedRef.current) setAttendanceType(derived);
+      } catch {
+        if (!cancelled && !attendanceTouchedRef.current) setAttendanceType('new');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [appt.patientId]);
 
   return (
     <Modal onClose={onClose} width={440}>
@@ -1462,6 +1456,31 @@ function CheckInModal({
             <DetailRow icon={<ClipboardList className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />} label={t('frontDesk.colComplaint')} value={appt.reason || '—'} />
             <DetailRow icon={<MapPin className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />} label={t('frontDesk.department')} value={appt.department || '—'} />
           </div>
+          {!alreadyIn && (
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                {t('frontDesk.visitType')}
+              </label>
+              <div className="flex gap-2">
+                {([['new', t('frontDesk.newVisit')], ['repeat', t('frontDesk.reAttendance')]] as const).map(([key, lbl]) => {
+                  const on = attendanceType === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => { attendanceTouchedRef.current = true; setAttendanceType(key); }}
+                      className="flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all"
+                      style={on
+                        ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
+                        : { background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                    >
+                      {lbl}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {alreadyIn && (
             <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: 'var(--accent-light)', border: '1px solid var(--border-light)' }}>
               <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
@@ -1494,7 +1513,7 @@ function CheckInModal({
             )}
             {!alreadyIn && (
               <button
-                onClick={async () => { setChecking(true); try { await onCheckIn(appt); } finally { setChecking(false); } }}
+                onClick={async () => { setChecking(true); try { await onCheckIn(appt, attendanceType); } finally { setChecking(false); } }}
                 disabled={checking}
                 className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
                 style={{ background: 'var(--color-success)' }}

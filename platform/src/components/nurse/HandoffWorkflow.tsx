@@ -12,7 +12,7 @@ import {
   FileText, BedDouble, AlertCircle, X, Printer, Pill, Check, ClipboardCheck, RotateCcw,
 } from '@/components/icons/lucide';
 import type { HandoffPatientEntry, ShiftHandoffDoc } from '@/lib/db-types';
-import { ACCENT, useMarEntries, useWardRoster } from './shared';
+import { useMarEntries, useWardRoster } from './shared';
 import { useHandoffs } from '@/lib/hooks/useHandoffs';
 import ListSearch from './ListSearch';
 
@@ -37,7 +37,8 @@ function deriveShift(hour: number): ShiftHandoffDoc['shift'] {
 export default function HandoffWorkflow({
   variant = 'page',
   onClose,
-}: { variant?: 'page' | 'modal'; onClose?: () => void }) {
+  onSigned,
+}: { variant?: 'page' | 'modal'; onClose?: () => void; onSigned?: () => void }) {
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
@@ -158,6 +159,7 @@ export default function HandoffWorkflow({
 
       setSignedDoc(doc);
       showToast(t('nurse.handoffSignedToast'), 'success');
+      onSigned?.();
       if (variant === 'modal') setTimeout(() => onClose?.(), 1600);
     } catch (err) {
       console.error('Failed to sign handoff:', err);
@@ -202,74 +204,69 @@ export default function HandoffWorkflow({
     ? new Date(signedDoc.signedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     : '';
 
-  // Real KPI strip — only counts we actually have.
+  // Real KPI strip — only counts we actually have. Colors are the design's
+  // semantic text tints (blue / danger / danger / warning).
   const stats = [
-    { icon: BedDouble, label: t('nurse.totalPatients'), value: totalPatients, color: '#2191D0', bg: 'rgba(37,99,235,0.12)' },
-    { icon: AlertCircle, label: t('nurse.criticalPatients'), value: criticalCount, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
-    { icon: Pill, label: t('nurse.medicationsOverdue'), value: overdueMarCount, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
-    { icon: Pill, label: t('nurse.medicationsDueNow'), value: dueMarCount, color: 'var(--color-warning)', bg: 'rgba(228,168,75,0.12)' },
+    { icon: BedDouble, label: t('nurse.totalPatients'), value: totalPatients, color: '#2191D0' },
+    { icon: AlertCircle, label: t('nurse.criticalPatients'), value: criticalCount, color: '#C24135' },
+    { icon: Pill, label: t('nurse.medicationsOverdue'), value: overdueMarCount, color: '#C24135' },
+    { icon: Pill, label: t('nurse.medicationsDueNow'), value: dueMarCount, color: '#B55E13' },
   ];
 
   // Previous-handoff read panel for the oncoming nurse.
   const previousPanel = (
-    <section className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-      <div className="flex items-center justify-between px-3 py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-        <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-            <ClipboardCheck className="w-3.5 h-3.5" style={{ color: ACCENT }} />
-          </span>
-          <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.previousHandoff')}</span>
+    <section className="ehr-handoff-section">
+      <div className="ehr-handoff-section-head">
+        <div>
+          <ClipboardCheck />
+          <h3>{t('nurse.previousHandoff')}</h3>
         </div>
         {latest && latest.status === 'acknowledged' && (
-          <span className="text-[8px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(27,158,119,0.12)', color: 'var(--color-success)' }}>
-            <Check className="w-3 h-3 inline" />
-          </span>
+          <b className="ehr-handoff-badge" data-tone="green" aria-label={t('nurse.acknowledgeHandoff')}>
+            <Check className="w-3 h-3" />
+          </b>
         )}
       </div>
-      <div className="p-2.5 space-y-2">
+      <div className="ehr-handoff-section-body">
         {!latest ? (
-          <p className="text-[11px] py-3 text-center" style={{ color: 'var(--text-muted)' }}>{t('nurse.noPreviousHandoff')}</p>
+          <p className="ehr-handoff-empty">{t('nurse.noPreviousHandoff')}</p>
         ) : (
           <>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="ehr-handoff-note">
               {t('nurse.handoffFromNurse', { name: latest.outgoingNurseName, shift: shiftLabel(latest.shift), date: latest.shiftDate })}
             </p>
             {latest.notes && (
-              <p className="text-[11px] whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{latest.notes}</p>
+              <p className="ehr-handoff-note whitespace-pre-wrap"><strong>{latest.notes}</strong></p>
             )}
-            {latest.patients.length > 0 && (
-              <div className="space-y-1.5">
-                {latest.patients.map(pt => (
-                  <div key={pt.patientId} className="p-2 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{pt.patientName}</span>
-                    {(pt.situation || pt.background || pt.assessment || pt.recommendation || pt.tasks?.length) ? (
-                      <ul className="mt-1 space-y-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        {pt.situation && <li><b>{t('nurse.sbarSituation')}:</b> {pt.situation}</li>}
-                        {pt.background && <li><b>{t('nurse.sbarBackground')}:</b> {pt.background}</li>}
-                        {pt.assessment && <li><b>{t('nurse.sbarAssessment')}:</b> {pt.assessment}</li>}
-                        {pt.recommendation && <li><b>{t('nurse.sbarRecommendation')}:</b> {pt.recommendation}</li>}
-                        {pt.tasks?.length ? <li><b>{t('nurse.sbarTasks')}:</b> {pt.tasks.join('; ')}</li> : null}
-                      </ul>
-                    ) : (
-                      <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('nurse.noHandoverDetail')}</p>
-                    )}
-                  </div>
-                ))}
+            {latest.patients.length > 0 && latest.patients.map(pt => (
+              <div key={pt.patientId} className="ehr-handoff-card">
+                <span className="ehr-handoff-name">{pt.patientName}</span>
+                {(pt.situation || pt.background || pt.assessment || pt.recommendation || pt.tasks?.length) ? (
+                  <ul className="ehr-handoff-sbar-list">
+                    {pt.situation && <li><b>{t('nurse.sbarSituation')}:</b> {pt.situation}</li>}
+                    {pt.background && <li><b>{t('nurse.sbarBackground')}:</b> {pt.background}</li>}
+                    {pt.assessment && <li><b>{t('nurse.sbarAssessment')}:</b> {pt.assessment}</li>}
+                    {pt.recommendation && <li><b>{t('nurse.sbarRecommendation')}:</b> {pt.recommendation}</li>}
+                    {pt.tasks?.length ? <li><b>{t('nurse.sbarTasks')}:</b> {pt.tasks.join('; ')}</li> : null}
+                  </ul>
+                ) : (
+                  <p className="ehr-handoff-note">{t('nurse.noHandoverDetail')}</p>
+                )}
               </div>
-            )}
+            ))}
             {latest.status === 'acknowledged' ? (
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-medium" style={{ color: 'var(--color-success)' }}>
+                <p className="ehr-handoff-note" style={{ color: '#167755', fontWeight: 700 }}>
                   {t('nurse.handoffAcknowledgedBy', {
                     name: latest.acknowledgedByName ?? '',
                     time: latest.acknowledgedAt ? new Date(latest.acknowledgedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
                   })}
                 </p>
                 <button
+                  type="button"
                   onClick={handleUnacknowledge}
                   disabled={acking}
-                  className="text-[10px] font-semibold inline-flex items-center gap-1 transition-opacity hover:opacity-80 flex-shrink-0"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="ehr-handoff-clear"
                   title={t('action.undo')}
                 >
                   <RotateCcw className="w-3 h-3" /> {t('action.undo')}
@@ -277,10 +274,11 @@ export default function HandoffWorkflow({
               </div>
             ) : (
               <button
+                type="button"
                 onClick={handleAcknowledge}
                 disabled={acking}
-                className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-white transition-all"
-                style={{ background: acking ? 'var(--text-muted)' : ACCENT }}
+                className="ehr-handoff-btn primary"
+                style={{ width: '100%' }}
               >
                 {t('nurse.acknowledgeHandoff')}
               </button>
@@ -292,20 +290,14 @@ export default function HandoffWorkflow({
   );
 
   const body = (
-    <div className="p-4 space-y-3 print-handoff flex-1 min-h-0 overflow-y-auto">
+    <div className="ehr-handoff-body print-handoff">
       {/* KPI strip — real counts only */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <div className="ehr-handoff-stats">
         {stats.map(s => (
-          <div
-            key={s.label}
-            className="rounded-2xl px-4 py-2.5 flex items-center gap-3 transition-shadow hover:shadow-md"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
-          >
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
-              <s.icon className="w-4 h-4" style={{ color: s.color }} />
-            </span>
-            <span className="text-[11px] font-medium leading-snug flex-1 min-w-0" style={{ color: 'var(--text-secondary)' }}>{s.label}</span>
-            <span className="text-2xl font-extrabold tabular-nums leading-none flex-shrink-0" style={{ color: s.color }}>{s.value}</span>
+          <div key={s.label} className="ehr-handoff-stat">
+            <s.icon style={{ color: s.color }} />
+            <span>{s.label}</span>
+            <b style={{ color: s.color }}>{s.value}</b>
           </div>
         ))}
       </div>
@@ -314,173 +306,150 @@ export default function HandoffWorkflow({
       {previousPanel}
 
       {/* Critical patients with per-patient SBAR editor */}
-      <section className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-        <div className="flex items-center justify-between px-3 py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-              <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
-            </span>
-            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.patientHandover')}</span>
+      <section className="ehr-handoff-section">
+        <div className="ehr-handoff-section-head">
+          <div>
+            <AlertCircle style={{ color: '#C24135' }} />
+            <h3>{t('nurse.patientHandover')}</h3>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>
-            {criticalCount}
-          </span>
+          <b className="ehr-handoff-badge" data-tone={criticalCount > 0 ? 'red' : undefined}>{criticalCount}</b>
         </div>
         {criticalPatients.length > 0 && (
-          <div className="px-3 py-2.5 flex items-center" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <div className="ehr-handoff-section-head" style={{ minHeight: 0, padding: '8px 12px' }}>
             <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
           </div>
         )}
-        <div className="p-2.5 space-y-2.5">
+        <div className="ehr-handoff-section-body">
           {filteredCritical.length > 0 ? (
             filteredCritical.map(p => {
               const d = sbar[p._id] ?? EMPTY_SBAR;
-              const inputStyle = { background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' } as const;
               // Surface the latest triage pain score / GCS read-only so the
               // oncoming nurse sees a critical patient's key neuro/pain status
               // at a glance — informational, not part of handoff persistence.
               const tri = patientTriageMap.get(p._id);
-              const chipStyle = { background: 'rgba(239,68,68,0.10)', color: 'var(--color-danger)' } as const;
               return (
-                <div key={p._id} className="p-2.5 rounded-xl space-y-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <div key={p._id} className="ehr-handoff-card">
+                  <div className="ehr-handoff-card-head">
+                    <div>
                       {p._demo ? (
-                        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+                        <span className="ehr-handoff-name">{patientFullName(p)}</span>
                       ) : (
                         <button
+                          type="button"
                           onClick={() => router.push(`/patients/${p._id}`)}
-                          className="text-[11px] font-semibold text-left hover:underline"
-                          style={{ color: 'var(--text-primary)' }}
+                          className="ehr-handoff-name"
                           title={t('nurse.viewPatientRecord')}
                         >
                           {patientFullName(p)}
                         </button>
                       )}
                       {tri?.painScore && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={chipStyle}>
-                          {t('nurse.painScore')} {tri.painScore}
-                        </span>
+                        <span className="ehr-handoff-chip">{t('nurse.painScore')} {tri.painScore}</span>
                       )}
                       {tri?.gcs && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={chipStyle}>
-                          {t('nurse.gcs')} {tri.gcs}
-                        </span>
+                        <span className="ehr-handoff-chip">{t('nurse.gcs')} {tri.gcs}</span>
                       )}
                     </div>
                     {sbarHasContent(sbar[p._id]) && (
                       <button
+                        type="button"
                         onClick={() => clearSbar(p._id)}
-                        className="text-[10px] font-semibold inline-flex items-center gap-1 transition-opacity hover:opacity-80"
-                        style={{ color: 'var(--text-muted)' }}
+                        className="ehr-handoff-clear"
                         title={t('action.clear')}
                       >
                         <X className="w-3 h-3" /> {t('action.clear')}
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <input value={d.situation} onChange={e => updateSbar(p._id, 'situation', e.target.value)} placeholder={t('nurse.sbarSituation')} className="w-full px-2.5 py-1.5 rounded-lg text-xs" style={inputStyle} />
-                    <input value={d.background} onChange={e => updateSbar(p._id, 'background', e.target.value)} placeholder={t('nurse.sbarBackground')} className="w-full px-2.5 py-1.5 rounded-lg text-xs" style={inputStyle} />
-                    <input value={d.assessment} onChange={e => updateSbar(p._id, 'assessment', e.target.value)} placeholder={t('nurse.sbarAssessment')} className="w-full px-2.5 py-1.5 rounded-lg text-xs" style={inputStyle} />
-                    <input value={d.recommendation} onChange={e => updateSbar(p._id, 'recommendation', e.target.value)} placeholder={t('nurse.sbarRecommendation')} className="w-full px-2.5 py-1.5 rounded-lg text-xs" style={inputStyle} />
+                  <div className="ehr-handoff-grid">
+                    <input value={d.situation} onChange={e => updateSbar(p._id, 'situation', e.target.value)} placeholder={t('nurse.sbarSituation')} className="ehr-handoff-input" />
+                    <input value={d.background} onChange={e => updateSbar(p._id, 'background', e.target.value)} placeholder={t('nurse.sbarBackground')} className="ehr-handoff-input" />
+                    <input value={d.assessment} onChange={e => updateSbar(p._id, 'assessment', e.target.value)} placeholder={t('nurse.sbarAssessment')} className="ehr-handoff-input" />
+                    <input value={d.recommendation} onChange={e => updateSbar(p._id, 'recommendation', e.target.value)} placeholder={t('nurse.sbarRecommendation')} className="ehr-handoff-input" />
                   </div>
-                  <textarea rows={2} value={d.tasks} onChange={e => updateSbar(p._id, 'tasks', e.target.value)} placeholder={t('nurse.sbarTasksPlaceholder')} className="w-full px-2.5 py-1.5 rounded-lg text-xs" style={inputStyle} />
+                  <textarea rows={2} value={d.tasks} onChange={e => updateSbar(p._id, 'tasks', e.target.value)} placeholder={t('nurse.sbarTasksPlaceholder')} className="ehr-handoff-input" />
                 </div>
               );
             })
           ) : (
-            <p className="text-[11px] py-4 text-center" style={{ color: 'var(--text-muted)' }}>{t('nurse.noCriticalPatients')}</p>
+            <p className="ehr-handoff-empty">{t('nurse.noCriticalPatients')}</p>
           )}
         </div>
       </section>
 
       {/* Shift-wide notes */}
-      <section className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-        <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-          <span className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-            <FileText className="w-3.5 h-3.5" style={{ color: ACCENT }} />
-          </span>
-          <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.notesOutgoingNurse')}</span>
+      <section className="ehr-handoff-section">
+        <div className="ehr-handoff-section-head">
+          <div>
+            <FileText />
+            <h3>{t('nurse.notesOutgoingNurse')}</h3>
+          </div>
         </div>
-        <div className="p-2.5">
+        <div className="ehr-handoff-section-body">
           <textarea
             rows={4}
             placeholder={t('nurse.handoffNotesPlaceholder')}
             value={handoffNotes}
             onChange={e => setHandoffNotes(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl text-sm"
-            style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+            className="ehr-handoff-input"
+            style={{ marginTop: 0 }}
           />
         </div>
       </section>
 
       {/* Sign-off */}
-      <div className="rounded-2xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-        {signedDoc ? (
-          <div className="flex items-center justify-center gap-2 py-1">
-            <span className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'transparent' }}>
-              <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
-            </span>
-            <span className="text-xs font-semibold" style={{ color: 'var(--color-success)' }}>
-              {t('nurse.handoffSignedBy', { name: signedDoc.outgoingNurseName, time: signedTime })}
-            </span>
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row sm:items-end gap-2">
-            <div className="flex-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                {t('nurse.incomingNurse')}
-              </label>
-              <input
-                type="text"
-                value={incomingNurse}
-                onChange={e => setIncomingNurse(e.target.value)}
-                placeholder={t('nurse.incomingNursePlaceholder')}
-                className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-              />
+      <section className="ehr-handoff-section">
+        <div className="ehr-handoff-section-body">
+          {signedDoc ? (
+            <div className="ehr-handoff-signed">
+              <Check /> {t('nurse.handoffSignedBy', { name: signedDoc.outgoingNurseName, time: signedTime })}
             </div>
-            <button
-              onClick={handleSignOff}
-              disabled={signing}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all flex-shrink-0"
-              style={{ background: signing ? 'var(--text-muted)' : ACCENT }}
-            >
-              {signing ? t('nurse.signingOff') : t('nurse.signOffComplete')}
-            </button>
-          </div>
-        )}
-        <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
-          {t('nurse.generatedBy', { name: currentUser.name, time: nowTime })} · {shiftLabel(shift)}
-        </p>
-      </div>
+          ) : (
+            <div className="ehr-handoff-signoff">
+              <div>
+                <label className="ehr-handoff-label">{t('nurse.incomingNurse')}</label>
+                <input
+                  type="text"
+                  value={incomingNurse}
+                  onChange={e => setIncomingNurse(e.target.value)}
+                  placeholder={t('nurse.incomingNursePlaceholder')}
+                  className="ehr-handoff-input"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSignOff}
+                disabled={signing}
+                className="ehr-handoff-btn primary"
+              >
+                {signing ? t('nurse.signingOff') : t('nurse.signOffComplete')}
+              </button>
+            </div>
+          )}
+          <p className="ehr-handoff-meta">
+            {t('nurse.generatedBy', { name: currentUser.name, time: nowTime })} · {shiftLabel(shift)}
+          </p>
+        </div>
+      </section>
     </div>
   );
 
   const header = (
-    <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-      <div className="flex items-center gap-2.5">
-        <span className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-          <FileText className="w-4 h-4" style={{ color: ACCENT }} />
-        </span>
+    <div className="ehr-handoff-head">
+      <div className="ehr-handoff-head-title">
+        <FileText />
         <div>
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.shiftHandoffReport')}</h2>
-          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{todayDate} · {currentUser.name}</p>
+          <h2>{t('nurse.shiftHandoffReport')}</h2>
+          <p>{todayDate} · {currentUser.name}</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
-          style={{ background: 'var(--accent-light)', color: ACCENT, border: '1px solid var(--accent-border)' }}
-        >
-          <Printer className="w-3 h-3" />
-          {t('action.print')}
+      <div className="ehr-handoff-head-actions">
+        <button type="button" onClick={() => window.print()} className="ehr-handoff-btn sm">
+          <Printer /> {t('action.print')}
         </button>
         {variant === 'modal' && (
-          <button onClick={() => onClose?.()} className="p-1.5 rounded-lg transition-all" style={{ background: 'var(--overlay-subtle)' }}>
-            <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          <button type="button" onClick={() => onClose?.()} className="ehr-handoff-close" aria-label={t('action.close')}>
+            <X className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -490,10 +459,7 @@ export default function HandoffWorkflow({
   if (variant === 'modal') {
     return (
       <Modal onClose={() => onClose?.()} width={768}>
-        <div
-          className="modal-content card-elevated flex flex-col"
-          style={{ width: '100%', maxHeight: '90vh' }}
-        >
+        <div className="ehr-handoff-modal" role="dialog" aria-modal="true" aria-label={t('nurse.shiftHandoffReport')}>
           {header}
           {body}
         </div>
@@ -503,7 +469,7 @@ export default function HandoffWorkflow({
 
   // variant === 'page'
   return (
-    <div className="dash-card overflow-hidden flex flex-col" style={{ padding: 0, flex: 1, minHeight: 0 }}>
+    <div className="ehr-handoff-modal" style={{ flex: 1, minHeight: 0, maxHeight: 'none', border: '1px solid var(--ehr-border)' }}>
       {header}
       {body}
     </div>

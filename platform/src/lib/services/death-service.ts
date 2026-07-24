@@ -7,7 +7,7 @@ import { updatePatient } from './patient-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { findByType } from './db-query';
-import { jubaYearMonth, jubaIsInMonth } from '../time-juba';
+import { jubaYearMonth, jubaIsInMonth, isInRange } from '../time-juba';
 
 export async function getAllDeaths(scope?: DataScope): Promise<DeathRegistrationDoc[]> {
   const db = deathsDB();
@@ -110,8 +110,18 @@ export async function deleteDeath(id: string): Promise<boolean> {
   }
 }
 
-export async function getDeathStats(scope?: DataScope) {
-  const all = await getAllDeaths(scope);
+/**
+ * @param range Optional half-open [from, to) ISO instant range to bound the
+ *   stats to a reporting period (e.g. a DHIS2 export month), filtered on the
+ *   death's own `dateOfDeath`. Omit for the existing all-time behavior —
+ *   added additively so this call stays backward-compatible for callers that
+ *   want the lifetime total (e.g. dashboards).
+ */
+export async function getDeathStats(scope?: DataScope, range?: { from: string; to: string }) {
+  let all = await getAllDeaths(scope);
+  if (range) {
+    all = all.filter(d => isInRange(d.dateOfDeath, range));
+  }
   const thisYear = new Date().getFullYear().toString();
   const thisMonth = jubaYearMonth();
   const maternalDeaths = all.filter(d => d.maternalDeath);

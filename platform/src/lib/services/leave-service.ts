@@ -82,6 +82,13 @@ export async function decideLeave(
   const db = leaveRequestsDB();
   try {
     const existing = await db.get(id) as LeaveRequestDoc;
+    // Segregation of duties: nobody decides their own leave, whatever their
+    // role. (Role-based authorization is client-enforced platform-wide — the
+    // offline write path has no server chokepoint — but self-approval is a
+    // data-level invariant we can hold here.)
+    if (existing.userId === decision.decidedBy) {
+      throw new Error('A leave request cannot be decided by its requester');
+    }
     const now = new Date().toISOString();
     existing.status = decision.status;
     existing.decidedAt = now;

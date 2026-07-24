@@ -20,7 +20,7 @@ import type { AppointmentDoc, TriageDoc } from '@/lib/db-types';
 export const PRIORITY_META: Record<'RED' | 'YELLOW' | 'GREEN', { label: string; tone: string }> = {
   RED: { label: 'Emergency', tone: 'red' },
   YELLOW: { label: 'Urgent', tone: 'yellow' },
-  GREEN: { label: 'Not urgent', tone: 'green' },
+  GREEN: { label: 'Routine', tone: 'green' },
 };
 
 export function waitLabel(minutes: number): string {

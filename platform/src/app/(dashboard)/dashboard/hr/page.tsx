@@ -6,9 +6,12 @@ import { Users, Plus, Clock, Calendar, Activity, Wallet } from '@/components/ico
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
+import { useToast } from '@/components/Toast';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
-import EhrDayStatsChart, { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
+import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
+import { useCapabilities } from '@/lib/hooks/useCapabilities';
+import RowActionsMenu from '@/components/RowActionsMenu';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 import type { StaffScheduleDoc } from '@/lib/db-types';
 
@@ -24,11 +27,18 @@ function formatClockTimeOrUndefined(iso?: string): string | undefined {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? undefined : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
+function titleCase(value: string): string {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 export default function HRDashboardPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const { currentUser } = useApp();
   const { users } = useUsers();
+  const { showToast } = useToast();
+  // Same approver role list as the full HR page's leave tab — who can act on
+  // a pending leave request from this dashboard's queue.
+  const isApprover = !!currentUser?.role && ['org_admin', 'medical_superintendent', 'hospital_manager', 'super_admin'].includes(currentUser.role);
   const [leave, setLeave] = useState<LeaveRequestDoc[]>([]);
   const [schedules, setSchedules] = useState<StaffScheduleDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,8 +127,34 @@ export default function HRDashboardPage() {
         (r.leaveType || '').toLowerCase().includes(query))
     : pendingLeave;
 
+  // Approve/reject a pending leave request directly from the dashboard queue.
+  // Mirrors the full HR page's `decideLeave` (src/app/(dashboard)/hr/page.tsx)
+  // so this dashboard can act on the queue it surfaces, not just link out to it.
+  const decideLeaveAction = async (id: string, status: 'approved' | 'rejected') => {
+    if (!currentUser) return;
+    try {
+      const { decideLeave } = await import('@/lib/services/leave-service');
+      const decidedAt = new Date().toISOString();
+      await decideLeave(id, {
+        status,
+        decidedBy: currentUser._id,
+        decidedByName: currentUser.name,
+      });
+      setLeave(prev => prev.map(l => l._id === id
+        ? { ...l, status, decidedAt, decidedBy: currentUser._id, decidedByName: currentUser.name }
+        : l));
+      showToast(status === 'approved' ? t('hr.leaveApproved') : t('hr.leaveRejected'), 'success');
+      setSelectedLeave(null);
+      markCapability('hr.leave-decision');
+    } catch (err) {
+      console.error('Failed to decide leave request', err);
+      showToast(status === 'approved' ? t('hr.leaveApproveFailed') : t('hr.leaveRejectFailed'), 'error');
+    }
+  };
+
   // Expandable per-row detail (leave window, role, reason) shown inline beneath
   // the row via EhrCareDashboard's `row.detail` slot, gated on the selected row.
+  // Approvers get an inline approve/reject action for pending requests.
   const renderLeaveDetail = (r: LeaveRequestDoc) => (
     <div style={{ margin: '0 0 8px', padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
       <div className="flex items-center justify-between mb-1">
@@ -127,8 +163,32 @@ export default function HRDashboardPage() {
       </div>
       <p className="text-[11px] capitalize" style={{ color: 'var(--text-secondary)' }}>{r.role.replace(/_/g, ' ')}</p>
       {r.reason && <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>“{r.reason}”</p>}
+      {isApprover && r.status === 'pending' && (
+        <div className="flex items-center justify-end mt-2">
+          <RowActionsMenu
+            actions={[
+              { key: 'approve', label: t('hr.approve'), tone: 'success', onClick: () => decideLeaveAction(r._id, 'approved') },
+              { key: 'reject', label: t('hr.reject'), tone: 'danger', onClick: () => decideLeaveAction(r._id, 'rejected') },
+            ]}
+          />
+        </div>
+      )}
     </div>
   );
+
+  // Capabilities card — `hr.leave-decision` latches from a real decision made
+  // in decideLeaveAction above, plus a live signal (this user's id already on
+  // a decided request) so a decision made in an earlier session still counts.
+  // `hr.schedule` / `hr.payroll` have no in-page completion action on this
+  // dashboard (schedule publishing and payroll runs happen on the full HR
+  // page) — they stay unchecked-until-done, linked to the same routes the
+  // metrics-rail shortcuts below already use.
+  const capabilityItems = useMemo(() => ([
+    { key: 'hr.leave-decision', label: 'Decide a leave request', signal: leave.some(l => l.decidedBy === currentUser?._id) },
+    { key: 'hr.schedule', label: 'Publish a staff schedule', href: '/hr?tab=schedule' },
+    { key: 'hr.payroll', label: 'Run a payroll register', href: '/hr?tab=payroll' },
+  ]), [leave, currentUser?._id]);
+  const { checklist: capabilitiesChecklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
   if (loading) {
     return (
@@ -162,7 +222,7 @@ export default function HRDashboardPage() {
           { label: t('hr.newLeaveRequest'), icon: Plus, onClick: () => router.push('/hr?tab=leave'), tone: 'primary' },
         ]}
         chart={(
-          <EhrDayStatsChart
+          <EhrWeekActivityChart
             items={hrChartItems}
             seriesNames={['Pending', 'Approved']}
             selectedDate={todayIso}
@@ -171,12 +231,19 @@ export default function HRDashboardPage() {
         )}
         rows={filteredPending.map((r): EhrCareDashboardRow => {
           const isOpen = selectedLeave === r._id;
+          const time = formatClockTimeOrUndefined(r.requestedAt);
           return {
             id: r._id,
             title: r.userName,
             subtitle: `${r.leaveType} · ${r.days}d · ${r.startDate} → ${r.endDate}`,
             compactMeta: `${r.days}d`,
-            status: r.leaveType,
+            time,
+            careTeam: r.role ? titleCase(r.role) : undefined,
+            careTeamLabel: 'Role',
+            location: r.facilityName,
+            locationLabel: 'Facility',
+            status: r.status,
+            statusLabel: titleCase(r.leaveType),
             statusTone: 'warning',
             onClick: () => setSelectedLeave(isOpen ? null : r._id),
             detail: isOpen ? renderLeaveDetail(r) : undefined,
@@ -193,7 +260,8 @@ export default function HRDashboardPage() {
           { label: t('hr.scheduleShifts'), icon: Calendar, onClick: () => router.push('/hr?tab=schedule') },
           { label: t('hr.payrollRegister'), icon: Wallet, onClick: () => router.push('/hr?tab=payroll') },
         ]}
-        checklist={[]}
+        checklist={capabilitiesChecklist}
+        checklistTitle="Capabilities"
         emptyTitle={t('hr.noPendingLeave')}
         emptyActionLabel={t('hr.viewAll')}
         onEmptyAction={() => router.push('/hr?tab=leave')}

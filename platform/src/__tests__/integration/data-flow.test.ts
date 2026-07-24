@@ -427,6 +427,12 @@ describe('Integration: data-flow', () => {
       deathRegistered: true,
     });
 
+    // generateDHIS2Export now filters every element to its source doc's own
+    // event timestamp falling inside the requested period
+    // (docs/EMR-FIELD-AUDIT-2026-07.md §4) — so the lab/immunization event
+    // dates below must land in the same "current month" period the
+    // assertions request, same as the birth/death dates above already do
+    // via `today`.
     await createLabResult({
       patientId: 'pat-export',
       patientName: 'Export Patient',
@@ -440,8 +446,8 @@ describe('Integration: data-flow', () => {
       abnormal: false,
       critical: false,
       orderedBy: 'Dr. Test',
-      orderedAt: '2025-01-01T00:00:00Z',
-      completedAt: '2025-01-01T12:00:00Z',
+      orderedAt: `${today}T00:00:00Z`,
+      completedAt: `${today}T12:00:00Z`,
     });
 
     await createImmunization({
@@ -451,7 +457,7 @@ describe('Integration: data-flow', () => {
       dateOfBirth: '2024-01-01',
       vaccine: 'BCG',
       doseNumber: 1,
-      dateGiven: '2024-01-15',
+      dateGiven: `${today}T00:00:00Z`,
       nextDueDate: '2024-03-15',
       facilityId: 'hosp-001',
       facilityName: 'Test Hospital',

@@ -41,13 +41,18 @@ jest.mock('@/lib/services/data-quality-service', () => ({
 }));
 
 import { teardownTestDBs, putDoc } from '../helpers/test-db';
-import { generateDHIS2Export, exportToJSON, exportToCSV } from '@/lib/services/dhis2-export-service';
+import { generateDHIS2Export, exportToJSON, exportToCSV, periodToRange } from '@/lib/services/dhis2-export-service';
 
 afterEach(async () => {
   await teardownTestDBs();
   uuidCounter = 0;
   jest.clearAllMocks();
 });
+
+// Test period used throughout is '202601' (January 2026). An instant safely
+// inside that period's Africa/Juba window, for docs that need an event
+// timestamp to survive the export's period filter.
+const IN_PERIOD = '2026-01-15T12:00:00.000Z';
 
 // Helper to create sample documents
 function createHospital(id: string, overrides: Record<string, unknown> = {}) {
@@ -69,6 +74,7 @@ function createDiseaseAlert(id: string, overrides: Record<string, unknown> = {})
     type: 'disease_alert',
     disease: 'Malaria',
     alertLevel: 'warning' as const,
+    reportDate: IN_PERIOD,
     ...overrides,
   };
 }
@@ -79,6 +85,7 @@ function createLabResult(id: string, overrides: Record<string, unknown> = {}) {
     type: 'lab_result',
     status: 'completed' as const,
     critical: false,
+    orderedAt: IN_PERIOD,
     ...overrides,
   };
 }
@@ -88,6 +95,7 @@ function createPrescription(id: string, overrides: Record<string, unknown> = {})
     _id: id,
     type: 'prescription',
     status: 'dispensed' as const,
+    createdAt: IN_PERIOD,
     ...overrides,
   };
 }
@@ -100,6 +108,7 @@ function createImmunization(id: string, overrides: Record<string, unknown> = {})
     vaccine: 'BCG',
     doseNumber: 1,
     status: 'completed' as const,
+    dateGiven: IN_PERIOD,
     ...overrides,
   };
 }
@@ -110,6 +119,39 @@ function createANCVisit(id: string, overrides: Record<string, unknown> = {}) {
     type: 'anc_visit',
     motherId: 'mother-001',
     riskLevel: 'normal' as const,
+    visitDate: IN_PERIOD,
+    ...overrides,
+  };
+}
+
+function createEncounter(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    _id: id,
+    type: 'clinical_encounter',
+    patientId: 'pat-001',
+    patientName: 'Test Patient',
+    clinicianId: '',
+    clinicianName: '',
+    hospitalId: 'hosp-001',
+    status: 'with_clinician',
+    stageKey: 'clinician',
+    snapshot: {},
+    labOrderIds: [],
+    startedAt: IN_PERIOD,
+    createdAt: IN_PERIOD,
+    updatedAt: IN_PERIOD,
+    ...overrides,
+  };
+}
+
+function createPatient(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    _id: id,
+    type: 'patient',
+    firstName: 'Test',
+    surname: 'Patient',
+    gender: 'Male' as const,
+    dateOfBirth: '2020-01-01',
     ...overrides,
   };
 }
@@ -191,9 +233,29 @@ describe('dhis2-export-service', () => {
     expect(elements).toContain('IMM_PENTA3_COMPLETED');
     expect(elements).toContain('IMM_MEASLES1_COMPLETED');
     expect(elements).toContain('IMM_DEFAULTERS');
-    expect(elements).toContain('IMM_BCG_COVERAGE');
-    expect(elements).toContain('IMM_PENTA3_COVERAGE');
-    expect(elements).toContain('IMM_MEASLES1_COVERAGE');
+  });
+
+  // IMM_*_COVERAGE elements were removed — they divided doses by "unique
+  // children seen in this dataset" rather than a population/census
+  // denominator, which is not a valid coverage rate
+  // (docs/EMR-FIELD-AUDIT-2026-07.md §4 honesty fix).
+  test('generateDHIS2Export no longer emits uninterpretable immunization coverage percentages', async () => {
+    const dataset = await generateDHIS2Export('202601');
+
+    const elements = dataset.dataValues.map(v => v.dataElement);
+    expect(elements).not.toContain('IMM_BCG_COVERAGE');
+    expect(elements).not.toContain('IMM_PENTA3_COVERAGE');
+    expect(elements).not.toContain('IMM_MEASLES1_COVERAGE');
+  });
+
+  test('generateDHIS2Export includes OPD attendance indicators', async () => {
+    const dataset = await generateDHIS2Export('202601');
+
+    const elements = dataset.dataValues.map(v => v.dataElement);
+    expect(elements).toContain('OPD_ATTENDANCE_TOTAL');
+    expect(elements).toContain('OPD_ATTENDANCE_NEW');
+    expect(elements).toContain('OPD_ATTENDANCE_REPEAT');
+    expect(elements).toContain('OPD_ATTENDANCE_BY_CATEGORY');
   });
 
   test('generateDHIS2Export includes ANC indicators', async () => {
@@ -411,11 +473,9 @@ describe('dhis2-export-service', () => {
 
     const immChildren = dataset.dataValues.find(e => e.dataElement === 'IMM_CHILDREN_TOTAL');
     const bcgCompleted = dataset.dataValues.find(e => e.dataElement === 'IMM_BCG_COMPLETED');
-    const bcgCoverage = dataset.dataValues.find(e => e.dataElement === 'IMM_BCG_COVERAGE');
 
     expect(immChildren!.value).toBe('2');
     expect(bcgCompleted!.value).toBe('2');
-    expect(bcgCoverage!.value).toBe('100'); // 2/2 * 100
   });
 
   test('generateDHIS2Export calculates ANC visit aggregates', async () => {
@@ -459,14 +519,14 @@ describe('dhis2-export-service', () => {
     const deathService = require('@/lib/services/death-service');
 
     birthService.getAllBirths.mockResolvedValueOnce([
-      { _id: 'birth-001', facilityId: 'hosp-001' },
-      { _id: 'birth-002', facilityId: 'hosp-001' },
-      { _id: 'birth-003', facilityId: 'hosp-002' },
+      { _id: 'birth-001', facilityId: 'hosp-001', dateOfBirth: IN_PERIOD },
+      { _id: 'birth-002', facilityId: 'hosp-001', dateOfBirth: IN_PERIOD },
+      { _id: 'birth-003', facilityId: 'hosp-002', dateOfBirth: IN_PERIOD },
     ]);
 
     deathService.getAllDeaths.mockResolvedValueOnce([
-      { _id: 'death-001', facilityId: 'hosp-001' },
-      { _id: 'death-002', facilityId: 'hosp-002' },
+      { _id: 'death-001', facilityId: 'hosp-001', dateOfDeath: IN_PERIOD },
+      { _id: 'death-002', facilityId: 'hosp-002', dateOfDeath: IN_PERIOD },
     ]);
 
     const hdb = hospitalsDB();
@@ -506,5 +566,165 @@ describe('dhis2-export-service', () => {
     expect(parsed.orgUnit).toBe('SS');
     expect(parsed.dataValues).toBeInstanceOf(Array);
     expect(parsed.dataValues.every((dv: { dataElement?: unknown; category?: unknown; value?: unknown }) => dv.dataElement && dv.category && dv.value !== undefined)).toBe(true);
+  });
+
+  // ── Period + scope filtering (docs/EMR-FIELD-AUDIT-2026-07.md §4) ──
+  describe('period and scope filtering', () => {
+    test('excludes a lab result ordered one instant before the period, includes one at the exact boundary', async () => {
+      const { labResultsDB } = require('@/lib/db');
+      const ldb = labResultsDB();
+      const { from } = periodToRange('202601', 'monthly');
+      const justBefore = new Date(new Date(from).getTime() - 1).toISOString();
+
+      await putDoc(ldb, createLabResult('lab-before', { orderedAt: justBefore }));
+      await putDoc(ldb, createLabResult('lab-at-start', { orderedAt: from }));
+
+      const dataset = await generateDHIS2Export('202601');
+      const total = dataset.dataValues.find(e => e.dataElement === 'LAB_TESTS_TOTAL');
+
+      expect(total!.value).toBe('1'); // only lab-at-start is in [from, to)
+    });
+
+    test('excludes a lab result ordered at the exact end boundary (half-open range)', async () => {
+      const { labResultsDB } = require('@/lib/db');
+      const ldb = labResultsDB();
+      const { to } = periodToRange('202601', 'monthly');
+
+      await putDoc(ldb, createLabResult('lab-at-end', { orderedAt: to }));
+      await putDoc(ldb, createLabResult('lab-inside', { orderedAt: new Date(new Date(to).getTime() - 1).toISOString() }));
+
+      const dataset = await generateDHIS2Export('202601');
+      const total = dataset.dataValues.find(e => e.dataElement === 'LAB_TESTS_TOTAL');
+
+      expect(total!.value).toBe('1'); // only lab-inside is < to
+    });
+
+    test('excludes prescriptions and immunizations from outside the requested month', async () => {
+      const { prescriptionsDB, immunizationsDB } = require('@/lib/db');
+      const rxdb = prescriptionsDB();
+      const immdb = immunizationsDB();
+
+      await putDoc(rxdb, createPrescription('rx-out-of-period', { createdAt: '2026-02-01T00:00:00.000Z' }));
+      await putDoc(rxdb, createPrescription('rx-in-period', {}));
+      await putDoc(immdb, createImmunization('imm-out-of-period', { dateGiven: '2025-12-31T00:00:00.000Z' }));
+      await putDoc(immdb, createImmunization('imm-in-period', {}));
+
+      const dataset = await generateDHIS2Export('202601');
+      const rxTotal = dataset.dataValues.find(e => e.dataElement === 'PRESCRIPTIONS_TOTAL');
+      const immChildren = dataset.dataValues.find(e => e.dataElement === 'IMM_CHILDREN_TOTAL');
+
+      expect(rxTotal!.value).toBe('1');
+      expect(immChildren!.value).toBe('1');
+    });
+
+    test('scopes lab results to the requesting facility only', async () => {
+      const { labResultsDB } = require('@/lib/db');
+      const ldb = labResultsDB();
+
+      await putDoc(ldb, createLabResult('lab-hosp-001', { hospitalId: 'hosp-001', orgId: 'org-1' }));
+      await putDoc(ldb, createLabResult('lab-hosp-002', { hospitalId: 'hosp-002', orgId: 'org-1' }));
+
+      const dataset = await generateDHIS2Export('202601', { role: 'medical_superintendent', hospitalId: 'hosp-001', orgId: 'org-1' });
+      const total = dataset.dataValues.find(e => e.dataElement === 'LAB_TESTS_TOTAL');
+
+      expect(total!.value).toBe('1'); // hosp-002's result must not leak into hosp-001's export
+    });
+
+    test('scopes hospital stock counts (beds) to the requesting facility only', async () => {
+      const { hospitalsDB } = require('@/lib/db');
+      const hdb = hospitalsDB();
+
+      await putDoc(hdb, createHospital('hosp-001', { totalBeds: 40, orgId: 'org-1' }));
+      await putDoc(hdb, createHospital('hosp-002', { totalBeds: 90, orgId: 'org-1' }));
+
+      const dataset = await generateDHIS2Export('202601', { role: 'medical_superintendent', hospitalId: 'hosp-001', orgId: 'org-1' });
+      const beds = dataset.dataValues.find(e => e.dataElement === 'TOTAL_BEDS');
+      const facilityRows = dataset.dataValues.filter(e => e.dataElement === 'FACILITY_BIRTHS');
+
+      expect(beds!.value).toBe('40'); // hosp-002's 90 beds must not be summed in
+      expect(facilityRows).toHaveLength(1); // only the scoped facility's row is emitted
+      expect(facilityRows[0].orgUnit).toBe('hosp-001');
+    });
+  });
+
+  // ── OPD attendance (new indicator) ──
+  describe('OPD attendance', () => {
+    test('splits attendance into new vs repeat and leaves the total unsplit-inclusive', async () => {
+      const { encountersDB } = require('@/lib/db');
+      const edb = encountersDB();
+
+      await putDoc(edb, createEncounter('enc-new-1', { attendanceType: 'new' }));
+      await putDoc(edb, createEncounter('enc-new-2', { attendanceType: 'new' }));
+      await putDoc(edb, createEncounter('enc-repeat-1', { attendanceType: 'repeat' }));
+
+      const dataset = await generateDHIS2Export('202601');
+      const total = dataset.dataValues.find(e => e.dataElement === 'OPD_ATTENDANCE_TOTAL');
+      const newAtt = dataset.dataValues.find(e => e.dataElement === 'OPD_ATTENDANCE_NEW');
+      const repeatAtt = dataset.dataValues.find(e => e.dataElement === 'OPD_ATTENDANCE_REPEAT');
+
+      expect(total!.value).toBe('3');
+      expect(newAtt!.value).toBe('2');
+      expect(repeatAtt!.value).toBe('1');
+    });
+
+    test('excludes an encounter that started outside the requested period', async () => {
+      const { encountersDB } = require('@/lib/db');
+      const edb = encountersDB();
+
+      await putDoc(edb, createEncounter('enc-old', { startedAt: '2025-11-01T00:00:00.000Z', attendanceType: 'new' }));
+      await putDoc(edb, createEncounter('enc-current', { attendanceType: 'new' }));
+
+      const dataset = await generateDHIS2Export('202601');
+      const total = dataset.dataValues.find(e => e.dataElement === 'OPD_ATTENDANCE_TOTAL');
+
+      expect(total!.value).toBe('1');
+    });
+
+    test('joins age band + sex from the patient for a known patient', async () => {
+      const { encountersDB, patientsDB } = require('@/lib/db');
+      const edb = encountersDB();
+      const pdb = patientsDB();
+
+      await putDoc(pdb, createPatient('pat-child', { gender: 'Female', dateOfBirth: '2024-01-01' })); // 2 years old at IN_PERIOD
+      await putDoc(edb, createEncounter('enc-child', { patientId: 'pat-child' }));
+
+      const dataset = await generateDHIS2Export('202601');
+      const combos = dataset.dataValues.filter(e => e.dataElement === 'OPD_ATTENDANCE_BY_CATEGORY');
+      const under5Female = combos.find(c => c.category === 'under5-female');
+
+      expect(under5Female!.value).toBe('1');
+    });
+
+    test('counts an encounter whose patient cannot be joined under the explicit unknown-age combo, never guessing a band', async () => {
+      const { encountersDB } = require('@/lib/db');
+      const edb = encountersDB();
+
+      // No matching PatientDoc exists for 'pat-missing'.
+      await putDoc(edb, createEncounter('enc-unjoinable', { patientId: 'pat-missing' }));
+
+      const dataset = await generateDHIS2Export('202601');
+      const combos = dataset.dataValues.filter(e => e.dataElement === 'OPD_ATTENDANCE_BY_CATEGORY');
+      const unknown = combos.find(c => c.category === 'unknown-age-unknown-sex');
+      const under5 = combos.filter(c => c.category.startsWith('under5'));
+      const fivePlus = combos.filter(c => c.category.startsWith('5plus'));
+
+      expect(unknown!.value).toBe('1');
+      // None of the known age bands should have absorbed this unjoinable encounter.
+      expect(under5.every(c => c.value === '0')).toBe(true);
+      expect(fivePlus.every(c => c.value === '0')).toBe(true);
+    });
+
+    test('emits the full expected age/sex grid with zeros when there is no data, mirroring the per-facility births/deaths pattern', async () => {
+      const dataset = await generateDHIS2Export('202601');
+      const combos = dataset.dataValues.filter(e => e.dataElement === 'OPD_ATTENDANCE_BY_CATEGORY');
+      const categories = combos.map(c => c.category).sort();
+
+      expect(categories).toEqual([
+        '5plus-female', '5plus-male',
+        'under5-female', 'under5-male',
+        'unknown-age-female', 'unknown-age-male',
+      ].sort());
+      expect(combos.every(c => c.value === '0')).toBe(true);
+    });
   });
 });

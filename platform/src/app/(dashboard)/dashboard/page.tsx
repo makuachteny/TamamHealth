@@ -15,6 +15,7 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { patientFullName, patientAge } from '@/lib/patient-utils';
 import { getDefaultDashboard } from '@/lib/permissions';
 import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
+import { useCapabilities } from '@/lib/hooks/useCapabilities';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
 
@@ -68,6 +69,29 @@ export default function DashboardPage() {
       .sort((a, b) => (b.assignedAt ?? '').localeCompare(a.assignedAt ?? '')),
     [patients, currentUser?._id],
   );
+
+  // Right-rail "Capabilities" card — each item latches checked forever the
+  // first time this clinician does it (see useCapabilities). Signals here are
+  // scoped to documents/referrals/visits this user authored or ran, never
+  // facility-wide state.
+  const capabilityItems = useMemo(() => {
+    const userId = currentUser?._id;
+    const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length;
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const telehealthToday = (appointments || []).filter(
+      a => a.providerId === userId && a.appointmentType === 'telehealth' && a.appointmentDate === todayIso,
+    );
+    return [
+      { key: 'doctor.consultation', label: 'Complete a consultation', signal: signCount > 0, href: '/consultation' },
+      { key: 'doctor.lab-order', label: 'Order lab tests', signal: resumableEncounters.length > 0, href: '/consultation' },
+      { key: 'doctor.referral', label: 'Refer a patient', signal: referrals.some(r => r.createdBy === userId), href: '/referrals' },
+      { key: 'doctor.telehealth', label: 'Run a telehealth visit', signal: telehealthToday.length > 0, href: '/appointments' },
+      // No cheap per-user "closed by me" signal in the loaded phone-notes data —
+      // stays unchecked until the clinician actually closes one from /messages.
+      { key: 'doctor.phone-note', label: 'Close a phone note', href: '/messages' },
+    ];
+  }, [currentUser?._id, unsignedDrafts, awaitingCosign, heldAssessments, resumableEncounters, referrals, appointments]);
+  const { checklist: capabilitiesChecklist } = useCapabilities(currentUser?._id, capabilityItems);
 
   // `/dashboard` is shared. Doctors / clinical officers / clinicians get the
   // clinical view; the medical superintendent gets its own admin view (rendered
@@ -212,6 +236,7 @@ export default function DashboardPage() {
         patients={assignedRows}
         appointments={myUpcomingAppts}
         outstanding={outstandingItems}
+        capabilities={capabilitiesChecklist}
         onUpdateAppointmentStatus={updateApptStatus}
       />
     </main>

@@ -149,6 +149,118 @@ export default function EhrDayStatsChart({
   );
 }
 
+/* ─── Weekly activity (doctor dashboard) ───
+   One stacked bar per weekday for the week containing the selected date —
+   series 1 (outpatient) on top of series 0 (inpatient). The selected day
+   renders at full strength, the rest ghosted. Untimed items still count
+   (a day bucket needs no clock time), so the bars agree with the worklist.
+   Clicking a bar re-focuses the dashboard on that date. */
+export function EhrWeekActivityChart({
+  items,
+  seriesNames,
+  selectedDate,
+  todayIso,
+  onSelectDate,
+  title = 'Day activity',
+}: {
+  items: DayStatsItem[];
+  seriesNames: [string, string];
+  selectedDate: string;
+  todayIso: string;
+  onSelectDate?: (iso: string) => void;
+  title?: string;
+}) {
+  const selected = parseIsoDate(selectedDate);
+  // Sunday-start week, matching the mini-calendar's S M T W T F S header.
+  const weekStart = addDays(selected, -selected.getDay());
+  const weekEnd = addDays(weekStart, 6);
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(weekStart, index);
+    return {
+      iso: toIsoDate(date),
+      letter: 'SMTWTFS'[index],
+      dateNumber: String(date.getDate()),
+      counts: [0, 0] as [number, number],
+      date,
+    };
+  });
+  const dayByIso = new Map(days.map(day => [day.iso, day]));
+  for (const item of items) {
+    const day = dayByIso.get(item.date || todayIso);
+    if (day) day.counts[item.series === 0 ? 0 : 1] += 1;
+  }
+  const maxTotal = Math.max(1, ...days.map(day => day.counts[0] + day.counts[1]));
+  const total = days.reduce((sum, day) => sum + day.counts[0] + day.counts[1], 0);
+  const selectedDay = days.find(day => day.iso === selectedDate);
+  const selectedTotal = selectedDay ? selectedDay.counts[0] + selectedDay.counts[1] : 0;
+  const weekRangeLabel = `${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(weekStart)}-${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(weekEnd)}`;
+  // Tallest stack tops out at ~84% of the plot; non-zero segments keep a
+  // visible minimum so a single visit never rounds away to nothing.
+  const pct = (count: number) => (count === 0 ? 0 : Math.max(10, Math.round((count / maxTotal) * 86)));
+  const dayTitle = (day: (typeof days)[number]) => {
+    const label = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(day.date);
+    return `${label} — ${day.counts[0]} ${seriesNames[0].toLowerCase()} · ${day.counts[1]} ${seriesNames[1].toLowerCase()}`;
+  };
+
+  return (
+    <div className="ehr-day-stats ehr-week-activity">
+      <div className="ehr-day-stats-head">
+        <h3>{title}</h3>
+        <span className="ehr-week-activity-caption">{weekRangeLabel}</span>
+      </div>
+      <div className="ehr-week-activity-summary">
+        <strong>{selectedTotal}</strong>
+        <span>selected day</span>
+        <b>{total}</b>
+        <span>week total</span>
+      </div>
+      {total === 0 ? (
+        <p className="ehr-day-stats-empty">No activity this week.</p>
+      ) : (
+        <div className="ehr-week-activity-bars">
+          {days.map(day => {
+            const dayTotal = day.counts[0] + day.counts[1];
+            const className = [
+              day.iso === selectedDate ? 'is-selected' : '',
+              day.iso === todayIso ? 'is-today' : '',
+              dayTotal === 0 ? 'is-empty' : '',
+            ].filter(Boolean).join(' ') || undefined;
+            return (
+              <button
+                key={day.iso}
+                type="button"
+                className={className}
+                aria-label={dayTitle(day)}
+                aria-pressed={day.iso === selectedDate}
+                title={dayTitle(day)}
+                onClick={() => onSelectDate?.(day.iso)}
+              >
+                <span className="ehr-week-activity-count">{dayTotal || ''}</span>
+                <span className="ehr-week-activity-track">
+                  {day.counts[1] > 0 && <i className="ehr-week-seg-out" style={{ height: `${pct(day.counts[1])}%` }} />}
+                  {day.counts[0] > 0 && <i className="ehr-week-seg-in" style={{ height: `${pct(day.counts[0])}%` }} />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="ehr-week-activity-days" aria-hidden="true">
+        {days.map(day => (
+          <span key={day.iso} className={day.iso === selectedDate ? 'is-selected' : undefined}>
+            <b>{day.letter}</b>
+            <small>{day.dateNumber}</small>
+          </span>
+        ))}
+      </div>
+      <div className="ehr-day-stats-legend">
+        <span><i style={{ background: 'var(--viz-inpatient)' }} /> {seriesNames[0]}</span>
+        <span><i style={{ background: 'var(--viz-outpatient)' }} /> {seriesNames[1]}</span>
+      </div>
+    </div>
+  );
+}
+
 /** Hour-of-day from "08:20", "8:20 AM" or "20:05"; null when absent/unparseable. */
 function parseHour(time?: string): number | null {
   if (!time) return null;

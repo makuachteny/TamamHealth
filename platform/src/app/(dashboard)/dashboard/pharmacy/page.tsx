@@ -15,10 +15,10 @@ import { formatMoney } from '@/lib/format-utils';
 import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel, pharmacyStageTone } from '@/lib/pharmacy-workflow';
 import type { PrescriptionDoc, PharmacyInventoryDoc, UserDoc } from '@/lib/db-types';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
+import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import EhrCareDashboard, {
   type EhrCareDashboardRow,
   type EhrCareDashboardAction,
-  type EhrCareDashboardChecklistItem,
 } from '@/components/ehr/EhrCareDashboard';
 import {
   Pill, Package, ShieldCheck, ClipboardList,
@@ -538,6 +538,9 @@ export default function PharmacyDashboardPage() {
     logAudit('DISPENSE_PRESCRIPTION', currentUser?._id, currentUser?.username,
       `Dispensed ${qty} ${inv.unit} ${rx.medication} to ${rx.patientName} (${rx._id})`).catch(() => {});
     showToast(t('pharmacy.dispensedToast', { medication: rx.medication, patient: rx.patientName }), 'success');
+    markCapability('pharmacy.dispense');
+    // requiresWitness (not just controlledSchedule) matches the witness gate above.
+    if (requiresWitness) markCapability('pharmacy.controlled');
     setDispensing(false);
     setDispenseTarget(null);
   };
@@ -574,6 +577,7 @@ export default function PharmacyDashboardPage() {
         });
       }
       showToast(t('pharmacy.stockedMedication', { medication: name }), 'success');
+      markCapability('pharmacy.receive-stock');
       setShowReceiveStock(false);
     } catch (err) {
       console.error(err);
@@ -699,10 +703,19 @@ export default function PharmacyDashboardPage() {
   headerActions.push({ label: t('pharmacy.kpiControlled'), icon: ShieldCheck, onClick: () => router.push('/controlled-substances') });
   headerActions.push({ label: t('pharmacy.stockAlerts'), icon: AlertTriangle, onClick: () => setCenterPanel(p => (p === 'stock' ? null : 'stock')), active: centerPanel === 'stock', tone: centerPanel === 'stock' ? 'primary' : 'neutral' });
 
-  const checklist: EhrCareDashboardChecklistItem[] = [];
-  if (canDispense) {
-    checklist.push({ label: t('pharmacy.receiveStock'), done: criticalCount === 0 && expiredCount === 0, onClick: () => setShowReceiveStock(true) });
-  }
+  // Capabilities card — each item latches checked forever the first time this
+  // pharmacist does it (see useCapabilities), never un-checked by later state.
+  // None of these have a cheap per-user "already done" signal from
+  // already-loaded data, so every item is marked at its action's own success
+  // point (see confirmDispense / handleReceiveStock below, and
+  // handlePrintReorder on the full /pharmacy page for the reorder item).
+  const capabilityItems = useMemo(() => (canDispense ? [
+    { key: 'pharmacy.dispense', label: 'Dispense a prescription', onClick: () => setQueueFilter('ready') },
+    { key: 'pharmacy.controlled', label: 'Dispense a controlled medicine with witness', onClick: () => setQueueFilter('controlled') },
+    { key: 'pharmacy.receive-stock', label: 'Receive stock', onClick: () => setShowReceiveStock(true) },
+    { key: 'pharmacy.reorder', label: 'Generate a reorder list', href: '/pharmacy' },
+  ] : []), [canDispense]);
+  const { checklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
   return (
     <>
@@ -734,19 +747,35 @@ export default function PharmacyDashboardPage() {
             const stage = pharmacyStage(rx);
             const balance = patientBalanceFor(rx);
             const paymentDue = stage === 'cleared_for_dispensing' && !isFinanciallyCleared(balance);
+            const controlled = isControlled(rx);
+            const pastPaymentGate = ['cleared_for_dispensing', 'dispensed', 'counseled', 'complete'].includes(stage);
+            // Context: the one real fact about this order worth a glance —
+            // an outstanding balance (with the amount, honestly), otherwise
+            // a controlled-substance flag, otherwise (once payment has
+            // actually been checked) that it's clear. No invented state
+            // before the order has reached a payment-relevant stage.
+            const location = paymentDue
+              ? `Payment due · ${formatMoney(balance)}`
+              : controlled
+                ? 'Controlled substance'
+                : pastPaymentGate ? 'Payment clear' : undefined;
             return {
               id: rx._id,
               title: rx.patientName,
               subtitle: `${rx.medication} · ${rx.dose} ${rx.frequency}${rx.duration ? ` x ${rx.duration}` : ''}`,
-              meta: `${rx.prescribedBy} · ${formatTime(rx.createdAt)} · ${isFinanciallyCleared(balance) ? 'Payment clear' : `Payment due ${formatMoney(balance)}`}`,
+              meta: `${rx.prescribedBy} · ${formatTime(rx.createdAt)}`,
               compactMeta: formatTime(rx.createdAt),
               time: formatTime(rx.createdAt),
               careTeam: rx.prescribedBy,
               careTeamLabel: 'Prescriber',
-              status: rx.status === 'discontinued' ? 'Discontinued' : paymentDue ? 'Payment due' : pharmacyStageLabel(stage),
-              statusTone: paymentDue ? 'warning' : rx.status === 'discontinued' ? 'danger' : rx.urgency === 'immediate' ? 'warning' : pharmacyStageTone(stage),
-              priority: paymentDue ? formatMoney(balance) : rx.urgency === 'immediate' ? t('pharmacy.urgent') : undefined,
-              room: paymentDue ? 'Cashier' : undefined,
+              // Status pill = the real dispense-pipeline stage, not a
+              // money amount or free-text urgency label (those don't belong
+              // in a pill — see `location` and `statusTone` below instead).
+              status: stage,
+              statusLabel: rx.status === 'discontinued' ? 'Discontinued' : pharmacyStageLabel(stage),
+              statusTone: rx.status === 'discontinued' ? 'danger' : paymentDue ? 'warning' : rx.urgency === 'immediate' ? 'warning' : pharmacyStageTone(stage),
+              location,
+              locationLabel: location ? (controlled && !paymentDue ? 'Substance' : 'Payment') : undefined,
               popupDetail: renderWorkflowPopup(rx),
             };
           })}
@@ -759,7 +788,7 @@ export default function PharmacyDashboardPage() {
           ]}
           metricsTitle={t('pharmacy.operations')}
           checklist={checklist}
-          checklistTitle={t('pharmacy.quickActions')}
+          checklistTitle="Capabilities"
           emptyTitle={rxLoading ? '' : t('pharmacy.noPrescriptionsFound')}
         >
           {/* Stat panels — opened from the header toggles; the active one

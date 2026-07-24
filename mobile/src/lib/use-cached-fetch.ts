@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { apiFetch } from './api-client';
 import { cacheGetWithMeta, cacheSet, TTL_24H } from './offline-cache';
 

@@ -4184,11 +4184,12 @@ thead th {
   position: relative;
 }
 
+/* Design: a 40px white circle holding a 30px role-colored initials mark. */
 .ehr-avatar {
-  width: 38px !important;
-  min-width: 38px;
-  height: 38px !important;
-  padding: 0 !important;
+  width: 40px !important;
+  min-width: 40px;
+  height: 40px !important;
+  padding: 3px !important;
   gap: 8px;
   justify-content: center !important;
   border: 1px solid var(--ehr-border) !important;
@@ -4230,7 +4231,7 @@ thead th {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 999px;
-  background: var(--ehr-blue);
+  background: var(--tb-blue-800, #015697);
   color: white;
   font-size: 11px;
   font-weight: 800;
@@ -4473,6 +4474,14 @@ thead th {
   border-radius: 4px !important;
 }
 
+/* Search fields are pills in the design — exempt them from the square-input
+   override above. */
+.tamam-ehr-app .ehr-rail-search input,
+.tamam-ehr-app .ehr-top-search input,
+.tamam-ehr-app .ehr-care-search input {
+  border-radius: 999px !important;
+}
+
 .tamam-ehr-app .page-container:has(> .ehr-schedule-shell) {
   display: flex;
   flex-direction: column;
@@ -4545,6 +4554,7 @@ thead th {
   grid-template-columns: var(--rail-col, minmax(230px, 260px)) minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+  padding: 6px 0 14px;
 }
 
 .ehr-clinical-dashboard-tabs {
@@ -4563,8 +4573,10 @@ thead th {
   flex: 1;
   min-width: 0;
   justify-content: center;
-  gap: 6px;
-  padding: 0 8px;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 18px;
+  font-size: 13.5px;
 }
 
 .ehr-clinical-dashboard-header-main {
@@ -4578,11 +4590,12 @@ thead th {
   padding-top: 0;
 }
 
-/* Greeting-row icons (Dashboard/Calendar toggle, Outstanding, Print, Send intake). */
+/* Greeting-row icons (New appointments, Dispense, Print, Send intake) — 16px
+   strokes inside the pills, per the design. */
 .ehr-clinical-dashboard-header .ehr-segmented button svg,
 .ehr-clinical-dashboard-header .ehr-schedule-actions button svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .ehr-schedule-actions,
@@ -4622,14 +4635,19 @@ thead th {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 32px;
-  padding: 0 13px;
+  min-height: 36px;
+  padding: 0 14px;
   border: 1px solid var(--ehr-border);
   border-radius: 999px;
   background: var(--ehr-panel);
   color: var(--ehr-text);
   font-size: 13px;
   font-weight: 700;
+}
+
+.ehr-schedule-actions button:not(.primary):hover {
+  border-color: var(--ehr-blue);
+  color: var(--tb-blue-800, #015697);
 }
 
 .ehr-segmented button.active {
@@ -4639,9 +4657,16 @@ thead th {
 }
 
 .ehr-schedule-actions button.primary {
+  padding: 0 16px;
   border-color: var(--accent-primary);
   background: var(--accent-primary);
   color: white;
+}
+
+.ehr-schedule-actions button.primary:hover,
+.ehr-segmented button.active:hover {
+  border-color: var(--tb-blue-800, #015697);
+  background: var(--tb-blue-800, #015697);
 }
 
 .ehr-segmented button svg,
@@ -4668,7 +4693,7 @@ thead th {
 .ehr-workspace-grid {
   display: grid;
   grid-template-columns: minmax(230px, 260px) minmax(0, 1fr) minmax(230px, 270px);
-  gap: 10px;
+  gap: 12px;
   align-items: stretch;
   height: 100%;
   min-height: 0;
@@ -4698,17 +4723,24 @@ thead th {
   position: relative;
 }
 
-.ehr-left-rail,
 .ehr-side-card,
 .ehr-worklist-panel,
 .ehr-center-panel {
   border: 1px solid var(--ehr-border);
-  border-radius: 6px;
+  border-radius: 12px;
   background: var(--ehr-panel);
 }
 
+/* The calendar rail is a transparent stack of separate cards (mini-calendar,
+   search pill, day-activity chart), not one bordered panel — per the Claude
+   Design doctor-dashboard mockup. */
 .ehr-left-rail {
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  overflow: hidden auto;
 }
 
 .ehr-today-button {
@@ -4724,8 +4756,10 @@ thead th {
 }
 
 .ehr-mini-calendar {
-  padding: 0 12px 14px;
-  border-bottom: 1px solid var(--ehr-border);
+  padding: 12px 12px 14px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 12px;
+  background: var(--ehr-panel);
 }
 
 .ehr-mini-calendar-title {
@@ -4733,7 +4767,7 @@ thead th {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 0 10px;
+  padding: 2px 0 10px;
   color: var(--ehr-muted);
   font-size: 13px;
   font-weight: 800;
@@ -4755,8 +4789,7 @@ thead th {
 }
 
 .ehr-mini-calendar-title button:hover {
-  border-color: var(--ehr-border);
-  background: var(--ehr-blue-light);
+  background: rgba(33, 145, 208, 0.1);
 }
 
 .ehr-mini-calendar-title span {
@@ -4818,7 +4851,7 @@ thead th {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 3px;
+  bottom: 2px;
   width: 4px;
   height: 4px;
   border-radius: 999px;
@@ -4868,9 +4901,9 @@ thead th {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 14px;
-  min-height: 58px;
+  min-height: 56px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--ehr-border);
+  border-bottom: 1px solid #E7EEF5;
 }
 
 .ehr-daybar > div:first-child {
@@ -4882,7 +4915,11 @@ thead th {
 
 .ehr-daybar h2 {
   margin: 0;
-  font-size: 17px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
   font-weight: 800;
 }
 
@@ -4891,7 +4928,37 @@ thead th {
   white-space: nowrap;
 }
 
+/* Daybar filter tabs are pills per the design: white 1px-border chips, the
+   active one filled blue. */
 .ehr-day-tabs button:not(.ehr-mobile-day-check) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 13px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  background: var(--ehr-panel);
+  color: var(--ehr-text);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ehr-day-tabs button:hover:not(.ehr-mobile-day-check):not(.active) {
+  border-color: var(--ehr-blue);
+  color: var(--tb-blue-800, #015697);
+}
+
+.ehr-day-tabs button.active:not(.ehr-mobile-day-check) {
+  border-color: var(--ehr-blue);
+  background: var(--ehr-blue);
+  color: #fff;
+}
+
+/* View-switcher variant (nurse station design): underlined tabs instead of
+   filter pills — h38, 2px underline, active deep-blue text. */
+.ehr-day-tabs.ehr-day-tabs--views button:not(.ehr-mobile-day-check) {
   height: 38px;
   padding: 0 4px 2px;
   border: 0;
@@ -4899,15 +4966,23 @@ thead th {
   border-radius: 0;
   background: transparent;
   color: var(--ehr-muted);
+  font-size: 13px;
   font-weight: 800;
 }
 
-.ehr-day-tabs button.active:not(.ehr-mobile-day-check) {
-  border-bottom-color: var(--ehr-blue);
-  background: transparent;
-  color: var(--ehr-blue);
+.ehr-day-tabs.ehr-day-tabs--views button:hover:not(.ehr-mobile-day-check):not(.active) {
+  border-color: transparent;
+  color: var(--tb-blue-800, #015697);
 }
 
+.ehr-day-tabs.ehr-day-tabs--views button.active:not(.ehr-mobile-day-check) {
+  border-bottom-color: var(--ehr-blue);
+  background: transparent;
+  color: var(--tb-blue-800, #015697);
+}
+
+/* The worklist body: a plain white region filling the centre panel below the
+   daybar — 12px inset, 8px row gap, bordered row cards (current design rev). */
 .ehr-appointment-list {
   flex: 1 1 0%;
   min-height: 0;
@@ -4917,7 +4992,8 @@ thead th {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
+  padding: 12px;
+  background: #fff;
 }
 
 .ehr-workspace-grid.is-dashboard > .ehr-center-panel > .ehr-appointment-list,
@@ -5019,20 +5095,20 @@ thead th {
 
 .ehr-appointment-row[data-triage="RED"] .ehr-patient-icon,
 .ehr-worklist-row[data-triage="RED"] .ehr-patient-icon {
-  background: var(--color-danger-bg);
-  color: var(--color-danger-text);
+  background: #FFF0EF;
+  color: #C24135;
 }
 
 .ehr-appointment-row[data-triage="YELLOW"] .ehr-patient-icon,
 .ehr-worklist-row[data-triage="YELLOW"] .ehr-patient-icon {
-  background: var(--color-warning-bg);
-  color: var(--color-warning-text);
+  background: #FFF4E9;
+  color: #B55E13;
 }
 
 .ehr-appointment-row[data-triage="GREEN"] .ehr-patient-icon,
 .ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon {
-  background: var(--accent-light);
-  color: var(--accent-primary);
+  background: #E8F7F1;
+  color: #167755;
 }
 
 .ehr-appointment-main {
@@ -5408,7 +5484,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-right-rail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   align-self: start;
   overflow: hidden;
 }
@@ -5419,9 +5495,9 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-side-card h2 {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   color: var(--ehr-text);
-  font-size: 19px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 0;
 }
@@ -5431,17 +5507,16 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
-/* line-height:1.35 makes the h2's box match its actual rendered ascent+
-   descent (verified against getBoundingClientRect of the text range) —
-   with line-height:1 the box was shorter than the glyphs, so flexbox
-   align-items:center centered the wrong (too-short) box and the icon
-   ended up sitting visibly low relative to the text. */
+/* Title line box pinned to exactly the icon's 17px height, so flexbox
+   centers the two on the same line for every role's side cards (Outstanding
+   items, Today's triage, Capabilities, Laboratory, …). */
 .ehr-side-card-head h2 {
   margin: 0;
-  line-height: 1.35;
+  font-size: 15px;
+  line-height: 17px;
 }
 
 .ehr-side-card-head svg {
@@ -5449,7 +5524,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   flex-shrink: 0;
   width: 17px;
   height: 17px;
-  margin-top: -8px;
+  margin: 0;
   color: var(--accent-primary);
 }
 
@@ -5570,26 +5645,84 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   line-height: 1.2;
 }
 
+/* Count badges use the design system's semantic tints: neutral, warning
+   (amber) and danger (red). */
 .ehr-outstanding-chips button b {
   flex: 0 0 auto;
   min-width: 23px;
   height: 23px;
   display: grid;
   place-items: center;
+  padding: 0 6px;
   border-radius: 999px;
-  background: #E9F0F2;
-  color: var(--ehr-text);
+  background: #EEF4F6;
+  color: #3D5967;
   font-size: 12px;
 }
 
 .ehr-outstanding-chips button.warning b {
-  background: #FFE3ED;
-  color: #A8204A;
+  background: #FFF4E9;
+  color: #B55E13;
 }
 
 .ehr-outstanding-chips button.danger b {
-  background: #FFE0D8;
-  color: #B43921;
+  background: #FFF0EF;
+  color: #C24135;
+}
+
+/* Capabilities checklist — custom checkbox (rounded square, blue when done),
+   done rows muted. Doubled .ehr-side-card selector outranks the later generic
+   side-card label rules; text-transform resets the global uppercase `label`
+   rule (sentence case per the design). */
+.ehr-side-card.ehr-capabilities-card label {
+  align-items: center;
+  gap: 9px;
+  color: var(--ehr-text);
+  font-size: 13px !important;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.ehr-capabilities-card label + label {
+  margin-top: 8px;
+}
+
+.ehr-side-card.ehr-capabilities-card input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  position: relative;
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0;
+  border: 1.5px solid #C8DDEA;
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ehr-side-card.ehr-capabilities-card input[type='checkbox']:checked {
+  background: var(--ehr-blue);
+  border-color: var(--ehr-blue);
+}
+
+.ehr-side-card.ehr-capabilities-card input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.ehr-side-card.ehr-capabilities-card label:has(input:checked) {
+  color: #8395A8;
+  font-weight: 500;
 }
 
 .ehr-greeting-row {
@@ -5633,9 +5766,9 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   margin: 4px 0 0;
   color: var(--ehr-blue);
   font-family: var(--font-platform);
-  font-weight: 700;
-  font-size: 24px;
-  line-height: 1;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.15;
   letter-spacing: 0;
 }
 
@@ -5647,13 +5780,15 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-clinical-dashboard-header .ehr-care-greeting {
   margin: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-height: 32px;
   display: flex;
   align-items: center;
   font-family: var(--font-platform);
-  font-weight: 700;
-  font-size: 18px;
-  line-height: 1;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.15;
   letter-spacing: 0;
 }
 
@@ -5854,10 +5989,15 @@ button.ward-stat-chip:focus:not(:focus-visible) {
    backdrop, no header strip. `--care-cols` is set per dashboard by
    EhrCareDashboard so roles that don't fill a column don't render it — the
    compact (<640px) treatment further down still overrides the template. */
+/* One card, like the Clinical Officer worklist: the white daybar and this
+   white list body join into a single panel (see `.ehr-daybar +
+   .ehr-appointment-list`), with the faint-blue `.ehr-queue-cards` backdrop
+   inset inside. No background override here — the old `--bg-secondary` fill
+   doubled up with the queue backdrop, and a transparent fill splits the
+   daybar off into a separate-looking card. */
 .ehr-appointment-list.ehr-care-list {
   gap: 8px;
-  border-radius: 16px;
-  background: var(--bg-secondary);
+  padding-inline: 4px;
 }
 
 .ehr-care-row {
@@ -6229,30 +6369,30 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   border: 0 !important;
 }
 
-/* Bare variant — used when the workflow child renders its own card(s) (the
-   nurse Ward/Triage/MAR/Handoff stations). The wrapper stops being a card so
-   those inner cards ARE the outer cards, with no panel drawn behind them, and
-   fills the center panel edge-to-edge (a small inset for breathing room).
-   Uses a two-class selector so it outranks the several single-class
+/* Bare variant — used when the workflow child renders its own board (the
+   nurse Ward/Triage/MAR/Handoff stations). No card chrome of its own: it is
+   simply the centre panel's white body under the daybar divider, with the
+   doctor worklist's 12px inset — the rows are the only cards. Uses a
+   two-class selector so it outranks the several single-class
    `.ehr-worklist-panel` border/background rules declared later in this file. */
 .ehr-worklist-panel.ehr-care-workflow--bare {
   margin: 0;
   border: 0;
-  background: transparent;
+  background: #fff;
   border-radius: 0;
-  /* Vertical gap under the daybar only — no horizontal inset, so the inner
-     cards' left/right edges line up with the full-width daybar (the header
-     showing the date + tab counts) above them. */
-  padding: 10px 0;
+  padding: 12px;
+  box-shadow: none !important;
 }
 .ehr-care-workflow.ehr-care-workflow--bare > * {
-  /* Let the child stretch to fill the panel height instead of natural size,
-     and don't strip the inner cards' own borders/radius. */
+  /* Let the child stretch to fill the panel height instead of natural size;
+     the station's own top-level panel chrome is stripped (the wrapper is the
+     card now) while inner queue-cards keep their own borders/backdrop. */
   flex: 1 1 auto;
   min-height: 0;
-  box-shadow: revert !important;
-  border-radius: revert !important;
-  border: revert !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  background: transparent;
 }
 /* Cancel the worklist-panel HEADER styling (`.ehr-worklist-panel >
    div:first-child`) that otherwise insets and horizontally centers the whole
@@ -6264,23 +6404,15 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   padding: 0;
   align-items: stretch;
 }
-/* A workflow that renders its own .ehr-worklist-panel (Ward) relies on the
-   wrapper's 10px padding for its edge gap, so drop the panel's own margin to
-   avoid doubling it. */
+/* A workflow that renders its own .ehr-worklist-panel (Ward) must not draw a
+   second card inside the centre panel — strip every bit of its chrome; the
+   wrapper's 12px padding supplies the edge gap. */
 .ehr-care-workflow--bare .ehr-worklist-panel {
   margin: 0;
-}
-
-.ehr-center-panel:has(.ward-workflow-panel--merged) > .ehr-daybar {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.ehr-care-workflow--bare .ward-workflow-panel--merged {
-  margin-top: -10px;
-  border-top: 0 !important;
-  border-top-left-radius: 0 !important;
-  border-top-right-radius: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent;
+  box-shadow: none !important;
 }
 
 .ehr-care-workflow--bare .ward-workflow-panel--merged > .ehr-worklist-table {
@@ -6290,11 +6422,16 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   min-height: 0;
   padding: 0;
   gap: 0;
-  border-bottom: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
+/* Ward rows are queue-cards; inside the bare wrapper they keep their own
+   faint-blue backdrop — the wrapper supplies the white card body, matching
+   the Clinical Officer worklist's single-card layering exactly. */
 .ehr-care-workflow--bare .ward-workflow-panel--merged .ehr-worklist-head,
-.ehr-care-workflow--bare .ward-workflow-panel--merged .ehr-worklist-row {
+.ehr-care-workflow--bare .ward-workflow-panel--merged .ehr-queue-card {
   width: 100%;
 }
 
@@ -6308,6 +6445,14 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Trailing open-chart action, matching the doctor's queue card. */
+.ehr-worklist-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 
 .ehr-mission-card {
   background: var(--color-brand-700) !important;
@@ -10898,10 +11043,10 @@ span:has(> svg:only-child) {
 .appointment-detail-sidebar__header {
   position: relative;
   display: grid;
-  grid-template-columns: 32px 1fr 32px;
-  gap: 10px;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  gap: 14px;
   align-items: start;
-  padding: 18px 18px 14px;
+  padding: 18px 20px 16px;
   border-bottom: 1px solid var(--border-light);
 }
 
@@ -10910,8 +11055,8 @@ span:has(> svg:only-child) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -10923,6 +11068,14 @@ span:has(> svg:only-child) {
 .appointment-detail-sidebar__close:hover {
   background: var(--bg-hover, rgba(15, 23, 42, 0.06));
   color: var(--text-primary);
+}
+
+.appointment-detail-sidebar__header-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(92px, 0.55fr) minmax(112px, 0.65fr);
+  gap: 18px;
+  align-items: start;
+  min-width: 0;
 }
 
 .appointment-detail-sidebar__title {
@@ -10944,29 +11097,48 @@ span:has(> svg:only-child) {
   line-height: 1.35;
 }
 
-.appointment-detail-sidebar__time {
-  color: var(--text-primary) !important;
-  font-weight: 700;
+.appointment-detail-sidebar__header-field {
+  min-width: 0;
+  padding-top: 2px;
 }
 
-.appointment-detail-sidebar__status {
-  grid-column: 2 / 3;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
+.appointment-detail-sidebar__header-field span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
-.appointment-detail-sidebar__status span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(33, 145, 208, 0.1);
-  color: var(--accent-primary);
-  font-size: 11px;
+.appointment-detail-sidebar__header-field strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
   font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .appointment-detail-sidebar__header {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .appointment-detail-sidebar__header-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .appointment-detail-sidebar__header-field {
+    padding-top: 0;
+  }
 }
 
 .appointment-detail-sidebar__tabs {
@@ -11720,37 +11892,14 @@ span:has(> svg:only-child) {
    existing Tamam visual system while reducing the oversized tablet/mobile feel. */
 .tamam-ehr-app {
   --ehr-top-rail-height: 60px;
-  /* Single source of truth for the app's outer gutter: the top rail and every
-     page-container read this, so the avatar pill's right edge sits flush with
-     the body cards below it for every role. */
-  --ehr-page-inset: 6px;
+  /* Outer gutter the top rail reads — the Claude Design mockup runs the rail
+     at 12px side padding. (The old 6px "compact" value also shrank every rail
+     control below the design sizes; the base rules are the design now.) */
+  --ehr-page-inset: 12px;
 }
 
-.ehr-top-rail {
-  grid-template-columns: 158px max-content 1fr auto;
-  gap: 10px;
-  padding: 0 var(--ehr-page-inset);
-}
-
-.ehr-top-brand {
-  width: 142px;
-  height: 38px;
-}
-
-.ehr-top-brand img {
-  width: 120px;
-}
-
-.ehr-top-modules button,
-.ehr-top-actions button {
-  width: 30px;
-  height: 30px;
-}
-
-.ehr-module-trigger {
-  width: 36px !important;
-}
-
+/* Compact patient search (restored): the wide design pill crowded the
+   centered facility name, so the rail keeps the previous 220×34 size. */
 .ehr-top-search {
   width: min(100%, 220px);
   height: 34px;
@@ -11763,75 +11912,22 @@ span:has(> svg:only-child) {
   white-space: nowrap;
 }
 
-.ehr-avatar:not(.ehr-avatar--labeled) {
-  width: 34px !important;
-  min-width: 34px;
-  height: 34px !important;
-  padding: 0 !important;
-}
-
-.ehr-avatar--labeled {
-  width: auto !important;
-  min-width: 92px;
-  max-width: 154px;
-  height: 34px !important;
-  padding: 2px 9px 2px 2px !important;
-}
-
-.ehr-avatar-mark {
-  width: 26px;
-  height: 26px;
-  font-size: 10px;
-}
-
+/* Design page frame: 12px top, 16px sides/bottom. */
 .tamam-ehr-app .page-container {
-  padding: var(--ehr-page-inset);
+  padding: 12px 16px 16px;
 }
 
-.ehr-schedule-header {
-  /* Matches the workspace grid's 8px gap below, so the greeting column
-     starts exactly where the centre panel (appointment card) starts. */
-  gap: 8px;
-  padding: 4px 0 8px;
-}
-
-.ehr-clinical-dashboard-header-main {
-  gap: 10px;
-}
-
-.ehr-segmented,
-.ehr-schedule-actions,
-.ehr-day-tabs,
-.ehr-clinical-strip {
-  gap: 6px;
-}
-
-.ehr-segmented button,
-.ehr-schedule-actions button,
-.ehr-clinical-strip button {
-  min-height: 28px;
-  padding: 0 11px;
-  font-size: 12px;
-}
-
-.ehr-care-greeting {
-  font-size: 18px;
-}
-
-/* Keep --rail-col in sync — the dashboard header's first grid column reads
-   this variable, so the greeting always lines up with the centre panel. */
-.ehr-schedule-shell {
-  --rail-col: minmax(200px, 232px);
-}
-
+/* The workspace grid keeps reading --rail-col so the header's first column
+   always matches the calendar rail; values are the design's (230-260 rail,
+   230-270 right rail, 12px gutters). */
 .ehr-workspace-grid,
 .ehr-workspace-grid.is-dashboard {
-  grid-template-columns: var(--rail-col, minmax(200px, 232px)) minmax(0, 1fr) minmax(210px, 250px);
-  gap: 8px;
+  grid-template-columns: var(--rail-col, minmax(230px, 260px)) minmax(0, 1fr) minmax(230px, 270px);
+  gap: 12px;
 }
 
 .ehr-workspace-grid.is-calendar {
-  grid-template-columns: var(--rail-col, minmax(200px, 232px)) minmax(0, 1fr);
+  grid-template-columns: var(--rail-col, minmax(230px, 260px)) minmax(0, 1fr);
 }
 
 .ehr-today-button {
@@ -11840,30 +11936,9 @@ span:has(> svg:only-child) {
   font-size: 11px;
 }
 
-.ehr-mini-calendar {
-  padding: 0 10px 12px;
-}
-
-.ehr-mini-calendar-title {
-  padding-bottom: 8px;
-  font-size: 12px;
-}
-
-.ehr-mini-calendar-title button {
-  flex-basis: 24px;
-  width: 24px !important;
-  min-width: 24px;
-  height: 24px !important;
-  min-height: 24px;
-}
-
-.ehr-mini-calendar-grid b,
-.ehr-mini-calendar-grid button {
+/* Design: 24px weekday-letter row over 26px day cells. */
+.ehr-mini-calendar-grid b {
   height: 24px;
-}
-
-.ehr-mini-calendar-grid button {
-  font-size: 11px;
 }
 
 .ehr-filter-group {
@@ -11871,23 +11946,7 @@ span:has(> svg:only-child) {
   padding: 10px;
 }
 
-.ehr-filter-group label,
-.ehr-side-card label {
-  font-size: 12px;
-}
-
-.ehr-daybar {
-  min-height: 48px;
-  gap: 10px;
-  padding: 0 14px;
-}
-
-.ehr-daybar h2 {
-  font-size: 15px;
-}
-
-.ehr-day-tabs button {
-  height: 32px;
+.ehr-filter-group label {
   font-size: 12px;
 }
 
@@ -11941,36 +12000,6 @@ span:has(> svg:only-child) {
 .ehr-worklist-row {
   gap: 14px;
   padding: 9px 14px;
-}
-
-.ehr-right-rail {
-  gap: 8px;
-}
-
-.ehr-side-card {
-  padding: 12px;
-}
-
-.ehr-side-card h2 {
-  margin-bottom: 10px;
-  font-size: 16px;
-}
-
-.ehr-side-card p {
-  margin-bottom: 10px;
-  font-size: 12px;
-  line-height: 1.38;
-}
-
-.ehr-side-card > button {
-  min-height: 30px;
-  font-size: 12px;
-}
-
-.ehr-side-card > button b {
-  min-width: 21px;
-  height: 21px;
-  font-size: 11px;
 }
 
 .ehr-mission-head {
@@ -13929,6 +13958,16 @@ span:has(> svg:only-child) {
   text-decoration: none;
 }
 
+/* Care rows (reception, lab, pharmacy…) name the patient in link blue, same
+   as the doctor's queue card and the ward board. */
+.ehr-care-row .ehr-appointment-main button {
+  color: var(--ehr-blue, var(--accent-primary));
+}
+
+.ehr-care-row:hover .ehr-appointment-main button {
+  text-decoration: underline;
+}
+
 .ehr-center-panel .ehr-appointment-main {
   display: block;
 }
@@ -14213,6 +14252,15 @@ span:has(> svg:only-child) {
   display: block;
 }
 
+/* Patient name reads as the link into the chart, same as the queue card. */
+.ehr-worklist-row .ehr-worklist-name strong {
+  color: var(--ehr-blue, var(--accent-primary));
+}
+
+.ehr-worklist-row:hover .ehr-worklist-name strong {
+  text-decoration: underline;
+}
+
 .ehr-worklist-row strong {
   color: var(--ehr-text-title);
   font-size: 15px;
@@ -14326,15 +14374,15 @@ span:has(> svg:only-child) {
 
 .ehr-side-card {
   border-color: var(--ehr-border);
-  border-radius: 16px;
-  padding: 18px;
+  border-radius: 12px;
+  padding: 14px;
   background: #FFFFFF;
 }
 
 .ehr-side-card h2 {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   color: var(--ehr-text-title);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -14345,48 +14393,9 @@ span:has(> svg:only-child) {
   line-height: 1.35;
 }
 
-.ehr-outstanding-chips {
-  gap: 0;
-}
-
-.ehr-outstanding-chips button {
-  min-height: 38px;
-  border-bottom: 1px solid var(--ehr-border-soft);
-  color: #3E5870;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.ehr-outstanding-chips button:last-child {
-  border-bottom: 0;
-}
-
-.ehr-outstanding-chips button b {
-  min-width: auto;
-  height: auto;
-  background: transparent;
-  color: var(--ehr-muted);
-  font-family: var(--font-platform-mono);
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.ehr-outstanding-chips button.warning b,
-.ehr-outstanding-chips button.danger b {
-  background: transparent;
-  color: #C94134;
-}
-
-.ehr-outstanding-chips button.neutral b {
-  color: var(--ehr-muted);
-}
-
-.ehr-side-card label {
-  min-height: 28px;
-  color: #3E5870;
-  font-size: 14px;
-  font-weight: 600;
-}
+/* Outstanding rows + count badges use the design's base styling (34px rows,
+   13px/700 labels, 23px tinted pill badges) — the old flat mono-count
+   restyle that lived here suppressed the design's tinted badges. */
 
 .ehr-side-card input {
   width: 18px;
@@ -14427,17 +14436,19 @@ span:has(> svg:only-child) {
   box-shadow: none !important;
 }
 
+/* Flat 12px-radius cards per the Claude Design mockups — border only, no
+   shadow. (.ehr-appointment-list is not a card: it is the white worklist
+   region inside the bordered centre panel — see below.) */
 .ehr-today-button,
 .ehr-mini-calendar,
 .ehr-filter-group,
 .ehr-day-stats,
 .ehr-side-card,
-.ehr-worklist-panel,
-.ehr-appointment-list {
+.ehr-worklist-panel {
   border: 1px solid var(--ehr-border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: #FFFFFF;
-  box-shadow: 0 1px 2px rgba(18, 52, 78, 0.04) !important;
+  box-shadow: none !important;
 }
 
 .ehr-today-button {
@@ -14448,13 +14459,16 @@ span:has(> svg:only-child) {
 }
 
 .ehr-mini-calendar {
-  padding: 12px;
-  border-bottom: 1px solid var(--ehr-border);
+  padding: 12px 12px 14px;
 }
 
+/* Rail filter groups carry their own card surface now that the rail itself
+   is transparent. */
 .ehr-filter-group {
   padding: 12px;
-  border-bottom: 1px solid var(--ehr-border);
+  border: 1px solid var(--ehr-border);
+  border-radius: 12px;
+  background: var(--ehr-panel);
 }
 
 .ehr-filter-group + .ehr-filter-group {
@@ -14468,9 +14482,12 @@ span:has(> svg:only-child) {
    blue/orange pair; the dark values are their dark-surface steps, not a
    dimmed copy (dataviz palette validator: both modes pass all checks). */
 .ehr-day-stats {
-  padding: 12px;
+  padding: 14px;
   --viz-inpatient: #2191D0;
   --viz-outpatient: #EB6834;
+  border: 1px solid var(--ehr-border);
+  border-radius: 12px;
+  background: var(--ehr-panel);
 }
 
 .ehr-day-stats-head {
@@ -14481,6 +14498,7 @@ span:has(> svg:only-child) {
 }
 
 .ehr-day-stats h3 {
+  margin: 0;
   color: var(--ehr-text);
   font-size: 13px;
   font-weight: 800;
@@ -14551,8 +14569,9 @@ span:has(> svg:only-child) {
 
 .ehr-day-stats-legend {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
-  margin-top: 6px;
+  margin-top: 10px;
   color: var(--ehr-muted);
   font-size: 11px;
   font-weight: 700;
@@ -14565,9 +14584,727 @@ span:has(> svg:only-child) {
 }
 
 .ehr-day-stats-legend i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+/* Weekly stacked variant (doctor dashboard): one rounded outpatient-over-
+   inpatient stack per weekday; the selected day at full strength, the rest
+   ghosted. Clicking a bar re-focuses the dashboard on that date. */
+.ehr-week-activity-caption {
+  color: var(--ehr-muted);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ehr-week-activity-summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  align-items: baseline;
+  gap: 4px 6px;
+  margin-top: 7px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  background: var(--ehr-table-head, #F4F8FB);
+}
+
+.ehr-week-activity-summary strong,
+.ehr-week-activity-summary b {
+  color: var(--ehr-text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ehr-week-activity-summary b {
+  color: var(--ehr-muted);
+}
+
+.ehr-week-activity-summary span {
+  color: var(--ehr-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.ehr-week-activity-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 104px;
+  margin-top: 12px;
+  padding: 0 2px 0;
+}
+
+.ehr-week-activity-bars button {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.ehr-week-activity-bars button:hover {
+  transform: translateY(-1px);
+}
+
+.ehr-week-activity-bars button.is-selected {
+  transform: translateY(-1px);
+}
+
+.ehr-week-activity-bars button:focus-visible {
+  outline: 2px solid var(--ehr-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.ehr-week-activity-count {
+  display: block;
+  min-height: 13px;
+  color: var(--ehr-muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+
+.ehr-week-activity-bars button.is-selected .ehr-week-activity-count {
+  color: var(--ehr-text);
+}
+
+.ehr-week-activity-track {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  width: 100%;
+  height: 86px;
+  padding: 3px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px;
+  background: linear-gradient(to top, rgba(131, 149, 168, 0.12) 0 1px, transparent 1px 50%, rgba(131, 149, 168, 0.12) 50% calc(50% + 1px), transparent calc(50% + 1px) 100%);
+}
+
+.ehr-week-activity-bars button.is-empty .ehr-week-activity-track {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(131, 149, 168, 0.08),
+    rgba(131, 149, 168, 0.08) 4px,
+    rgba(131, 149, 168, 0.03) 4px,
+    rgba(131, 149, 168, 0.03) 8px
+  );
+}
+
+.ehr-week-activity-bars button.is-selected .ehr-week-activity-track {
+  border-color: var(--ehr-blue);
+  box-shadow: 0 0 0 2px rgba(33, 145, 208, 0.12);
+}
+
+.ehr-week-activity-bars button.is-today:not(.is-selected) .ehr-week-activity-track {
+  border-color: rgba(33, 145, 208, 0.5);
+}
+
+.ehr-week-activity-bars i {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  opacity: 0.55;
+}
+
+.ehr-week-activity-bars button.is-selected i,
+.ehr-week-activity-bars button:hover i {
+  opacity: 1;
+}
+
+.ehr-week-seg-out {
+  background: var(--viz-outpatient);
+  border-radius: 5px 5px 2px 2px;
+}
+
+.ehr-week-seg-in {
+  background: var(--viz-inpatient);
+  border-radius: 2px 2px 5px 5px;
+}
+
+.ehr-week-activity-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+  padding: 0 2px;
+}
+
+.ehr-week-activity-days span {
+  display: grid;
+  gap: 1px;
+  text-align: center;
+  color: var(--ehr-muted);
+}
+
+.ehr-week-activity-days span.is-selected {
+  color: var(--ehr-text);
+}
+
+.ehr-week-activity-days b {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.ehr-week-activity-days small {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.ehr-week-activity .ehr-day-stats-legend {
+  margin-top: 10px;
+}
+
+/* ── Ward occupancy card (nurse left rail, design 02) ──
+   One row per ward: name + "N free" beside a filled occupancy meter. Amber
+   when the ward is down to its last bed; the count flips white once the fill
+   reaches it. */
+.ehr-occupancy-card {
+  padding: 14px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 12px;
+  background: var(--ehr-panel);
+}
+
+.ehr-occupancy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ehr-occupancy-head h3 {
+  margin: 0;
+  color: var(--ehr-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ehr-occupancy-head > b {
+  color: var(--ehr-text);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ehr-occupancy-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ehr-occupancy-row {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.ehr-occupancy-row-name {
+  min-width: 0;
+}
+
+.ehr-occupancy-row-name span {
+  display: block;
+  color: var(--ehr-text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ehr-occupancy-row-name b {
+  display: block;
+  margin-top: 1px;
+  color: #167755;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ehr-occupancy-row-name b.is-tight {
+  color: #B55E13;
+}
+
+.ehr-occupancy-bar {
+  position: relative;
+  height: 16px;
+  border-radius: 5px;
+  background: #EDF2F7;
+  overflow: hidden;
+}
+
+.ehr-occupancy-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 5px 0 0 5px;
+  background: var(--ehr-blue);
+}
+
+.ehr-occupancy-bar.is-tight i {
+  background: #B55E13;
+}
+
+.ehr-occupancy-bar span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 6px;
+  color: #597386;
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ehr-occupancy-bar.is-full span {
+  color: #fff;
+}
+
+/* ── Shift handoff popup (nurse) ──
+   Same flat design language as the dashboards: white 12px-radius sheet, 56px
+   header with #E7EEF5 divider, bordered 10px section cards, tinted badges,
+   pill buttons. */
+.ehr-handoff-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: min(86vh, 920px);
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ehr-handoff-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #E7EEF5;
+}
+
+.ehr-handoff-head-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ehr-handoff-head-title svg {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  color: var(--ehr-blue);
+}
+
+.ehr-handoff-head-title h2 {
+  margin: 0;
+  color: var(--ehr-text);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.ehr-handoff-head-title p {
+  margin: 1px 0 0;
+  color: var(--ehr-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ehr-handoff-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ehr-handoff-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ehr-muted);
+}
+
+.ehr-handoff-close:hover {
+  border-color: var(--ehr-border);
+  background: rgba(33, 145, 208, 0.07);
+  color: var(--tb-blue-800, #015697);
+}
+
+.ehr-handoff-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: #fff;
+}
+
+.ehr-handoff-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.ehr-handoff-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ehr-handoff-stat svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+
+.ehr-handoff-stat span {
+  flex: 1;
+  min-width: 0;
+  color: var(--ehr-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.ehr-handoff-stat b {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.ehr-handoff-section {
+  border: 1px solid var(--ehr-border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.ehr-handoff-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid #E7EEF5;
+}
+
+.ehr-handoff-section-head > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ehr-handoff-section-head svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--ehr-blue);
+}
+
+.ehr-handoff-section-head h3 {
+  margin: 0;
+  color: var(--ehr-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ehr-handoff-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.ehr-handoff-badge {
+  min-width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #EEF4F6;
+  color: #3D5967;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ehr-handoff-badge[data-tone='red'] {
+  background: #FFF0EF;
+  color: #C24135;
+}
+
+.ehr-handoff-badge[data-tone='green'] {
+  background: #E8F7F1;
+  color: #167755;
+}
+
+.ehr-handoff-card {
+  padding: 10px 12px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ehr-handoff-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ehr-handoff-card-head > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ehr-handoff-name {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tb-blue-800, #015697);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: left;
+}
+
+button.ehr-handoff-name:hover {
+  text-decoration: underline;
+}
+
+.ehr-handoff-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #FFF0EF;
+  color: #C24135;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ehr-handoff-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ehr-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ehr-handoff-clear:hover {
+  color: #C24135;
+}
+
+.ehr-handoff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ehr-handoff-input,
+textarea.ehr-handoff-input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px !important;
+  background: #fff;
+  color: var(--ehr-text);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+}
+
+.ehr-handoff-input:focus {
+  border-color: var(--ehr-blue);
+}
+
+.ehr-handoff-input::placeholder {
+  color: #8CA0AE;
+  font-weight: 500;
+}
+
+textarea.ehr-handoff-input {
+  margin-top: 8px;
+  resize: vertical;
+}
+
+.ehr-handoff-note {
+  margin: 0;
+  color: var(--ehr-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ehr-handoff-note strong {
+  color: var(--ehr-text);
+  font-weight: 700;
+}
+
+.ehr-handoff-sbar-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--ehr-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ehr-handoff-sbar-list b {
+  color: var(--ehr-text);
+  font-weight: 700;
+}
+
+.ehr-handoff-empty {
+  margin: 0;
+  padding: 14px 0;
+  color: var(--ehr-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.ehr-handoff-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ehr-text);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ehr-handoff-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ehr-handoff-btn:hover {
+  border-color: var(--ehr-blue);
+  color: var(--tb-blue-800, #015697);
+}
+
+.ehr-handoff-btn.primary {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.ehr-handoff-btn.primary:hover {
+  border-color: var(--tb-blue-800, #015697);
+  background: var(--tb-blue-800, #015697);
+  color: #fff;
+}
+
+.ehr-handoff-btn.sm {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.ehr-handoff-btn[disabled] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.ehr-handoff-signoff {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ehr-handoff-signoff > div {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.ehr-handoff-label {
+  display: block;
+  margin-bottom: 5px;
+  color: #8395A8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ehr-handoff-signed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 0;
+  color: #167755;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ehr-handoff-signed svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ehr-handoff-meta {
+  margin: 10px 0 0;
+  color: var(--ehr-muted);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .ehr-filter-group:has(+ .ehr-filter-group) {
@@ -14593,29 +15330,10 @@ span:has(> svg:only-child) {
   accent-color: var(--color-success-500);
 }
 
-.ehr-center-panel {
-  border: 0;
-  background: transparent;
-}
-
+/* The centre panel keeps its own border + white surface (design): the daybar
+   and worklist live INSIDE it, separated only by the #E7EEF5 divider. */
 .ehr-appointment-list {
-  border-bottom: 1px solid var(--ehr-border);
   overflow: hidden auto;
-}
-
-/* The date/stats bar and the appointment rows below it read as one card
-   (header row + divider + list), not two stacked cards with a gap. */
-.ehr-daybar {
-  background: #FFFFFF;
-  border: 1px solid var(--ehr-border);
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 1px 2px rgba(18, 52, 78, 0.04) !important;
-}
-
-.ehr-daybar + .ehr-appointment-list {
-  margin-top: -8px;
-  border-top: 0;
-  border-radius: 0 0 16px 16px;
 }
 
 .ehr-worklist-panel {
@@ -14674,11 +15392,12 @@ span:has(> svg:only-child) {
   padding: 0;
 }
 
+/* The centre panel is a real bordered card in the design (12px radius, white),
+   with the 56px daybar + its #E7EEF5 divider inside it — not a transparent
+   wrapper with a floating title row. */
 .ehr-center-panel {
   display: flex;
   flex-direction: column;
-  border: 0;
-  background: transparent;
   overflow: hidden;
 }
 
@@ -14686,51 +15405,36 @@ span:has(> svg:only-child) {
   align-self: start;
 }
 
+/* Flat 12px cards, border only — per the Claude Design mockup. */
 .ehr-today-button,
 .ehr-mini-calendar,
 .ehr-filter-group,
-.ehr-appointment-list,
 .ehr-worklist-panel,
 .ehr-side-card {
   border: 1px solid var(--ehr-border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: #FFFFFF;
-  box-shadow: 0 1px 2px rgba(18, 52, 78, 0.04) !important;
+  box-shadow: none !important;
+}
+
+/* The worklist body is the panel's own white interior, not a nested card. */
+.ehr-appointment-list {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none !important;
 }
 
 .ehr-today-button {
   width: 100%;
   margin: 0;
-}
-
-.ehr-workspace-grid.is-dashboard > .ehr-left-rail > .ehr-today-button,
-.ehr-workspace-grid.is-dashboard > .ehr-center-panel > .ehr-daybar,
-.ehr-workspace-grid.is-dashboard > .ehr-right-rail > .ehr-side-card:first-of-type {
-  margin-top: 0;
-}
-
-.ehr-workspace-grid.is-dashboard > .ehr-left-rail > .ehr-today-button,
-.ehr-workspace-grid.is-dashboard > .ehr-center-panel > .ehr-daybar {
   height: 34px;
   min-height: 34px;
 }
 
-.ehr-workspace-grid.is-dashboard > .ehr-center-panel > .ehr-daybar {
-  padding: 0;
-  border-bottom: 0;
-  align-items: center;
-}
-
-.ehr-workspace-grid.is-dashboard > .ehr-center-panel > .ehr-daybar h2 {
-  line-height: 34px;
-}
-
-.ehr-workspace-grid.is-dashboard > .ehr-center-panel > .ehr-daybar .ehr-day-tabs {
-  align-items: center;
-}
-
-.ehr-workspace-grid.is-dashboard > .ehr-center-panel > .ehr-daybar .ehr-day-tabs button {
-  height: 34px;
+.ehr-workspace-grid.is-dashboard > .ehr-left-rail > .ehr-today-button,
+.ehr-workspace-grid.is-dashboard > .ehr-right-rail > .ehr-side-card:first-of-type {
+  margin-top: 0;
 }
 
 .ehr-mini-calendar,
@@ -14834,96 +15538,24 @@ span:has(> svg:only-child) {
 }
 
 /* ============ Dashboard density pass ============
-   Sizes only — no color/structure changes. The dashboard's cards, calendar,
-   checkboxes, and table rows were sized for a much lower-density layout than
-   the mockup intends; this tightens fonts/padding/heights across the board. */
-.ehr-workspace-grid,
-.ehr-left-rail,
-.ehr-center-panel,
-.ehr-right-rail {
-  gap: 8px !important;
-}
-
-.ehr-today-button {
-  height: 28px !important;
-  min-height: 28px !important;
-  font-size: 11px;
-}
-
-.ehr-mini-calendar {
-  padding: 0 10px 10px !important;
-}
-
-.ehr-mini-calendar-title {
-  padding: 8px 0 6px !important;
-}
-
-.ehr-mini-calendar-title span {
-  font-size: 12px;
-}
-
-.ehr-mini-calendar-grid button {
-  height: 22px !important;
-  font-size: 11px !important;
-}
-
-.ehr-mini-calendar-grid b {
-  font-size: 10px !important;
-}
-
+   Trimmed to the rules that do NOT conflict with the Claude Design doctor-
+   dashboard spec. The old !important size overrides here (8px grid gaps, 44px
+   daybar, 22px calendar cells, 12px side-card padding, 14px checkboxes, 11px
+   tab text) were exactly what kept the redesign from applying — the design's
+   sizes now live in the base rules above. */
 .ehr-filter-group {
   padding: 10px !important;
   gap: 6px !important;
 }
 
-.ehr-filter-group label,
-.ehr-side-card label {
+.ehr-filter-group label {
   font-size: 12px !important;
   gap: 6px !important;
 }
 
-.ehr-filter-group input,
-.ehr-side-card input {
+.ehr-filter-group input {
   width: 14px !important;
   height: 14px !important;
-}
-
-.ehr-daybar {
-  min-height: 44px !important;
-  padding: 0 12px !important;
-}
-
-.ehr-daybar h2 {
-  font-size: 15px !important;
-}
-
-.ehr-day-tabs button {
-  font-size: 11px !important;
-}
-
-.ehr-side-card {
-  padding: 12px !important;
-}
-
-.ehr-side-card h2 {
-  margin-bottom: 8px !important;
-  font-size: 15px !important;
-}
-
-.ehr-side-card p {
-  margin-bottom: 8px !important;
-  font-size: 11.5px !important;
-}
-
-.ehr-side-card > button {
-  min-height: 28px !important;
-  font-size: 12px !important;
-}
-
-.ehr-side-card > button b {
-  min-width: 20px;
-  height: 20px;
-  font-size: 11px;
 }
 
 /* Stethoscope reads visually heavier than the other side-card icons at the
@@ -14999,6 +15631,41 @@ span:has(> svg:only-child) {
 .ehr-side-card.ehr-mission-card .ehr-side-card-head svg {
   stroke: #fff;
   color: #fff;
+}
+
+/* Final shared side-card header alignment. Several role dashboards add their
+   own card-title rules later in the file, so this keeps every right-rail card
+   header on one clean line: icon first, title beside it, both starting together. */
+.ehr-side-card .ehr-side-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ehr-side-card .ehr-side-card-head h2 {
+  margin: 0 !important;
+  color: var(--ehr-text-title, var(--ehr-text));
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 24px;
+}
+
+.ehr-side-card .ehr-side-card-head svg,
+.ehr-side-card .ehr-side-card-head svg.lucide {
+  display: block;
+  flex: 0 0 24px;
+  width: 24px !important;
+  height: 24px !important;
+  margin: 0;
+  color: var(--accent-primary);
+  stroke: currentColor;
+}
+
+.ehr-side-card.ehr-mission-card .ehr-side-card-head h2,
+.ehr-side-card.ehr-mission-card .ehr-side-card-head svg {
+  color: #fff;
+  stroke: currentColor;
 }
 
 /* ── Patient chart section tabs: horizontal bar below the patient header ──
@@ -15113,32 +15780,14 @@ span:has(> svg:only-child) {
   background: var(--ehr-blue-light);
 }
 
-/* Outstanding rows carry four cells (icon / text / meta / chevron). The
-   double class out-specifies the `.ehr-appointment-row:not(.ehr-care-row)`
-   4-column (icon/time/main/actions) template above. */
-.ehr-appointment-row.ehr-outstanding-entry {
-  grid-template-columns: 42px minmax(0, 1fr) max-content max-content;
-  cursor: pointer;
-}
-
+/* Non-telehealth outstanding entries render as compact queue-card rows
+   (see `.ehr-queue-card--compact` near the queue-card rules below);
+   telehealth entries stay full appointment-row cards. */
 .ehr-outstanding-title {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
-}
-
-.ehr-outstanding-entry-meta {
-  flex: 0 0 auto;
-  color: var(--ehr-muted);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.ehr-outstanding-entry-chevron {
-  flex: 0 0 auto;
-  color: var(--ehr-muted);
 }
 
 .ehr-outstanding-chips button.is-open {
@@ -15355,7 +16004,9 @@ span:has(> svg:only-child) {
    at exactly 15px and the two lists' columns line up:
    1 + 4 + 1 + 9 = 1 + 14. Scoped away from .ehr-care-list so the nurse/
    front-desk care dashboards keep their own density. */
-.ehr-appointment-list:not(.ehr-care-list) {
+/* Scoped to appointment-row lists only — the doctor worklist (queue cards)
+   keeps the design's even 12px inset. */
+.ehr-appointment-list:not(.ehr-care-list):not(:has(.ehr-queue-scroll)) {
   padding-inline: 4px;
 }
 
@@ -15706,7 +16357,6 @@ span:has(> svg:only-child) {
   position: relative;
   display: flex;
   align-items: center;
-  margin-top: 12px;
 }
 
 .ehr-rail-search-icon {
@@ -15718,13 +16368,14 @@ span:has(> svg:only-child) {
 
 .ehr-rail-search input {
   width: 100%;
-  height: 40px;
-  padding: 0 36px;
+  height: 38px;
+  padding: 0 34px;
   border: 1px solid var(--ehr-border);
   border-radius: 999px;
   background: var(--ehr-panel);
   color: var(--ehr-text);
-  font-size: 0.875rem;
+  font-size: 13px;
+  font-weight: 600;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -15828,39 +16479,107 @@ span:has(> svg:only-child) {
 /* Wide list scrolls inside its own frame; the page never scrolls sideways. */
 .ehr-queue-scroll {
   overflow-x: auto;
+  width: 100%;
 }
 
 /* Queue rows are cards, matching the appointment card list: no header row,
    each row carries its own surface and every column stays on one grid so the
    values line up down the list. */
+/* Rows sit directly on the white body — bordered cards carry the structure,
+   no tinted backdrop (current design rev). */
 .ehr-queue-cards {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 880px;
-  /* Soft backdrop, like the appointment card list — it's what lets the row
-     shadows read instead of disappearing into a white-on-white panel. */
-  padding: 10px 6px;
-  border-radius: 16px;
-  background: var(--bg-secondary);
+  width: 100%;
+  min-width: 0;
 }
 
 .ehr-queue-card {
   display: grid;
-  grid-template-columns: minmax(260px, 1.7fr) minmax(104px, 0.8fr) minmax(112px, 0.9fr) minmax(104px, 0.8fr) minmax(132px, 1fr) minmax(92px, 0.7fr) 84px;
-  gap: 20px;
+  grid-template-columns: minmax(260px, 2fr) minmax(130px, 1fr) minmax(130px, 0.95fr) minmax(130px, 1fr) minmax(160px, 1.15fr) minmax(112px, 0.85fr);
+  gap: 16px;
   align-items: center;
-  min-height: 64px;
-  padding: 9px 14px;
+  min-height: 52px;
+  padding: 6px 8px;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 10px;
   background: #fff;
   border-color: var(--ehr-border);
   box-shadow: none !important;
   color: var(--ehr-text);
   cursor: pointer;
   font-size: 13px;
-  transition: box-shadow 140ms ease;
+  transition: border-color 140ms ease;
+}
+
+/* Doctor / ward worklist variant — action buttons live in the row popup. */
+.ehr-queue-card--worklist,
+.ehr-queue-guide {
+  grid-template-columns: minmax(280px, 2.2fr) minmax(160px, 1.1fr) minmax(150px, 1fr) minmax(160px, 1.1fr) minmax(130px, 0.9fr);
+}
+
+/* Uppercase column guide floated above the first card; 9px side padding lines
+   its labels up with the card content (1px border + 8px card padding). */
+.ehr-queue-guide {
+  display: grid;
+  gap: 16px;
+  align-items: center;
+  padding: 0 9px;
+  margin-bottom: -2px;
+}
+
+.ehr-queue-guide span {
+  overflow: hidden;
+  color: #8395A8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Action column is right-aligned, matching the flex-end action buttons. */
+.ehr-queue-guide span:last-child {
+  text-align: right;
+}
+
+.ehr-queue-guide:not(.ehr-queue-guide--station):not(.ehr-queue-guide--care) span:last-child,
+.ehr-care-list--no-actions .ehr-queue-guide--care span:last-child {
+  text-align: left;
+}
+
+/* Nurse-station variant (design 02): Patient / Location / Acuity / Status /
+   Action — the status is a tinted pill and the action a single pill button. */
+.ehr-queue-card--station,
+.ehr-queue-guide--station {
+  grid-template-columns: minmax(200px, 2fr) minmax(110px, 1fr) minmax(100px, 1fr) minmax(120px, 1fr) 76px;
+}
+
+.ehr-queue-location-cell {
+  color: var(--ehr-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ehr-queue-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--tb-blue-800, #015697);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ehr-queue-action-pill:hover {
+  border-color: var(--ehr-blue);
+  background: rgba(33, 145, 208, 0.07);
 }
 
 .ehr-queue-card:hover,
@@ -15894,6 +16613,31 @@ span:has(> svg:only-child) {
 
 .ehr-queue-patient .ehr-patient-icon {
   flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+/* Acuity avatars are soft semantic tints (not solid triage colors), matching
+   the priority pills — RED/YELLOW/GREEN from triage, neutral elsewhere. */
+.ehr-patient-icon[data-acuity='RED'] {
+  background: #FFF0EF;
+  color: #C24135;
+}
+
+.ehr-patient-icon[data-acuity='YELLOW'] {
+  background: #FFF4E9;
+  color: #B55E13;
+}
+
+.ehr-patient-icon[data-acuity='GREEN'] {
+  background: #E8F7F1;
+  color: #167755;
+}
+
+.ehr-patient-icon[data-acuity='neutral'] {
+  background: #EEF4F6;
+  color: #3D5967;
 }
 
 .ehr-queue-patient-text {
@@ -15914,7 +16658,7 @@ span:has(> svg:only-child) {
   display: block;
   max-width: 100%;
   overflow: hidden;
-  color: var(--accent-primary);
+  color: var(--tb-blue-800, #015697);
   font-size: 13.5px;
   font-weight: 700;
   line-height: 1.25;
@@ -15937,19 +16681,29 @@ span:has(> svg:only-child) {
   white-space: nowrap;
 }
 
+/* Priority pill tints/text are the semantic danger/warning/success tokens
+   (design-facts), replacing the older ward-soft colors. */
 .ehr-queue-pill[data-tone='red'] {
-  background: var(--ward-rose-soft, #fde7ec);
-  color: #a5314b;
+  background: #FFF0EF;
+  color: #C24135;
 }
 
 .ehr-queue-pill[data-tone='yellow'] {
-  background: var(--ward-gold-soft, #fdf1dc);
-  color: #8a5a12;
+  background: #FFF4E9;
+  color: #B55E13;
 }
 
 .ehr-queue-pill[data-tone='green'] {
-  background: var(--ward-green-soft, #e2f4e8);
-  color: #1f7a44;
+  background: #E8F7F1;
+  color: #167755;
+}
+
+/* Neutral status pill — used by EhrCareDashboard rows whose `priority` isn't
+   a RED/YELLOW/GREEN triage code, so the pill falls back to a plain status
+   label instead of the clinician acuity pill. */
+.ehr-queue-pill[data-tone='neutral'] {
+  background: var(--ehr-table-head);
+  color: #315F6A;
 }
 
 .ehr-queue-status {
@@ -15960,9 +16714,49 @@ span:has(> svg:only-child) {
   font-variant-numeric: tabular-nums;
 }
 
-.ehr-queue-wait-over {
-  color: var(--triage-red, #c0392b);
+.ehr-queue-wait {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1.12;
+}
+
+.ehr-queue-wait strong {
+  color: var(--ehr-text);
+  font-family: var(--font-platform-mono);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.ehr-queue-wait small {
+  display: block;
+  margin-top: 3px;
+  color: var(--ehr-muted);
+  font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.ehr-queue-wait small.is-soon {
+  color: #B55E13;
+}
+
+.ehr-queue-wait small.is-past {
+  color: #8395A8;
+}
+
+.ehr-queue-wait-over {
+  color: #C24135;
+  font-weight: 700;
+}
+
+.ehr-queue-wait.ehr-queue-wait-over strong,
+.ehr-queue-wait.ehr-queue-wait-over small {
+  color: #C24135;
 }
 
 .ehr-queue-wait-over small {
@@ -15985,7 +16779,7 @@ span:has(> svg:only-child) {
   width: 30px;
   height: 30px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 8px;
   color: var(--ehr-muted);
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
@@ -15993,9 +16787,228 @@ span:has(> svg:only-child) {
 .ehr-queue-action:hover,
 .ehr-queue-action:focus-visible {
   border-color: var(--ehr-border);
-  background: var(--ehr-panel-soft);
-  color: var(--accent-primary);
+  background: rgba(33, 145, 208, 0.07);
+  color: var(--tb-blue-800, #015697);
   outline: none;
+}
+
+/* Compact queue-card modifier — for rows with fewer, shorter columns than
+   the full patient worklist (outstanding-item entries, MoH facility/report
+   lists): identity, one muted meta cell, one tone pill, one open action. */
+.ehr-queue-cards--compact {
+  min-width: 0;
+}
+
+.ehr-queue-card--compact {
+  grid-template-columns: minmax(200px, 1.8fr) minmax(96px, 1fr) minmax(112px, 0.8fr);
+  gap: 16px;
+}
+
+.ehr-queue-card--compact .ehr-queue-actions {
+  justify-content: center;
+}
+
+.ehr-care-list .ehr-queue-guide--care {
+  grid-template-columns: minmax(260px, 1.7fr) minmax(104px, 0.8fr) minmax(112px, 0.9fr) minmax(104px, 0.8fr) minmax(132px, 1fr) minmax(92px, 0.7fr);
+  padding: 0 9px;
+  margin: 0 0 -2px;
+}
+
+.ehr-care-list--no-actions {
+  padding: 14px;
+}
+
+.ehr-care-list--no-actions .ehr-queue-cards {
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ehr-care-list--no-actions .ehr-queue-card,
+.ehr-care-list--no-actions .ehr-queue-guide--care {
+  grid-template-columns:
+    minmax(300px, 2.2fr)
+    minmax(150px, 1fr)
+    minmax(140px, 0.9fr)
+    minmax(150px, 1fr)
+    minmax(180px, 1.2fr)
+    minmax(130px, 0.85fr);
+  column-gap: 20px;
+}
+
+.ehr-care-list--no-actions .ehr-queue-guide--care {
+  padding: 0 15px;
+  margin: 0 0 -2px;
+}
+
+.ehr-care-list--no-actions .ehr-queue-card {
+  min-height: 62px;
+  padding: 8px 15px;
+  border-radius: 8px;
+}
+
+.ehr-care-list--no-actions .ehr-queue-cell,
+.ehr-care-list--no-actions .ehr-queue-status {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+}
+
+/* Assigned patients module: match the doctors-module framed worklist. */
+.ehr-center-panel:has(.ehr-assigned-worklist-list) {
+  border: 1px solid var(--ehr-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: none !important;
+}
+
+.ehr-assigned-worklist-daybar {
+  min-height: 58px;
+  padding: 0 16px;
+  border-bottom: 1px solid #E7EEF5;
+  background: #fff;
+}
+
+.ehr-assigned-worklist-daybar h2 {
+  color: var(--ehr-text);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.ehr-assigned-worklist-daybar .ehr-day-tabs {
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.ehr-assigned-worklist-daybar .ehr-day-tabs button:not(.ehr-mobile-day-check) {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ehr-text);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.ehr-assigned-worklist-daybar .ehr-day-tabs button.active:not(.ehr-mobile-day-check) {
+  border-color: var(--ehr-blue);
+  background: var(--ehr-blue);
+  color: #fff;
+}
+
+.ehr-assigned-worklist-list {
+  padding: 14px;
+  background: #fff;
+  gap: 10px;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-scroll {
+  overflow-x: auto;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-cards {
+  width: 100%;
+  min-width: 0;
+  gap: 10px;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-guide {
+  padding: 0 15px;
+  margin: 2px 0 -2px;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-guide span {
+  color: #8395A8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-card--worklist {
+  min-height: 58px;
+  padding: 8px 15px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none !important;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-card--worklist:hover,
+.ehr-assigned-worklist-list .ehr-queue-card--worklist:focus-visible {
+  border-color: var(--ehr-blue);
+  background: #fff;
+  box-shadow: none !important;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-patient .ehr-patient-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-name {
+  color: var(--tb-blue-800, #015697);
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-patient p {
+  margin-top: 2px;
+  color: var(--ehr-muted);
+  font-size: 12px;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-cell {
+  color: var(--ehr-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-status {
+  color: var(--ehr-text);
+  font-weight: 800;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-num-col {
+  color: var(--ehr-text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-wait-over {
+  color: #C24135;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-actions {
+  gap: 8px;
+}
+
+.ehr-assigned-worklist-list .ehr-queue-action {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ehr-blue);
+}
+
+@media (max-width: 860px) {
+  .ehr-queue-cards,
+  .ehr-care-list--no-actions .ehr-queue-cards,
+  .ehr-assigned-worklist-list .ehr-queue-cards {
+    min-width: 900px;
+  }
+}
+
+/* Small muted caption under a compact card's tone pill — for a second real
+   status field (e.g. triage disposition: pending/seen/admitted…) that the
+   4-column compact template has no dedicated cell for. */
+.ehr-queue-substatus {
+  margin: 3px 0 0;
+  color: var(--ehr-muted);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* Move dialog */
@@ -16964,7 +17977,7 @@ span:has(> svg:only-child) {
 
 /* Keep appointment/worklist cards separated by depth, not colored borders.
    Status meaning stays in the pills/text; rows remain visually calm. */
-.ehr-center-panel .ehr-appointment-list,
+.ehr-center-panel .ehr-appointment-list:not(:has(.ehr-queue-scroll)),
 .appointment-card-list {
   padding-inline: 6px;
 }

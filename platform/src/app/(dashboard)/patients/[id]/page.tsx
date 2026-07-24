@@ -1912,15 +1912,7 @@ export default function PatientDetailPage() {
                   </button>
                 </div>
               ) : (
-              <div className="relative px-6 py-5" style={{ paddingLeft: 56, maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
-                {/* Vertical spine */}
-                <div
-                  className="absolute top-5 bottom-5 w-0.5"
-                  style={{
-                    left: 32,
-                    background: 'var(--accent-primary)',
-                  }}
-                />
+              <div className="relative px-6 py-5" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
                 {filteredHistory.map((rec) => {
                   const ai = (rec as unknown as Record<string, unknown>).aiEvaluation as { suggestedDiagnoses: { icd10Code: string; name: string; confidence: number; reasoning: string; severity: string; suggestedTreatment?: string }[]; vitalSignAlerts: string[]; recommendedTests: string[]; severityAssessment: string; clinicalNotes: string; evaluatedAt: string } | undefined;
                   const isAIExpanded = expandedAI.has(rec._id + '-history');
@@ -1937,33 +1929,6 @@ export default function PatientDetailPage() {
                   });
                   return (
                   <div key={rec._id} className="relative pb-5 last:pb-0">
-                    {/* Timeline marker */}
-                    <button
-                      onClick={toggleExpand}
-                      className="absolute flex items-center justify-center"
-                      style={{
-                        left: -30,
-                        top: 14,
-                        width: 20,
-                        height: 20,
-                        borderRadius: '50%',
-                        background: 'var(--bg-card)',
-                        border: `2px solid ${markerColor}`,
-                        boxShadow: `0 0 0 4px var(--bg-card), 0 2px 8px ${markerColor}33`,
-                        cursor: 'pointer',
-                      }}
-                      aria-label={isExpanded ? 'Collapse encounter' : 'Expand encounter'}
-                    >
-                      <div
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          background: markerColor,
-                        }}
-                      />
-                    </button>
-
                     {/* Encounter card */}
                     <div
                       className="ehr-encounter-card rounded-xl transition-all hover:shadow-md"

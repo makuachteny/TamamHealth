@@ -4,28 +4,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { AppointmentDoc, AppointmentStatus } from '@/lib/db-types';
 import {
-  ArrowRightLeft,
   Calendar,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  ClipboardCheck,
   ClipboardList,
   FlaskConical,
   MoreVertical,
-  Pencil,
   Pill,
   Plus,
   Printer,
   Search,
-  SendHorizontal,
+  Send,
   Stethoscope,
   Video,
   X,
 } from '@/components/icons/lucide';
-import { initials, stateColor } from '@/lib/patient-utils';
-import { formatClockTime } from '@/lib/format-utils';
+import { initials } from '@/lib/patient-utils';
+import { formatClockTime, formatTimeUntil } from '@/lib/format-utils';
 import { useToast } from '@/components/Toast';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -39,7 +38,7 @@ import {
   addDays,
   formatMonthTitle,
 } from '@/components/ehr/EhrMiniCalendar';
-import EhrDayStatsChart, { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
+import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import EhrVisitPopup, { EhrQueueMoveDialog, PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useApp } from '@/lib/context';
@@ -142,6 +141,22 @@ function statusTone(status: AppointmentStatus) {
   return 'scheduled';
 }
 
+// Outstanding-entry tone → triage-style avatar color and a status pill,
+// reusing the codebase's existing tone vocabulary (Overdue/Needs
+// attention/Open already appear elsewhere as status labels) rather than
+// inventing new copy per entry.
+function outstandingTonePriority(tone?: OutstandingEntry['tone']): 'RED' | 'YELLOW' | 'GREEN' {
+  if (tone === 'danger') return 'RED';
+  if (tone === 'warning') return 'YELLOW';
+  return 'GREEN';
+}
+
+function outstandingPillTone(tone?: OutstandingEntry['tone']) {
+  if (tone === 'danger') return { key: 'red', label: 'Overdue' };
+  if (tone === 'warning') return { key: 'yellow', label: 'Needs attention' };
+  return { key: 'green', label: 'Open' };
+}
+
 function departmentTone(value?: string) {
   const department = (value || '').toLowerCase();
   if (department.includes('emergency')) return 'emergency';
@@ -158,6 +173,7 @@ export default function EhrClinicalDashboard({
   patients,
   appointments,
   outstanding,
+  capabilities,
   onUpdateAppointmentStatus,
 }: {
   clinicianName: string;
@@ -165,6 +181,9 @@ export default function EhrClinicalDashboard({
   patients: WorklistPatient[];
   appointments: AppointmentDoc[];
   outstanding: OutstandingItem[];
+  /** "What can I do here" checklist — checked once the clinician has ever
+   *  performed the action (see useCapabilities), never un-checked after. */
+  capabilities?: { label: string; done?: boolean; href?: string; onClick?: () => void }[];
   onUpdateAppointmentStatus?: (appointmentId: string, status: AppointmentStatus) => Promise<void> | void;
 }) {
   const router = useRouter();
@@ -338,7 +357,11 @@ export default function EhrClinicalDashboard({
   const calendarCells = useMemo(() => {
     const monthStart = startOfMonth(calendarMonth);
     const gridStart = addDays(monthStart, -monthStart.getDay());
-    return Array.from({ length: 42 }).map((_, index) => {
+    // Only as many week rows as the month needs (design shows no trailing
+    // blank week — July 2026 renders 5 rows, not a fixed 6).
+    const daysInMonth = addDays(startOfMonth(addMonths(monthStart, 1)), -1).getDate();
+    const weekCount = Math.ceil((monthStart.getDay() + daysInMonth) / 7);
+    return Array.from({ length: weekCount * 7 }).map((_, index) => {
       const date = addDays(gridStart, index);
       const iso = toIsoDate(date);
       return {
@@ -467,6 +490,13 @@ export default function EhrClinicalDashboard({
     const entry = row.patientId ? queueEntryByPatient.get(row.patientId) : undefined;
     const triage = row.patientId ? activeTriageByPatient.get(row.patientId) : undefined;
     const inService = Boolean(entry?.assignedToId) || row.status === 'in_progress';
+    const appointmentAt = row.appointment?.appointmentTime
+      ? new Date(`${row.appointment.appointmentDate}T${row.appointment.appointmentTime}:00`)
+      : null;
+    const relativeNow = queueNowMs === null ? null : new Date(queueNowMs);
+    const appointmentRelative = appointmentAt && relativeNow && !Number.isNaN(appointmentAt.getTime())
+      ? formatTimeUntil(appointmentAt.toISOString(), relativeNow)
+      : '';
     return {
       entry: entry ?? null,
       triage: triage ?? null,
@@ -477,11 +507,26 @@ export default function EhrClinicalDashboard({
         ? `In service${entry?.assignedToName ? ` · ${entry.assignedToName}` : ''}`
         : entry ? 'Waiting' : statusLabel(row.status),
       queueText: entry ? STAGE_LABELS[entry.stage] : typeLabel(row.department),
-      waitText: entry ? waitLabel(entry.minutesWaiting) : '—',
+      waitText: entry ? formatClockTime(entry.enteredStageAt) : row.appointment?.appointmentTime ? formatClockTime(row.appointment.appointmentTime) : '—',
+      waitSubtext: entry ? waitLabel(entry.minutesWaiting) : appointmentRelative,
       overTarget: Boolean(entry?.flaggedForReassessment),
       inService,
     };
   };
+
+  // Daybar filter pills (design): Waiting = rows actively in a queue (arrived,
+  // not yet in service) or checked in; Scheduled = everything else (in
+  // service, booked appointments, registry-only assignments).
+  const [worklistFilter, setWorklistFilter] = useState<'all' | 'waiting' | 'scheduled'>('all');
+  const isWaitingRow = (row: UnifiedPatientRow) => {
+    const columns = rowQueueColumns(row);
+    return !columns.inService && (Boolean(columns.entry) || row.status === 'checked_in');
+  };
+  const waitingCount = visiblePatientRows.filter(isWaitingRow).length;
+  const scheduledCount = visiblePatientRows.length - waitingCount;
+  const filteredPatientRows = worklistFilter === 'all'
+    ? visiblePatientRows
+    : visiblePatientRows.filter(row => isWaitingRow(row) === (worklistFilter === 'waiting'));
 
   // Row popup (visit info + actions) and the Move dialog it can open.
   const [visitRow, setVisitRow] = useState<UnifiedPatientRow | null>(null);
@@ -704,26 +749,24 @@ export default function EhrClinicalDashboard({
           <button
             type="button"
             aria-label="Dispense"
-            style={{ background: '#fff', borderColor: 'var(--border-light)', color: '#000' }}
             onClick={() => { setFindPatientQuery(''); setFindPatientOpen(true); }}
           >
-            <Pill className="w-4 h-4" color="#000" /> Dispense
+            <Pill className="w-4 h-4" /> Dispense
           </button>
           <button
             type="button"
             aria-label="Print today's schedule"
-            style={{ background: '#fff', borderColor: 'var(--border-light)', color: '#000' }}
             onClick={() => window.print()}
           >
-            <Printer className="w-4 h-4" color="#000" /> Print
+            <Printer className="w-4 h-4" /> Print
           </button>
           <button
             type="button"
+            className="primary"
             aria-label="Send intake"
-            style={{ background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: '#fff' }}
             onClick={() => router.push('/patient-intake')}
           >
-            <SendHorizontal className="w-4 h-4" color="#fff" /> Send intake
+            <Send className="w-4 h-4" /> Send intake
           </button>
         </div>
       </section>
@@ -782,7 +825,16 @@ export default function EhrClinicalDashboard({
             )}
           </div>
 
-          <DayActivityChart appointments={filteredAppointments} selectedDate={selectedDate} todayIso={todayIso} admittedPatientIds={admittedPatientIds} />
+          <DayActivityChart
+            appointments={filteredAppointments}
+            selectedDate={selectedDate}
+            todayIso={todayIso}
+            admittedPatientIds={admittedPatientIds}
+            onSelectDate={iso => {
+              setSelectedDate(iso);
+              setCalendarMonth(startOfMonth(parseIsoDate(iso)));
+            }}
+          />
         </aside>
 
         <main className="ehr-center-panel">
@@ -821,119 +873,146 @@ export default function EhrClinicalDashboard({
                   </div>
                 )}
 
-                {(activeOutstanding.entries ?? []).map(entry => {
-                  // Telehealth visits render as full appointment cards (same
-                  // columns as the schedule) with a Status column in place of
-                  // Language. Clicking opens the appointment popover; Join lives
-                  // inside it.
-                  const appointment = appointments.find(a => a._id === entry.id);
-                  if (appointment && isTelehealth(appointment)) {
-                    return (
-                      <article
-                        key={entry.id}
-                        className="ehr-appointment-row"
-                        data-triage={appointmentTriage(appointment.priority)}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => openOutstandingEntry(entry)}
-                        onKeyDown={event => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            openOutstandingEntry(entry);
-                          }
-                        }}
-                      >
-                        <div className="ehr-appointment-identity">
-                          <div className="ehr-patient-icon" style={{ background: stateColor(appointmentTriage(appointment.priority)), color: '#fff' }}>{initials(appointment.patientName)}</div>
-                          <div className="ehr-appointment-main">
-                            <button type="button" className="print-visible" onClick={event => { event.stopPropagation(); openPatientRecord(appointment); }}>
-                              {appointment.patientName}
-                            </button>
-                            <p>{appointment.reason || 'Telehealth visit'}</p>
-                          </div>
-                        </div>
-                        <div className="ehr-appointment-time">
-                          <strong>{formatClockTime(appointment.appointmentTime)}</strong>
-                          <span>{typeLabel(appointment.priority)}</span>
-                        </div>
-                        <div className="ehr-appointment-language">
-                          <strong>{statusLabel(appointment.status)}</strong>
-                          <span>Status</span>
-                        </div>
-                        <span className="ehr-appointment-department">
-                          <b className={`ehr-department-pill ${departmentTone(appointment.department)}`}>{typeLabel(appointment.department || 'Telemedicine')}</b>
-                        </span>
-                        <div className="ehr-status-menu">
-                          <select
-                            value={appointment.status}
-                            className={statusTone(appointment.status)}
-                            onClick={event => event.stopPropagation()}
-                            onKeyDown={event => event.stopPropagation()}
-                            onChange={event => {
-                              void onUpdateAppointmentStatus?.(appointment._id, event.target.value as AppointmentStatus);
+                {(activeOutstanding.entries?.length ?? 0) > 0 && (
+                  <div className="ehr-queue-scroll">
+                    <div className="ehr-queue-cards ehr-queue-cards--compact">
+                      {(activeOutstanding.entries ?? []).map(entry => {
+                        // Telehealth visits render as full appointment cards (same
+                        // columns as the schedule) with a Status column in place of
+                        // Language. Clicking opens the appointment popover; Join lives
+                        // inside it.
+                        const appointment = appointments.find(a => a._id === entry.id);
+                        if (appointment && isTelehealth(appointment)) {
+                          return (
+                            <article
+                              key={entry.id}
+                              className="ehr-appointment-row"
+                              data-triage={appointmentTriage(appointment.priority)}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openOutstandingEntry(entry)}
+                              onKeyDown={event => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  openOutstandingEntry(entry);
+                                }
+                              }}
+                            >
+                              <div className="ehr-appointment-identity">
+                                <div className="ehr-patient-icon" data-acuity={appointmentTriage(appointment.priority)}>{initials(appointment.patientName)}</div>
+                                <div className="ehr-appointment-main">
+                                  <button type="button" className="print-visible" onClick={event => { event.stopPropagation(); openPatientRecord(appointment); }}>
+                                    {appointment.patientName}
+                                  </button>
+                                  <p>{appointment.reason || 'Telehealth visit'}</p>
+                                </div>
+                              </div>
+                              <div className="ehr-appointment-time">
+                                <strong>{formatClockTime(appointment.appointmentTime)}</strong>
+                                <span>{typeLabel(appointment.priority)}</span>
+                              </div>
+                              <div className="ehr-appointment-language">
+                                <strong>{statusLabel(appointment.status)}</strong>
+                                <span>Status</span>
+                              </div>
+                              <span className="ehr-appointment-department">
+                                <b className={`ehr-department-pill ${departmentTone(appointment.department)}`}>{typeLabel(appointment.department || 'Telemedicine')}</b>
+                              </span>
+                              <div className="ehr-status-menu">
+                                <select
+                                  value={appointment.status}
+                                  className={statusTone(appointment.status)}
+                                  onClick={event => event.stopPropagation()}
+                                  onKeyDown={event => event.stopPropagation()}
+                                  onChange={event => {
+                                    void onUpdateAppointmentStatus?.(appointment._id, event.target.value as AppointmentStatus);
+                                  }}
+                                >
+                                  {statusOptions.map(status => (
+                                    <option key={status} value={status}>{statusLabel(status)}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </article>
+                          );
+                        }
+                        const pill = outstandingPillTone(entry.tone);
+                        return (
+                          <div
+                            key={entry.id}
+                            className="ehr-queue-card ehr-queue-card--compact"
+                            data-triage={outstandingTonePriority(entry.tone)}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => openOutstandingEntry(entry)}
+                            onKeyDown={event => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                openOutstandingEntry(entry);
+                              }
                             }}
                           >
-                            {statusOptions.map(status => (
-                              <option key={status} value={status}>{statusLabel(status)}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </article>
-                    );
-                  }
-                  return (
-                  <article
-                    key={entry.id}
-                    className="ehr-appointment-row ehr-outstanding-entry"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openOutstandingEntry(entry)}
-                    onKeyDown={event => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        openOutstandingEntry(entry);
-                      }
-                    }}
-                  >
-                    <div
-                      className="ehr-patient-icon"
-                      style={{ background: stateColor(entry.tone === 'danger' ? 'RED' : entry.tone === 'warning' ? 'YELLOW' : 'GREEN'), color: '#fff' }}
-                    >
-                      {initials(entry.title)}
+                            <div className="ehr-queue-patient">
+                              <span
+                                className="ehr-patient-icon"
+                                data-acuity={outstandingTonePriority(entry.tone)}
+                              >
+                                {initials(entry.title)}
+                              </span>
+                              <div className="ehr-queue-patient-text">
+                                <button type="button" className="ehr-queue-name" onClick={event => { event.stopPropagation(); openOutstandingEntry(entry); }}>
+                                  {entry.title}
+                                </button>
+                                {entry.subtitle && <p>{entry.subtitle}</p>}
+                              </div>
+                            </div>
+
+                            <div className="ehr-queue-cell ehr-queue-muted-cell">{entry.meta || '—'}</div>
+
+                            <div className="ehr-queue-cell">
+                              <span className="ehr-queue-pill" data-tone={pill.key}>{pill.label}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="ehr-appointment-main">
-                      <button type="button" onClick={event => { event.stopPropagation(); openOutstandingEntry(entry); }}>
-                        {entry.title}
-                      </button>
-                      {entry.subtitle && <p>{entry.subtitle}</p>}
-                    </div>
-                    {entry.meta && <span className="ehr-outstanding-entry-meta">{entry.meta}</span>}
-                    <ChevronRight className="w-4 h-4 ehr-outstanding-entry-chevron" />
-                  </article>
-                  );
-                })}
+                  </div>
+                )}
               </div>
             </>
           ) : (
             <>
-	          <div className="ehr-daybar">
+	          <div className="ehr-daybar ehr-assigned-worklist-daybar">
 	            <h2>Patients assigned to you</h2>
 	            <div className="ehr-day-tabs">
-              {view === 'dashboard' ? (
-                <>
-                  <button type="button" className="active">
-                    {visiblePatientRows.length} Patient{visiblePatientRows.length === 1 ? '' : 's'}
-                  </button>
-                </>
-	              ) : (
-	                <button type="button" className="active">
-	                  {selectedAppointmentsForDay.length} Appointment{selectedAppointmentsForDay.length === 1 ? '' : 's'}
-	                </button>
-	              )}
+              <button
+                type="button"
+                className={worklistFilter === 'all' ? 'active' : undefined}
+                aria-pressed={worklistFilter === 'all'}
+                onClick={() => setWorklistFilter('all')}
+              >
+                All · {visiblePatientRows.length}
+              </button>
+              <button
+                type="button"
+                className={worklistFilter === 'waiting' ? 'active' : undefined}
+                aria-pressed={worklistFilter === 'waiting'}
+                onClick={() => setWorklistFilter('waiting')}
+              >
+                Waiting · {waitingCount}
+              </button>
+              <button
+                type="button"
+                className={worklistFilter === 'scheduled' ? 'active' : undefined}
+                aria-pressed={worklistFilter === 'scheduled'}
+                onClick={() => setWorklistFilter('scheduled')}
+              >
+                Scheduled · {scheduledCount}
+              </button>
 	            </div>
 	          </div>
 
-	          <div className="ehr-appointment-list">
+	          <div className="ehr-appointment-list ehr-assigned-worklist-list">
             {visiblePatientRows.length === 0 && (
               <div className="ehr-empty-state">
                 <ClipboardList className="w-8 h-8" />
@@ -948,7 +1027,18 @@ export default function EhrClinicalDashboard({
             {visiblePatientRows.length > 0 && (
               <div className="ehr-queue-scroll">
                 <div className="ehr-queue-cards">
-                  {visiblePatientRows.map((row) => {
+                  <div className="ehr-queue-guide" aria-hidden="true">
+                    {['Patient', 'Coming from', 'Priority', 'Status', 'Wait'].map(head => (
+                      <span key={head}>{head}</span>
+                    ))}
+                  </div>
+                  {filteredPatientRows.length === 0 && (
+                    <div className="ehr-empty-state">
+                      <strong>No {worklistFilter} patients</strong>
+                      <span>Nothing is in the {worklistFilter === 'waiting' ? 'waiting' : 'scheduled'} bucket right now.</span>
+                    </div>
+                  )}
+                  {filteredPatientRows.map((row) => {
                     const columns = rowQueueColumns(row);
                     const openRow = () => {
                       if (row.patientId) setVisitRow(row);
@@ -958,7 +1048,7 @@ export default function EhrClinicalDashboard({
                       <div
                         key={row.id}
                         data-triage={row.triagePriority}
-                        className="ehr-queue-card"
+                        className="ehr-queue-card ehr-queue-card--worklist"
                         role="button"
                         tabIndex={0}
                         onClick={openRow}
@@ -970,7 +1060,7 @@ export default function EhrClinicalDashboard({
                         }}
                       >
                         <div className="ehr-queue-patient">
-                          <span className="ehr-patient-icon" style={{ background: stateColor(row.triagePriority), color: '#fff' }}>
+                          <span className="ehr-patient-icon" data-acuity={row.triagePriority}>
                             {initials(row.name)}
                           </span>
                           <div className="ehr-queue-patient-text">
@@ -996,36 +1086,11 @@ export default function EhrClinicalDashboard({
                           <span className="ehr-queue-status">{columns.statusText}</span>
                         </div>
 
-                        <div className="ehr-queue-cell ehr-queue-muted-cell">{columns.queueText}</div>
-
                         <div className="ehr-queue-cell ehr-queue-num-col">
-                          <span className={columns.overTarget ? 'ehr-queue-wait-over' : undefined}>
-                            {columns.waitText}
-                            {columns.overTarget && <small> over target</small>}
-                          </span>
-                        </div>
-
-                        <div className="ehr-queue-actions">
-                          {columns.entry && (
-                            <button
-                              type="button"
-                              className="ehr-queue-action"
-                              title="Move to another queue"
-                              aria-label={`Move ${row.name} to another queue`}
-                              onClick={event => { event.stopPropagation(); setMoveEntry(columns.entry); }}
-                            >
-                              <ArrowRightLeft className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="ehr-queue-action"
-                            title="Open visit"
-                            aria-label={`Open ${row.name}`}
-                            onClick={event => { event.stopPropagation(); openRow(); }}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
+                          <div className={`ehr-queue-wait ${columns.overTarget ? 'ehr-queue-wait-over' : ''}`.trim()}>
+                            <strong>{columns.waitText}</strong>
+                            {columns.waitSubtext && <small>{columns.waitSubtext}</small>}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1151,6 +1216,20 @@ export default function EhrClinicalDashboard({
               ))}
             </div>
           </section>
+          {capabilities && capabilities.length > 0 && (
+            <div className="ehr-side-card ehr-capabilities-card">
+              <div className="ehr-side-card-head">
+                <ClipboardCheck className="w-5 h-5" />
+                <h2>Capabilities</h2>
+              </div>
+              {capabilities.map(item => (
+                <label key={item.label} onClick={item.onClick || (item.href ? () => router.push(item.href as string) : undefined)}>
+                  <input type="checkbox" checked={!!item.done} readOnly />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+          )}
         </aside>
         )}
       </section>
@@ -1159,13 +1238,15 @@ export default function EhrClinicalDashboard({
 }
 
 /* ─── Day activity chart (left rail) ───
-   Maps the clinician's schedule onto the shared `EhrDayStatsChart` widget:
-   Inpatient (the patient holds an active ward admission) vs Outpatient
-   (everyone else). Cancelled and no-show visits are excluded. */
+   Maps the clinician's own (provider/location-filtered) schedule onto the
+   weekly `EhrWeekActivityChart`: Inpatient (the patient holds an active ward
+   admission) vs Outpatient (everyone else). Cancelled and no-show visits are
+   excluded, so the bars stay a truthful picture of the doctor's week. */
 const CHART_HIDDEN_STATUSES: AppointmentStatus[] = ['cancelled', 'no_show'];
 
-function DayActivityChart({ appointments, selectedDate, todayIso, admittedPatientIds }: {
+function DayActivityChart({ appointments, selectedDate, todayIso, admittedPatientIds, onSelectDate }: {
   appointments: AppointmentDoc[]; selectedDate: string; todayIso: string; admittedPatientIds: Set<string>;
+  onSelectDate?: (iso: string) => void;
 }) {
   const items = useMemo<DayStatsItem[]>(() => appointments
     .filter(appointment => !CHART_HIDDEN_STATUSES.includes(appointment.status))
@@ -1176,11 +1257,12 @@ function DayActivityChart({ appointments, selectedDate, todayIso, admittedPatien
     })), [appointments, admittedPatientIds]);
 
   return (
-    <EhrDayStatsChart
+    <EhrWeekActivityChart
       items={items}
       seriesNames={['Inpatient', 'Outpatient']}
       selectedDate={selectedDate}
       todayIso={todayIso}
+      onSelectDate={onSelectDate}
     />
   );
 }

@@ -134,6 +134,237 @@ export async function getOpenEncounterForPatient(patientId: string): Promise<Enc
   return open[0] ?? null;
 }
 
+/** How recent an encounter must be to count as "the same visit" for reuse. */
+const OPEN_ENCOUNTER_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The newest open (non-terminal) encounter for a patient created within the
+ * last 24h — the visit an arriving or consulting patient should be joined to
+ * instead of spawning a duplicate encounter for the same episode of care.
+ * Unlike `getOpenEncounterForPatient`, this is time-bounded so a stale open
+ * encounter from days ago (abandoned without a formal close) never silently
+ * absorbs an unrelated new visit.
+ *
+ * `hospitalId` is required: within an org every facility replicates the same
+ * encounter DB, so an unscoped join would let Facility B's check-in absorb a
+ * still-open encounter created at Facility A — writing B's triage and consult
+ * activity onto an A-owned visit (cross-facility record mixing). A patient
+ * presenting at a different facility gets a fresh encounter there instead.
+ */
+export async function findOpenEncounterForPatient(patientId: string, hospitalId: string): Promise<EncounterDoc | null> {
+  const rows = await findByType<EncounterDoc>(
+    encountersDB(), 'clinical_encounter', { patientId }, { indexFields: ['type', 'patientId'] },
+  );
+  const cutoff = Date.now() - OPEN_ENCOUNTER_LOOKBACK_MS;
+  const open = rows.filter(e =>
+    !isTerminal(e.status) &&
+    e.hospitalId === hospitalId &&
+    new Date(e.createdAt || e.startedAt || 0).getTime() >= cutoff,
+  );
+  open.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  return open[0] ?? null;
+}
+
+/**
+ * True if the patient has ever had an encounter reach a terminal status.
+ * Used to auto-derive `attendanceType` (new vs repeat) at arrival.
+ */
+export async function hasClosedEncounterForPatient(patientId: string): Promise<boolean> {
+  const rows = await findByType<EncounterDoc>(
+    encountersDB(), 'clinical_encounter', { patientId }, { indexFields: ['type', 'patientId'] },
+  );
+  return rows.some(e => isTerminal(e.status));
+}
+
+export interface CreateArrivalEncounterInput {
+  patientId: string;
+  patientName: string;
+  hospitalNumber?: string;
+  hospitalId: string;
+  hospitalName?: string;
+  orgId?: string;
+  /** How the patient arrived — stamped on the encounter as its front door. */
+  arrivalChannel: 'appointment' | 'walk_in' | 'referral';
+  /** The scheduled appointment this arrival matched, when one existed. */
+  appointmentId?: string;
+  attendanceType?: 'new' | 'repeat';
+  /** Acting front-desk user, for the audit trail. */
+  actorId?: string;
+}
+
+/**
+ * Create the encounter at the moment a patient arrives at the facility — the
+ * visit id that threads registration/check-in/triage together instead of the
+ * former patientId-only joins (docs/EMR-FIELD-AUDIT-2026-07.md §1 and §3).
+ *
+ * No clinician is assigned yet at arrival, so `clinicianId`/`clinicianName`
+ * are stamped empty and filled in once the patient is routed to one.
+ *
+ * The encounter is created at the legal Stage 1-2 entry status for its
+ * arrival channel and then walked, hop by hop through `transitionEncounter`
+ * (so every move is validated and audited exactly like any other transition),
+ * to `awaiting_triage`:
+ *   - walk-in / referral: arrived_at_facility → awaiting_next_station → awaiting_triage
+ *   - appointment:        registered → arrived_at_facility → awaiting_next_station → awaiting_triage
+ */
+export async function createArrivalEncounter(input: CreateArrivalEncounterInput): Promise<EncounterDoc> {
+  const now = new Date().toISOString();
+  const initialStatus: EncounterStatus = input.arrivalChannel === 'appointment' ? 'registered' : 'arrived_at_facility';
+  let enc = await createEncounter({
+    patientId: input.patientId,
+    patientName: input.patientName,
+    hospitalNumber: input.hospitalNumber,
+    clinicianId: '',
+    clinicianName: '',
+    hospitalId: input.hospitalId,
+    hospitalName: input.hospitalName,
+    status: initialStatus,
+    snapshot: {},
+    labOrderIds: [],
+    startedAt: now,
+    orgId: input.orgId,
+    attendanceType: input.attendanceType,
+    arrivalChannel: input.arrivalChannel,
+    appointmentId: input.appointmentId,
+  });
+  const remainingHops: EncounterStatus[] = initialStatus === 'registered'
+    ? ['arrived_at_facility', 'awaiting_next_station', 'awaiting_triage']
+    : ['awaiting_next_station', 'awaiting_triage'];
+  for (const hop of remainingHops) {
+    enc = await transitionEncounter(enc._id, hop, { actorId: input.actorId });
+  }
+  return enc;
+}
+
+/**
+ * Stage 1-5 chain from a just-arrived encounter (post check-in) up to
+ * `with_clinician` — the triage → routing → rooming hops a walk-in/appointment
+ * arrival must pass through before a clinician can pick it up. Mirrors
+ * FACILITY_DISCHARGE_CHAIN's pattern below: find where the encounter
+ * currently sits and walk the remaining legal hops.
+ */
+const CLINICIAN_HANDOFF_CHAIN: EncounterStatus[] = [
+  'arrived_at_facility',
+  'awaiting_next_station',
+  'awaiting_triage',
+  'in_triage',
+  'triaged_awaiting_destination',
+  'routed_to_clinic',
+  'arrived_at_clinic_awaiting_rooming',
+  'in_rooming',
+  'ready_for_clinician',
+  'with_clinician',
+];
+
+/**
+ * Statuses BEFORE a clinician has taken the visit — the only states a
+ * front-desk (re-)check-in may join. Once the encounter is with a clinician
+ * or in a downstream loop (labs, pharmacy, checkout), a second check-in must
+ * not attach a fresh pending triage to the in-flight visit; the caller
+ * rejects it instead.
+ */
+export const PRE_CLINICIAN_STATUSES: EncounterStatus[] = [
+  'scheduled',
+  'registered',
+  ...CLINICIAN_HANDOFF_CHAIN.filter(status => status !== 'with_clinician'),
+];
+
+/**
+ * Advance an already-arrived encounter (created via `createArrivalEncounter`
+ * at check-in) through the legal triage/rooming chain to `with_clinician`,
+ * picking up wherever it currently sits — instead of a consultation spawning
+ * a second, disconnected encounter for the same visit
+ * (docs/EMR-FIELD-AUDIT-2026-07.md §3, §5 "Consultation" call site). Every
+ * hop runs through `transitionEncounter` so the machine is never bypassed and
+ * the audit trail records the same moves check-in/triage/rooming stations
+ * would have. Pre-arrival statuses (`scheduled`/`registered`) are hopped to
+ * `arrived_at_facility` first. Already-`with_clinician` (or clinically
+ * diverted — escalated/admitted/etc.) encounters are returned untouched
+ * rather than throwing, since a resumed consult may legitimately find the
+ * encounter already there.
+ */
+export async function advanceEncounterToClinician(
+  id: string,
+  opts: { clinicianId?: string; clinicianName?: string; snapshot?: Record<string, unknown>; triageId?: string; actorId?: string } = {},
+): Promise<EncounterDoc> {
+  let enc = await getEncounter(id);
+  if (!enc) throw new Error(`Encounter not found: ${id}`);
+
+  if (opts.clinicianId != null || opts.clinicianName != null || opts.snapshot != null || opts.triageId != null) {
+    enc = await updateEncounter(id, {
+      clinicianId: opts.clinicianId ?? enc.clinicianId,
+      clinicianName: opts.clinicianName ?? enc.clinicianName,
+      snapshot: opts.snapshot ?? enc.snapshot,
+      triageId: opts.triageId ?? enc.triageId,
+    }) ?? enc;
+  }
+  if (enc.status === 'with_clinician') return enc;
+
+  if (enc.status === 'scheduled') {
+    enc = await transitionEncounter(id, 'registered', { actorId: opts.actorId });
+  }
+  if (enc.status === 'registered') {
+    enc = await transitionEncounter(id, 'arrived_at_facility', { actorId: opts.actorId });
+  }
+
+  const startIdx = CLINICIAN_HANDOFF_CHAIN.indexOf(enc.status);
+  if (startIdx === -1) return enc; // not on this chain (e.g. escalated/admitted) — leave as-is
+
+  for (let i = startIdx + 1; i < CLINICIAN_HANDOFF_CHAIN.length; i++) {
+    enc = await transitionEncounter(id, CLINICIAN_HANDOFF_CHAIN[i], { actorId: opts.actorId });
+  }
+  return enc;
+}
+
+export interface CreateDirectConsultationEncounterInput {
+  patientId: string;
+  patientName: string;
+  hospitalNumber?: string;
+  clinicianId: string;
+  clinicianName: string;
+  hospitalId: string;
+  hospitalName?: string;
+  orgId?: string;
+  snapshot: Record<string, unknown>;
+  labOrderIds?: string[];
+  triageId?: string;
+  startedAt: string;
+  actorId?: string;
+}
+
+/**
+ * Create an encounter for a consultation with no prior check-in (a clinician
+ * starting a visit directly). Rather than materialising straight at
+ * `with_clinician`, the encounter is created at the legal Stage 1 entry
+ * status and walked hop-by-hop (via `transitionEncounter`, using the same
+ * `CLINICIAN_HANDOFF_CHAIN` a checked-in arrival follows) so the state
+ * machine is never bypassed, even for a direct consult.
+ */
+export async function createDirectConsultationEncounter(
+  input: CreateDirectConsultationEncounterInput,
+): Promise<EncounterDoc> {
+  let enc = await createEncounter({
+    patientId: input.patientId,
+    patientName: input.patientName,
+    hospitalNumber: input.hospitalNumber,
+    clinicianId: input.clinicianId,
+    clinicianName: input.clinicianName,
+    hospitalId: input.hospitalId,
+    hospitalName: input.hospitalName,
+    status: CLINICIAN_HANDOFF_CHAIN[0],
+    snapshot: input.snapshot,
+    labOrderIds: input.labOrderIds ?? [],
+    triageId: input.triageId,
+    startedAt: input.startedAt,
+    orgId: input.orgId,
+    arrivalChannel: 'walk_in',
+  });
+  for (let i = 1; i < CLINICIAN_HANDOFF_CHAIN.length; i++) {
+    enc = await transitionEncounter(enc._id, CLINICIAN_HANDOFF_CHAIN[i], { actorId: input.actorId });
+  }
+  return enc;
+}
+
 /**
  * Facility checkout (Stage 10): advance an encounter that has finished its
  * clinical work through the legal clinic-checkout → facility-checkout chain to

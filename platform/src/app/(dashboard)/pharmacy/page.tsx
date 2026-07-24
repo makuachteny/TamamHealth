@@ -20,6 +20,7 @@ import PageInstructionCard from '@/components/PageInstructionCard';
 import { formatMoney } from '@/lib/format-utils';
 import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
+import { markCapability } from '@/lib/capability-storage';
 
 const UNITS = ['tablets', 'vials', 'bottles', 'sachets', 'tubes', 'ampoules', 'sachet', 'ml'];
 
@@ -562,9 +563,13 @@ export default function PharmacyPage() {
   const activeRxs = activePatient ? rxFor(activePatient) : [];
 
   // Print a reorder / purchase order from the items currently needing restock.
+  // Also latches the pharmacy.reorder capability mark shown on the pharmacy
+  // dashboard's Capabilities card (dashboard/pharmacy/page.tsx) — the reorder
+  // flow itself lives only here, on the full pharmacy page.
   const handlePrintReorder = () => {
     const w = window.open('', '_blank');
     if (!w) return;
+    if (currentUser?._id) markCapability('pharmacy.reorder', currentUser._id);
     const rows = reorderList.map(i =>
       `<tr><td>${i.medicationName}</td><td>${i.category}</td><td>${i.stockLevel} ${i.unit}</td><td>${i.reorderLevel}</td><td>${orderQtyFor(i)}</td></tr>`
     ).join('');

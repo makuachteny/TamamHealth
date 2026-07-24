@@ -5,7 +5,7 @@ import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
-import { jubaYearMonth, jubaIsInMonth } from '../time-juba';
+import { jubaYearMonth, jubaIsInMonth, isInRange } from '../time-juba';
 import { findByType } from './db-query';
 
 /**
@@ -150,8 +150,18 @@ export async function deleteBirth(id: string): Promise<boolean> {
   }
 }
 
-export async function getBirthStats(scope?: DataScope) {
-  const all = await getAllBirths(scope);
+/**
+ * @param range Optional half-open [from, to) ISO instant range to bound the
+ *   stats to a reporting period (e.g. a DHIS2 export month), filtered on the
+ *   birth's own `dateOfBirth`. Omit for the existing all-time behavior —
+ *   added additively so this call stays backward-compatible for callers that
+ *   want the lifetime total (e.g. dashboards).
+ */
+export async function getBirthStats(scope?: DataScope, range?: { from: string; to: string }) {
+  let all = await getAllBirths(scope);
+  if (range) {
+    all = all.filter(b => isInRange(b.dateOfBirth, range));
+  }
   const thisMonth = jubaYearMonth();
   const thisYear = new Date().getFullYear().toString();
   return {

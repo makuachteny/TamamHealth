@@ -7,6 +7,7 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useToast } from '@/components/Toast';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
+import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import {
   ClipboardCheck, Baby, Skull, Syringe, HeartPulse,
   Database, Building2, ArrowRight, CheckCircle2, AlertTriangle,
@@ -79,9 +80,9 @@ interface CensusData {
 }
 
 // A saved report as displayed in the worklist: the census payload plus the
-// real submission timestamp from the wrapping FacilityCensusDoc (the census
-// payload itself is just numbers/text — no time of its own).
-type SavedCensusReport = CensusData & { _submittedAt?: string };
+// real submission timestamp/author from the wrapping FacilityCensusDoc (the
+// census payload itself is just numbers/text — no time or author of its own).
+type SavedCensusReport = CensusData & { _submittedAt?: string; _submittedBy?: string };
 
 function formatTime(iso?: string): string | undefined {
   if (!iso) return undefined;
@@ -157,9 +158,10 @@ export default function DataEntryDashboard() {
         submittedByName: currentUser?.name,
       });
       const updated = await getFacilityCensusByFacility(facilityId);
-      setSavedReports(updated.map(r => ({ ...(r.census as unknown as CensusData), _submittedAt: r.createdAt })).slice(0, 30));
+      setSavedReports(updated.map(r => ({ ...(r.census as unknown as CensusData), _submittedAt: r.createdAt, _submittedBy: r.submittedByName })).slice(0, 30));
       showToast(t('dataEntry.toastSaved'), 'success');
       setShowForm(false);
+      markCapability('data-entry.census');
     } catch {
       showToast(t('dataEntry.toastSaveFailed'), 'error');
     } finally {
@@ -179,7 +181,7 @@ export default function DataEntryDashboard() {
         const { getFacilityCensusByFacility } = await import('@/lib/services/facility-census-service');
         const facilityId = currentUser?.hospitalId || 'unknown';
         const existing = await getFacilityCensusByFacility(facilityId);
-        if (!cancelled) setSavedReports(existing.map(r => ({ ...(r.census as unknown as CensusData), _submittedAt: r.createdAt })).slice(0, 30));
+        if (!cancelled) setSavedReports(existing.map(r => ({ ...(r.census as unknown as CensusData), _submittedAt: r.createdAt, _submittedBy: r.submittedByName })).slice(0, 30));
       } catch {
         if (!cancelled) setSavedReports([]);
       }
@@ -414,6 +416,17 @@ export default function DataEntryDashboard() {
     );
   };
 
+  // Capabilities card — `data-entry.census` latches from a real submission
+  // in handleSave above. There is no amend/correction handler anywhere in
+  // facility-census-service.ts (only save + read) so a
+  // "data-entry.correction" capability isn't wired here — the page can't
+  // actually do that yet, and inventing a fake handler would just be an
+  // aspirational checklist item.
+  const capabilityItems = useMemo(() => ([
+    { key: 'data-entry.census', label: 'File a daily census report', onClick: () => setShowForm(true) },
+  ]), []);
+  const { checklist: capabilitiesChecklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
+
   if (!currentUser) return null;
 
   return (
@@ -456,7 +469,9 @@ export default function DataEntryDashboard() {
             compactMeta: t('dataEntry.bedsCount', { occupied: r.occupiedBeds, total: r.totalBeds }),
             date: r.date,
             time: formatTime(r._submittedAt),
-            status: `${occ}%`,
+            careTeam: r._submittedBy,
+            careTeamLabel: 'Submitted by',
+            statusLabel: r.totalBeds > 0 ? `${occ}% occupied` : undefined,
             statusTone: occ > 90 ? 'danger' : occ > 70 ? 'warning' : 'done',
             onClick: () => setSelectedReport(isOpen ? null : id),
             detail: isOpen ? renderReportDetail(r) : undefined,
@@ -467,12 +482,15 @@ export default function DataEntryDashboard() {
           { label: t('dashboard.bedOccupancy'), value: latest ? `${bedOccupancy}%` : '--', tone: bedOccupancy > 90 ? 'danger' : bedOccupancy > 70 ? 'warning' : 'success' },
           { label: t('dataEntry.kpiMedicineAvail'), value: latest ? `${medAvailability}%` : '--', tone: medAvailability >= 80 ? 'success' : medAvailability >= 50 ? 'warning' : 'danger' },
           { label: t('dataEntry.kpiReportsFiled'), value: savedReports.length },
+          // Daily alert surface — the checklist below is now a latch-once
+          // capability, so this metric keeps "has today's census been filed"
+          // visible day to day (reusing the existing generic done/pending
+          // status words rather than adding new one-off i18n keys).
+          { label: t('dataEntry.dailyCensus'), value: (!!latest && latest.date === today) ? t('patientPortal.done') : t('patientPortal.pending'), tone: (!!latest && latest.date === today) ? 'success' : 'warning', onClick: () => setShowForm(true) },
         ]}
         metricsTitle={t('dataEntry.title')}
-        checklist={[
-          { label: t('dataEntry.dailyCensus'), done: !!latest && latest.date === today, onClick: () => setShowForm(true) },
-        ]}
-        checklistTitle={t('dataEntry.dataCollection')}
+        checklist={capabilitiesChecklist}
+        checklistTitle="Capabilities"
         missionTitle={myHospital?.name}
         missionDescription={myHospital ? `${myHospital.state} · ${myHospital.county || myHospital.town} · ${myHospital.type?.replace(/_/g, ' ') ?? ''}` : undefined}
         centerSubtitle={savedReports.length === 0 ? t('dataEntry.noReportsDesc') : undefined}

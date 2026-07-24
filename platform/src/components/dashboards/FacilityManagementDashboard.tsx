@@ -230,9 +230,9 @@ export default function FacilityManagementDashboard() {
               </div>
             </div>
 
-            {/* Weekly patient activity (titled "Reviews Score" to match the reference) */}
+            {/* Weekly patient activity — registrations, appointments, cancellations */}
             <ChartCard
-              title="Reviews Score"
+              title="Weekly Patient Activity"
               defaultType="bar"
               defaultPeriod="week"
             >
@@ -307,17 +307,17 @@ export default function FacilityManagementDashboard() {
               </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table className="w-full" style={{ minWidth: 900 }}>
+              <table className="w-full" style={{ minWidth: 640 }}>
                 <thead>
                   <tr>
-                    {['User', 'Role', 'Department', 'Availability', 'Facility Inbox', 'Last Inquiry', 'Action'].map(h => (
+                    {['User', 'Role', 'Department', 'Availability', 'Action'].map(h => (
                       <th key={h} className={`px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider ${h === 'Action' ? 'text-right' : 'text-left'}`} style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {userInquiryRows.length === 0 && (
-                    <tr><td colSpan={7} className="px-5 py-8 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No users available for this facility.</td></tr>
+                    <tr><td colSpan={5} className="px-5 py-8 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No users available for this facility.</td></tr>
                   )}
                   {userInquiryRows.map(({ user, available, active }, i) => (
                     <tr key={user._id} role="button" tabIndex={0}
@@ -340,12 +340,6 @@ export default function FacilityManagementDashboard() {
                       <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{ROLE_LABEL[user.role] || user.role}</td>
                       <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{user.department || user.specialty || user.hospitalName || 'General'}</td>
                       <td className="px-5 py-2.5">{statusPill(!active ? 'Inactive' : available ? 'Available' : 'Active')}</td>
-                      <td className="px-5 py-2.5">
-                        <span className="text-[12px] font-semibold" style={{ color: unreadEnquiries.length > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-                          {unreadEnquiries.length}
-                        </span>
-                      </td>
-                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{lastInquiryLabel}</td>
                       <td className="px-5 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
@@ -386,15 +380,24 @@ export default function FacilityManagementDashboard() {
                   <tbody>
                     {enquiries.length === 0 ? (
                       <tr><td colSpan={5} className="px-4 py-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No patient enquiries.</td></tr>
-                    ) : enquiries.map(m => (
+                    ) : enquiries.map(m => {
+                      // Real per-row status from the message's own `readBy` list
+                      // (scoped to this user when known), not a hardcoded pill —
+                      // it used to render "on"/green for every row regardless.
+                      const isRead = currentUserId ? !!m.readBy?.includes(currentUserId) : (m.readBy?.length ?? 0) > 0;
+                      return (
                       <tr key={m._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <td className="px-4 py-2.5 text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{m.patientName || 'Patient'}</td>
                         <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{m.subject || 'General Inquiry'}</td>
                         <td className="px-4 py-2.5 text-[12px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{(m.sentAt || m.createdAt || '').slice(0, 10)}</td>
                         <td className="px-4 py-2.5">
                           <div className="flex justify-center">
-                            <span className="inline-flex items-center w-9 h-5 rounded-full px-0.5" style={{ background: 'var(--color-success)' }}>
-                              <span className="w-4 h-4 rounded-full bg-white ml-auto" />
+                            <span
+                              className="inline-flex items-center w-9 h-5 rounded-full px-0.5"
+                              style={{ background: isRead ? 'var(--color-success)' : 'var(--overlay-medium)' }}
+                              title={isRead ? 'Read' : 'Unread'}
+                            >
+                              <span className={`w-4 h-4 rounded-full bg-white ${isRead ? 'ml-auto' : 'mr-auto'}`} />
                             </span>
                           </div>
                         </td>
@@ -406,7 +409,8 @@ export default function FacilityManagementDashboard() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

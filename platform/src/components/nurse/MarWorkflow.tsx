@@ -1,23 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
+import { useWards } from '@/lib/hooks/useWards';
 import Modal from '@/components/Modal';
 import { Pill, Check, X, CheckCircle2, RotateCcw, FileText } from '@/components/icons/lucide';
 import type { MedicationAdministration } from '@/lib/db-types';
 import { useMarEntries, type MAREntry } from './shared';
 import RowActionsMenu from '@/components/referrals/RowActionsMenu';
 import ListSearch from './ListSearch';
+import { initials } from '@/lib/patient-utils';
 
 type AdminStatus = 'given' | 'held' | 'refused' | 'missed';
 
-export default function MarWorkflow() {
+export default function MarWorkflow({ onAdminister }: { onAdminister?: () => void }) {
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
   const { marEntries, markGiven, recordEntry, undoAdministration } = useMarEntries();
+  const { activeAdmissions } = useWards();
+
+  // patientId → their active ward/bed placement, for the Source column —
+  // MAREntry itself carries no ward/bed (it's sourced from prescriptions),
+  // so this is the same real-admission join WardWorkflow uses.
+  const admissionByPatient = useMemo(() => {
+    const map = new Map<string, { wardName: string; bedNumber?: string }>();
+    for (const a of activeAdmissions) {
+      if (!map.has(a.patientId)) map.set(a.patientId, { wardName: a.wardName, bedNumber: a.bedNumber });
+    }
+    return map;
+  }, [activeAdmissions]);
 
   // Administration modal state
   const [modalEntry, setModalEntry] = useState<MAREntry | null>(null);
@@ -53,6 +67,13 @@ export default function MarWorkflow() {
     held: t('nurse.marStatusHeld'),
     refused: t('nurse.marStatusRefused'),
     missed: t('nurse.marStatusMissed'),
+  };
+
+  // Queue-card pill tone for each due-state — honest, distinct colors: red
+  // for overdue, yellow for due-now, green for given, and a plain neutral
+  // (not yet due, nothing to flag) for upcoming.
+  const DUE_TONE: Record<MAREntry['status'], 'red' | 'yellow' | 'green' | 'neutral'> = {
+    overdue: 'red', due: 'yellow', upcoming: 'neutral', given: 'green',
   };
 
   const marStatusColor = (status: MAREntry['status']) => {
@@ -99,7 +120,16 @@ export default function MarWorkflow() {
       witnessName: modalWitness,
     });
     setSubmitting(false);
-    if (ok) closeModal();
+    if (ok) {
+      onAdminister?.();
+      closeModal();
+    }
+  };
+
+  // Quick "Given" row action — same capability signal as the modal path.
+  const handleMarkGiven = async (entryId: string) => {
+    const ok = await markGiven(entryId);
+    if (ok) onAdminister?.();
   };
 
   return (
@@ -127,54 +157,53 @@ export default function MarWorkflow() {
         </div>
       </div>
       <div className="flex-1" style={{ overflow: 'auto', minHeight: 0 }}>
-        <table className="w-full" style={{ minWidth: 840 }}>
-          <thead>
-            <tr>
-              {[t('nurse.colTime'), t('nurse.colPatient'), t('nurse.colMedication'), t('nurse.colDose'), t('nurse.colRoute'), t('nurse.colStatus'), t('nurse.colAction')].map(h => (
-                <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+        <div className="ehr-queue-scroll">
+          <div className="ehr-queue-cards">
             {filteredEntries.map(entry => {
               const sc = marStatusColor(entry.status);
+              const tone = DUE_TONE[entry.status];
+              const admission = admissionByPatient.get(entry.patientId);
+              const source = admission ? `${admission.wardName}${admission.bedNumber ? ` · ${admission.bedNumber}` : ''}` : '—';
+              const context = [entry.medication, entry.dose, entry.route].filter(Boolean).join(' · ') || '—';
+              // Time column: what already happened (last given) takes priority
+              // over the schedule slot — matches "next-due/last-given" spec.
+              const timeText = entry.status === 'given' && entry.givenAt
+                ? new Date(entry.givenAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                : (entry.time || '—');
               return (
-                <tr
-                  key={entry.id}
-                  className="cursor-pointer transition-colors hover:bg-[var(--table-row-hover)]"
-                  style={{
-                    borderBottom: '1px solid var(--border-light)',
-                    background: sc.bg,
-                  }}
-                >
-                  <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color: 'var(--text-primary)' }}>{entry.time}</td>
-                  <td className="px-4 py-2.5">
-                    <button onClick={() => router.push(`/patients/${entry.patientId}`)} className="text-left hover:underline">
-                      <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{entry.patientName}</span>
-                    </button>
-                  </td>
-                  <td className="px-4 py-2.5 text-[12px] font-semibold" style={{ color: sc.color }}>{entry.medication}</td>
-                  <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{entry.dose}</td>
-                  <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{entry.route}</td>
-                  <td className="px-4 py-2.5">
-                    <span className="text-[9px] font-bold px-2 py-1 rounded" style={{ background: `${sc.color}20`, color: sc.color }}>
-                      {sc.label}
-                    </span>
-                    {entry.givenAt && (
-                      <p className="text-[8px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {new Date(entry.givenAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                <div key={entry.id} className="ehr-queue-card">
+                  <div className="ehr-queue-patient">
+                    {/* A not-yet-due dose must not read like an administered one —
+                        neutral (upcoming) keeps the grey tint instead of green. */}
+                    <span className="ehr-patient-icon" data-acuity={tone === 'neutral' ? 'neutral' : tone.toUpperCase()}>{initials(entry.patientName)}</span>
+                    <div className="ehr-queue-patient-text">
+                      <button type="button" className="ehr-queue-name" onClick={() => router.push(`/patients/${entry.patientId}`)}>
+                        {entry.patientName}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="ehr-queue-cell ehr-queue-muted-cell">{source}</div>
+
+                  <div className="ehr-queue-cell">
+                    <span className="ehr-queue-pill" data-tone={tone}>{sc.label}</span>
+                  </div>
+
+                  <div className="ehr-queue-cell">—</div>
+
+                  <div className="ehr-queue-cell ehr-queue-muted-cell">{context}</div>
+
+                  <div className="ehr-queue-cell ehr-queue-num-col">
+                    <strong>{timeText}</strong>
+                  </div>
+
+                  <div className="ehr-queue-actions">
                     <RowActionsMenu
                       ariaLabel={t('nurse.colAction')}
                       actions={
                         entry.status !== 'given'
                           ? [
-                              { key: 'given', label: t('nurse.marQuickGiven'), tone: 'success' as const, icon: <Check className="w-4 h-4" />, onClick: () => markGiven(entry.id) },
+                              { key: 'given', label: t('nurse.marQuickGiven'), tone: 'success' as const, icon: <Check className="w-4 h-4" />, onClick: () => handleMarkGiven(entry.id) },
                               { key: 'outcome', label: t('nurse.marDetailsAction'), icon: <FileText className="w-4 h-4" />, onClick: () => openModal(entry) },
                             ]
                           : [
@@ -183,12 +212,12 @@ export default function MarWorkflow() {
                             ]
                       }
                     />
-                  </td>
-                </tr>
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
       {marEntries.length === 0 && (
         <div className="text-center py-12">

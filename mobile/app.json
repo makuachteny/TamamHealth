@@ -4,7 +4,6 @@
     "slug": "tamamhealth-patient",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "scheme": "tamamhealth-patient",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

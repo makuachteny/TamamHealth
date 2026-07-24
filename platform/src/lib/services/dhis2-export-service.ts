@@ -2,9 +2,13 @@ import { getAllBirths, getBirthStats } from './birth-service';
 import { getAllDeaths, getDeathStats } from './death-service';
 import { getAllAssessments } from './facility-assessment-service';
 import { getNationalDataQuality } from './data-quality-service';
+import { getAllEncounters } from './encounter-service';
 import { hospitalsDB, patientsDB, referralsDB, diseaseAlertsDB, labResultsDB, prescriptionsDB, immunizationsDB, ancDB } from '../db';
-import type { HospitalDoc, PatientDoc, ReferralDoc, DiseaseAlertDoc, LabResultDoc, PrescriptionDoc, ImmunizationDoc, ANCVisitDoc } from '../db-types';
+import type { HospitalDoc, PatientDoc, ReferralDoc, DiseaseAlertDoc, LabResultDoc, PrescriptionDoc, ImmunizationDoc, ANCVisitDoc, EncounterDoc, UserRole } from '../db-types';
 import { findByType } from './db-query';
+import type { DataScope } from './data-scope';
+import { filterByScope } from './data-scope';
+import { isInRange } from '../time-juba';
 
 // DHIS2 only accepts compact period codes (YYYYMM / YYYYWww / YYYY) — accept
 // the HTML-friendly YYYY-MM the UI emits but reject anything else.
@@ -37,6 +41,101 @@ export interface DHIS2ExportScope {
   role?: string;
 }
 
+/** Africa/Juba is UTC+03:00, no DST — mirrors the constant in time-juba.ts. */
+const JUBA_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * Convert a normalized DHIS2 period (YYYYMM / YYYYWww / YYYY — the output of
+ * `normalizeDhis2Period`) into a half-open [from, to) ISO instant range,
+ * anchored to Africa/Juba wall-clock boundaries. Every data element below is
+ * filtered to source docs whose own event timestamp falls in this range —
+ * previously `period` was only used as a label, never as a filter
+ * (docs/EMR-FIELD-AUDIT-2026-07.md §4).
+ */
+export function periodToRange(period: string, frequency: 'monthly' | 'weekly' | 'yearly' = 'monthly'): { from: string; to: string } {
+  if (frequency === 'yearly') {
+    const y = Number(period);
+    return {
+      from: new Date(Date.UTC(y, 0, 1) - JUBA_OFFSET_MS).toISOString(),
+      to: new Date(Date.UTC(y + 1, 0, 1) - JUBA_OFFSET_MS).toISOString(),
+    };
+  }
+  if (frequency === 'weekly') {
+    const m = /^(\d{4})W(\d{2})$/.exec(period);
+    if (!m) throw new Error('Invalid weekly DHIS2 period: ' + period);
+    const y = Number(m[1]);
+    const week = Number(m[2]);
+    // ISO week 1 is the week containing Jan 4th. Find that week's Monday
+    // (calendar-date arithmetic — weekday doesn't depend on timezone), then
+    // step forward (week - 1) weeks, matching jubaWeekStart()'s Monday-start
+    // convention.
+    const jan4Day = new Date(Date.UTC(y, 0, 4)).getUTCDay();
+    const daysFromMonday = (jan4Day + 6) % 7;
+    const week1MondayCalendarMs = Date.UTC(y, 0, 4 - daysFromMonday);
+    const startCalendarMs = week1MondayCalendarMs + (week - 1) * 7 * 24 * 60 * 60 * 1000;
+    return {
+      from: new Date(startCalendarMs - JUBA_OFFSET_MS).toISOString(),
+      to: new Date(startCalendarMs + 7 * 24 * 60 * 60 * 1000 - JUBA_OFFSET_MS).toISOString(),
+    };
+  }
+  // monthly: YYYYMM
+  const y = Number(period.slice(0, 4));
+  const mo = Number(period.slice(4, 6)); // 1-12
+  return {
+    from: new Date(Date.UTC(y, mo - 1, 1) - JUBA_OFFSET_MS).toISOString(),
+    to: new Date(Date.UTC(y, mo, 1) - JUBA_OFFSET_MS).toISOString(),
+  };
+}
+
+/**
+ * Build the filterByScope-compatible DataScope from the export's (looser)
+ * DHIS2ExportScope. Without a role we can't tell admin/national roles from
+ * facility-scoped ones, so we deliberately skip scope filtering rather than
+ * guess — the caller gets the pre-existing unscoped behavior in that case.
+ */
+function toDataScope(scope?: DHIS2ExportScope): DataScope | undefined {
+  if (!scope?.role) return undefined;
+  return { role: scope.role as UserRole, orgId: scope.orgId, hospitalId: scope.hospitalId };
+}
+
+/**
+ * Age band for the OPD attendance category combo, as of the encounter's
+ * `startedAt`. Prefers an exact age from `dateOfBirth`; falls back to the
+ * patient's raw `estimatedAge` (registration-time estimate, not decayed
+ * forward — decaying it would be a guess layered on a guess); returns
+ * 'unknown-age' when neither is available or the patient can't be joined at
+ * all. Never fabricates a band.
+ */
+function resolveAgeBand(patient: PatientDoc | undefined, atIso: string): 'under5' | '5plus' | 'unknown-age' {
+  if (!patient) return 'unknown-age';
+  let ageYears: number | undefined;
+  if (patient.dateOfBirth) {
+    const dob = new Date(patient.dateOfBirth).getTime();
+    const at = new Date(atIso).getTime();
+    if (!Number.isNaN(dob) && !Number.isNaN(at)) {
+      ageYears = (at - dob) / (365.25 * 24 * 60 * 60 * 1000);
+    }
+  }
+  if (ageYears === undefined && typeof patient.estimatedAge === 'number') {
+    ageYears = patient.estimatedAge;
+  }
+  if (ageYears === undefined || ageYears < 0) return 'unknown-age';
+  return ageYears < 5 ? 'under5' : '5plus';
+}
+
+/**
+ * Sex label for the OPD category combo. PatientDoc.gender is currently a
+ * required 'Male' | 'Female' field (no 'Unknown' option yet —
+ * docs/EMR-FIELD-AUDIT-2026-07.md §2 reception table flags that as a
+ * separate fix), so the only way to land here without an exact match is an
+ * unjoinable patient (deleted/missing doc) — never guessed as either sex.
+ */
+function resolveSexLabel(patient: PatientDoc | undefined): 'male' | 'female' | 'unknown-sex' {
+  if (patient?.gender === 'Male') return 'male';
+  if (patient?.gender === 'Female') return 'female';
+  return 'unknown-sex';
+}
+
 export interface DHIS2DataSet {
   exportDate: string;
   period: string;
@@ -60,46 +159,92 @@ export async function generateDHIS2Export(
   const period = normalizeDhis2Period(rawPeriod, frequency);
   const orgUnit = aggregateOrgUnit(scope);
   const now = new Date().toISOString();
+  const range = periodToRange(period, frequency);
+  const dataScope = toDataScope(scope);
 
-  // Gather all data
+  // Gather all data. Every element below is either (a) a STOCK value — a
+  // point-in-time count (facility roster, staff, beds, current patient
+  // register, readiness assessment) that is scope-filtered but NOT
+  // period-filtered because "how many beds does the facility have right now"
+  // has no period, or (b) a FLOW value — activity that happened inside
+  // `range`, filtered on the source doc's own event timestamp per
+  // docs/EMR-FIELD-AUDIT-2026-07.md §4.
   const hDB = hospitalsDB();
-  const hospitals = await findByType<HospitalDoc>(hDB, 'hospital');
+  let hospitals = await findByType<HospitalDoc>(hDB, 'hospital');
+  if (dataScope) {
+    // HospitalDoc has no separate `hospitalId` field — its own `_id` IS the
+    // facility id — so mirror data-quality-service.ts's approach of aliasing
+    // `_id` onto `hospitalId` before running it through the shared scope filter.
+    hospitals = filterByScope(
+      hospitals.map(h => ({ ...h, hospitalId: (h as HospitalDoc & { hospitalId?: string }).hospitalId ?? h._id })),
+      dataScope,
+    ) as HospitalDoc[];
+  }
 
   const pDB = patientsDB();
-  const patients = await findByType<PatientDoc>(pDB, 'patient');
+  const allPatients = await findByType<PatientDoc>(pDB, 'patient');
+  // Kept unfiltered for the OPD age/sex join below — an encounter can belong
+  // to a patient registered at a different facility (referral/transfer), so
+  // the join must not be pre-restricted to the export's own scope. The STOCK
+  // "how many patients on file" count below uses the scoped view instead.
+  const patients = dataScope ? filterByScope(allPatients, dataScope) : allPatients;
+  const patientById = new Map(allPatients.map(p => [p._id, p]));
 
   const rDB = referralsDB();
-  const referrals = await findByType<ReferralDoc>(rDB, 'referral');
+  let referrals = await findByType<ReferralDoc>(rDB, 'referral');
+  if (dataScope) referrals = filterByScope(referrals, dataScope);
+  referrals = referrals.filter(r => isInRange(r.createdAt, range));
 
   const daDB = diseaseAlertsDB();
-  const alerts = await findByType<DiseaseAlertDoc>(daDB, 'disease_alert');
+  let alerts = await findByType<DiseaseAlertDoc>(daDB, 'disease_alert');
+  if (dataScope) alerts = filterByScope(alerts, dataScope);
+  alerts = alerts.filter(a => isInRange(a.reportDate, range));
 
-  const birthStats = await getBirthStats();
-  const deathStats = await getDeathStats();
-  const births = await getAllBirths();
-  const deaths = await getAllDeaths();
-  const assessments = await getAllAssessments();
-  const dataQuality = await getNationalDataQuality();
+  const birthStats = await getBirthStats(dataScope, range);
+  const deathStats = await getDeathStats(dataScope, range);
+  const births = (await getAllBirths(dataScope)).filter(b => isInRange(b.dateOfBirth, range));
+  const deaths = (await getAllDeaths(dataScope)).filter(d => isInRange(d.dateOfDeath, range));
+  // Facility readiness assessments and the national data-quality rollup are
+  // STOCK values (current state of the facility, not something that
+  // happened inside the period) — scope-filtered only.
+  const assessments = await getAllAssessments(dataScope);
+  const dataQuality = await getNationalDataQuality(dataScope);
 
-  // Lab data
+  // Lab data — event timestamp is the order date.
   const labDB = labResultsDB();
-  const labResults = await findByType<LabResultDoc>(labDB, 'lab_result');
+  let labResults = await findByType<LabResultDoc>(labDB, 'lab_result');
+  if (dataScope) labResults = filterByScope(labResults, dataScope);
+  labResults = labResults.filter(l => isInRange(l.orderedAt, range));
 
-  // Prescription data
+  // Prescription data — PrescriptionDoc has no distinct `prescribedAt`; the
+  // inherited BaseDoc `createdAt` is the moment the order was written, which
+  // is the prescribing event.
   const rxDB = prescriptionsDB();
-  const prescriptions = await findByType<PrescriptionDoc>(rxDB, 'prescription');
+  let prescriptions = await findByType<PrescriptionDoc>(rxDB, 'prescription');
+  if (dataScope) prescriptions = filterByScope(prescriptions, dataScope);
+  prescriptions = prescriptions.filter(p => isInRange(p.createdAt, range));
 
-  // Immunization data
+  // Immunization data — event timestamp is the administration date.
   const immDB = immunizationsDB();
-  const immunizations = await findByType<ImmunizationDoc>(immDB, 'immunization');
+  let immunizations = await findByType<ImmunizationDoc>(immDB, 'immunization');
+  if (dataScope) immunizations = filterByScope(immunizations, dataScope);
+  immunizations = immunizations.filter(i => isInRange(i.dateGiven, range));
 
-  // ANC data
+  // ANC data — event timestamp is the visit date.
   const ancDatabase = ancDB();
-  const ancVisits = await findByType<ANCVisitDoc>(ancDatabase, 'anc_visit');
+  let ancVisits = await findByType<ANCVisitDoc>(ancDatabase, 'anc_visit');
+  if (dataScope) ancVisits = filterByScope(ancVisits, dataScope);
+  ancVisits = ancVisits.filter(a => isInRange(a.visitDate, range));
+
+  // Encounters — the OPD attendance source. Event timestamp is arrival
+  // (`startedAt`), matching how the encounter is created at check-in
+  // (encounter-service.ts createArrivalEncounter).
+  const allEncounters: EncounterDoc[] = await getAllEncounters(dataScope);
+  const encounters = allEncounters.filter(e => isInRange(e.startedAt, range));
 
   const dataValues: DHIS2DataValue[] = [];
 
-  // Population health indicators
+  // Population health indicators (STOCK — scope-filtered, not period-filtered)
   dataValues.push(
     { dataElement: 'TOTAL_HOSPITALS', category: 'default', value: hospitals.length.toString(), period, orgUnit },
     { dataElement: 'TOTAL_PATIENTS', category: 'default', value: patients.length.toString(), period, orgUnit },
@@ -108,6 +253,38 @@ export async function generateDHIS2Export(
     { dataElement: 'TOTAL_NURSES', category: 'default', value: hospitals.reduce((s, h) => s + h.nurses, 0).toString(), period, orgUnit },
     { dataElement: 'TOTAL_CLINICAL_OFFICERS', category: 'default', value: hospitals.reduce((s, h) => s + h.clinicalOfficers, 0).toString(), period, orgUnit },
   );
+
+  // OPD attendance (new indicator — docs/EMR-FIELD-AUDIT-2026-07.md §4 item 1:
+  // "OPD attendances (new/repeat × age-band × sex) — needs encounter +
+  // attendanceType only"). Period + scope filtered above.
+  const attendanceNew = encounters.filter(e => e.attendanceType === 'new').length;
+  const attendanceRepeat = encounters.filter(e => e.attendanceType === 'repeat').length;
+  dataValues.push(
+    { dataElement: 'OPD_ATTENDANCE_TOTAL', category: 'default', value: encounters.length.toString(), period, orgUnit },
+    { dataElement: 'OPD_ATTENDANCE_NEW', category: 'default', value: attendanceNew.toString(), period, orgUnit },
+    { dataElement: 'OPD_ATTENDANCE_REPEAT', category: 'default', value: attendanceRepeat.toString(), period, orgUnit },
+  );
+  // Age-band × sex category combos, joined from PatientDoc at encounter time.
+  // Seed the expected grid with zeros (same "emit zeros" rationale as the
+  // per-facility births/deaths loop below) so an empty combo is
+  // distinguishable from a combo that was never computed; a patient with no
+  // DOB/estimatedAge or no matching PatientDoc lands in the explicit
+  // unknown-age combo — never guessed.
+  const opdCategoryCounts = new Map<string, number>([
+    ['under5-male', 0], ['under5-female', 0],
+    ['5plus-male', 0], ['5plus-female', 0],
+    ['unknown-age-male', 0], ['unknown-age-female', 0],
+  ]);
+  for (const enc of encounters) {
+    const patient = patientById.get(enc.patientId);
+    const ageBand = resolveAgeBand(patient, enc.startedAt);
+    const sexLabel = resolveSexLabel(patient);
+    const key = `${ageBand}-${sexLabel}`;
+    opdCategoryCounts.set(key, (opdCategoryCounts.get(key) ?? 0) + 1);
+  }
+  for (const [category, count] of [...opdCategoryCounts.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    dataValues.push({ dataElement: 'OPD_ATTENDANCE_BY_CATEGORY', category, value: count.toString(), period, orgUnit });
+  }
 
   // CRVS indicators
   dataValues.push(
@@ -152,7 +329,11 @@ export async function generateDHIS2Export(
     { dataElement: 'PRESCRIPTIONS_PENDING', category: 'default', value: rxPending.toString(), period, orgUnit },
   );
 
-  // Immunization indicators
+  // Immunization indicators. Coverage percentages (IMM_*_COVERAGE) were
+  // removed: they divided doses by "unique children seen in this dataset"
+  // rather than a population/census denominator, so the resulting "%" was
+  // uninterpretable as coverage (docs/EMR-FIELD-AUDIT-2026-07.md §4 honesty
+  // fix). Dose counts — the actual captured data — are kept.
   const bcgCompleted = immunizations.filter(i => i.vaccine === 'BCG' && i.status === 'completed').length;
   const penta3Completed = immunizations.filter(i => i.vaccine === 'Penta' && i.doseNumber === 3 && i.status === 'completed').length;
   const measles1Completed = immunizations.filter(i => i.vaccine === 'Measles' && i.doseNumber === 1 && i.status === 'completed').length;
@@ -164,9 +345,6 @@ export async function generateDHIS2Export(
     { dataElement: 'IMM_PENTA3_COMPLETED', category: 'default', value: penta3Completed.toString(), period, orgUnit },
     { dataElement: 'IMM_MEASLES1_COMPLETED', category: 'default', value: measles1Completed.toString(), period, orgUnit },
     { dataElement: 'IMM_DEFAULTERS', category: 'default', value: immDefaulters.toString(), period, orgUnit },
-    { dataElement: 'IMM_BCG_COVERAGE', category: 'default', value: uniqueChildren > 0 ? Math.round(bcgCompleted / uniqueChildren * 100).toString() : '0', period, orgUnit },
-    { dataElement: 'IMM_PENTA3_COVERAGE', category: 'default', value: uniqueChildren > 0 ? Math.round(penta3Completed / uniqueChildren * 100).toString() : '0', period, orgUnit },
-    { dataElement: 'IMM_MEASLES1_COVERAGE', category: 'default', value: uniqueChildren > 0 ? Math.round(measles1Completed / uniqueChildren * 100).toString() : '0', period, orgUnit },
   );
 
   // ANC indicators
@@ -184,7 +362,7 @@ export async function generateDHIS2Export(
     { dataElement: 'ANC_HIGH_RISK', category: 'default', value: highRiskMothers.toString(), period, orgUnit },
   );
 
-  // Data quality indicators (from WHO report)
+  // Data quality indicators (from WHO report) — STOCK, scope-filtered only.
   dataValues.push(
     { dataElement: 'REPORTING_COMPLETENESS', category: 'default', value: dataQuality.avgCompleteness.toString(), period, orgUnit },
     { dataElement: 'REPORTING_TIMELINESS', category: 'default', value: dataQuality.avgTimeliness.toString(), period, orgUnit },
@@ -195,7 +373,8 @@ export async function generateDHIS2Export(
   );
 
   // Per-facility births/deaths — emit zeros so a facility that reported 0 is
-  // distinguishable from a facility that didn't report at all.
+  // distinguishable from a facility that didn't report at all. `births`/
+  // `deaths` are already period+scope filtered above.
   for (const h of hospitals) {
     const fBirths = births.filter(b => b.facilityId === h._id).length;
     const fDeaths = deaths.filter(d => d.facilityId === h._id).length;

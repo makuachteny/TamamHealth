@@ -7,9 +7,10 @@ jest.mock('uuid', () => ({ v4: () => `${String(++uuidCounter).padStart(8, '0')}-
 jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
 
 import { teardownTestDBs } from '../helpers/test-db';
-import { checkInPatient } from '@/lib/services/check-in-service';
+import { checkInPatient, deriveAttendanceType } from '@/lib/services/check-in-service';
 import { getTriageByPatient } from '@/lib/services/triage-service';
 import { createAppointment, getAppointmentsByPatient } from '@/lib/services/appointment-service';
+import { getEncounter, dischargeEncounter, advanceEncounterToClinician, transitionEncounter } from '@/lib/services/encounter-service';
 import { jubaDate } from '@/lib/time-juba';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
@@ -76,5 +77,76 @@ describe('Patient check-in (P-checkin)', () => {
     const res = await checkInPatient({ ...base });
     expect(res.appointmentCheckedIn).toBe(false);
     expect(res.triage.status).toBe('pending');
+  });
+});
+
+describe('Check-in creates the visit encounter (EMR-FIELD-AUDIT §3)', () => {
+  test('walk-in check-in creates an encounter, threads its id onto the triage, and defaults to a new attendance', async () => {
+    const res = await checkInPatient({ ...base, chiefComplaint: 'Fever' });
+    expect(res.encounter.status).toBe('awaiting_triage');
+    expect(res.encounter.arrivalChannel).toBe('walk_in');
+    expect(res.encounter.appointmentId).toBeUndefined();
+    expect(res.attendanceType).toBe('new');
+    expect(res.encounter.attendanceType).toBe('new');
+    expect(res.triage.encounterId).toBe(res.encounter._id);
+  });
+
+  test('appointment check-in stores the matched appointmentId and arrivalChannel on the encounter (no longer discarded)', async () => {
+    const appt = await createAppointment({
+      patientId: 'patient-001', patientName: 'Ayen Deng', providerId: 'u-dr', providerName: 'Dr. Wani',
+      facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national',
+      appointmentDate: jubaDate(), appointmentTime: '09:00', appointmentType: 'general', priority: 'routine',
+      department: 'OPD', reason: 'Review', status: 'scheduled', bookedBy: 'u-desk', bookedByName: 'Amira',
+      state: 'Central Equatoria',
+    } as unknown as Parameters<typeof createAppointment>[0]);
+
+    const res = await checkInPatient({ ...base });
+    expect(res.appointmentId).toBe(appt._id);
+    expect(res.encounter.appointmentId).toBe(appt._id);
+    expect(res.encounter.arrivalChannel).toBe('appointment');
+  });
+
+  test('an explicit attendanceType overrides auto-derivation', async () => {
+    const res = await checkInPatient({ ...base, attendanceType: 'repeat' });
+    expect(res.attendanceType).toBe('repeat');
+    expect(res.encounter.attendanceType).toBe('repeat');
+  });
+
+  test('re-checking in while a visit is still open joins the same encounter instead of duplicating it', async () => {
+    const first = await checkInPatient({ ...base });
+    const second = await checkInPatient({ ...base });
+    expect(second.encounter._id).toBe(first.encounter._id);
+    // Still only one triage-side attempt to double check the encounter itself
+    // wasn't recreated (both triage docs may legitimately exist as separate
+    // queue entries, but they must point at the same visit).
+    expect(second.triage.encounterId).toBe(first.encounter._id);
+  });
+
+  test('rejects a duplicate check-in once the visit is with a clinician', async () => {
+    const first = await checkInPatient({ ...base, patientId: 'patient-midvisit', patientName: 'Mid Visit' });
+    await advanceEncounterToClinician(first.encounter._id, { clinicianId: 'user-doc', clinicianName: 'Dr Mayen' });
+    // A second check-in must not attach a fresh pending triage to the
+    // in-flight consultation — it is rejected with a front-desk message.
+    await expect(checkInPatient({ ...base, patientId: 'patient-midvisit', patientName: 'Mid Visit' }))
+      .rejects.toThrow(/visit in progress/);
+  });
+
+  test('deriveAttendanceType: new with no history, repeat once an encounter has closed', async () => {
+    expect(await deriveAttendanceType('patient-fresh')).toBe('new');
+
+    const res = await checkInPatient({ ...base, patientId: 'patient-002', patientName: 'Deng Garang' });
+    // Walk the visit the rest of the way to a terminal status (triage →
+    // clinician → clinic checkout → discharge) so it counts as history.
+    await advanceEncounterToClinician(res.encounter._id, { clinicianId: 'user-doc', clinicianName: 'Dr Mayen' });
+    await transitionEncounter(res.encounter._id, 'ready_for_clinic_checkout');
+    await dischargeEncounter(res.encounter._id, { actorId: 'desk-1' });
+
+    expect(await deriveAttendanceType('patient-002')).toBe('repeat');
+  });
+
+  test('the created encounter is retrievable via getEncounter', async () => {
+    const res = await checkInPatient({ ...base });
+    const fetched = await getEncounter(res.encounter._id);
+    expect(fetched?._id).toBe(res.encounter._id);
   });
 });

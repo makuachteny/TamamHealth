@@ -327,16 +327,17 @@ export default function EhrTopRail() {
         )}
         <QuickActions />
         <div className="ehr-user-menu-wrap" ref={userRef}>
+          {/* Design: a plain 40px circle avatar — the role label lives in the
+              menu below, not on the rail. */}
           <button
             type="button"
-            className={`ehr-avatar ehr-avatar--labeled ${userOpen ? 'active' : ''}`}
-            title={currentUser?.name || 'Tamam user'}
+            className={`ehr-avatar ${userOpen ? 'active' : ''}`}
+            title={`${currentUser?.name || 'Tamam user'} · ${roleConfig?.badgeLabel || roleLabel}`}
             onClick={() => setUserOpen(value => !value)}
             aria-expanded={userOpen}
             aria-haspopup="menu"
           >
-            <span className="ehr-avatar-mark" style={roleConfig?.color ? { background: roleConfig.color } : undefined}>{userInitials}</span>
-            <span className="ehr-avatar-role">{roleConfig?.badgeLabel || roleLabel}</span>
+            <span className="ehr-avatar-mark">{userInitials}</span>
           </button>
 
           {userOpen && (

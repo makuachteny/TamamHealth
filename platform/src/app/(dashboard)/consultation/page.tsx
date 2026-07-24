@@ -947,10 +947,19 @@ export default function ConsultationPage() {
     referralUrgency, referralReason, visitDisposition,
   });
 
-  // Ensure exactly one EncounterDoc exists for this visit. Created lazily on the
-  // first order/finalise action (status `with_clinician`) so EVERY visit — not
-  // only lab-paused ones — has a canonical encounter. Returns its id, and keeps
+  // Ensure exactly one EncounterDoc exists for this visit. Created/joined
+  // lazily on the first order/finalise action so EVERY visit — not only
+  // lab-paused ones — has a canonical encounter. Returns its id, and keeps
   // the snapshot fresh on subsequent calls.
+  //
+  // If the patient already has an open encounter from check-in (arrived,
+  // possibly triaged/routed/roomed), that visit is reused and walked legally
+  // to `with_clinician` rather than spawning a second, disconnected encounter
+  // for the same episode of care. Only when there's truly no open visit (a
+  // direct consult with no prior check-in) is a fresh encounter created — and
+  // even then it starts at a legal initial status and walks to
+  // `with_clinician`, never materialising there directly.
+  // See docs/EMR-FIELD-AUDIT-2026-07.md §3 and §5 ("Consultation").
   const ensureEncounter = async (): Promise<string | null> => {
     if (!selectedPatient) return null;
     const enc = await import('@/lib/services/encounter-service');
@@ -959,21 +968,34 @@ export default function ConsultationPage() {
       return encounterId;
     }
     const patientData = patients.find(p => p._id === selectedPatient);
-    const created = await enc.createEncounter({
-      patientId: selectedPatient,
-      patientName: patientData ? patientFullName(patientData) : '',
-      hospitalNumber: patientData?.hospitalNumber || '',
-      clinicianId: currentUser?._id || '',
-      clinicianName: currentUser?.name || '',
-      hospitalId: currentUser?.hospitalId || '',
-      hospitalName: currentUser?.hospital?.name || currentUser?.hospitalName || '',
-      status: 'with_clinician',
-      snapshot: buildEncounterSnapshot(),
-      labOrderIds: [],
-      triageId: todaysTriage?._id,
-      startedAt: consultationStartedAt,
-      orgId: currentUser?.orgId,
-    });
+    const patientName = patientData ? patientFullName(patientData) : '';
+    const hospitalNumber = patientData?.hospitalNumber || '';
+    const clinicianId = currentUser?._id || '';
+    const clinicianName = currentUser?.name || '';
+    const hospitalId = currentUser?.hospitalId || '';
+    const hospitalName = currentUser?.hospital?.name || currentUser?.hospitalName || '';
+
+    const openEncounter = await enc.findOpenEncounterForPatient(selectedPatient, hospitalId);
+    const created = openEncounter
+      ? await enc.advanceEncounterToClinician(openEncounter._id, {
+          clinicianId, clinicianName,
+          snapshot: buildEncounterSnapshot(),
+          triageId: todaysTriage?._id,
+        })
+      : await enc.createDirectConsultationEncounter({
+          patientId: selectedPatient,
+          patientName,
+          hospitalNumber,
+          clinicianId,
+          clinicianName,
+          hospitalId,
+          hospitalName,
+          snapshot: buildEncounterSnapshot(),
+          labOrderIds: [],
+          triageId: todaysTriage?._id,
+          startedAt: consultationStartedAt,
+          orgId: currentUser?.orgId,
+        });
     setEncounterId(created._id);
     return created._id;
   };

@@ -7,10 +7,35 @@
  * checked_in in the same action. Full ETAT ABCC assessment is left to the nurse
  * triage station; the front desk captures arrival context + an acuity flag.
  */
-import type { TriageDoc, TriagePriority } from '../db-types';
+import type { TriageDoc, TriagePriority, EncounterDoc } from '../db-types';
 import { createTriage } from './triage-service';
 import { getAppointmentsByPatient, updateAppointmentStatus } from './appointment-service';
 import { jubaDate } from '../time-juba';
+import { createArrivalEncounter, findOpenEncounterForPatient, hasClosedEncounterForPatient, PRE_CLINICIAN_STATUSES } from './encounter-service';
+import { getRecordsByPatient } from './medical-record-service';
+
+export type AttendanceType = 'new' | 'repeat';
+
+/**
+ * New case vs re-attendance, auto-derived once at arrival: a patient with any
+ * prior medical record or any previously closed encounter is a repeat
+ * attendance; otherwise it's a new case. The clerk may override the result
+ * (see PatientCheckInForm.tsx's Visit toggle).
+ */
+export async function deriveAttendanceType(patientId: string): Promise<AttendanceType> {
+  try {
+    const records = await getRecordsByPatient(patientId);
+    if (records.length > 0) return 'repeat';
+  } catch {
+    // best-effort — fall through to the encounter check
+  }
+  try {
+    if (await hasClosedEncounterForPatient(patientId)) return 'repeat';
+  } catch {
+    // best-effort — default to 'new' below
+  }
+  return 'new';
+}
 
 export type CheckInAcuity = 'routine' | 'priority' | 'emergency';
 
@@ -47,6 +72,11 @@ export interface CheckInInput {
   acuity?: CheckInAcuity;
   vitals?: CheckInVitals;
   notes?: string;
+  /**
+   * New case vs re-attendance. When omitted, auto-derived via
+   * `deriveAttendanceType` from the patient's history.
+   */
+  attendanceType?: AttendanceType;
   /** Acting front-desk user. */
   checkedInById: string;
   checkedInByName: string;
@@ -54,9 +84,12 @@ export interface CheckInInput {
 
 export interface CheckInResult {
   triage: TriageDoc;
+  /** The visit (encounter) this check-in joined or created. */
+  encounter: EncounterDoc;
   /** True when a scheduled appointment for today was also marked checked_in. */
   appointmentCheckedIn: boolean;
   appointmentId?: string;
+  attendanceType: AttendanceType;
 }
 
 /**
@@ -69,6 +102,56 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
   }
   const acuity = input.acuity ?? 'routine';
   const v = input.vitals ?? {};
+
+  // Resolve a same-day scheduled/confirmed appointment up front so the match
+  // is threaded onto the encounter instead of being computed and discarded
+  // (docs/EMR-FIELD-AUDIT-2026-07.md §1, structural break #1) — non-fatal.
+  let appointmentId: string | undefined;
+  try {
+    const today = jubaDate();
+    const appts = await getAppointmentsByPatient(input.patientId);
+    const match = appts.find(
+      (a) => a.appointmentDate === today && (a.status === 'scheduled' || a.status === 'confirmed'),
+    );
+    if (match) appointmentId = match._id;
+  } catch {
+    // appointment lookup is best-effort; a walk-in check-in still proceeds
+  }
+
+  const arrivalChannel: 'appointment' | 'walk_in' | 'referral' = appointmentId
+    ? 'appointment'
+    : input.modeOfArrival === 'referral'
+      ? 'referral'
+      : 'walk_in';
+
+  const attendanceType = input.attendanceType ?? await deriveAttendanceType(input.patientId);
+
+  // Join the patient's already-open visit (e.g. re-checked-in after a lapse)
+  // instead of spawning a duplicate encounter for the same episode of care —
+  // scoped to THIS facility, so another facility's open encounter in the
+  // shared org DB is never absorbed.
+  let encounter = await findOpenEncounterForPatient(input.patientId, input.facilityId || '');
+  if (encounter && !PRE_CLINICIAN_STATUSES.includes(encounter.status)) {
+    // The visit is already with a clinician (or in a downstream loop such as
+    // labs/checkout). A duplicate check-in here would attach a fresh pending
+    // triage to a mid-flight encounter and re-queue a patient who is already
+    // being seen — reject it with a message the front-desk toast can show.
+    throw new Error('This patient already has a visit in progress — no new check-in was recorded.');
+  }
+  if (!encounter) {
+    encounter = await createArrivalEncounter({
+      patientId: input.patientId,
+      patientName: input.patientName,
+      hospitalNumber: input.hospitalNumber,
+      hospitalId: input.facilityId || '',
+      hospitalName: input.facilityName,
+      orgId: input.orgId,
+      arrivalChannel,
+      appointmentId,
+      attendanceType,
+      actorId: input.checkedInById,
+    });
+  }
 
   const triage = await createTriage({
     patientId: input.patientId,
@@ -101,25 +184,19 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
     facilityName: input.facilityName,
     orgId: input.orgId,
     status: 'pending',
+    encounterId: encounter._id,
   } as Omit<TriageDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
 
-  // Link a same-day appointment if present — non-fatal.
+  // Mark the matched appointment checked_in — non-fatal.
   let appointmentCheckedIn = false;
-  let appointmentId: string | undefined;
-  try {
-    const today = jubaDate();
-    const appts = await getAppointmentsByPatient(input.patientId);
-    const match = appts.find(
-      (a) => a.appointmentDate === today && (a.status === 'scheduled' || a.status === 'confirmed'),
-    );
-    if (match) {
-      await updateAppointmentStatus(match._id, 'checked_in');
+  if (appointmentId) {
+    try {
+      await updateAppointmentStatus(appointmentId, 'checked_in');
       appointmentCheckedIn = true;
-      appointmentId = match._id;
+    } catch {
+      // appointment linkage is best-effort; the check-in itself still succeeded
     }
-  } catch {
-    // appointment linkage is best-effort; the check-in itself still succeeded
   }
 
-  return { triage, appointmentCheckedIn, appointmentId };
+  return { triage, encounter, appointmentCheckedIn, appointmentId, attendanceType };
 }

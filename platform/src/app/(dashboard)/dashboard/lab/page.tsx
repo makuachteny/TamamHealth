@@ -5,11 +5,12 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import Modal from '@/components/Modal';
 import type { LabResultDoc } from '@/lib/db-types';
 import {
-  FlaskConical, CheckCircle2, AlertTriangle,
-  Microscope, Droplets,
+  CheckCircle2, AlertTriangle,
+  Microscope,
   Loader2,
   X, Save, Table, List, BellOff,
 } from '@/components/icons/lucide';
@@ -148,9 +149,6 @@ export default function LabDashboardPage() {
   // keep the lab bench focused on specimen-based investigations.
   const results = useMemo(() => allResults.filter(r => !isImagingStudy(r)), [allResults]);
   const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
-  // Specimen Pipeline + Recent Completed moved off the center
-  // panel into the Laboratory side card; this opens one of them in a modal.
-  const [labPanel, setLabPanel] = useState<null | 'specimen' | 'recent'>(null);
   // Work-queue status filter (shell tabs) + inline search bound to the shell's left rail.
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [queueSearch, setQueueSearch] = useState('');
@@ -210,7 +208,6 @@ export default function LabDashboardPage() {
 
   // --- Categorized results ---
   const allPendingOrders = useMemo(() => results.filter(r => r.status === 'pending' || r.status === 'in_progress'), [results]);
-  const recentCompleted = useMemo(() => results.filter(r => r.status === 'completed').slice(0, 6), [results]);
   const completedDiseaseRows = useMemo<CompletedDiseaseRow[]>(() => {
     return results
       .flatMap(lab => diseasesForCompletedLab(lab).map((disease, index) => ({
@@ -259,13 +256,6 @@ export default function LabDashboardPage() {
       );
     }).slice(0, 40);
   }, [completedDiseaseRows, queueSearch]);
-  const labWorkflowStages = useMemo(() => [
-    { key: 'received', label: 'Specimen Received', count: results.filter(r => r.status === 'pending').length, color: '#2563eb' },
-    { key: 'analysis', label: 'Analysis In Progress', count: results.filter(r => r.status === 'in_progress').length, color: '#0891b2' },
-    { key: 'reported', label: 'Result Reported', count: results.filter(r => r.status === 'completed').length, color: '#7c3aed' },
-    { key: 'critical', label: 'Critical Communication', count: results.filter(r => r.status === 'completed' && r.critical).length, color: 'var(--color-danger)' },
-  ], [results]);
-
   // Unique test types for batch mode
   const pendingTestTypes = useMemo(() => {
     const types = new Set(allPendingOrders.map(o => o.testName));
@@ -334,6 +324,7 @@ export default function LabDashboardPage() {
         }, ...prev]);
       }
 
+      markCapability('lab.result');
       setShowResultModal(false);
       setSelectedOrderId('');
       setResultValue('');
@@ -380,6 +371,7 @@ export default function LabDashboardPage() {
       if (newCriticals.length > 0) {
         setCriticalAlerts(prev => [...newCriticals, ...prev]);
       }
+      markCapability('lab.result');
       setBatchTestType('');
       setBatchEntries([]);
     } catch (err) {
@@ -391,6 +383,7 @@ export default function LabDashboardPage() {
 
   const handleAcknowledgeAlert = (alertId: string) => {
     setCriticalAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
+    markCapability('lab.critical');
   };
 
   // Drop a patient row from the current batch-entry draft before saving. Only
@@ -407,6 +400,19 @@ export default function LabDashboardPage() {
       return { ...e, resultValue: value, flag: flagRes ? flagRes.flag : '' };
     }));
   };
+
+  // Capabilities card — each item latches checked forever the first time this
+  // lab tech does it (see useCapabilities), never un-checked by later state.
+  // No cheap per-user "already done" signal exists in the loaded lab-result
+  // data (specimens/results aren't attributed to the tech who processed
+  // them), so every item is marked at its own action's success point below.
+  // Declared before the loading-guard return since hooks must run unconditionally.
+  const capabilityItems = useMemo(() => ([
+    { key: 'lab.receive', label: 'Receive a specimen', onClick: () => setQueueFilter('pending') },
+    { key: 'lab.result', label: 'Enter a result', onClick: () => setShowResultModal(true) },
+    { key: 'lab.critical', label: 'Escalate a critical result', onClick: () => setQueueFilter('completed') },
+  ]), []);
+  const { checklist: capabilitiesChecklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
   if (loading) {
     return (
@@ -428,6 +434,7 @@ export default function LabDashboardPage() {
 
   const startProcessingOrder = async (orderId: string) => {
     await update(orderId, { status: 'in_progress' as const });
+    markCapability('lab.receive');
   };
 
   const renderLabWorkflowPopup = (order: typeof visibleQueue[number]) => {
@@ -509,10 +516,7 @@ export default function LabDashboardPage() {
           actions={[
             { label: t('lab.enterResult'), icon: Microscope, onClick: () => setShowResultModal(true), tone: 'primary' },
             { label: t('lab.batchEntry'), icon: Table, onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
-            { label: t('lab.specimenPipeline'), icon: Droplets, onClick: () => setLabPanel(p => (p === 'specimen' ? null : 'specimen')), active: labPanel === 'specimen', tone: labPanel === 'specimen' ? 'primary' : 'neutral' },
-            { label: 'Results', icon: CheckCircle2, onClick: () => setLabPanel(p => (p === 'recent' ? null : 'recent')), active: labPanel === 'recent', tone: labPanel === 'recent' ? 'primary' : 'neutral' },
           ]}
-          hideRowList={labPanel !== null}
           // Critical/abnormal results still count as "resulted" for the day chart —
           // statusTone flags severity, not completion, so chartSeries is set
           // explicitly from order.status rather than relying on the done→series1
@@ -530,10 +534,13 @@ export default function LabDashboardPage() {
               careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
-              status: row.severity === 'critical' ? 'Critical' : 'Complete',
+              status: 'completed',
+              statusLabel: 'Complete',
               statusTone: row.severity === 'critical' ? 'danger' : row.severity === 'abnormal' ? 'warning' : 'done',
               chartSeries: 1,
-              priority: row.severity === 'critical' ? 'Critical' : undefined,
+              // A critical result is a true acuity — same RED pill the rest
+              // of the app uses for "needs attention now", not free text.
+              priority: row.severity === 'critical' ? 'RED' : undefined,
               popupDetail: renderLabWorkflowPopup(lab),
             };
           }) : visibleQueue.map((order): EhrCareDashboardRow => {
@@ -549,22 +556,27 @@ export default function LabDashboardPage() {
               careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
-              status: order.critical ? 'Critical' : labStatusLabel(order.status),
+              status: order.status,
+              statusLabel: labStatusLabel(order.status),
               statusTone: order.critical ? 'danger' : order.abnormal ? 'warning' : order.status === 'completed' ? 'done' : order.status === 'in_progress' ? 'active' : 'scheduled',
               chartSeries: order.status === 'completed' ? 1 : 0,
-              priority: order.critical ? t('lab.critical') : undefined,
+              // A critical result is a true acuity — same RED pill the rest
+              // of the app uses for "needs attention now", not free text.
+              priority: order.critical ? 'RED' : undefined,
               popupDetail: renderLabWorkflowPopup(order),
             };
           })}
           metrics={[
             { label: t('lab.abnormalBadge'), value: completedDiseaseRows.filter(row => row.severity === 'abnormal').length, tone: 'warning' },
             { label: t('lab.critical'), value: completedDiseaseRows.filter(row => row.severity === 'critical').length, tone: 'danger' },
+            // Daily warning surface — the checklist item below is now a
+            // latch-once capability, so this metric keeps the "unacknowledged
+            // critical" alert visible day to day.
+            { label: t('lab.criticalResult'), value: kpis.unacknowledgedCritical, tone: kpis.unacknowledgedCritical > 0 ? 'danger' : 'neutral', onClick: () => setQueueFilter('completed') },
           ]}
           metricsTitle={t('lab.laboratory')}
-          checklist={[
-            { label: t('lab.criticalResult'), done: kpis.unacknowledgedCritical === 0, onClick: () => setQueueFilter('completed') },
-          ]}
-          checklistTitle={t('lab.quickActions')}
+          checklist={capabilitiesChecklist}
+          checklistTitle="Capabilities"
           emptyTitle={t('lab.noPendingOrders')}
         >
         {/* --- Feature 2: Critical Result Alert Banner --- */}
@@ -603,100 +615,6 @@ export default function LabDashboardPage() {
           </div>
         )}
 
-        {/* Specimen Pipeline / Recent Completed — opened from the
-            header toggles (and the Laboratory side card); the active panel
-            replaces the worklist and occupies the whole center. */}
-        {labPanel && (
-          <div className="dash-card rounded-2xl overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                {labPanel === 'specimen'
-                  ? <Droplets className="w-4 h-4" style={{ color: '#EC4899' }} />
-                  : <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />}
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {labPanel === 'specimen' ? t('lab.specimenPipeline') : 'Results'}
-                </span>
-                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                  {labPanel === 'specimen' ? t('lab.resultsCount', { count: kpis.total }) : t('lab.resultsCount', { count: recentCompleted.length })}
-                </span>
-              </div>
-              <button type="button" onClick={() => setLabPanel(null)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
-                <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-              </button>
-            </div>
-
-            {labPanel === 'specimen' && (
-              <div className="flex-1 overflow-y-auto p-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
-                {labWorkflowStages.map((stage, index) => {
-                  const pct = kpis.total > 0 ? Math.round((stage.count / kpis.total) * 100) : 0;
-                  return (
-                    <div key={stage.key} className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: stage.color }}>{stage.label}</span>
-                        <span className="text-[10px] font-bold" style={{ color: stage.color }}>{stage.count}</span>
-                      </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: stage.color }} />
-                      </div>
-                      <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                        {stage.key === 'critical' ? 'Subset requiring urgent communication' : `Stage ${index + 1} of lab workflow`}
-                      </p>
-                    </div>
-                  );
-                })}
-                </div>
-              </div>
-            )}
-
-            {labPanel === 'recent' && (
-              <div className="flex-1 overflow-y-auto">
-                {recentCompleted.length > 0 ? (
-                  <table className="data-table" style={{ minWidth: 760 }}>
-                    <thead>
-                      <tr>
-                        <th>Patient</th>
-                        <th>Result</th>
-                        <th>Test</th>
-                        <th>Specimen</th>
-                        <th>Flag</th>
-                        <th>Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentCompleted.map(r => (
-                        <tr key={r._id}>
-                          <td className="font-medium text-sm">{r.patientName}</td>
-                          <td className="text-sm font-semibold" style={{ color: r.critical ? 'var(--color-danger)' : r.abnormal ? '#FB923C' : 'var(--text-primary)' }}>
-                            {r.result || 'Recorded'} {r.unit}
-                          </td>
-                          <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r.testName}</td>
-                          <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{r.specimen}</td>
-                          <td>
-                            <span className="badge text-[10px]" style={{
-                              background: r.critical ? 'rgba(239,68,68,0.12)' : r.abnormal ? 'rgba(251,146,60,0.12)' : 'rgba(74,222,128,0.12)',
-                              color: r.critical ? 'var(--color-danger)' : r.abnormal ? '#FB923C' : 'var(--color-success)',
-                            }}>
-                              {r.critical ? t('lab.critical') : r.abnormal ? t('lab.abnormalBadge') : t('lab.normalBadge')}
-                            </span>
-                          </td>
-                          <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
-                            {r.completedAt ? new Date(r.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <Microscope className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noCompletedResults')}</p>
-                    </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
         </EhrCareDashboard>
       </main>
 

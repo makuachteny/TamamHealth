@@ -6,7 +6,7 @@ import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useToast } from '@/components/Toast';
-import { patientFullName, patientGenderAge } from '@/lib/patient-utils';
+import { patientFullName, patientGenderAge, initials } from '@/lib/patient-utils';
 import { isVitalInRange, VITAL_RANGES } from '@/lib/clinical/vitals';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -16,8 +16,29 @@ import {
 import {
   ACCENT, calculateTriagePriority, type TriageResult,
 } from './shared';
+import { PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
 import ListSearch from './ListSearch';
 import RowActionsMenu, { type RowAction } from '@/components/referrals/RowActionsMenu';
+
+// Mode-of-arrival → Source column label, using the same terms as the ETAT
+// form's own <select> options.
+function modeOfArrivalLabel(mode: string | undefined, t: (key: string) => string): string {
+  switch (mode) {
+    case 'walk-in': return t('nurse.modeWalkIn');
+    case 'ambulance': return t('nurse.modeAmbulance');
+    case 'referral': return t('nurse.modeReferral');
+    case 'police': return t('nurse.modePolice');
+    case 'other': return t('nurse.modeOther');
+    default: return '—';
+  }
+}
+
+// Triage status → Status column label. No dedicated i18n key exists per
+// status today (the old row just printed the raw value); title-case it so
+// the queue-card Status cell reads like the rest of the app.
+function triageStatusLabel(status: string): string {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
 
 export default function TriageWorkflow({ initialPatientId }: { initialPatientId?: string }) {
   const { t } = useTranslation();
@@ -39,6 +60,10 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
   const [triagePatientSearch, setTriagePatientSearch] = useState('');
   // Inline search for the "Recent Triages" list (right column).
   const [historySearch, setHistorySearch] = useState('');
+  // "Now" for the recent-triages Wait column — captured once on mount rather
+  // than read from Date.now() during render (impure). Live-ish, not live: no
+  // ticking interval, matching the spec for this list.
+  const [nowMs] = useState(() => Date.now());
   const [triageVitals, setTriageVitals] = useState({
     temperature: '', pulse: '', respiratoryRate: '', systolic: '', diastolic: '',
     oxygenSaturation: '', weight: '', painScore: '', bloodGlucose: '', gcs: '', muac: '',
@@ -640,53 +665,49 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
           {filteredHistory.length === 0 ? (
             <p className="text-center text-xs py-8" style={{ color: 'var(--text-muted)' }}>{t('nurse.noTriages')}</p>
           ) : (
-            <div className="space-y-2">
+            <div className="ehr-queue-cards ehr-queue-cards--compact">
               {filteredHistory.slice(0, 12).map(ti => {
-                const timeAgo = (() => {
-                  try {
-                    const mins = Math.floor((Date.now() - new Date(ti.triagedAt).getTime()) / 60000);
-                    if (mins < 1) return t('nurse.justNow');
-                    if (mins < 60) return t('nurse.minsAgo', { mins });
-                    const hrs = Math.floor(mins / 60);
-                    if (hrs < 24) return t('nurse.hrsAgo', { hrs });
-                    return t('nurse.daysAgo', { days: Math.floor(hrs / 24) });
-                  } catch { return ''; }
-                })();
+                const priorityMeta = PRIORITY_META[ti.priority];
+                const minutesAgo = Math.max(0, Math.floor((nowMs - new Date(ti.triagedAt).getTime()) / 60000));
+                const actions: RowAction[] = [
+                  { key: 'view', label: t('nurse.triageActionView'), icon: <Eye />, onClick: () => router.push(`/patients/${ti.patientId}`) },
+                  { key: 'edit', label: t('action.edit'), icon: <ClipboardList />, onClick: () => loadTriageForEdit(ti) },
+                ];
+                if (ti.status !== 'seen' && ti.status !== 'discharged' && ti.status !== 'admitted') {
+                  actions.push({ key: 'seen', label: t('nurse.triageActionMarkSeen'), tone: 'success', icon: <CheckCircle2 />, onClick: () => setTriageStatus(ti, 'seen', t('nurse.triageActionMarkSeen')) });
+                }
+                if (ti.status !== 'admitted') {
+                  actions.push({ key: 'admit', label: t('nurse.triageActionAdmit'), icon: <LogIn />, onClick: () => setTriageStatus(ti, 'admitted', t('nurse.triageActionAdmit')) });
+                }
+                if (ti.status !== 'referred') {
+                  actions.push({ key: 'refer', label: t('nurse.triageActionRefer'), icon: <Send />, onClick: () => setTriageStatus(ti, 'referred', t('nurse.triageActionRefer')) });
+                }
+                if (ti.status !== 'discharged') {
+                  actions.push({ key: 'discharge', label: t('nurse.triageActionDischarge'), tone: 'danger', icon: <LogOut />, onClick: () => setTriageStatus(ti, 'discharged', t('nurse.triageActionDischarge')) });
+                }
                 return (
-                  <div
-                    key={ti._id}
-                    className="flex items-center gap-2 p-2 rounded-xl"
-                    style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
-                  >
-                    <button className="flex-1 min-w-0 text-left" onClick={() => router.push(`/patients/${ti.patientId}`)} title={t('nurse.viewPatientRecord')}>
-                      <p className="text-[11px] font-semibold truncate hover:underline" style={{ color: 'var(--text-primary)' }}>{ti.patientName}</p>
-                      <p className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>
-                        {ti.chiefComplaint || t('nurse.noComplaintRecorded')} · {timeAgo}
-                      </p>
-                    </button>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: ti.status === 'pending' ? 'rgba(252,211,77,0.12)' : ti.status === 'seen' ? 'rgba(92,184,168,0.12)' : 'rgba(31, 157, 111,0.12)', color: ti.status === 'pending' ? 'var(--color-warning)' : ti.status === 'seen' ? '#2191D0' : 'var(--color-success)' }}>
-                        {ti.status}
-                      </span>
-                      {(() => {
-                        const actions: RowAction[] = [
-                          { key: 'view', label: t('nurse.triageActionView'), icon: <Eye />, onClick: () => router.push(`/patients/${ti.patientId}`) },
-                          { key: 'edit', label: t('action.edit'), icon: <ClipboardList />, onClick: () => loadTriageForEdit(ti) },
-                        ];
-                        if (ti.status !== 'seen' && ti.status !== 'discharged' && ti.status !== 'admitted') {
-                          actions.push({ key: 'seen', label: t('nurse.triageActionMarkSeen'), tone: 'success', icon: <CheckCircle2 />, onClick: () => setTriageStatus(ti, 'seen', t('nurse.triageActionMarkSeen')) });
-                        }
-                        if (ti.status !== 'admitted') {
-                          actions.push({ key: 'admit', label: t('nurse.triageActionAdmit'), icon: <LogIn />, onClick: () => setTriageStatus(ti, 'admitted', t('nurse.triageActionAdmit')) });
-                        }
-                        if (ti.status !== 'referred') {
-                          actions.push({ key: 'refer', label: t('nurse.triageActionRefer'), icon: <Send />, onClick: () => setTriageStatus(ti, 'referred', t('nurse.triageActionRefer')) });
-                        }
-                        if (ti.status !== 'discharged') {
-                          actions.push({ key: 'discharge', label: t('nurse.triageActionDischarge'), tone: 'danger', icon: <LogOut />, onClick: () => setTriageStatus(ti, 'discharged', t('nurse.triageActionDischarge')) });
-                        }
-                        return <RowActionsMenu ariaLabel={t('nurse.colActions')} actions={actions} />;
-                      })()}
+                  <div key={ti._id} className="ehr-queue-card ehr-queue-card--compact">
+                    <div className="ehr-queue-patient">
+                      <span className="ehr-patient-icon" data-acuity={ti.priority}>{initials(ti.patientName)}</span>
+                      <div className="ehr-queue-patient-text">
+                        <button type="button" className="ehr-queue-name" onClick={() => router.push(`/patients/${ti.patientId}`)} title={t('nurse.viewPatientRecord')}>
+                          {ti.patientName}
+                        </button>
+                        <p>{ti.chiefComplaint || t('nurse.noComplaintRecorded')}</p>
+                      </div>
+                    </div>
+
+                    <div className="ehr-queue-cell ehr-queue-muted-cell">
+                      {modeOfArrivalLabel(ti.modeOfArrival, t)} · {waitLabel(minutesAgo)}
+                    </div>
+
+                    <div className="ehr-queue-cell">
+                      <span className="ehr-queue-pill" data-tone={priorityMeta.tone}>{priorityMeta.label}</span>
+                      <p className="ehr-queue-substatus">{triageStatusLabel(ti.status)}</p>
+                    </div>
+
+                    <div className="ehr-queue-actions">
+                      <RowActionsMenu ariaLabel={t('nurse.colActions')} actions={actions} />
                     </div>
                   </div>
                 );

@@ -63,3 +63,21 @@ export function jubaTime(): string {
   const n = jubaNow();
   return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
 }
+
+/**
+ * True if `iso` falls within the half-open instant range [range.from, range.to).
+ * Both boundaries are already-resolved ISO instants — e.g. produced by
+ * dhis2-export-service's period→range conversion (which does its own Juba
+ * offset math to anchor the boundaries to local wall-clock days/weeks/months).
+ * This helper does no timezone math of its own; it's a plain timestamp
+ * compare, kept here alongside the other date helpers so callers doing
+ * period-bounded reporting share one implementation.
+ */
+export function isInRange(iso: string | undefined, range: { from: string; to: string }): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  const fromMs = new Date(range.from).getTime();
+  const toMs = new Date(range.to).getTime();
+  return t >= fromMs && t < toMs;
+}

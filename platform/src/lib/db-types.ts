@@ -995,6 +995,18 @@ export interface EncounterDoc extends BaseDoc {
   medicalRecordId?: string;
   closedAt?: string;
   orgId?: string;
+  /**
+   * New case vs re-attendance, captured once at arrival (front desk or
+   * auto-derived). See docs/EMR-FIELD-AUDIT-2026-07.md §3.
+   */
+  attendanceType?: 'new' | 'repeat';
+  /** How the patient arrived — the encounter's front door. */
+  arrivalChannel?: 'appointment' | 'walk_in' | 'referral';
+  /**
+   * The scheduled appointment this visit matched at check-in, when one
+   * existed. Previously computed and discarded by check-in-service.ts.
+   */
+  appointmentId?: string;
 }
 
 /**
@@ -1260,6 +1272,8 @@ export interface TriageDoc extends BaseDoc {
   handoffTo?: string;      // clinician id who took over
   handoffToName?: string;
   handoffAt?: string;
+  /** The visit this triage belongs to — set by check-in-service.ts at arrival. */
+  encounterId?: string;
 }
 
 // ===== Pharmacy Inventory =====

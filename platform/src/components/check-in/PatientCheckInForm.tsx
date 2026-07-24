@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useToast } from '@/components/Toast';
 import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
 import PatientAvatar from '@/components/patients/PatientAvatar';
-import { ClipboardCheck, Search, X, UserPlus } from '@/components/icons/lucide';
-import type { CheckInAcuity } from '@/lib/services/check-in-service';
+import { LogIn, Search, X, UserPlus } from '@/components/icons/lucide';
+import type { CheckInAcuity, AttendanceType } from '@/lib/services/check-in-service';
 import type { PatientDoc } from '@/lib/db-types';
 
 const ARRIVAL_MODES = ['walk-in', 'ambulance', 'referral', 'police', 'other'] as const;
@@ -17,6 +17,11 @@ const ACUITY: { key: CheckInAcuity; label: string; color: string; bg: string }[]
   { key: 'routine', label: 'Routine', color: 'var(--color-success)', bg: 'rgba(21,121,92,0.12)' },
   { key: 'priority', label: 'Priority', color: '#B45309', bg: 'rgba(217,119,6,0.12)' },
   { key: 'emergency', label: 'Emergency', color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)' },
+];
+
+const ATTENDANCE: { key: AttendanceType; label: string }[] = [
+  { key: 'new', label: 'New visit' },
+  { key: 'repeat', label: 'Re-attendance' },
 ];
 
 const inputStyle: React.CSSProperties = {
@@ -95,6 +100,27 @@ export default function PatientCheckInForm({
   const [form, setForm] = useState<CheckInFormState>(initialForm);
   const set = (k: keyof CheckInFormState, v: string) => setForm(f => ({ ...f, [k]: v }));
 
+  // Visit type (new vs re-attendance) — auto-derived from the patient's
+  // history as soon as they're selected; the clerk can override before
+  // submitting. Re-derived on every fresh patient selection.
+  const [attendanceType, setAttendanceType] = useState<AttendanceType>('new');
+  const attendanceTouchedRef = useRef(false);
+  useEffect(() => {
+    if (!selected) return;
+    attendanceTouchedRef.current = false;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { deriveAttendanceType } = await import('@/lib/services/check-in-service');
+        const derived = await deriveAttendanceType(selected._id);
+        if (!cancelled && !attendanceTouchedRef.current) setAttendanceType(derived);
+      } catch {
+        if (!cancelled && !attendanceTouchedRef.current) setAttendanceType('new');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selected]);
+
   useEffect(() => {
     if (!preselectedPatientId) return;
     const patient = patients.find(x => x._id === preselectedPatientId);
@@ -131,6 +157,7 @@ export default function PatientCheckInForm({
         symptomDuration: form.symptomDuration.trim() || undefined,
         knownAllergies: form.knownAllergies.trim() || undefined,
         acuity: form.acuity,
+        attendanceType,
         notes: form.notes.trim() || undefined,
         vitals: {
           temperature: form.temperature || undefined,
@@ -151,6 +178,7 @@ export default function PatientCheckInForm({
       setForm(initialForm);
       setSelected(null);
       setQuery('');
+      setAttendanceType('new');
       onComplete?.();
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Check-in failed', 'error');
@@ -185,7 +213,7 @@ export default function PatientCheckInForm({
     <div className={shellClass}>
       <div className={sectionClass}>
         <h3 className="text-sm font-semibold mb-3 inline-flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-          <ClipboardCheck className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> Patient
+          <LogIn className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> Patient
         </h3>
         {selected ? (
           <div className="checkin-patient-summary">
@@ -268,6 +296,27 @@ export default function PatientCheckInForm({
           <input value={form.chiefComplaint} onChange={e => set('chiefComplaint', e.target.value)} placeholder="e.g. Fever and headache" style={inputStyle} />
         </div>
         <div>
+          {label('Visit')}
+          <div className="flex gap-2">
+            {ATTENDANCE.map(a => {
+              const on = attendanceType === a.key;
+              return (
+                <button
+                  key={a.key}
+                  type="button"
+                  onClick={() => { attendanceTouchedRef.current = true; setAttendanceType(a.key); }}
+                  className="flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all"
+                  style={on
+                    ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
+                    : { background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                >
+                  {a.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div>
           {label('Known allergies')}
           <input value={form.knownAllergies} onChange={e => set('knownAllergies', e.target.value)} placeholder="e.g. Penicillin (or leave blank)" style={inputStyle} />
         </div>
@@ -315,7 +364,7 @@ export default function PatientCheckInForm({
       <div className="ehr-checkin-form-actions">
         <button type="button" onClick={cancel} className="btn btn-secondary">Cancel</button>
         <button type="button" onClick={submit} disabled={submitting || !selected} className="btn btn-primary btn-lg">
-          {submitting ? 'Checking in...' : <><ClipboardCheck className="w-4 h-4" /> Check in patient</>}
+          {submitting ? 'Checking in...' : <><LogIn className="w-4 h-4" /> Check in patient</>}
         </button>
       </div>
     </div>

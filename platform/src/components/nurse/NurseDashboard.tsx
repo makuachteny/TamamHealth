@@ -5,21 +5,64 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  Pill, FileText, BedDouble, AlertTriangle,
+  BedDouble, ArrowRightLeft, Plus, Printer,
   Syringe, Users, Calendar, Activity, Baby, UserX,
 } from '@/components/icons/lucide';
+import type { WardDoc } from '@/lib/db-types-ward';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useWards } from '@/lib/hooks/useWards';
-import { patientAgeLabel, patientFullName, patientGenderAge, patientRegisteredAt } from '@/lib/patient-utils';
+import { patientFullName, patientGenderAge, patientRegisteredAt } from '@/lib/patient-utils';
 import { getRoleConfig } from '@/lib/permissions';
+import { DEMO_WARD_PATIENTS, IS_DEMO } from '@/components/nurse/shared';
+import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import WardWorkflow from './WardWorkflow';
 import MarWorkflow from './MarWorkflow';
 import TriageWorkflow from './TriageWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
 
-type StationTab = 'ward' | 'mar' | 'triage' | 'handoff';
+type StationTab = 'ward' | 'mar' | 'triage';
+
+/* ── Ward occupancy (left rail, design 02) ──
+   One meter per active ward: occupied beds over capacity, "N free" beside it.
+   Amber once a ward is down to its last free bed; the in-bar count flips to
+   white when the fill reaches it. Hidden entirely when no ward carries bed
+   counts (small facilities). */
+function WardOccupancyCard({ wards }: { wards: WardDoc[] }) {
+  const active = wards.filter(ward => ward.isActive !== false && (ward.totalBeds || 0) > 0);
+  if (active.length === 0) return null;
+  const total = active.reduce((sum, ward) => sum + ward.totalBeds, 0);
+  const used = active.reduce((sum, ward) => sum + (ward.occupiedBeds || 0), 0);
+  return (
+    <div className="ehr-occupancy-card">
+      <div className="ehr-occupancy-head">
+        <h3>Ward occupancy</h3>
+        <b>{used}/{total}</b>
+      </div>
+      <div className="ehr-occupancy-rows">
+        {active.slice(0, 6).map(ward => {
+          const occupied = ward.occupiedBeds || 0;
+          const free = Math.max(0, ward.totalBeds - occupied);
+          const pct = Math.min(100, Math.round((occupied / ward.totalBeds) * 100));
+          const tight = free <= 1;
+          return (
+            <div key={ward._id} className="ehr-occupancy-row">
+              <div className="ehr-occupancy-row-name">
+                <span title={ward.name}>{ward.name}</span>
+                <b className={tight ? 'is-tight' : undefined}>{free} free</b>
+              </div>
+              <div className={`ehr-occupancy-bar${tight ? ' is-tight' : ''}${pct >= 92 ? ' is-full' : ''}`}>
+                <i style={{ width: `${pct}%` }} />
+                <span>{occupied}/{ward.totalBeds}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // Only plots a time when the source field is a full timestamp (contains a
 // clock component) — registration/admission dates are sometimes date-only,
@@ -36,7 +79,7 @@ export default function NurseDashboard() {
   const router = useRouter();
   const { patients } = usePatients();
   const { triages } = useTriage();
-  const { activeAdmissions } = useWards();
+  const { activeAdmissions, wards } = useWards();
   const today = new Date().toISOString().slice(0, 10);
   const triageToday = triages.filter(tr => (tr.triagedAt || '').startsWith(today));
   const criticalTriage = triageToday.filter(tr => tr.priority === 'RED').length;
@@ -50,6 +93,8 @@ export default function NurseDashboard() {
   // body below (the clinical-officer dashboard pattern: quick-action cards drive
   // the view rather than top-bar tabs).
   const [activeTab, setActiveTab] = useState<StationTab>('ward');
+  // Shift handoff opens as a popup over the dashboard, not a station view.
+  const [handoffOpen, setHandoffOpen] = useState(false);
 
   // Free-text search for the station lives in the LEFT RAIL (between the
   // mini-calendar and the day chart); WardWorkflow receives it as a prop so
@@ -60,36 +105,42 @@ export default function NurseDashboard() {
     ward: t('nurse.tabWard'),
     mar: t('nurse.tabMar'),
     triage: t('nurse.tabTriage'),
-    handoff: t('nurse.shiftHandoff'),
   }), [t]);
 
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
   const allowedRoutes = useMemo(() => roleConfig?.allowedRoutes ?? [], [roleConfig]);
   const canUseRoute = useCallback((href: string) => allowedRoutes.includes(href), [allowedRoutes]);
 
+  // Tab counts must match what each station board actually displays. The ward
+  // board (shared.tsx `wardPatients`) swaps in the demo roster when the real
+  // roster is thin in demo mode — mirror that rule here so the tab never says
+  // "0" above a visibly populated board.
+  const wardBoardCount = (patients.length >= 10 || !IS_DEMO) ? patients.length : DEMO_WARD_PATIENTS.length;
   const stationTabs = useMemo(() => ([
-    { key: 'ward' as const, label: stationLabel.ward, count: activeAdmissions.length || patients.length },
-    { key: 'mar' as const, label: stationLabel.mar, count: activeAdmissions.length },
+    { key: 'ward' as const, label: stationLabel.ward, count: wardBoardCount },
+    // MAR carries no count: its board lists medication entries (built inside
+    // MarWorkflow), and the only number available here — active admissions —
+    // routinely disagrees with what the board displays. No count beats a
+    // wrong one.
+    { key: 'mar' as const, label: stationLabel.mar },
     { key: 'triage' as const, label: stationLabel.triage, count: triageToday.length },
-    { key: 'handoff' as const, label: stationLabel.handoff },
-  ]), [activeAdmissions.length, patients.length, stationLabel.handoff, stationLabel.mar, stationLabel.triage, stationLabel.ward, triageToday.length]);
+  ]), [wardBoardCount, stationLabel.mar, stationLabel.triage, stationLabel.ward, triageToday.length]);
 
+  // Ward/MAR/Triage switch via the daybar tabs (design 02); Handoff is a popup.
+  const daybarTabs = stationTabs;
   useEffect(() => {
-    if (!stationTabs.some(tab => tab.key === activeTab) && stationTabs[0]) {
-      setActiveTab(stationTabs[0].key);
+    if (!daybarTabs.some(tab => tab.key === activeTab) && daybarTabs[0]) {
+      setActiveTab(daybarTabs[0].key);
     }
-  }, [activeTab, stationTabs]);
+  }, [activeTab, daybarTabs]);
 
-  const actions = useMemo<EhrCareDashboardAction[]>(() => {
-    const stationActions: EhrCareDashboardAction[] = stationTabs.map(tab => ({
-      label: tab.label,
-      icon: tab.key === 'ward' ? BedDouble : tab.key === 'mar' ? Pill : tab.key === 'triage' ? AlertTriangle : FileText,
-      onClick: () => setActiveTab(tab.key),
-      active: activeTab === tab.key,
-      tone: activeTab === tab.key ? 'primary' : 'neutral',
-    }));
-    return stationActions;
-  }, [activeTab, stationTabs]);
+  // Header actions per the nurse-station design: "+ New triage" as the rail
+  // CTA, then Print and the primary "Start handoff" on the right.
+  const actions = useMemo<EhrCareDashboardAction[]>(() => ([
+    { label: 'New triage', icon: Plus, onClick: () => setActiveTab('triage'), tone: 'primary' },
+    { label: 'Print', icon: Printer, onClick: () => window.print(), tone: 'neutral' },
+    { label: 'Start handoff', icon: ArrowRightLeft, onClick: () => setHandoffOpen(true), tone: 'primary' },
+  ]), []);
 
   const rows = useMemo<EhrCareDashboardRow[]>(() => {
     if (activeTab === 'triage') {
@@ -127,9 +178,12 @@ export default function NurseDashboard() {
           meta: `${admission.hospitalNumber || 'No MRN'} · ${admission.admittingDiagnosis || 'No diagnosis'} · ${admission.attendingPhysicianName || 'No physician'}`,
           time,
           status: 'admitted',
+          statusLabel: 'Admitted',
           statusTone: admission.severity === 'critical' ? 'danger' : admission.severity === 'severe' ? 'warning' : 'ready',
           chartSeries: (admission.severity === 'critical' || admission.severity === 'severe' ? 0 : 1) as 0 | 1,
-          priority: admission.severity,
+          // Admission severity is a real acuity — same RED/YELLOW pill as
+          // triage, not a free-text label.
+          priority: admission.severity === 'critical' ? 'RED' : admission.severity === 'severe' ? 'YELLOW' : undefined,
           room: admission.nurseAssignedName,
           date: (admission.admissionDate || today).slice(0, 10),
           onClick: () => router.push(`/wards/mar/${admission._id}`),
@@ -148,10 +202,12 @@ export default function NurseDashboard() {
         meta: `${patient.hospitalNumber || 'No MRN'} · ${patient.phone || 'No phone'} · ${patient.county || 'No location'}`,
         time,
         status: patient.assignedDoctor ? 'assigned' : 'needs routing',
+        statusLabel: patient.assignedDoctor ? 'Assigned' : 'Needs routing',
         statusTone: patient.assignedDoctor ? 'ready' : 'warning',
         // Already routed to a doctor is "Routine"; still needing routing is "Urgent".
         chartSeries: (patient.assignedDoctor ? 1 : 0) as 0 | 1,
-        priority: patientAgeLabel(patient),
+        // Age already reads in the subtitle (patientGenderAge) — it isn't an
+        // acuity, so it doesn't belong in the priority pill.
         room: patient.assignedDoctorName,
         date: (patient.registeredAt || patient.registrationDate || today).slice(0, 10),
         onClick: () => router.push(`/patients/${patient._id}`),
@@ -175,9 +231,25 @@ export default function NurseDashboard() {
     { label: 'In consult', value: inConsultTriage },
   ]), [criticalTriage, urgentTriage, waitingTriage, inConsultTriage]);
 
-  const checklist = useMemo(() => ([
-    { label: 'Complete triage queue', done: triageToday.length === 0, onClick: () => setActiveTab('triage') },
-  ]), [triageToday.length]);
+  // Capabilities card — each item latches checked forever the first time this
+  // nurse does it (see useCapabilities), never un-checked by later state.
+  const capabilityItems = useMemo(() => ([
+    {
+      key: 'nurse.triage',
+      label: 'Complete a triage assessment',
+      // Scoped to assessments THIS nurse performed, not the whole facility's queue.
+      signal: triageToday.some(tr => tr.triagedBy === currentUser?._id),
+      onClick: () => setActiveTab('triage'),
+    },
+    // WardWorkflow's rows only navigate to the patient chart's Vitals tab —
+    // recording itself happens on that page, outside this dashboard's reach,
+    // so there's no completion point to latch on here. Stays unchecked until
+    // the nurse actually records a vital sign in the chart.
+    { key: 'nurse.vitals', label: 'Record ward vitals', onClick: () => setActiveTab('ward') },
+    { key: 'nurse.mar', label: 'Administer medications (MAR)', onClick: () => setActiveTab('mar') },
+    { key: 'nurse.handoff', label: 'Hand off a shift', onClick: () => setHandoffOpen(true) },
+  ]), [triageToday, currentUser?._id]);
+  const { checklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
   if (!currentUser) return null;
 
@@ -189,7 +261,9 @@ export default function NurseDashboard() {
           eyebrow={roleConfig?.label || 'Nursing'}
           greetingName={currentUser.name || 'nurse'}
           dateLabel={dateLabel}
-          tabs={stationTabs}
+          // Ward/MAR/Triage switch uses the shared doctor-module daybar pills;
+          // Handoff opens from the header button.
+          tabs={daybarTabs}
           activeTab={activeTab}
           onTabChange={(tab) => setActiveTab(tab as StationTab)}
           searchValue={railSearch}
@@ -201,7 +275,9 @@ export default function NurseDashboard() {
           // severity, or routing status), so chartSeries is set explicitly per
           // row rather than relying on the done-based default — none of these
           // three stations' rows ever reach a 'done' statusTone.
-          chartSeriesNames={['Urgent', 'Routine']}
+          chartTitle="Triage activity"
+          chartSeriesNames={['Acute', 'Routine']}
+          railContent={<WardOccupancyCard wards={wards} />}
           actionStrip={[
             ...(canUseRoute('/patients') ? [{ label: 'Patient search', icon: Users, onClick: () => router.push('/patients') }] : []),
             ...(canUseRoute('/wards') ? [{ label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') }] : []),
@@ -213,25 +289,35 @@ export default function NurseDashboard() {
             ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
           ]}
           rows={rows}
+          // The design's daybar carries only the station title + tabs — the
+          // tabs already show each board's count, so no subtitle.
+          centerTitle="Nursing station"
+          centerSubtitle=""
           metrics={metrics}
           checklist={checklist}
           calendarEventDates={[
             ...triageToday.map(triage => (triage.triagedAt || today).slice(0, 10)),
             ...activeAdmissions.map(admission => (admission.admissionDate || today).slice(0, 10)),
           ]}
-          metricsTitle="Nursing station"
-          checklistTitle="Nursing checklist"
+          metricsTitle="Today's triage"
+          checklistTitle="Capabilities"
           checklistDescription="Ward care, triage, medications, and handoff."
           emptyTitle="No patients in this station"
           hideRowList
         >
           <div className="flex flex-col" style={{ minHeight: 0 }}>
             {activeTab === 'ward' && <WardWorkflow search={railSearch} showHeader={false} />}
-            {activeTab === 'mar' && <MarWorkflow />}
+            {activeTab === 'mar' && <MarWorkflow onAdminister={() => markCapability('nurse.mar')} />}
             {activeTab === 'triage' && <TriageWorkflow />}
-            {activeTab === 'handoff' && <HandoffWorkflow variant="page" />}
           </div>
         </EhrCareDashboard>
+        {handoffOpen && (
+          <HandoffWorkflow
+            variant="modal"
+            onClose={() => setHandoffOpen(false)}
+            onSigned={() => markCapability('nurse.handoff')}
+          />
+        )}
       </main>
     </>
   );
