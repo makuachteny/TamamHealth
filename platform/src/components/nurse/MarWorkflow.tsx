@@ -1,17 +1,17 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useWards } from '@/lib/hooks/useWards';
 import Modal from '@/components/Modal';
-import { Pill, Check, X, CheckCircle2, RotateCcw, FileText } from '@/components/icons/lucide';
+import { Pill, X, CheckCircle2, RotateCcw, Filter } from '@/components/icons/lucide';
 import type { MedicationAdministration } from '@/lib/db-types';
 import { useMarEntries, type MAREntry } from './shared';
-import RowActionsMenu from '@/components/referrals/RowActionsMenu';
 import ListSearch from './ListSearch';
-import { initials } from '@/lib/patient-utils';
+import { initials, stateColor } from '@/lib/patient-utils';
+import { formatTimeUntil } from '@/lib/format-utils';
 
 type AdminStatus = 'given' | 'held' | 'refused' | 'missed';
 
@@ -19,8 +19,11 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
-  const { marEntries, markGiven, recordEntry, undoAdministration } = useMarEntries();
+  const { marEntries, recordEntry, undoAdministration } = useMarEntries();
   const { activeAdmissions } = useWards();
+  // "Now" for the Time column's relative subline — captured once on mount
+  // (live-ish, matching the Recent Triages list), not re-read during render.
+  const [now] = useState(() => new Date());
 
   // patientId → their active ward/bed placement, for the Source column —
   // MAREntry itself carries no ward/bed (it's sourced from prescriptions),
@@ -47,6 +50,18 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
   const [search, setSearch] = useState('');
   // Status filter — narrows the rows to a single administration status.
   const [statusFilter, setStatusFilter] = useState<'all' | MAREntry['status']>('all');
+  // The Filters panel opens as a dropdown anchored to its trigger — same
+  // pattern as the patients list. Close on outside click or Escape.
+  const [showFilters, setShowFilters] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showFilters) return;
+    const onDown = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilters(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFilters(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [showFilters]);
   const q = search.trim().toLowerCase();
   const filteredEntries = marEntries.filter(e => {
     if (statusFilter !== 'all' && e.status !== statusFilter) return false;
@@ -126,105 +141,188 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
     }
   };
 
-  // Quick "Given" row action — same capability signal as the modal path.
-  const handleMarkGiven = async (entryId: string) => {
-    const ok = await markGiven(entryId);
-    if (ok) onAdminister?.();
-  };
-
   return (
-    <div className="dash-card overflow-hidden flex flex-col" style={{ padding: '0', flex: 1, minHeight: 0 }}>
-      <div className="flex items-center gap-3 px-4 py-3 border-b flex-wrap" style={{ borderBottom: '1px solid var(--border-light)' }}>
-        <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {STATUS_FILTERS.map(f => {
-            const on = statusFilter === f.key;
-            return (
-              <button
-                key={f.key}
-                onClick={() => setStatusFilter(f.key)}
-                className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md transition-colors"
-                style={{
-                  background: on ? 'var(--accent-light)' : 'transparent',
-                  color: on ? 'var(--accent-primary)' : 'var(--text-muted)',
-                  border: `1px solid ${on ? 'var(--accent-border, rgba(33,145,208,0.25))' : 'var(--border-light)'}`,
-                }}
+    // No card chrome of its own — like the ward board, the MAR sits directly
+    // on the centre panel's white body; the rows are the only cards.
+    <div className="overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+      {/* No extra side padding — the centre panel already insets its body, so
+          the title/search share the queue cards' left edge. */}
+      <div className="pt-2 pb-3 flex-shrink-0">
+        {/* Title + status stats (inline, right-aligned — mirrors the patients
+            list header: colored legend dots with live counts). */}
+        <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+          <span style={{ fontFamily: 'var(--font-platform)', fontWeight: 800, fontSize: 16, lineHeight: 1.2, letterSpacing: 0, color: 'var(--ehr-text)' }}>
+            {t('nurse.marTitle')}
+          </span>
+          <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+            {[
+              { label: t('patients.all'), value: marEntries.length, color: 'var(--text-muted)' },
+              { label: t('nurse.marOverdue'), value: marEntries.filter(e => e.status === 'overdue').length, color: 'var(--color-danger)' },
+              { label: t('nurse.marDueNow'), value: marEntries.filter(e => e.status === 'due').length, color: '#D97706' },
+              { label: t('nurse.marUpcoming'), value: marEntries.filter(e => e.status === 'upcoming').length, color: '#2191D0' },
+              { label: t('nurse.marGiven'), value: marEntries.filter(e => e.status === 'given').length, color: '#15795C' },
+            ].map(s => (
+              <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                {s.label} ({s.value.toLocaleString()})
+              </span>
+            ))}
+          </div>
+        </div>
+        {/* Search + filter row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setShowFilters(s => !s)}
+              aria-expanded={showFilters}
+              aria-label={t('patients.filtersTitle')}
+              title={t('patients.filtersTitle')}
+              style={{
+                position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 38, height: 38, padding: 0, borderRadius: 999,
+                border: `1px solid ${statusFilter !== 'all' ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                background: statusFilter !== 'all' ? 'rgba(33,145,208,0.08)' : 'var(--bg-card-solid)',
+                color: statusFilter !== 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <Filter className="w-4 h-4" />
+              {statusFilter !== 'all' && (
+                <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-bold" style={{ top: -4, right: -4, background: '#2191D0', color: '#fff' }}>
+                  1
+                </span>
+              )}
+            </button>
+            {showFilters && (
+              <div
+                className="absolute right-0 mt-2 rounded-2xl overflow-hidden z-50"
+                style={{ width: 220, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
               >
-                {f.label}
-              </button>
-            );
-          })}
+                <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('patients.filtersTitle')}</span>
+                  <div className="flex items-center gap-2">
+                    {statusFilter !== 'all' && (
+                      <button onClick={() => setStatusFilter('all')} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
+                    )}
+                    <button type="button" onClick={() => setShowFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                      <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                    </button>
+                  </div>
+                </div>
+                <div className="py-1">
+                  {STATUS_FILTERS.map(f => {
+                    const on = statusFilter === f.key;
+                    return (
+                      <button
+                        key={f.key}
+                        onClick={() => { setStatusFilter(f.key); setShowFilters(false); }}
+                        className="w-full flex items-center justify-between px-4 py-2 text-[13px] text-left hover:bg-[var(--overlay-subtle)]"
+                        style={{ color: on ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: on ? 600 : 400 }}
+                      >
+                        {f.label}
+                        {on && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex-1" style={{ overflow: 'auto', minHeight: 0 }}>
-        <div className="ehr-queue-scroll">
-          <div className="ehr-queue-cards">
+        {filteredEntries.length === 0 ? (
+          // No bare column-header row over an empty list — the guide only
+          // renders when there are rows to label.
+          <div className="ehr-empty-state">
+            <Pill className="w-8 h-8" />
+            <strong>{t('nurse.noMedications')}</strong>
+            <span>{search.trim() || statusFilter !== 'all'
+              ? 'Nothing matches the current search or filter.'
+              : 'Scheduled doses will appear here as prescriptions are charted.'}</span>
+          </div>
+        ) : (
+        <div className="appointment-card-surface">
+          {/* The appointments-page table, exactly: PATIENT / TIME / LOCATION /
+              MEDICATION / STATUS with the dose as the status cue. */}
+          <div className="appointment-card-flow">
+            <div className="appointment-card-head" aria-hidden="true">
+              {['Patient', 'Time', 'Location', 'Medication', 'Status'].map(head => (
+                <span key={head}>{head}</span>
+              ))}
+            </div>
             {filteredEntries.map(entry => {
               const sc = marStatusColor(entry.status);
               const tone = DUE_TONE[entry.status];
               const admission = admissionByPatient.get(entry.patientId);
               const source = admission ? `${admission.wardName}${admission.bedNumber ? ` · ${admission.bedNumber}` : ''}` : '—';
-              const context = [entry.medication, entry.dose, entry.route].filter(Boolean).join(' · ') || '—';
               // Time column: what already happened (last given) takes priority
               // over the schedule slot — matches "next-due/last-given" spec.
               const timeText = entry.status === 'given' && entry.givenAt
                 ? new Date(entry.givenAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                 : (entry.time || '—');
+              const timeSub = entry.status === 'given' && entry.givenAt
+                ? formatTimeUntil(entry.givenAt, now)
+                : formatTimeUntil(entry.scheduledFor, now);
+              const overdue = entry.status === 'overdue';
+              const statusPillClass = entry.status === 'overdue' ? 'status-no-show'
+                : entry.status === 'due' ? 'status-attention'
+                : entry.status === 'given' ? 'status-completed'
+                : '';
+              // A not-yet-due dose must not read like an administered one —
+              // neutral (upcoming) keeps the grey avatar instead of green.
+              const avatarBg = tone === 'neutral' ? 'var(--ehr-muted)' : stateColor(tone.toUpperCase());
               return (
-                <div key={entry.id} className="ehr-queue-card">
-                  <div className="ehr-queue-patient">
-                    {/* A not-yet-due dose must not read like an administered one —
-                        neutral (upcoming) keeps the grey tint instead of green. */}
-                    <span className="ehr-patient-icon" data-acuity={tone === 'neutral' ? 'neutral' : tone.toUpperCase()}>{initials(entry.patientName)}</span>
-                    <div className="ehr-queue-patient-text">
-                      <button type="button" className="ehr-queue-name" onClick={() => router.push(`/patients/${entry.patientId}`)}>
+                <div
+                  key={entry.id}
+                  className="ehr-appointment-row appointment-card-row"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openModal(entry)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openModal(entry);
+                    }
+                  }}
+                >
+                  <div className="ehr-appointment-identity">
+                    <div className="ehr-patient-icon" style={{ background: avatarBg, color: '#fff' }}>{initials(entry.patientName)}</div>
+                    <div className="ehr-appointment-main appointment-card-patient">
+                      <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`/patients/${entry.patientId}`); }}>
                         {entry.patientName}
                       </button>
+                      <p>{entry.frequency || 'Scheduled dose'}</p>
                     </div>
                   </div>
 
-                  <div className="ehr-queue-cell ehr-queue-muted-cell">{source}</div>
-
-                  <div className="ehr-queue-cell">
-                    <span className="ehr-queue-pill" data-tone={tone}>{sc.label}</span>
+                  <div className="ehr-appointment-time">
+                    <strong style={overdue ? { color: '#C24135' } : undefined}>{timeText}</strong>
+                    {timeSub && <span className={overdue ? 'is-soon' : ''}>{timeSub}</span>}
                   </div>
 
-                  <div className="ehr-queue-cell">—</div>
-
-                  <div className="ehr-queue-cell ehr-queue-muted-cell">{context}</div>
-
-                  <div className="ehr-queue-cell ehr-queue-num-col">
-                    <strong>{timeText}</strong>
+                  <div className="appointment-card-provider">
+                    <strong>{source}</strong>
+                    <span>{admission ? 'Ward · bed' : 'Location'}</span>
                   </div>
 
-                  <div className="ehr-queue-actions">
-                    <RowActionsMenu
-                      ariaLabel={t('nurse.colAction')}
-                      actions={
-                        entry.status !== 'given'
-                          ? [
-                              { key: 'given', label: t('nurse.marQuickGiven'), tone: 'success' as const, icon: <Check className="w-4 h-4" />, onClick: () => handleMarkGiven(entry.id) },
-                              { key: 'outcome', label: t('nurse.marDetailsAction'), icon: <FileText className="w-4 h-4" />, onClick: () => openModal(entry) },
-                            ]
-                          : [
-                              { key: 'outcome', label: t('nurse.marDetailsAction'), icon: <FileText className="w-4 h-4" />, onClick: () => openModal(entry) },
-                              ...(entry.administrationId ? [{ key: 'undo', label: t('action.undo'), icon: <RotateCcw className="w-4 h-4" />, onClick: () => handleUndo(entry) }] : []),
-                            ]
-                      }
-                    />
+                  <div className="appointment-card-provider">
+                    <strong>{entry.medication}</strong>
+                    <span>{[entry.dose, entry.route].filter(Boolean).join(' · ') || 'Medication'}</span>
+                  </div>
+
+                  <div className="appointment-card-status">
+                    <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{sc.label}</span>
+                    <small>{entry.status === 'given' ? 'Recorded' : 'Tap to record'}</small>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
+        )}
       </div>
-      {marEntries.length === 0 && (
-        <div className="text-center py-12">
-          <Pill className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('nurse.noMedications')}</p>
-        </div>
-      )}
 
       {/* Record-administration modal */}
       {modalEntry && (
@@ -365,6 +463,12 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
                 {t('nurse.marRecordedAs')} <strong style={{ color: 'var(--text-primary)' }}>{currentUser?.name}</strong>
               </p>
               <div className="flex items-center gap-2">
+                {modalEntry.status === 'given' && modalEntry.administrationId && (
+                  <button onClick={() => handleUndo(modalEntry)} className="btn btn-secondary inline-flex items-center gap-1.5">
+                    <RotateCcw className="w-4 h-4" />
+                    {t('action.undo')}
+                  </button>
+                )}
                 <button onClick={closeModal} className="btn btn-secondary">{t('nurse.marCancel')}</button>
                 <button
                   onClick={handleSubmit}

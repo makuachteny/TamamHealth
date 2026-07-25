@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 // Clean single-stroke Tailwind Labs Heroicons via the local compatibility shim.
@@ -37,6 +37,18 @@ function groupBySection(items: NavItem[]): { section: string | null; items: NavI
   return groups;
 }
 
+function uniqueNavItems(items: NavItem[]): NavItem[] {
+  const seen = new Set<string>();
+  const result: NavItem[] = [];
+  for (const item of items) {
+    const key = item.action ? `${item.action}:${item.href}` : item.href;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const { logout, currentUser, sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useApp();
@@ -68,7 +80,7 @@ export default function Sidebar() {
   const role = currentUser?.role;
   const canChangeLang = role === 'super_admin' || role === 'org_admin' || role === 'government' || role === 'medical_superintendent';
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
-  const navItems = roleConfig?.navItems || [];
+  const navItems = useMemo(() => uniqueNavItems(roleConfig?.navItems || []), [roleConfig?.navItems]);
   const groups = groupBySection(navItems);
   const hasSections = navItems.some(i => i.section);
 

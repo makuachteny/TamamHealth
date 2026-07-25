@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { AppointmentDoc, AppointmentStatus } from '@/lib/db-types';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import type { AppointmentDoc, AppointmentStatus, EncounterDoc, LabResultDoc } from '@/lib/db-types';
 import {
   Calendar,
   Check,
@@ -23,7 +24,7 @@ import {
   Video,
   X,
 } from '@/components/icons/lucide';
-import { initials } from '@/lib/patient-utils';
+import { initials, stateColor } from '@/lib/patient-utils';
 import { formatClockTime, formatTimeUntil } from '@/lib/format-utils';
 import { useToast } from '@/components/Toast';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -44,6 +45,9 @@ import { useTriage } from '@/lib/hooks/useTriage';
 import { useApp } from '@/lib/context';
 import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import type { TriageDoc } from '@/lib/db-types';
+import { encountersDB, labResultsDB } from '@/lib/db';
+import { makeCoalescer } from '@/lib/hooks/live-reload';
+import { tooltipStyle, axisTick } from '@/components/ChartCard';
 
 function appointmentTriage(priority: AppointmentDoc['priority']) {
   if (priority === 'emergency') return 'RED';
@@ -155,6 +159,18 @@ function outstandingPillTone(tone?: OutstandingEntry['tone']) {
   if (tone === 'danger') return { key: 'red', label: 'Overdue' };
   if (tone === 'warning') return { key: 'yellow', label: 'Needs attention' };
   return { key: 'green', label: 'Open' };
+}
+
+// Mirrors dashboard/lab/page.tsx's FLAG_COLORS convention (critical=red,
+// abnormal=amber) rather than importing it — that page's constant isn't
+// exported for reuse, so the same rgba/CSS-var values are matched here.
+// A result that's overdue for review but neither flagged abnormal nor
+// critical still needs a pill; it gets a neutral gray "Overdue" rather than
+// inventing a fabricated severity.
+function overdueFlagTone(result: Pick<LabResultDoc, 'critical' | 'abnormal'>) {
+  if (result.critical) return { label: 'Critical', bg: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)', border: 'rgba(239,68,68,0.25)' };
+  if (result.abnormal) return { label: 'Abnormal', bg: 'rgba(251,191,36,0.12)', color: 'var(--color-warning)', border: 'rgba(251,191,36,0.25)' };
+  return { label: 'Overdue', bg: 'rgba(148,163,184,0.14)', color: 'var(--text-muted)', border: 'rgba(148,163,184,0.28)' };
 }
 
 function departmentTone(value?: string) {
@@ -458,6 +474,104 @@ export default function EhrClinicalDashboard({
   // deduped to the newest record per patient.
   const { currentUser } = useApp();
   const { triages, update: updateTriageDoc } = useTriage();
+
+  // ── Clinical activity charts (consultations trend + lab-review aging) ──
+  // Neither `getAllEncounters` nor `getOverdueUnreviewedResults` has a
+  // dedicated hook yet (unlike lab results / resumable encounters), so this
+  // loads them directly and stays live via the same PouchDB `.changes()` +
+  // coalescer pattern `useResumableEncounters`/`useLabResults` use.
+  const [allEncounters, setAllEncounters] = useState<EncounterDoc[]>([]);
+  const [overdueLabResults, setOverdueLabResults] = useState<LabResultDoc[]>([]);
+  const vizScope = useMemo(() => (
+    currentUser ? { orgId: currentUser.orgId, hospitalId: currentUser.hospitalId, role: currentUser.role } : undefined
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [currentUser?.orgId, currentUser?.hospitalId, currentUser?.role]);
+  useEffect(() => {
+    let cancelled = false;
+    const loadClinicalViz = async () => {
+      try {
+        const [{ getAllEncounters }, { getOverdueUnreviewedResults }] = await Promise.all([
+          import('@/lib/services/encounter-service'),
+          import('@/lib/services/lab-service'),
+        ]);
+        const [encounters, overdue] = await Promise.all([
+          getAllEncounters(vizScope),
+          getOverdueUnreviewedResults(vizScope),
+        ]);
+        if (!cancelled) {
+          setAllEncounters(encounters);
+          setOverdueLabResults(overdue);
+        }
+      } catch (err) {
+        console.error('Failed to load clinical dashboard chart data', err);
+      }
+    };
+    loadClinicalViz();
+    const reload = makeCoalescer(() => { if (!cancelled) loadClinicalViz(); });
+    const encChanges = encountersDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger()).on('error', () => { /* noop */ });
+    const labChanges = labResultsDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger()).on('error', () => { /* noop */ });
+    return () => {
+      cancelled = true;
+      reload.cancel();
+      try { encChanges.cancel(); } catch { /* noop */ }
+      try { labChanges.cancel(); } catch { /* noop */ }
+    };
+  }, [vizScope]);
+
+  // "My consultations per day" — encounters this clinician ran (clinicianId
+  // match, the same identity the rest of this file uses for "mine"), bucketed
+  // by startedAt's calendar day over the trailing 14 days including today.
+  const consultationsPerDay = useMemo(() => {
+    const days: { iso: string; label: string; count: number }[] = [];
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    for (let i = 13; i >= 0; i--) {
+      const day = new Date(startOfToday);
+      day.setDate(day.getDate() - i);
+      days.push({
+        iso: toIsoDate(day),
+        label: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        count: 0,
+      });
+    }
+    if (!currentUser) return days;
+    const byIso = new Map(days.map(d => [d.iso, d]));
+    for (const encounter of allEncounters) {
+      if (encounter.clinicianId !== currentUser._id || !encounter.startedAt) continue;
+      const started = new Date(encounter.startedAt);
+      if (Number.isNaN(started.getTime())) continue;
+      const bucket = byIso.get(toIsoDate(started));
+      if (bucket) bucket.count += 1;
+    }
+    return days;
+  }, [allEncounters, currentUser]);
+  const consultationsTotal = useMemo(
+    () => consultationsPerDay.reduce((sum, day) => sum + day.count, 0),
+    [consultationsPerDay],
+  );
+
+  // "Abnormal-results aging" — getOverdueUnreviewedResults() already does the
+  // SLA math (24h critical / 7-day routine, order-lifecycles.getResultReviewSLA);
+  // scoped here to labs THIS clinician ordered. LabResultDoc.orderedBy is a
+  // free-text name (stamped from currentUser.name at order time — see
+  // consultation/page.tsx and lab/page.tsx), so it's matched the same way this
+  // file already matches "my" appointments in matchesProviderFilter (name
+  // equality against clinicianName), rather than an id join that doesn't exist
+  // on this doc.
+  const overdueLabRows = useMemo(() => {
+    const now = Date.now();
+    const mine = currentUser?.name
+      ? overdueLabResults.filter(r => r.orderedBy === currentUser.name)
+      : [];
+    return mine
+      .map(r => ({
+        ...r,
+        hoursOverdue: Math.max(0, Math.round((now - new Date(r.updatedAt || r.createdAt || '').getTime()) / 3_600_000)),
+      }))
+      .sort((a, b) => b.hoursOverdue - a.hoursOverdue);
+  }, [overdueLabResults, currentUser?.name]);
   // Wall-clock sampled in an effect (render stays pure) and refreshed once a
   // minute so wait times and the time-aged scores keep aging on screen.
   const [queueNowMs, setQueueNowMs] = useState<number | null>(null);
@@ -1026,11 +1140,16 @@ export default function EhrClinicalDashboard({
 
             {visiblePatientRows.length > 0 && (
               <div className="ehr-queue-scroll">
-                <div className="ehr-queue-cards">
-                  <div className="ehr-queue-guide" aria-hidden="true">
-                    {['Patient', 'Coming from', 'Priority', 'Status', 'Wait'].map(head => (
-                      <span key={head}>{head}</span>
-                    ))}
+                {/* The appointments-page table, exactly: PATIENT / TIME /
+                    COMING FROM / QUEUE / STATUS with the acuity as the small
+                    cue under the status pill. */}
+                <div className="appointment-card-flow">
+                  <div className="appointment-card-head" aria-hidden="true">
+                    <span>Patient</span>
+                    <span>Time</span>
+                    <span>Coming from</span>
+                    <span>Queue</span>
+                    <span>Status</span>
                   </div>
                   {filteredPatientRows.length === 0 && (
                     <div className="ehr-empty-state">
@@ -1044,11 +1163,17 @@ export default function EhrClinicalDashboard({
                       if (row.patientId) setVisitRow(row);
                       else if (row.appointment) setOpenAppointment(row.appointment);
                     };
+                    const statusPillClass = columns.inService || row.status === 'checked_in' || row.status === 'in_progress' ? 'status-checked-in'
+                      : columns.statusText === 'Waiting' ? 'status-attention'
+                      : row.status === 'confirmed' ? 'status-confirmed'
+                      : row.status === 'completed' ? 'status-completed'
+                      : row.status === 'cancelled' || row.status === 'no_show' ? 'status-no-show'
+                      : '';
                     return (
                       <div
                         key={row.id}
                         data-triage={row.triagePriority}
-                        className="ehr-queue-card ehr-queue-card--worklist"
+                        className="ehr-appointment-row appointment-card-row"
                         role="button"
                         tabIndex={0}
                         onClick={openRow}
@@ -1059,38 +1184,44 @@ export default function EhrClinicalDashboard({
                           }
                         }}
                       >
-                        <div className="ehr-queue-patient">
-                          <span className="ehr-patient-icon" data-acuity={row.triagePriority}>
+                        <div className="ehr-appointment-identity">
+                          <div className="ehr-patient-icon" style={{ background: stateColor(row.triagePriority), color: '#fff' }}>
                             {initials(row.name)}
-                          </span>
-                          <div className="ehr-queue-patient-text">
-                            <button type="button" className="ehr-queue-name print-visible" onClick={event => { event.stopPropagation(); openRow(); }}>
+                          </div>
+                          <div className="ehr-appointment-main appointment-card-patient">
+                            <button type="button" className="print-visible" onClick={event => { event.stopPropagation(); openRow(); }}>
                               {row.name}
                             </button>
                             <p>
                               {row.reason}
-                              {row.patient && <small> · {row.patient.age ? `${row.patient.age}y` : 'Age unknown'} · {row.patient.gender || 'Not recorded'}</small>}
+                              {row.patient && <> · {row.patient.age ? `${row.patient.age}y` : 'Age unknown'} · {row.patient.gender || 'Not recorded'}</>}
                             </p>
                           </div>
                         </div>
 
-                        <div className="ehr-queue-cell ehr-queue-muted-cell">{columns.comingFrom}</div>
-
-                        <div className="ehr-queue-cell">
-                          <span className="ehr-queue-pill" data-tone={PRIORITY_META[row.triagePriority].tone}>
-                            {PRIORITY_META[row.triagePriority].label}
-                          </span>
+                        <div className="ehr-appointment-time">
+                          <strong style={columns.overTarget ? { color: '#C24135' } : undefined}>{columns.waitText}</strong>
+                          {columns.waitSubtext && (
+                            <span className={columns.overTarget ? 'is-soon' : ''}>
+                              {columns.waitSubtext}{columns.overTarget ? ' · over target' : ''}
+                            </span>
+                          )}
                         </div>
 
-                        <div className="ehr-queue-cell">
-                          <span className="ehr-queue-status">{columns.statusText}</span>
+                        <div className="appointment-card-provider">
+                          <strong>{columns.comingFrom}</strong>
+                          <span>Source</span>
                         </div>
 
-                        <div className="ehr-queue-cell ehr-queue-num-col">
-                          <div className={`ehr-queue-wait ${columns.overTarget ? 'ehr-queue-wait-over' : ''}`.trim()}>
-                            <strong>{columns.waitText}</strong>
-                            {columns.waitSubtext && <small>{columns.waitSubtext}</small>}
-                          </div>
+                        <div className="ehr-appointment-department">
+                          {columns.queueText
+                            ? <span className={`ehr-department-pill ${departmentTone(columns.queueText)}`}>{columns.queueText}</span>
+                            : <span className="ehr-queue-muted-cell">—</span>}
+                        </div>
+
+                        <div className="appointment-card-status">
+                          <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{columns.statusText}</span>
+                          <small>{PRIORITY_META[row.triagePriority].label}</small>
                         </div>
                       </div>
                     );
@@ -1233,6 +1364,7 @@ export default function EhrClinicalDashboard({
         </aside>
         )}
       </section>
+
     </div>
   );
 }

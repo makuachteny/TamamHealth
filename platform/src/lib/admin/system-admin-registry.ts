@@ -71,7 +71,6 @@ const FACILITY_ADMIN_ROLES: UserRole[] = [
   'org_admin',
   'medical_superintendent',
   'hospital_manager',
-  'facility_administrator',
 ];
 
 const RECORDS_ADMIN_ROLES: UserRole[] = [

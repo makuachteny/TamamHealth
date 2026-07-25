@@ -3948,7 +3948,6 @@ const so: TranslationMap = {
   'adminUsers.role_rooming_nurse': 'Kalkaaliye Soo-dhaweynta',
   'adminUsers.role_clinician': 'Dhakhtar',
   'adminUsers.role_records_hmis_officer': 'Sarkaalka Diiwaanka / HMIS',
-  'adminUsers.role_facility_administrator': 'Maamulaha Xarunta',
   'orgAdmin.pageTitle': 'Dashboard-ka Hay\'adda',
   'orgAdmin.organization': 'Hay\'adda',
   'orgAdmin.subtitle': 'Hay\'addaada kooban.',

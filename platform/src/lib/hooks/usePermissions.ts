@@ -22,7 +22,6 @@ export function usePermissions() {
   const isRegistrationClerk = role === 'central_registration_clerk';
   const isClinicClerk = role === 'clinic_clerk';
   const isRecordsHmis = role === 'records_hmis_officer';
-  const isFacilityAdmin = role === 'facility_administrator';
 
   // Platform & org management
   const canManagePlatform = isSuperAdmin;
@@ -31,7 +30,7 @@ export function usePermissions() {
   const canEditBranding = isSuperAdmin || isOrgAdmin;
   // Must mirror WRITE_ROLES in /api/users — user accounts are provisioned
   // through that central API (the security boundary), so showing the
-  // management UI to roles the API rejects (government, facility_administrator)
+  // management UI to roles the API rejects (e.g. government)
   // only produced 403s — or worse, before centralization, stranded local-only
   // accounts that could never log in anywhere.
   const canManageUsers = isSuperAdmin || isOrgAdmin;
@@ -42,7 +41,7 @@ export function usePermissions() {
   const isMedSupt = role === 'medical_superintendent';
   const canEditClinical = role === 'doctor' || role === 'clinical_officer' || isClinician || isMedSupt;
   // Midwives provide clinical maternity care, so they can view clinical records.
-  const canViewClinical = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isFacilityAdmin || isMedSupt || isSuperAdmin;
+  const canViewClinical = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isMedSupt || isSuperAdmin;
   const canConsult = role === 'doctor' || role === 'clinical_officer' || isClinician || isMedSupt;
   const canPrescribe = role === 'doctor' || role === 'clinical_officer' || isClinician || isMedSupt;
   const canOrderLabs = role === 'doctor' || role === 'clinical_officer' || isClinician || isMedSupt;
@@ -65,33 +64,33 @@ export function usePermissions() {
   // by duty: reception schedules/checks in, clinicians advance visits, HMIS
   // and management can export operational lists.
   const canBookAppointments = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isRegistrationClerk || isClinicClerk || role === 'front_desk' || isMedSupt || isSuperAdmin;
-  const canConfirmAppointments = isRegistrationClerk || isClinicClerk || role === 'front_desk' || isMedSupt || isFacilityAdmin || isOrgAdmin || isSuperAdmin;
+  const canConfirmAppointments = isRegistrationClerk || isClinicClerk || role === 'front_desk' || isMedSupt || isOrgAdmin || isSuperAdmin;
   const canManageAppointmentSchedule = canConfirmAppointments;
   const canCheckInAppointments = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || role === 'front_desk' || isMedSupt || isSuperAdmin;
   const canAdvanceAppointments = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isMedSupt || isSuperAdmin;
-  const canExportAppointments = isRegistrationClerk || isClinicClerk || role === 'front_desk' || role === 'hrio' || isRecordsHmis || isFacilityAdmin || isHospitalManager || isMedSupt || isOrgAdmin || isSuperAdmin;
+  const canExportAppointments = isRegistrationClerk || isClinicClerk || role === 'front_desk' || role === 'hrio' || isRecordsHmis || isHospitalManager || isMedSupt || isOrgAdmin || isSuperAdmin;
 
   // Messages — any clinical/CHW role can send (view is broader via nav config)
-  const canSendMessages = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || isRecordsHmis || isFacilityAdmin || role === 'front_desk' || isCashier || role === 'pharmacist' || role === 'lab_tech' || isCountyDirector || role === 'hrio' || role === 'nutritionist' || role === 'radiologist' || isMedSupt || isOrgAdmin || isSuperAdmin;
+  const canSendMessages = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || isRecordsHmis || role === 'front_desk' || isCashier || role === 'pharmacist' || role === 'lab_tech' || isCountyDirector || role === 'hrio' || role === 'nutritionist' || role === 'radiologist' || isMedSupt || isOrgAdmin || isSuperAdmin;
 
   // Facility assessments — data entry + supervisors + government + hospital manager + county + records/admin
-  const canAssessFacility = isDataEntry || role === 'hrio' || isRecordsHmis || isFacilityAdmin || isMedSupt || isGovernment || isCountyDirector || isHospitalManager || isSuperAdmin;
+  const canAssessFacility = isDataEntry || role === 'hrio' || isRecordsHmis || isMedSupt || isGovernment || isCountyDirector || isHospitalManager || isSuperAdmin;
 
   // Analytics & intelligence — management + government + county (moved off doctors)
-  const canViewEpidemicIntel = isHospitalManager || isMedSupt || isFacilityAdmin || isGovernment || isCountyDirector || isSuperAdmin;
-  const canViewMCHAnalytics = role === 'nutritionist' || isHospitalManager || isMedSupt || isFacilityAdmin || isGovernment || isCountyDirector || isSuperAdmin;
+  const canViewEpidemicIntel = isHospitalManager || isMedSupt || isGovernment || isCountyDirector || isSuperAdmin;
+  const canViewMCHAnalytics = role === 'nutritionist' || isHospitalManager || isMedSupt || isGovernment || isCountyDirector || isSuperAdmin;
 
   // Reports & export — HRIO, records/HMIS officer, and the county director own DHIS2/HMIS reporting.
   const canExportDHIS2 = isGovernment || isHospitalManager || role === 'hrio' || isRecordsHmis || isCountyDirector || isSuperAdmin;
   // Reports/analytics were deliberately moved off clinicians (see canViewEpidemicIntel/
   // canViewMCHAnalytics above) onto HMIS/management/government roles; clinical_officer
   // was a leftover here and is intentionally excluded for consistency.
-  const canViewReports = role === 'hrio' || isRecordsHmis || isFacilityAdmin || isHospitalManager || isMedSupt || isGovernment || isCountyDirector || isOrgAdmin || isSuperAdmin;
+  const canViewReports = role === 'hrio' || isRecordsHmis || isHospitalManager || isMedSupt || isGovernment || isCountyDirector || isOrgAdmin || isSuperAdmin;
 
   // Billing & collections — biller + dedicated cashier + management + admins.
   // Front desk no longer handles money (separation of duties).
-  const canCollectPayments = isMedicalBiller || isCashier || isFacilityAdmin || isMedSupt || isOrgAdmin || isSuperAdmin;
-  const canManageBilling = isMedicalBiller || isFacilityAdmin || isHospitalManager || isOrgAdmin || isSuperAdmin;
+  const canCollectPayments = isMedicalBiller || isCashier || isMedSupt || isOrgAdmin || isSuperAdmin;
+  const canManageBilling = isMedicalBiller || isHospitalManager || isOrgAdmin || isSuperAdmin;
 
   // Vital events — clinical staff + midwife + BHW/CHV + records/data entry + workflow nurses/clinician
   const canRecordVitalEvents = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRecordsHmis || role === 'hrio' || isDataEntry || isMedSupt;

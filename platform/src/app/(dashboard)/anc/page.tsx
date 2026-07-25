@@ -39,7 +39,7 @@ export default function ANCPage() {
   // Programme analytics (summary cards + ANC continuum funnel) are a population
   // view for facility management and the Ministry of Health. Clinical roles keep
   // the data recordings, workflow, and the mother/visit data.
-  const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
+  const canViewCoverage = ['hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
   // Table toolbar search (shared list-page header), combined with the
   // platform-wide search bar so a term typed elsewhere still narrows this list.
   const [tableSearch, setTableSearch] = useState('');

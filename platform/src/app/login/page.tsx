@@ -33,7 +33,6 @@ const ACCOUNT_NAME: Record<string, string> = {
   'nutr.nyabol': 'Nyabol Koang Jal',
   'data.ayen': 'Ayen Dut Malual',
   'hmis.john': 'John Majok Chol',
-  'facadmin.rita': 'Rita Akello Ojok',
   'org.admin': 'Mercy Org Administrator',
   'sup.mary': 'Mary Lado Kenyi',
   'county.lopez': 'Dr. Lopez Lokai Modi',
@@ -100,7 +99,6 @@ const demoAccounts: { role: string; roleKey: UserRole; user: string; desc: strin
   { group: 'Juba Teaching Hospital',    role: 'Medical Biller',         roleKey: 'medical_biller',             user: 'biller.nyandeng',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
   { group: 'Juba Teaching Hospital',    role: 'Data Entry Clerk',       roleKey: 'data_entry_clerk',           user: 'data.ayen',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
   { group: 'Juba Teaching Hospital',    role: 'Records / HMIS Officer', roleKey: 'records_hmis_officer',       user: 'hmis.john',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Juba Teaching Hospital',    role: 'Facility Administrator', roleKey: 'facility_administrator',     user: 'facadmin.rita',    desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
 
   // 2 ── Wau State Hospital.
   { group: 'Wau State Hospital',        role: 'Clinical Officer',       roleKey: 'clinical_officer',           user: 'co.deng',          desc: 'Wau State Hospital',        hospital: 'hosp-002' },

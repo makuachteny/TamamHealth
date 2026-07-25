@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useWards } from '@/lib/hooks/useWards';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { formatClockTime, formatTimeUntil } from '@/lib/format-utils';
-import { patientFullName, patientAgeLabel, initials } from '@/lib/patient-utils';
+import { patientFullName, patientAgeLabel, initials, stateColor } from '@/lib/patient-utils';
 import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 
@@ -175,9 +175,12 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
               </div>
             )}
             {displayedPatients.length > 0 && (
-              <div className="ehr-queue-cards">
-                <div className="ehr-queue-guide" aria-hidden="true">
-                  {['Patient', 'Location', 'Acuity', 'Status', 'Wait'].map(head => (
+              <div className="appointment-card-surface">
+                {/* The appointments-page table, exactly: PATIENT / TIME /
+                    LOCATION / QUEUE / STATUS, acuity as the status cue. */}
+                <div className="appointment-card-flow">
+                <div className="appointment-card-head" aria-hidden="true">
+                  {['Patient', 'Time', 'Location', 'Queue', 'Status'].map(head => (
                     <span key={head}>{head}</span>
                   ))}
                 </div>
@@ -225,10 +228,19 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                   const overTarget = Boolean(entry?.flaggedForReassessment);
                   const subtitle = `${triage?.chiefComplaint || patient.hospitalNumber || 'No ID'} · ${patientAgeLabel(patient)} · ${patient.gender || 'Not recorded'}`;
                   const activate = patient._demo ? undefined : () => router.push(`/patients/${patient._id}?tab=vitals`);
+                  const stageText = entry
+                    ? STAGE_LABELS[entry.stage]
+                    : demoTriage
+                    ? (demoTriage.status === 'pending' ? STAGE_LABELS.awaiting_triage : STAGE_LABELS.awaiting_rooming)
+                    : appointment?.department || '';
+                  const statusPillClass = inService ? 'status-checked-in'
+                    : waiting ? 'status-attention'
+                    : notTriaged ? 'status-attention'
+                    : appointment ? '' : '';
                   return (
                     <div
                       key={patient._id}
-                      className="ehr-queue-card ehr-queue-card--worklist"
+                      className="ehr-appointment-row appointment-card-row"
                       data-triage={priority}
                       role={patient._demo ? undefined : 'button'}
                       tabIndex={patient._demo ? undefined : 0}
@@ -236,33 +248,42 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                       onKeyDown={patient._demo ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate?.(); } }}
                       style={{ cursor: patient._demo ? 'default' : 'pointer' }}
                     >
-                      <div className="ehr-queue-patient">
-                        <span className="ehr-patient-icon" data-acuity={priority}>{initials(patientFullName(patient))}</span>
-                        <div className="ehr-queue-patient-text">
+                      <div className="ehr-appointment-identity">
+                        <div className="ehr-patient-icon" style={{ background: stateColor(priority), color: '#fff' }}>{initials(patientFullName(patient))}</div>
+                        <div className="ehr-appointment-main appointment-card-patient">
                           <strong className="ehr-queue-name">{patientFullName(patient)}</strong>
                           <p>{subtitle}</p>
                         </div>
                       </div>
 
-                      <div className="ehr-queue-cell ehr-queue-muted-cell">{location}</div>
-
-                      <div className="ehr-queue-cell">
-                        <span className="ehr-queue-pill" data-tone={ACUITY_META[priority].tone}>{ACUITY_META[priority].label}</span>
+                      <div className="ehr-appointment-time">
+                        <strong style={overTarget ? { color: '#C24135' } : undefined}>{waitText}</strong>
+                        {waitSubtext && (
+                          <span className={overTarget ? 'is-soon' : ''}>
+                            {waitSubtext}{overTarget ? ' · over target' : ''}
+                          </span>
+                        )}
                       </div>
 
-                      <div className="ehr-queue-cell">
-                        <span className="ehr-queue-status">{statusText}</span>
+                      <div className="appointment-card-provider">
+                        <strong>{admission ? location : (location === '—' ? 'Not placed' : location)}</strong>
+                        <span>{admission ? 'Ward · bed' : 'Location'}</span>
                       </div>
 
-                      <div className="ehr-queue-cell ehr-queue-num-col">
-                        <div className={`ehr-queue-wait ${overTarget ? 'ehr-queue-wait-over' : ''}`.trim()}>
-                          <strong>{waitText}</strong>
-                          {waitSubtext && <small>{waitSubtext}</small>}
-                        </div>
+                      <div className="ehr-appointment-department">
+                        {stageText
+                          ? <span className="ehr-department-pill opd">{stageText}</span>
+                          : <span className="ehr-queue-muted-cell">—</span>}
+                      </div>
+
+                      <div className="appointment-card-status">
+                        <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText}</span>
+                        <small>{ACUITY_META[priority].label}</small>
                       </div>
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </div>

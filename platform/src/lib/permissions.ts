@@ -40,9 +40,11 @@ import {
   Siren,
   Baby,
   UserX,
+  Shield,
   ShieldAlert,
   Eye,
   TrendingUp,
+  GitCompareArrows,
 } from '@/components/icons/lucide';
 import { BRAND_DARKER, BRAND_PRIMARY, BRAND_SECONDARY } from './theme-colors';
 
@@ -111,19 +113,19 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.super_admin.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.super_admin.allowed],
     navItems: [
-      ...FACILITY_NAV,
-      // Platform-operator controls (kept so super-admin never loses tenant /
-      // system access); no href duplicates the facility nav above.
-      { href: '/admin', label: 'Platform Dashboard', icon: Gauge, section: 'PLATFORM' },
-      { href: '/admin/organizations', label: 'Organizations', icon: Building2, section: 'PLATFORM' },
-      { href: '/admin/users', label: 'All Users', icon: Users, section: 'PLATFORM' },
-      { href: '/admin/billing', label: 'Billing', icon: CreditCard, section: 'PLATFORM' },
-      { href: '/payments', label: 'Payments', icon: Wallet, section: 'PLATFORM' },
-      { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'PLATFORM' },
-      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, section: 'PLATFORM' },
-      { href: '/admin/system', label: 'System Config', icon: Server, section: 'PLATFORM' },
-      { href: '/it', label: 'IT Operations', icon: Server, section: 'PLATFORM' },
-      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'PLATFORM' },
+      { href: '/admin', label: 'Platform Dashboard', icon: Gauge, section: 'OVERVIEW' },
+      { href: '/admin/control', label: 'Control Center', icon: Shield, section: 'OVERVIEW' },
+      { href: '/admin/organizations', label: 'Organizations', icon: Building2, section: 'TENANTS' },
+      { href: '/admin/users', label: 'Users & Access', icon: Users, section: 'TENANTS' },
+      { href: '/hospitals', label: 'Facilities', icon: HospitalIcon, section: 'TENANTS' },
+      { href: '/admin/billing', label: 'Billing & Plans', icon: CreditCard, section: 'FINANCE' },
+      { href: '/payments', label: 'Revenue & Payments', icon: Wallet, section: 'FINANCE' },
+      { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'FINANCE' },
+      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, section: 'INTELLIGENCE' },
+      { href: '/reports', label: 'Reports', icon: ClipboardCheck, section: 'INTELLIGENCE' },
+      { href: '/admin/system', label: 'System & Integrations', icon: Server, section: 'OPERATIONS' },
+      { href: '/it', label: 'IT Operations', icon: Wrench, section: 'OPERATIONS' },
+      { href: '/admin/conflicts', label: 'Conflict Queue', icon: GitCompareArrows, section: 'OPERATIONS' },
     ],
     color: BRAND_SECONDARY,
     gradientFrom: BRAND_DARKER,
@@ -673,31 +675,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'HMIS Off.',
   },
 
-  facility_administrator: {
-    label: 'Facility Administrator',
-    defaultDashboard: ROLE_ROUTE_TABLE.facility_administrator.defaultDashboard,
-    allowedRoutes: [...ROLE_ROUTE_TABLE.facility_administrator.allowed],
-    navItems: [
-      { href: '/facility-overview', label: 'Facility Dashboard', icon: LayoutDashboard, section: 'ADMINISTRATION' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'ADMINISTRATION' },      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'ADMINISTRATION' },
-      { href: '/equipment', label: 'Assets', icon: Wrench, section: 'ADMINISTRATION' },
-      { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'ADMINISTRATION' },
-      { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
-      { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
-      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardPen, section: 'CLINICAL' },
-      { href: '/referrals', label: 'Referrals', icon: Send, section: 'CLINICAL' },
-      { href: '/blood-bank', label: 'Blood Bank', icon: Droplets, section: 'CLINICAL' },
-      { href: '/emergency-preparedness', label: 'Emergency Prep', icon: ShieldAlert, section: 'CLINICAL' },
-      { href: '/controlled-substances', label: 'Controlled Substances', icon: ClipboardCheck, section: 'COMPLIANCE' },
-      { href: '/payments', label: 'Bills', icon: Wallet, section: 'FINANCE' },
-      { href: '/reports', label: 'Reports', icon: BarChart3, section: 'REPORTING' },
-      { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'REPORTING' },
-      { href: '/it', label: 'IT Operations', icon: Server, section: 'REPORTING' },
-      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'REPORTING' },
-      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-    ],
-    color: BRAND_SECONDARY, gradientFrom: BRAND_DARKER, gradientTo: BRAND_SECONDARY, badgeLabel: 'Facility Admin'
-  },
 };
 
 export function getRoleConfig(role: UserRole): RoleConfig {
@@ -727,7 +704,7 @@ export const CONFLICT_RESOLUTION_ROLES: UserRole[] = [
   'hrio',
 ];
 
-const WORKFLOW_ROLES: UserRole[] = ['central_registration_clerk', 'clinic_clerk', 'triage_nurse', 'rooming_nurse', 'clinician', 'records_hmis_officer', 'facility_administrator'];
+const WORKFLOW_ROLES: UserRole[] = ['central_registration_clerk', 'clinic_clerk', 'triage_nurse', 'rooming_nurse', 'clinician', 'records_hmis_officer'];
 const PRIVATE_SECTOR_ROLES: UserRole[] = ['org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller', ...WORKFLOW_ROLES];
 const ALL_ROLES: UserRole[] = ['super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'government', 'county_health_director', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller', ...WORKFLOW_ROLES];
 

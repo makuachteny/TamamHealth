@@ -51,7 +51,7 @@ export default function SystemAdministrationPage() {
 
   const accountHref = currentUser?.role === 'super_admin'
     ? '/admin/users'
-    : currentUser?.role === 'org_admin' || currentUser?.role === 'facility_administrator'
+    : currentUser?.role === 'org_admin'
       ? '/org-admin/users'
       : '/hr';
 

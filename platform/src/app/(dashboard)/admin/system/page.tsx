@@ -235,7 +235,7 @@ export default function AdminSystemPage() {
   return (
     <>
       <TopBar title={t('system.title')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter admin-detail-page">
 
         {/* SYNC OPERATIONS — manual triggers for the same endpoints that the
             scheduled cron sidecar calls. Useful for verifying end-to-end push

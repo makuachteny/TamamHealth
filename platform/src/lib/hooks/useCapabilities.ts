@@ -49,7 +49,11 @@ export function useCapabilities(userId: string | undefined, items: CapabilityIte
 
   const checklist = useMemo(() => items.map(item => ({
     label: item.label,
-    done: Boolean(userId && (hasCapabilityMark(item.key, userId) || item.signal)),
+    // Product decision (Jul 2026): every capability renders checked for every
+    // user — the card is a "what this role can do here" map, not an earned
+    // checklist. The latch/mark/signal machinery still records real usage in
+    // storage for any future view that wants the honest per-user state.
+    done: true,
     href: item.href,
     onClick: item.onClick,
   })),

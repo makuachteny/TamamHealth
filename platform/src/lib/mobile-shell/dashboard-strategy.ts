@@ -13,7 +13,7 @@ export type MobileDashboardArchetype = 'clinical' | 'lab' | 'pharmacy' | 'front_
  * none are silently unhandled): super_admin, org_admin, cashier, government,
  * county_health_director, data_entry_clerk, medical_superintendent, hrio,
  * nutritionist, radiologist, hospital_manager, medical_biller,
- * records_hmis_officer, facility_administrator. These are admin/financial/
+ * records_hmis_officer. These are admin/financial/
  * oversight roles (or, for nutritionist/radiologist, roles with no lane data
  * model yet — candidate v2 archetypes) with no patient/appointment surface
  * the shell's Dashboard/Patients/Calendar tabs map onto.

@@ -15,6 +15,24 @@ const DEFAULT_CONFIG: Omit<PlatformConfigDoc, '_id' | '_rev' | 'createdAt' | 'up
   },
   defaultPrimaryColor: BRAND_PRIMARY,
   defaultSecondaryColor: BRAND_SECONDARY,
+  superAdminPolicies: {
+    mfaRequired: true,
+    passwordMinLength: 12,
+    sessionTimeoutMinutes: 15,
+    emergencyAccessEnabled: true,
+    emergencyAccessReviewHours: 24,
+    impersonationEnabled: false,
+    impersonationMaxMinutes: 30,
+    dualApprovalForHighRisk: true,
+    auditRetentionYears: 6,
+    phiExportRequiresReason: true,
+    dataDeletionRequiresApproval: true,
+    ssoEnabled: false,
+    apiKeysEnabled: false,
+    backupRpoHours: 24,
+    backupRtoHours: 8,
+    supportAccessRequiresTicket: true,
+  },
 };
 
 export async function getPlatformConfig(): Promise<PlatformConfigDoc> {

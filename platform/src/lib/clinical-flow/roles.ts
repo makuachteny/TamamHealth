@@ -69,8 +69,7 @@ export type ClinicalFlowRole =
   | 'lab_technician' // 6
   | 'pharmacist' // 7 — pharmacist / pharmacy technician
   | 'cashier' // 8
-  | 'records_hmis_officer' // 9
-  | 'facility_administrator'; // 10
+  | 'records_hmis_officer'; // 9
 
 export interface RoleDefinition {
   role: ClinicalFlowRole;
@@ -148,13 +147,6 @@ export const CLINICAL_FLOW_ROLES: Readonly<Record<ClinicalFlowRole, RoleDefiniti
     capabilities: ['records_hmis', 'result_review'],
     clinicalVisibility: 'light_clinical',
     mapsToUserRoles: ['records_hmis_officer', 'hrio', 'data_entry_clerk'],
-  },
-  facility_administrator: {
-    role: 'facility_administrator', number: 10, label: 'Facility administrator',
-    primaryFunction: 'User management, facility configuration, oversight',
-    capabilities: ['user_management', 'facility_configuration', 'oversight', 'exemption_authorization'],
-    clinicalVisibility: 'full_chart',
-    mapsToUserRoles: ['facility_administrator', 'medical_superintendent', 'hospital_manager', 'org_admin', 'super_admin'],
   },
 };
 

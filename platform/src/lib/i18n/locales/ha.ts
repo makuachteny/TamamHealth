@@ -3948,7 +3948,6 @@ const ha: TranslationMap = {
   'adminUsers.role_rooming_nurse': 'Nas na Karɓar Marasa Lafiya',
   'adminUsers.role_clinician': 'Likita',
   'adminUsers.role_records_hmis_officer': 'Jami\'in Bayanai / HMIS',
-  'adminUsers.role_facility_administrator': 'Manajan Cibiya',
   'orgAdmin.pageTitle': 'Dashboard na Ƙungiya',
   'orgAdmin.organization': 'Ƙungiya',
   'orgAdmin.subtitle': 'Ƙungiyarka a takaice.',

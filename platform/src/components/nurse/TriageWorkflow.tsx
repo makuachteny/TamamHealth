@@ -649,7 +649,6 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
         </div>
       </div>
 
-      {/* Right column: Recent Triages List (1/3 width) */}
       <div className="lg:flex-[1] card-elevated overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
           <div className="flex items-center gap-2">
@@ -665,7 +664,12 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
           {filteredHistory.length === 0 ? (
             <p className="text-center text-xs py-8" style={{ color: 'var(--text-muted)' }}>{t('nurse.noTriages')}</p>
           ) : (
-            <div className="ehr-queue-cards ehr-queue-cards--compact">
+            <div className="ehr-queue-cards ehr-queue-cards--triage">
+              <div className="ehr-queue-guide ehr-queue-guide--triage" aria-hidden="true">
+                {['Patient', 'Source', 'Acuity', 'Status', 'Wait', 'Action'].map(head => (
+                  <span key={head}>{head}</span>
+                ))}
+              </div>
               {filteredHistory.slice(0, 12).map(ti => {
                 const priorityMeta = PRIORITY_META[ti.priority];
                 const minutesAgo = Math.max(0, Math.floor((nowMs - new Date(ti.triagedAt).getTime()) / 60000));
@@ -686,7 +690,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
                   actions.push({ key: 'discharge', label: t('nurse.triageActionDischarge'), tone: 'danger', icon: <LogOut />, onClick: () => setTriageStatus(ti, 'discharged', t('nurse.triageActionDischarge')) });
                 }
                 return (
-                  <div key={ti._id} className="ehr-queue-card ehr-queue-card--compact">
+                  <div key={ti._id} className="ehr-queue-card ehr-queue-card--triage" data-triage={ti.priority}>
                     <div className="ehr-queue-patient">
                       <span className="ehr-patient-icon" data-acuity={ti.priority}>{initials(ti.patientName)}</span>
                       <div className="ehr-queue-patient-text">
@@ -698,12 +702,22 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
                     </div>
 
                     <div className="ehr-queue-cell ehr-queue-muted-cell">
-                      {modeOfArrivalLabel(ti.modeOfArrival, t)} · {waitLabel(minutesAgo)}
+                      {modeOfArrivalLabel(ti.modeOfArrival, t)}
                     </div>
 
                     <div className="ehr-queue-cell">
                       <span className="ehr-queue-pill" data-tone={priorityMeta.tone}>{priorityMeta.label}</span>
-                      <p className="ehr-queue-substatus">{triageStatusLabel(ti.status)}</p>
+                    </div>
+
+                    <div className="ehr-queue-cell">
+                      <span className="ehr-queue-status">{triageStatusLabel(ti.status)}</span>
+                    </div>
+
+                    <div className="ehr-queue-cell ehr-queue-num-col">
+                      <div className="ehr-queue-wait">
+                        <strong>{new Date(ti.triagedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</strong>
+                        <small>{waitLabel(minutesAgo)}</small>
+                      </div>
                     </div>
 
                     <div className="ehr-queue-actions">

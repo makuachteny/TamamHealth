@@ -29,7 +29,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   super_admin: {
     allowed: [
       '/facility-management',
-      '/admin', '/admin/organizations', '/admin/users', '/admin/system',
+      '/admin', '/admin/control', '/admin/organizations', '/admin/users', '/admin/system', '/admin/conflicts',
       '/it', '/system-admin',
       '/admin/billing', '/admin/analytics',
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
@@ -322,29 +322,6 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     defaultDashboard: '/dashboard/data-entry',
   },
 
-  facility_administrator: {
-    // Non-clinical facility manager: administration, oversight, finance, HR,
-    // assets, records/data quality, and population reporting. NOT a consulting
-    // clinician — no consultation/telehealth encounter tools and no lab/pharmacy
-    // operations pages (those belong to clinicians, lab techs, and pharmacists).
-    allowed: [
-      '/dashboard', '/patients', '/referrals', '/messages',
-      '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/reports', '/settings',
-      '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
-      '/appointments', '/facility-assessments', '/data-quality', '/patient-intake',
-      '/facility-settings',
-      '/it', '/system-admin',
-      '/payments', '/payments/claims',
-      '/wards', '/equipment', '/hr', '/dashboard/hr',
-      '/blood-bank', '/controlled-substances', '/emergency-preparedness',
-      '/org-admin/users',
-    ],
-    // The Facility Overview page is the facility administrator's home dashboard
-    // (the legacy quick-actions dashboard was removed; every shortcut it held now
-    // lives as its own sidebar tab).
-    defaultDashboard: '/facility-overview',
-  },
 };
 
 const DEFAULT_DASHBOARD_FALLBACK = '/dashboard';

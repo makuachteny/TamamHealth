@@ -23,7 +23,6 @@ const APPOINTMENT_CONFIRM_ROLES: UserRole[] = [
   'clinic_clerk',
   'front_desk',
   'medical_superintendent',
-  'facility_administrator',
   'org_admin',
   'super_admin',
 ];

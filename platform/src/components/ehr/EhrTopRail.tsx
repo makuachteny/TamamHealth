@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Building2,
   Calendar,
   ChevronDown,
   HelpCircle,
@@ -13,7 +12,6 @@ import {
   Plus,
   Search,
   Settings,
-  User,
   UserPlus,
   Users,
   X,
@@ -181,13 +179,6 @@ export default function EhrTopRail() {
     router.push(href);
   };
 
-  const openProfilePage = () => {
-    setUserOpen(false);
-    // No standalone /profile route exists — the profile form lives on the
-    // Settings page's default (preferences) tab.
-    router.push('/settings');
-  };
-
   const openSettingsPage = () => {
     setUserOpen(false);
     router.push('/settings');
@@ -342,18 +333,6 @@ export default function EhrTopRail() {
 
           {userOpen && (
             <div className="ehr-user-menu" role="menu">
-              <div className="ehr-user-menu-identity" aria-hidden>
-                <span className="ehr-user-menu-name">{currentUser?.name}</span>
-                {facilityName && (
-                  <span className="ehr-user-menu-facility">
-                    <Building2 className="w-3 h-3" /> {facilityName}
-                  </span>
-                )}
-              </div>
-              <button type="button" role="menuitem" onClick={openProfilePage}>
-                <User className="w-4 h-4" />
-                <span>Profile</span>
-              </button>
               <button type="button" role="menuitem" onClick={openSettingsPage}>
                 <Settings className="w-4 h-4" />
                 <span>Settings</span>

@@ -39,7 +39,6 @@ const ROLE_LABELS: Record<UserRole, string> = {
   rooming_nurse: 'Rooming Nurse',
   clinician: 'Doctor',
   records_hmis_officer: 'Records / HMIS Officer',
-  facility_administrator: 'Facility Administrator',
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -205,7 +204,7 @@ export default function AdminUsersPage() {
   return (
     <>
       <TopBar title={t('adminUsers.title')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter admin-detail-page">
 
         {/* Header stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">

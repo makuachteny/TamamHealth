@@ -124,7 +124,7 @@ type SeedUserRole =
   | 'hrio' | 'nutritionist' | 'radiologist'
   | 'org_admin' | 'hospital_manager' | 'medical_biller'
   | 'central_registration_clerk' | 'clinic_clerk' | 'triage_nurse' | 'rooming_nurse'
-  | 'clinician' | 'records_hmis_officer' | 'facility_administrator';
+  | 'clinician' | 'records_hmis_officer';
 
 interface SeedUserProfile {
   username: string;
@@ -176,7 +176,6 @@ const defaultUsers: SeedUserProfile[] = [
   { username: 'rooming.sara', name: 'Sara Aluel Bol', role: 'rooming_nurse', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'clinician.peter', name: 'Dr. Peter Garang Deng', role: 'clinician', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'hmis.john', name: 'John Majok Chol', role: 'records_hmis_officer', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'facadmin.rita', name: 'Rita Akello Ojok', role: 'facility_administrator', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   // Private org admin (Mercy Hospital Group)
   { username: 'org.admin', name: 'Mercy Org Administrator', role: 'org_admin', orgId: PRIVATE_ORG_ID },
   { username: 'dr.mercy', name: 'Dr. Grace Lado', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PRIVATE_ORG_ID },
@@ -213,7 +212,6 @@ const ROLE_PROFILE: Record<SeedUserRole, { department: string; specialty?: strin
   hrio: { department: 'Human Resources' },
   hospital_manager: { department: 'Administration' },
   medical_superintendent: { department: 'Administration', specialty: 'Physician' },
-  facility_administrator: { department: 'Administration' },
 };
 
 /**

@@ -19,12 +19,23 @@ import {
   Eye,
 } from '@/components/icons/lucide';
 import { formatMoney } from '@/lib/format-utils';
-import type { MessageDoc } from '@/lib/db-types';
+import type { MessageDoc, UserDoc } from '@/lib/db-types';
 import { ROLE_LABEL } from '@/lib/role-display';
 
 const TEAL = 'var(--color-brand-400)';
 const PURPLE = 'var(--accent-primary)';
 const CORAL = '#FB923C';
+
+// Chart palette — validated against the dataviz six-checks on the light
+// surface. The weekly triple passes outright; the cash-flow green/amber pair
+// sits in the CVD warn band, which is legal only because the labeled amount
+// tiles + slice gap carry identity — keep those if you retint.
+const CHART_BLUE = '#2a78d6';   // appointments
+const CHART_GREEN = '#199e70';  // new patients
+const CHART_RED = '#e34948';    // canceled
+const CASH_RECEIVED = '#0ca30c';
+const CASH_PENDING = '#eda100';
+const CASH_PENDING_TEXT = '#a16207'; // legible amber for text on light cards
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** JS getDay() (0=Sun..6=Sat) → our Mon-first index (0=Mon..6=Sun). */
@@ -52,6 +63,19 @@ export default function FacilityManagementDashboard() {
   const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [enquiries, setEnquiries] = useState<MessageDoc[]>([]);
   const [availableProviderIds, setAvailableProviderIds] = useState<Set<string>>(new Set());
+
+  // Manage-user popup (org/super admins get reset-password, deactivate, delete).
+  // localEdits overlays API writes onto the list immediately — the users DB is
+  // pull-only, so the change feed only catches up after the next sync cycle.
+  const [selectedUser, setSelectedUser] = useState<UserDoc | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [localEdits, setLocalEdits] = useState<Record<string, Partial<UserDoc> | 'deleted'>>({});
+
+  const canManageUsers = currentUser?.role === 'org_admin' || currentUser?.role === 'super_admin';
 
   // Billing (cash flow), enquiries (inbound patient messages) and provider
   // availability are loaded from services — all real data, scope-filtered.
@@ -84,15 +108,21 @@ export default function FacilityManagementDashboard() {
   }, [scope]);
 
   // ─── Derived counts ───
-  const doctors = useMemo(() => users.filter(u => u.role === 'doctor' || u.role === 'clinical_officer' || u.role === 'clinician'), [users]);
-  const nurses = useMemo(() => users.filter(u => u.role === 'nurse' || u.role === 'midwife'), [users]);
+  const visibleUsers = useMemo(() => users
+    .filter(u => localEdits[u._id] !== 'deleted')
+    .map(u => {
+      const edit = localEdits[u._id];
+      return edit && edit !== 'deleted' ? { ...u, ...edit } : u;
+    }), [users, localEdits]);
+  const doctors = useMemo(() => visibleUsers.filter(u => u.role === 'doctor' || u.role === 'clinical_officer' || u.role === 'clinician'), [visibleUsers]);
+  const nurses = useMemo(() => visibleUsers.filter(u => u.role === 'nurse' || u.role === 'midwife'), [visibleUsers]);
 
   const received = billing?.totalRevenue ?? 0;
   const pending = billing?.totalOutstanding ?? 0;
   const totalInvoice = received + pending;
   const cashData = [
-    { name: 'Received', value: received, color: TEAL },
-    { name: 'Pending', value: pending, color: PURPLE },
+    { name: 'Received', value: received, color: CASH_RECEIVED },
+    { name: 'Pending', value: pending, color: CASH_PENDING },
   ].filter(d => d.value > 0);
 
   // ─── Weekly patient activity (real: registrations, appointments, cancellations) ───
@@ -139,7 +169,7 @@ export default function FacilityManagementDashboard() {
 
   const userInquiryRows = useMemo(() => {
     const priorityRoles = new Set(['front_desk', 'clinic_clerk', 'central_registration_clerk', 'doctor', 'clinician', 'clinical_officer', 'nurse', 'pharmacist', 'lab_tech']);
-    return users
+    return visibleUsers
       .filter(user => priorityRoles.has(user.role) || user.isActive)
       .sort((a, b) => {
         const activeDelta = Number(b.isActive !== false) - Number(a.isActive !== false);
@@ -148,13 +178,80 @@ export default function FacilityManagementDashboard() {
         if (availableDelta) return availableDelta;
         return a.name.localeCompare(b.name);
       })
-      .slice(0, 6)
+      .slice(0, 5)
       .map(user => ({
         user,
         available: availableProviderIds.has(user._id),
         active: user.isActive !== false,
       }));
-  }, [availableProviderIds, users]);
+  }, [availableProviderIds, visibleUsers]);
+
+  const openUser = (user: UserDoc) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setConfirmingDelete(false);
+    setActionError(null);
+    setActionNotice(null);
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedUser || !currentUser) return;
+    if (newPassword.length < 8) {
+      setActionError('Temporary password must be at least 8 characters.');
+      return;
+    }
+    setActionBusy(true); setActionError(null); setActionNotice(null);
+    try {
+      const { resetPassword } = await import('@/lib/services/user-service');
+      await resetPassword(selectedUser._id, newPassword, currentUser._id, currentUser.username);
+      setNewPassword('');
+      setActionNotice(`Temporary password set — ${selectedUser.name} must choose a new one at next sign-in.`);
+    } catch (err) {
+      setActionError((err as Error).message || 'Failed to reset password');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleToggleActive = async () => {
+    if (!selectedUser || !currentUser) return;
+    const makeActive = selectedUser.isActive === false;
+    setActionBusy(true); setActionError(null); setActionNotice(null);
+    try {
+      if (makeActive) {
+        const { updateUser } = await import('@/lib/services/user-service');
+        await updateUser(selectedUser._id, { isActive: true }, currentUser._id, currentUser.username);
+      } else {
+        const { deactivateUser } = await import('@/lib/services/user-service');
+        await deactivateUser(selectedUser._id, currentUser._id, currentUser.username);
+      }
+      setLocalEdits(prev => ({
+        ...prev,
+        [selectedUser._id]: { ...(prev[selectedUser._id] as Partial<UserDoc> | undefined), isActive: makeActive },
+      }));
+      setSelectedUser({ ...selectedUser, isActive: makeActive });
+      setActionNotice(makeActive ? 'Account reactivated.' : 'Account deactivated — the user can no longer sign in.');
+    } catch (err) {
+      setActionError((err as Error).message || 'Failed to update account');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser || !currentUser) return;
+    setActionBusy(true); setActionError(null);
+    try {
+      const { deleteUser } = await import('@/lib/services/user-service');
+      await deleteUser(selectedUser._id, currentUser._id, currentUser.username);
+      setLocalEdits(prev => ({ ...prev, [selectedUser._id]: 'deleted' }));
+      setSelectedUser(null);
+    } catch (err) {
+      setActionError((err as Error).message || 'Failed to delete user');
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   if (!currentUser) return null;
 
@@ -178,39 +275,45 @@ export default function FacilityManagementDashboard() {
     <>
       <main className="page-container page-enter">
         <DashboardGreetingHeader />
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-3">
 
           {/* ═══ ROW 1 — Cash Flow · Stat cards · Weekly activity ═══ */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
 
             {/* Cash Flow */}
             <div className="dash-card overflow-hidden">
               <div className="px-5 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Cash Flow</h3>
               </div>
-              <div className="flex items-center gap-4 p-5">
-                <div className="relative flex-shrink-0" style={{ width: 150, height: 150 }}>
+              <div className="flex items-center gap-4 p-4">
+                <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={cashData.length ? cashData : [{ name: 'None', value: 1, color: 'var(--border-light)' }]}
-                        dataKey="value" innerRadius={52} outerRadius={70} paddingAngle={cashData.length > 1 ? 3 : 0} stroke="none">
+                        dataKey="value" innerRadius={44} outerRadius={60} paddingAngle={cashData.length > 1 ? 3 : 0} stroke="none">
                         {(cashData.length ? cashData : [{ color: 'var(--border-light)' }]).map((d, i) => <Cell key={i} fill={d.color} />)}
                       </Pie>
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{formatMoney(totalInvoice)}</span>
+                    <span className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{formatMoney(totalInvoice)}</span>
                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total invoice</span>
                   </div>
                 </div>
                 <div className="flex-1 space-y-2">
-                  <div className="rounded-xl p-3" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.18)' }}>
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Received Amount</p>
-                    <p className="text-base font-bold" style={{ color: PURPLE }}>{formatMoney(received)}</p>
+                  <div className="rounded-xl p-2.5" style={{ background: 'rgba(12,163,12,0.10)', border: '1px solid rgba(12,163,12,0.28)' }}>
+                    <p className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                      <span className="w-2 h-2 rounded-full inline-block" style={{ background: CASH_RECEIVED }} />
+                      Received Amount
+                    </p>
+                    <p className="text-base font-bold" style={{ color: CASH_RECEIVED }}>{formatMoney(received)}</p>
                   </div>
-                  <div className="rounded-xl p-3" style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)' }}>
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Pending Amount</p>
-                    <p className="text-base font-bold" style={{ color: TEAL }}>{formatMoney(pending)}</p>
+                  <div className="rounded-xl p-2.5" style={{ background: 'rgba(237,161,0,0.12)', border: '1px solid rgba(237,161,0,0.35)' }}>
+                    <p className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                      <span className="w-2 h-2 rounded-full inline-block" style={{ background: CASH_PENDING }} />
+                      Pending Amount
+                    </p>
+                    <p className="text-base font-bold" style={{ color: CASH_PENDING_TEXT }}>{formatMoney(pending)}</p>
                   </div>
                 </div>
               </div>
@@ -238,20 +341,19 @@ export default function FacilityManagementDashboard() {
             >
               {({ chartType }) => {
                 const series = [
-                  { key: 'newPatients', name: 'New Patients', color: PURPLE },
-                  { key: 'appointments', name: 'Appointments', color: TEAL },
-                  { key: 'canceled', name: 'Canceled', color: CORAL },
+                  { key: 'appointments', name: 'Appointments', color: CHART_BLUE },
+                  { key: 'newPatients', name: 'New Patients', color: CHART_GREEN },
+                  { key: 'canceled', name: 'Canceled', color: CHART_RED },
                 ];
-                const commonProps = { data: weekly, barGap: 2, barCategoryGap: '20%' };
                 const legendProps = { wrapperStyle: { fontSize: 11 }, iconType: 'circle' as const };
                 if (chartType === 'area') {
                   return (
-                    <ResponsiveContainer width="100%" height={232}>
+                    <ResponsiveContainer width="100%" height={208}>
                       <AreaChart data={weekly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                         <AreaGradients />
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
                         <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
-                        <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} />
+                        <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} allowDecimals={false} />
                         <Tooltip {...chartTooltipStyle} />
                         <Legend {...legendProps} />
                         {series.map(s => <Area key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} fill={s.color} fillOpacity={0.12} strokeWidth={2} />)}
@@ -261,11 +363,11 @@ export default function FacilityManagementDashboard() {
                 }
                 if (chartType === 'line') {
                   return (
-                    <ResponsiveContainer width="100%" height={232}>
+                    <ResponsiveContainer width="100%" height={208}>
                       <LineChart data={weekly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
                         <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
-                        <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} />
+                        <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} allowDecimals={false} />
                         <Tooltip {...chartTooltipStyle} />
                         <Legend {...legendProps} />
                         {series.map(s => <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2} dot={{ r: 3 }} />)}
@@ -273,14 +375,22 @@ export default function FacilityManagementDashboard() {
                     </ResponsiveContainer>
                   );
                 }
+                // Default: one stacked column per day — total activity at a
+                // glance, composition by segment. Grouped bars read poorly at
+                // these single-digit counts.
                 return (
-                  <ResponsiveContainer width="100%" height={232}>
-                    <BarChart {...commonProps}>
+                  <ResponsiveContainer width="100%" height={208}>
+                    <BarChart data={weekly} barCategoryGap="32%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
                       <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
-                      <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} />
+                      <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} allowDecimals={false} />
                       <Tooltip cursor={{ fill: 'var(--overlay-subtle)' }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                       <Legend {...legendProps} />
-                      {series.map(s => <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[3, 3, 0, 0]} />)}
+                      {series.map((s, i) => (
+                        <Bar key={s.key} dataKey={s.key} name={s.name} stackId="day" fill={s.color}
+                          maxBarSize={28} stroke="var(--bg-card-solid)" strokeWidth={1}
+                          radius={i === series.length - 1 ? [4, 4, 0, 0] : 0} />
+                      ))}
                     </BarChart>
                   </ResponsiveContainer>
                 );
@@ -294,7 +404,7 @@ export default function FacilityManagementDashboard() {
               <div>
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Users & Inquiries</h3>
                 <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {users.length} users · {unreadEnquiries.length} open inquiries · Last {lastInquiryLabel}
+                  {visibleUsers.length} users · {unreadEnquiries.length} open inquiries · Last {lastInquiryLabel}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -322,10 +432,10 @@ export default function FacilityManagementDashboard() {
                   {userInquiryRows.map(({ user, available, active }, i) => (
                     <tr key={user._id} role="button" tabIndex={0}
                       className="cursor-pointer hover:bg-[var(--table-row-hover)]"
-                      onClick={() => router.push('/hr')}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push('/hr'); } }}
+                      onClick={() => openUser(user)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUser(user); } }}
                       style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td className="px-5 py-2.5">
+                      <td className="px-5 py-2">
                         <div className="flex items-center gap-3">
                           <span className="text-[12px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{String(i + 1).padStart(2, '0')}</span>
                           <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: active ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
@@ -337,16 +447,16 @@ export default function FacilityManagementDashboard() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{ROLE_LABEL[user.role] || user.role}</td>
-                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{user.department || user.specialty || user.hospitalName || 'General'}</td>
-                      <td className="px-5 py-2.5">{statusPill(!active ? 'Inactive' : available ? 'Available' : 'Active')}</td>
-                      <td className="px-5 py-2.5">
+                      <td className="px-5 py-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{ROLE_LABEL[user.role] || user.role}</td>
+                      <td className="px-5 py-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{user.department || user.specialty || user.hospitalName || 'General'}</td>
+                      <td className="px-5 py-2">{statusPill(!active ? 'Inactive' : available ? 'Available' : 'Active')}</td>
+                      <td className="px-5 py-2">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={(e) => { e.stopPropagation(); router.push(unreadEnquiries.length > 0 ? '/messages' : '/hr'); }}
+                            onClick={(e) => { e.stopPropagation(); openUser(user); }}
                             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--overlay-medium)]"
-                            title={unreadEnquiries.length > 0 ? 'View inquiries' : 'View users'}
-                            aria-label={unreadEnquiries.length > 0 ? 'View inquiries' : 'View users'}
+                            title={canManageUsers ? 'Manage user' : 'View user'}
+                            aria-label={canManageUsers ? 'Manage user' : 'View user'}
                           >
                             <Eye className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                           </button>
@@ -360,7 +470,7 @@ export default function FacilityManagementDashboard() {
           </div>
 
           {/* ═══ ROW 3 — Enquiries · Doctors ═══ */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
 
             {/* Enquiries (inbound patient messages) */}
             <div className="dash-card overflow-hidden">
@@ -420,7 +530,7 @@ export default function FacilityManagementDashboard() {
             <div className="dash-card overflow-hidden">
               <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Doctors</h3>
-                <button onClick={() => router.push('/admin/users')} className="text-[12px] font-medium inline-flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>View all <ChevronRight className="w-3 h-3" /></button>
+                <button onClick={() => router.push('/hr')} className="text-[12px] font-medium inline-flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>View all <ChevronRight className="w-3 h-3" /></button>
               </div>
               <div className="p-2">
                 {/* Column header (No / Name / Status) */}
@@ -432,7 +542,7 @@ export default function FacilityManagementDashboard() {
                 </div>
                 {doctors.length === 0 ? (
                   <p className="px-3 py-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No doctors on record.</p>
-                ) : doctors.slice(0, 6).map((d, i) => {
+                ) : doctors.slice(0, 5).map((d, i) => {
                   const available = availableProviderIds.has(d._id);
                   return (
                     <div key={d._id} className="flex items-center gap-3 px-3 py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -453,6 +563,103 @@ export default function FacilityManagementDashboard() {
 
         </div>
       </main>
+
+      {/* Manage-user popup — details for everyone; reset-password, activate/
+          deactivate, and delete only for org/super admins. */}
+      {selectedUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => { if (!actionBusy) setSelectedUser(null); }}
+        >
+          <div
+            className="rounded-2xl shadow-2xl w-full max-w-md"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <span className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: selectedUser.isActive !== false ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                {(selectedUser.name || '?').split(' ').map(part => part[0]).slice(0, 2).join('')}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{selectedUser.name}</h2>
+                <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                  {selectedUser.username} · {ROLE_LABEL[selectedUser.role] || selectedUser.role}
+                </p>
+              </div>
+              {statusPill(selectedUser.isActive === false ? 'Inactive' : 'Active')}
+            </div>
+
+            <div className="px-5 py-4 grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+              <div><span style={{ color: 'var(--text-muted)' }}>Department: </span><span style={{ color: 'var(--text-primary)' }}>{selectedUser.department || '--'}</span></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Specialty: </span><span style={{ color: 'var(--text-primary)' }}>{selectedUser.specialty || '--'}</span></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Facility: </span><span style={{ color: 'var(--text-primary)' }}>{selectedUser.hospitalName || '--'}</span></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Phone: </span><span style={{ color: 'var(--text-primary)' }}>{selectedUser.phone || '--'}</span></div>
+            </div>
+
+            {canManageUsers && (
+              <div className="px-5 pb-4 space-y-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Reset password</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="New temporary password"
+                      autoComplete="off"
+                      className="flex-1 rounded px-3 py-2 text-sm outline-none"
+                      style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+                    />
+                    <button
+                      onClick={handleResetPassword}
+                      className="btn btn-secondary whitespace-nowrap"
+                      disabled={actionBusy || !newPassword}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                    The user will be asked to choose their own password at next sign-in.
+                  </p>
+                </div>
+
+                {actionNotice && <p className="text-xs" style={{ color: 'var(--color-success)' }}>{actionNotice}</p>}
+                {actionError && <p className="text-xs" style={{ color: 'var(--color-danger)' }}>{actionError}</p>}
+
+                {confirmingDelete && (
+                  <div className="rounded-lg p-3 text-xs" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid rgba(229,46,66,0.25)', color: 'var(--color-danger)' }}>
+                    This permanently removes {selectedUser.name}&apos;s account. This cannot be undone.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="px-5 py-3 flex items-center gap-2" style={{ borderTop: '1px solid var(--border-light)' }}>
+              {canManageUsers && selectedUser._id !== currentUser._id && (
+                <>
+                  <button onClick={handleToggleActive} className="btn btn-secondary" disabled={actionBusy}>
+                    {selectedUser.isActive === false ? 'Activate' : 'Deactivate'}
+                  </button>
+                  {confirmingDelete ? (
+                    <>
+                      <button onClick={handleDeleteUser} className="btn" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={actionBusy}>
+                        {actionBusy ? 'Deleting…' : 'Confirm delete'}
+                      </button>
+                      <button onClick={() => setConfirmingDelete(false)} className="btn btn-secondary" disabled={actionBusy}>Keep user</button>
+                    </>
+                  ) : (
+                    <button onClick={() => { setConfirmingDelete(true); setActionNotice(null); setActionError(null); }} className="btn btn-secondary" style={{ color: 'var(--color-danger)' }} disabled={actionBusy}>
+                      Delete
+                    </button>
+                  )}
+                </>
+              )}
+              <button onClick={() => setSelectedUser(null)} className="btn btn-secondary ml-auto" disabled={actionBusy}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

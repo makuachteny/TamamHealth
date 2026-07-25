@@ -114,7 +114,7 @@ export default function AdminAnalyticsPage() {
   return (
     <>
       <TopBar title={t('analytics.title')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter admin-detail-page">
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">

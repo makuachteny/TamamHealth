@@ -20,6 +20,11 @@ import EhrCareDashboard, {
   type EhrCareDashboardRow,
   type EhrCareDashboardAction,
 } from '@/components/ehr/EhrCareDashboard';
+import { toIsoDate, addDays } from '@/components/ehr/EhrMiniCalendar';
+import { tooltipStyle, axisTick } from '@/components/ChartCard';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell, ResponsiveContainer,
+} from 'recharts';
 import {
   Pill, Package, ShieldCheck, ClipboardList,
   Activity, AlertTriangle, Clock, CheckCircle2, ChevronRight,
@@ -52,6 +57,24 @@ function formatTime(iso?: string): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
+
+// Turns a minutes count into "1h 20m" / "45m" for the queue-wait stat tile.
+function formatMinutes(totalMinutes: number): string {
+  const total = Math.round(totalMinutes);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+// Chart marks (not UI status pills, which keep using the --color-* tokens
+// elsewhere in this file) use the fixed brand chart palette.
+const CHART_BLUE = '#2a78d6';
+const CHART_GREEN = '#199e70';
+const CHART_RED = '#e34948';
+const CHART_AMBER = '#eda100';
+const CHART_NEUTRAL = '#94a3b8'; // "Other" aggregate bucket only — not a brand color
+const DISPENSE_SERIES_COLORS = [CHART_BLUE, CHART_GREEN, CHART_RED, CHART_AMBER];
+const DISPENSED_DONE_STAGES = new Set(['dispensed', 'counseled', 'complete']);
 
 // ===================== DISPENSE CONFIRMATION MODAL =====================
 // Shows the patient/drug summary, any real drug-interaction warnings pulled
@@ -285,7 +308,7 @@ export default function PharmacyDashboardPage() {
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'review' | 'payment' | 'ready' | 'dispensed' | 'controlled'>('all');
   // Which stat panel (header toggles) occupies the center instead of the Rx
   // queue; null = normal queue view.
-  const [centerPanel, setCenterPanel] = useState<'pipeline' | 'stock' | null>(null);
+  const [centerPanel, setCenterPanel] = useState<'pipeline' | 'stock' | 'charts' | null>(null);
   // Queue text search (bound to the shared shell's left-rail search).
   const [queueSearch, setQueueSearch] = useState('');
   const [balanceByPatient, setBalanceByPatient] = useState<Map<string, number>>(new Map());
@@ -346,6 +369,87 @@ export default function PharmacyDashboardPage() {
       .filter(i => i.status !== 'adequate')
       .sort((a, b) => (a.stockLevel / Math.max(1, a.reorderLevel)) - (b.stockLevel / Math.max(1, b.reorderLevel))),
     [inventory],
+  );
+
+  // ── Analytics panel data (centerPanel === 'charts') ──
+
+  // (a) Dispensed-per-day for the last 14 days, split by the top 4 movers
+  // (by total dispensed count in the window) plus an "Other" bucket for
+  // everything else — real dispense events only (rx.status === 'dispensed'
+  // with a real rx.dispensedAt timestamp from confirmDispense/dispense()).
+  type DispensedDayRow = { key: string; label: string; Other: number } & Record<string, number | string>;
+  const dispensedTrend = useMemo(() => {
+    const dispensedRx = rxQueue.filter(rx => rx.status === 'dispensed' && !!rx.dispensedAt);
+    const medTotals = new Map<string, number>();
+    for (const rx of dispensedRx) medTotals.set(rx.medication, (medTotals.get(rx.medication) || 0) + 1);
+    const topMeds = Array.from(medTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([name]) => name);
+
+    const today = new Date();
+    const days: DispensedDayRow[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = addDays(today, -i);
+      const key = toIsoDate(d);
+      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const row = { key, label, Other: 0 } as DispensedDayRow;
+      topMeds.forEach(med => { row[med] = 0; });
+      days.push(row);
+    }
+    const dayIndex = new Map(days.map((d, i) => [d.key, i]));
+    for (const rx of dispensedRx) {
+      const idx = dayIndex.get(toIsoDate(new Date(rx.dispensedAt as string)));
+      if (idx === undefined) continue; // outside the 14-day window
+      const row = days[idx];
+      if (topMeds.includes(rx.medication)) row[rx.medication] = (row[rx.medication] as number) + 1;
+      else row.Other = row.Other + 1;
+    }
+    const hasOther = days.some(d => d.Other > 0);
+    return { days, medNames: topMeds, hasOther };
+  }, [rxQueue]);
+
+  // (b) Pending-dispensing queue depth + average wait for orders currently
+  // sitting in the queue (real orderStatus stage via pharmacyStage(), same
+  // classification the rest of this page uses — not yet dispensed/counseled/
+  // complete, and not a discontinued order).
+  const pendingQueueRx = useMemo(
+    () => rxQueue.filter(rx => rx.status !== 'discontinued' && !DISPENSED_DONE_STAGES.has(pharmacyStage(rx))),
+    [rxQueue],
+  );
+  const avgWaitMinutes = useMemo(() => {
+    const withCreated = pendingQueueRx.filter(rx => !!rx.createdAt);
+    if (withCreated.length === 0) return null;
+    const now = Date.now();
+    const totalMinutes = withCreated.reduce((sum, rx) => sum + Math.max(0, (now - new Date(rx.createdAt).getTime()) / 60000), 0);
+    return totalMinutes / withCreated.length;
+  }, [pendingQueueRx]);
+
+  // (c) Estimated days-of-stock-remaining, proxied from today's real
+  // consumption: stockLevel / dispensedToday (both real inventory fields —
+  // see pharmacy-inventory-service.decrementStock). There is no multi-day
+  // consumption-history collection to average over, so items with zero
+  // dispenses recorded today get an honest "insufficient data" instead of a
+  // fabricated rate. RAG thresholds: <=3d red, <=7d amber, >7d green.
+  type StockRiskRow = { item: (typeof inventory)[number]; daysRemaining: number | null; rag: 'red' | 'amber' | 'green' | null };
+  const stockRiskRows = useMemo<StockRiskRow[]>(() => {
+    return inventory
+      .map(item => {
+        if (!item.dispensedToday || item.dispensedToday <= 0) return { item, daysRemaining: null, rag: null };
+        const daysRemaining = item.stockLevel / item.dispensedToday;
+        const rag: 'red' | 'amber' | 'green' = daysRemaining <= 3 ? 'red' : daysRemaining <= 7 ? 'amber' : 'green';
+        return { item, daysRemaining, rag };
+      })
+      .sort((a, b) => {
+        if (a.daysRemaining === null && b.daysRemaining === null) return a.item.medicationName.localeCompare(b.item.medicationName);
+        if (a.daysRemaining === null) return 1;
+        if (b.daysRemaining === null) return -1;
+        return a.daysRemaining - b.daysRemaining;
+      });
+  }, [inventory]);
+  const atRiskChartItems = useMemo(
+    () => stockRiskRows.filter((r): r is StockRiskRow & { daysRemaining: number; rag: 'red' | 'amber' | 'green' } => r.daysRemaining !== null).slice(0, 8),
+    [stockRiskRows],
   );
 
   const reviewStages: PrescriptionStatus[] = ['received_in_pharmacy_queue', 'under_review', 'held_awaiting_clarification', 'stockout_partial_referred', 'clinician_consultation_in_progress'];
@@ -702,6 +806,7 @@ export default function PharmacyDashboardPage() {
   }
   headerActions.push({ label: t('pharmacy.kpiControlled'), icon: ShieldCheck, onClick: () => router.push('/controlled-substances') });
   headerActions.push({ label: t('pharmacy.stockAlerts'), icon: AlertTriangle, onClick: () => setCenterPanel(p => (p === 'stock' ? null : 'stock')), active: centerPanel === 'stock', tone: centerPanel === 'stock' ? 'primary' : 'neutral' });
+  headerActions.push({ label: 'Analytics', icon: BarChart3, onClick: () => setCenterPanel(p => (p === 'charts' ? null : 'charts')), active: centerPanel === 'charts', tone: centerPanel === 'charts' ? 'primary' : 'neutral' });
 
   // Capabilities card — each item latches checked forever the first time this
   // pharmacist does it (see useCapabilities), never un-checked by later state.
@@ -880,6 +985,136 @@ export default function PharmacyDashboardPage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {centerPanel === 'charts' && (
+            <div className="dash-card rounded-2xl overflow-hidden flex flex-col">
+              <div className="px-3 py-2 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <BarChart3 className="w-4 h-4" style={{ color: ACCENT }} />
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Dispensing &amp; Stock Analytics</span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-4">
+
+                {/* (b) Queue depth + average wait stat tiles */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Pending dispensing queue</p>
+                    <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{pendingQueueRx.length}</p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Orders not yet dispensed, counseled or complete</p>
+                  </div>
+                  <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Average wait in queue</p>
+                    <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{avgWaitMinutes == null ? '—' : formatMinutes(avgWaitMinutes)}</p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      {avgWaitMinutes == null ? 'No orders currently waiting' : `Across ${pendingQueueRx.length} order${pendingQueueRx.length === 1 ? '' : 's'} still in queue, right now`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* (a) Dispensed-per-day, top medications */}
+                <div>
+                  <span className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-primary)' }}>Dispensed per day — top medications (last 14 days)</span>
+                  {dispensedTrend.medNames.length === 0 ? (
+                    <p className="text-[11px] py-4 text-center" style={{ color: 'var(--text-muted)' }}>No dispensed prescriptions recorded in the last 14 days.</p>
+                  ) : (
+                    <div style={{ width: '100%', height: 190 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={dispensedTrend.days} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                          <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval={1} />
+                          <YAxis allowDecimals={false} tick={axisTick} axisLine={false} tickLine={false} width={26} />
+                          <Tooltip {...tooltipStyle} />
+                          <Legend wrapperStyle={{ fontSize: 10 }} />
+                          {dispensedTrend.medNames.map((med, i) => (
+                            <Bar
+                              key={med}
+                              dataKey={med}
+                              name={med}
+                              stackId="dispensed"
+                              fill={DISPENSE_SERIES_COLORS[i % DISPENSE_SERIES_COLORS.length]}
+                              radius={!dispensedTrend.hasOther && i === dispensedTrend.medNames.length - 1 ? [3, 3, 0, 0] : undefined}
+                            />
+                          ))}
+                          {dispensedTrend.hasOther && (
+                            <Bar dataKey="Other" name="Other" stackId="dispensed" fill={CHART_NEUTRAL} radius={[3, 3, 0, 0]} />
+                          )}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+
+                {/* (c) Most at-risk stock, by estimated days remaining */}
+                <div>
+                  <span className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-primary)' }}>Most at-risk stock — estimated days remaining</span>
+                  <p className="text-[10px] mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Estimated from stock on hand ÷ units dispensed today. Items with no dispenses recorded today are excluded — there isn&apos;t a rate to estimate from.
+                  </p>
+                  {atRiskChartItems.length === 0 ? (
+                    <p className="text-[11px] py-4 text-center" style={{ color: 'var(--text-muted)' }}>No items have recorded dispenses today to estimate a consumption rate.</p>
+                  ) : (
+                    <div style={{ width: '100%', height: Math.max(120, atRiskChartItems.length * 26) }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={atRiskChartItems.map(r => ({ name: r.item.medicationName, days: Math.round(r.daysRemaining * 10) / 10, rag: r.rag }))}
+                          layout="vertical"
+                          margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
+                        >
+                          <XAxis type="number" allowDecimals={false} tick={axisTick} axisLine={false} tickLine={false} />
+                          <YAxis type="category" dataKey="name" width={150} tick={{ ...axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => {
+                            const days = v ?? 0;
+                            return [`${days} day${days === 1 ? '' : 's'}`, 'Est. remaining'];
+                          }} />
+                          <Bar dataKey="days" radius={[0, 3, 3, 0]}>
+                            {atRiskChartItems.map((r, i) => (
+                              <Cell key={i} fill={r.rag === 'red' ? CHART_RED : r.rag === 'amber' ? CHART_AMBER : CHART_GREEN} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+
+                {/* (c) RAG table — every inventory item */}
+                <div>
+                  <span className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-primary)' }}>Days of stock remaining, by medication</span>
+                  <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
+                    <table className="w-full text-[11px]" style={{ borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--overlay-subtle)' }}>
+                          <th className="text-left px-2.5 py-1.5 font-semibold" style={{ color: 'var(--text-muted)' }}>Medication</th>
+                          <th className="text-right px-2.5 py-1.5 font-semibold" style={{ color: 'var(--text-muted)' }}>Stock</th>
+                          <th className="text-right px-2.5 py-1.5 font-semibold" style={{ color: 'var(--text-muted)' }}>Dispensed today</th>
+                          <th className="text-right px-2.5 py-1.5 font-semibold" style={{ color: 'var(--text-muted)' }}>Est. days remaining</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stockRiskRows.map(({ item, daysRemaining, rag }) => (
+                          <tr key={item._id} style={{ borderTop: '1px solid var(--border-light)' }}>
+                            <td className="px-2.5 py-1.5" style={{ color: 'var(--text-primary)' }}>{item.medicationName}</td>
+                            <td className="px-2.5 py-1.5 text-right" style={{ color: 'var(--text-muted)' }}>{item.stockLevel} {item.unit}</td>
+                            <td className="px-2.5 py-1.5 text-right" style={{ color: 'var(--text-muted)' }}>{item.dispensedToday}</td>
+                            <td className="px-2.5 py-1.5 text-right">
+                              {daysRemaining == null ? (
+                                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>No dispenses today</span>
+                              ) : (
+                                <span className="font-bold px-1.5 py-0.5 rounded" style={{
+                                  background: rag === 'red' ? 'var(--color-danger-bg)' : rag === 'amber' ? 'var(--color-warning-bg)' : 'var(--color-success-bg)',
+                                  color: rag === 'red' ? 'var(--color-danger)' : rag === 'amber' ? 'var(--color-warning)' : 'var(--color-success)',
+                                }}>
+                                  {Math.round(daysRemaining * 10) / 10}d
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           )}

@@ -3948,7 +3948,6 @@ const am: TranslationMap = {
   'adminUsers.role_rooming_nurse': 'የመቀበያ ነርስ',
   'adminUsers.role_clinician': 'ሐኪም',
   'adminUsers.role_records_hmis_officer': 'የመዝገብ / HMIS ኦፊሰር',
-  'adminUsers.role_facility_administrator': 'የተቋም አስተዳዳሪ',
   'orgAdmin.pageTitle': 'የድርጅት ዳሽቦርድ',
   'orgAdmin.organization': 'ድርጅት',
   'orgAdmin.subtitle': 'የድርጅትዎ አጠቃላይ እይታ።',

@@ -3948,7 +3948,6 @@ const pt: TranslationMap = {
   'adminUsers.role_rooming_nurse': 'Enfermeiro de Acolhimento',
   'adminUsers.role_clinician': 'Médico',
   'adminUsers.role_records_hmis_officer': 'Oficial de Registos / SIS',
-  'adminUsers.role_facility_administrator': 'Administrador da Unidade',
   'orgAdmin.pageTitle': 'Painel da Organização',
   'orgAdmin.organization': 'Organização',
   'orgAdmin.subtitle': 'A sua organização num relance.',

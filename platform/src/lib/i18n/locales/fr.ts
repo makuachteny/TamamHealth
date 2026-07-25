@@ -3971,7 +3971,6 @@ const fr: TranslationMap = {
   'adminUsers.role_rooming_nurse': 'Infirmier d\'accueil',
   'adminUsers.role_clinician': 'Médecin',
   'adminUsers.role_records_hmis_officer': 'Responsable des dossiers / SIS',
-  'adminUsers.role_facility_administrator': 'Administrateur de l\'établissement',
   'orgAdmin.pageTitle': 'Tableau de bord de l\'organisation',
   'orgAdmin.organization': 'Organisation',
   'orgAdmin.subtitle': 'Votre organisation en un coup d\'œil.',

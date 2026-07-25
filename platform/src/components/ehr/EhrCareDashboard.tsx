@@ -6,7 +6,7 @@ import { ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, typ
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
-import { initials } from '@/lib/patient-utils';
+import { initials, stateColor } from '@/lib/patient-utils';
 import { formatTimeUntil } from '@/lib/format-utils';
 
 export type EhrCareDashboardAction = {
@@ -97,6 +97,17 @@ function isTriageCode(value?: string): value is 'RED' | 'YELLOW' | 'GREEN' {
   return value === 'RED' || value === 'YELLOW' || value === 'GREEN';
 }
 
+/** Department pill tone, matching the appointments table's service pills. */
+function departmentTone(value?: string) {
+  const department = (value || '').toLowerCase();
+  if (department.includes('emergency')) return 'emergency';
+  if (department.includes('maternity')) return 'maternity';
+  if (department.includes('pediatric') || department.includes('paediatric')) return 'pediatrics';
+  if (department.includes('surgery')) return 'surgery';
+  if (department.includes('lab')) return 'lab';
+  return 'opd';
+}
+
 function pillToneFromStatus(tone?: EhrCareDashboardRow['statusTone']): string {
   if (tone === 'danger') return 'red';
   if (tone === 'warning') return 'yellow';
@@ -132,7 +143,6 @@ export default function EhrCareDashboard({
   checklist,
   showCalendar = true,
   railContent,
-  tabsVariant = 'pills',
   chart,
   chartTitle = 'Day activity',
   chartSeriesNames = ['Open', 'Completed'],
@@ -183,9 +193,6 @@ export default function EhrCareDashboard({
   /** Extra left-rail card(s) rendered between the day chart and the filter
    *  group — e.g. the nurse dashboard's ward-occupancy card. */
   railContent?: ReactNode;
-  /** Daybar tab style: 'pills' (filter chips, the doctor worklist look) or
-   *  'views' (underlined view-switcher tabs, per the nurse-station design). */
-  tabsVariant?: 'pills' | 'views';
   /** Explicit left-rail chart. When omitted, the shared "Day statistics"
    *  widget is plotted from this dashboard's own rows. */
   chart?: ReactNode;
@@ -402,7 +409,7 @@ export default function EhrCareDashboard({
                 </p>
               )}
             </div>
-            <div className={`ehr-day-tabs${tabsVariant === 'views' ? ' ehr-day-tabs--views' : ''}`}>
+            <div className="ehr-day-tabs">
               {tabs.map(tab => (
                 <button
                   key={tab.key}
@@ -428,78 +435,86 @@ export default function EhrCareDashboard({
               </div>
             ) : (
               <div className="ehr-queue-scroll">
-                <div className="ehr-queue-cards">
-                  <div className="ehr-queue-guide ehr-queue-guide--care" aria-hidden="true">
-                    {['Patient', 'Coming from', 'Priority', 'Status', 'Queue', 'Wait'].map(head => (
-                      <span key={head}>{head}</span>
-                    ))}
+                {/* Exactly the appointments-page table: PATIENT / TIME /
+                    CARE TEAM / DEPARTMENT / STATUS, reusing its classes so
+                    every user's patient list reads identically. */}
+                <div className="appointment-card-flow">
+                  <div className="appointment-card-head" aria-hidden="true">
+                    <span>Patient</span>
+                    <span>Time</span>
+                    <span>Care team</span>
+                    <span>Department</span>
+                    <span>Status</span>
                   </div>
                   {visibleRows.map(row => {
-                    // A real triage acuity code gets the shared clinician
-                    // priority pill; everyone else's free-text `priority`
-                    // (a severity label, a fee amount, an age band, …) falls
-                    // back to the status pill instead — see isTriageCode.
+                    // A real triage acuity code colors the avatar (the
+                    // appointments table conveys priority the same way);
+                    // everyone else's tone falls back on statusTone.
                     const priorityCode = isTriageCode(row.priority) ? row.priority : null;
                     const avatarAcuity = priorityCode
                       ?? (row.statusTone === 'danger' ? 'RED' : row.statusTone === 'warning' ? 'YELLOW' : 'GREEN');
                     const sourceText = row.careTeam || row.compactMeta || row.meta || '';
                     const contextText = row.location || row.room || row.meta || '';
                     const statusText = row.statusLabel || (row.status ? titleCase(row.status) : '');
-                    const priorityText = row.priority || '';
                     const activate = () => openDetail(row);
                     const countdown = (() => {
                       if (!now || !row.timeAt) return null;
                       const label = formatTimeUntil(row.timeAt, now);
                       if (!label) return null;
                       const minutesAway = (new Date(row.timeAt).getTime() - now.getTime()) / 60000;
-                      // Overdue reads muted (it's history); the next half hour
-                      // reads amber so the row about to be due stands out.
                       const tone = minutesAway < 0 ? 'is-past' : minutesAway <= 30 ? 'is-soon' : '';
                       return { label, tone };
                     })();
+                    // Status pill tone reuses the appointment pill classes.
+                    const statusPillClass = row.statusTone === 'done' ? 'status-completed'
+                      : row.statusTone === 'active' ? 'status-checked-in'
+                      : row.statusTone === 'ready' ? 'status-confirmed'
+                      : row.statusTone === 'danger' ? 'status-no-show'
+                      : row.statusTone === 'warning' ? 'status-attention'
+                      : '';
+                    // Under-pill cue: acuity when known, else the countdown.
+                    const cue = priorityCode
+                      ? PRIORITY_META[priorityCode].label
+                      : countdown?.label || '';
                     return (
                       <div key={row.id}>
                         <div
-                          className="ehr-queue-card"
+                          className="ehr-appointment-row appointment-card-row"
                           data-triage={priorityCode || undefined}
                           role="button"
                           tabIndex={0}
                           onClick={activate}
                           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); } }}
                         >
-                          <div className="ehr-queue-patient">
-                            <span className="ehr-patient-icon" data-acuity={avatarAcuity}>{initials(row.title)}</span>
-                            <div className="ehr-queue-patient-text">
-                              <button type="button" className="ehr-queue-name print-visible" onClick={(event) => { event.stopPropagation(); activate(); }}>
+                          <div className="ehr-appointment-identity">
+                            <div className="ehr-patient-icon" style={{ background: stateColor(avatarAcuity), color: '#fff' }}>{initials(row.title)}</div>
+                            <div className="ehr-appointment-main appointment-card-patient">
+                              <button type="button" className="print-visible" onClick={(event) => { event.stopPropagation(); activate(); }}>
                                 {row.title}
                               </button>
                               <p>{row.subtitle}</p>
                             </div>
                           </div>
 
-                          <div className="ehr-queue-cell ehr-queue-muted-cell">{sourceText}</div>
-
-                          <div className="ehr-queue-cell">
-                            {priorityCode ? (
-                              <span className="ehr-queue-pill" data-tone={PRIORITY_META[priorityCode].tone}>{PRIORITY_META[priorityCode].label}</span>
-                            ) : priorityText ? (
-                              <span className="ehr-queue-pill" data-tone={pillToneFromStatus(row.statusTone)}>{priorityText}</span>
-                            ) : null}
+                          <div className="ehr-appointment-time">
+                            <strong>{row.time || row.date || '—'}</strong>
+                            {countdown ? <span className={countdown.tone}>{countdown.label}</span> : <span>{row.locationLabel || 'Queue'}</span>}
                           </div>
 
-                          <div className="ehr-queue-cell">
-                            <span className="ehr-queue-status">
-                              {statusText}
-                            </span>
+                          <div className="appointment-card-provider">
+                            <strong>{sourceText || 'Unassigned'}</strong>
+                            <span>{row.careTeamLabel || 'Care team'}</span>
                           </div>
 
-                          <div className="ehr-queue-cell ehr-queue-muted-cell">{contextText}</div>
+                          <div className="ehr-appointment-department">
+                            {contextText
+                              ? <span className={`ehr-department-pill ${departmentTone(contextText)}`}>{contextText}</span>
+                              : <span className="ehr-queue-muted-cell">—</span>}
+                          </div>
 
-                          <div className="ehr-queue-cell ehr-queue-num-col">
-                            <div className="ehr-queue-wait">
-                              <strong>{row.time || row.date || '—'}</strong>
-                              {countdown && <small className={countdown.tone}>{countdown.label}</small>}
-                            </div>
+                          <div className="appointment-card-status">
+                            <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText || '—'}</span>
+                            <small>{cue}</small>
                           </div>
                         </div>
                         {row.detail}
@@ -595,30 +610,21 @@ export default function EhrCareDashboard({
           />
           <aside className="appointment-detail-sidebar" role="dialog" aria-modal="true" aria-label="Details">
             <div className="appointment-detail-sidebar__header">
-              <button type="button" className="appointment-detail-sidebar__back" onClick={() => setOpenRow(null)} aria-label="Close">
-                <ChevronLeft size={22} />
-              </button>
-              <div className="appointment-detail-sidebar__header-grid">
-                <div className="appointment-detail-sidebar__title">
-                  <h2>{openRow.title}</h2>
-                  {openRow.subtitle && <p>{openRow.subtitle}</p>}
-                </div>
-                {(openRow.time || openRow.compactMeta) && (
-                  <div className="appointment-detail-sidebar__header-field">
-                    <span>Time</span>
-                    <strong>{openRow.time || openRow.compactMeta}</strong>
-                  </div>
-                )}
-                {(openRow.statusLabel || openRow.status) && (
-                  <div className="appointment-detail-sidebar__header-field">
-                    <span>Status</span>
-                    <strong>{openRow.statusLabel || titleCase(openRow.status || '')}</strong>
-                  </div>
-                )}
+              <div className="appointment-detail-sidebar__title">
+                <h2>{openRow.title}</h2>
+                {openRow.subtitle && <p>{openRow.subtitle}</p>}
               </div>
-              <button type="button" className="appointment-detail-sidebar__close" onClick={() => setOpenRow(null)} aria-label="Close">
-                <X size={16} />
-              </button>
+              {/* Back + close live together on the right so the title (and
+                  everything under it) shares the body's left edge. Time and
+                  status stay in the Visit Information rows only. */}
+              <div className="appointment-detail-sidebar__header-icons">
+                <button type="button" className="appointment-detail-sidebar__back" onClick={() => setOpenRow(null)} aria-label="Back">
+                  <ChevronLeft size={20} />
+                </button>
+                <button type="button" className="appointment-detail-sidebar__close" onClick={() => setOpenRow(null)} aria-label="Close">
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {openRow.popupDetail ? (
@@ -640,7 +646,9 @@ export default function EhrCareDashboard({
                   ? [
                       { label: 'Time', value: openRow.time || openRow.compactMeta },
                       { label: 'Reason', value: openRow.subtitle },
-                      { label: 'Priority', value: openRow.priority },
+                      // Raw triage codes (YELLOW/RED/GREEN) read like debug
+                      // output — surface the clinical label instead.
+                      { label: 'Priority', value: isTriageCode(openRow.priority) ? PRIORITY_META[openRow.priority].label : openRow.priority },
                       { label: 'Status', value: openRow.statusLabel || (openRow.status ? titleCase(openRow.status) : undefined) },
                       { label: 'Room', value: openRow.room },
                       { label: openRow.careTeamLabel || 'Care team', value: openRow.careTeam },

@@ -3970,7 +3970,6 @@ const sw: TranslationMap = {
   'adminUsers.role_rooming_nurse': 'Muuguzi wa Mapokezi',
   'adminUsers.role_clinician': 'Daktari',
   'adminUsers.role_records_hmis_officer': 'Afisa wa Rekodi / HMIS',
-  'adminUsers.role_facility_administrator': 'Msimamizi wa Kituo',
   'orgAdmin.pageTitle': 'Dashibodi ya Shirika',
   'orgAdmin.organization': 'Shirika',
   'orgAdmin.subtitle': 'Shirika lako kwa muhtasari.',

@@ -1,7 +1,5 @@
 'use client';
 
-import { Search } from '@/components/icons/lucide';
-
 /**
  * Inline free-text search for a nurse station list. Lives in the list's own
  * header (ward, MAR, triage, handoff) rather than the platform-wide top search
@@ -17,15 +15,17 @@ export default function ListSearch({
   placeholder?: string;
 }) {
   return (
-    <div className="relative flex-1 min-w-0">
-      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+    <div className="flex-1 min-w-0">
       <input
-        type="search"
+        type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full !pl-9 !pr-3 !py-2 text-[13px]"
-        style={{ background: 'var(--overlay-subtle)' }}
+        style={{
+          width: '100%', padding: '9px 18px', height: 38, borderRadius: 999,
+          border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)',
+          fontSize: 13, color: 'var(--text-primary)', outline: 'none',
+        }}
       />
     </div>
   );

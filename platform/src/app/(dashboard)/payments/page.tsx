@@ -7,6 +7,10 @@ import {
   X, Wallet, Activity, AlertCircle, ChevronRight, ExternalLink, Receipt, Shield, Clock, Banknote,
   RotateCcw, Ban, AlertTriangle,
 } from '@/components/icons/lucide';
+import {
+  BarChart, Bar, ComposedChart, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell,
+} from 'recharts';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -15,15 +19,48 @@ import { computePlanKpis } from '@/components/payments/PlanKpiCards';
 import DataTile from '@/components/DataTile';
 import Modal from '@/components/Modal';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import ChartCard, { tooltipStyle, axisTick } from '@/components/ChartCard';
+import { toIsoDate, addDays } from '@/components/ehr/EhrMiniCalendar';
 import PaymentPanel from '@/components/payments/PaymentPanel';
 import { getMethodConfig } from '@/lib/payment-method-config';
-import type { PaymentDoc, ClaimDoc, PaymentPlanDoc } from '@/lib/db-types-payments';
-import type { BillingDoc } from '@/lib/db-types-billing';
+import type { PaymentDoc, ClaimDoc, PaymentPlanDoc, PaymentMethodType } from '@/lib/db-types-payments';
+import type { BillingDoc, ChargeCategory } from '@/lib/db-types-billing';
+import type { EncounterDoc } from '@/lib/db-types';
 import { formatMoney } from '@/lib/format-utils';
 
 // Shared grid template for the patient-account list so the column header row and
 // every data row line up: Patient | Payments | Claims | Plans | Last activity | Balance | ›
 const PAYMENTS_COLS = 'minmax(0, 1fr) 120px 90px 80px 80px 130px 120px 110px 24px';
+
+// Compact stat-tile sizing shared by the small KPI grids on this page.
+const COMPACT_TILE_STYLE = { minHeight: 56, padding: '7px 12px' } as const;
+
+// Encounter statuses that represent a clinically-finished visit — used to spot
+// visits that closed out without ever generating a bill (see `unbilledEncounters`).
+const ENCOUNTER_COMPLETION_STATUSES = new Set([
+  'discharged', 'discharged_with_referral', 'discharged_with_pending_items',
+]);
+
+const CHARGE_CATEGORY_LABELS: Record<ChargeCategory, string> = {
+  consultation: 'Consultation',
+  laboratory: 'Laboratory',
+  pharmacy: 'Pharmacy',
+  radiology: 'Radiology',
+  procedure: 'Procedure',
+  bed_charge: 'Bed Charge',
+  surgery: 'Surgery',
+  ambulance: 'Ambulance',
+  other: 'Other',
+};
+
+// Compact axis-tick formatter for money charts (full precision stays in the
+// tooltip via formatMoney) — keeps narrow chart columns from crowding.
+function compactAmount(v: number): string {
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${Math.round(v / 1_000)}k`;
+  return String(Math.round(v));
+}
 
 interface PatientLine {
   patientId: string;
@@ -43,13 +80,16 @@ interface PaymentsData {
   claims: ClaimDoc[];
   plans: PaymentPlanDoc[];
   bills: BillingDoc[];
+  // Used only to derive the "unbilled encounters" tile below — completed
+  // encounters that never produced a bill.
+  encounters: EncounterDoc[];
 }
 
 export default function PaymentsPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser, globalSearch, setGlobalSearch } = useApp();
-  const [data, setData] = useState<PaymentsData>({ payments: [], claims: [], plans: [], bills: [] });
+  const [data, setData] = useState<PaymentsData>({ payments: [], claims: [], plans: [], bills: [], encounters: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Text search comes from the shared global search state, surfaced as the
@@ -85,17 +125,19 @@ export default function PaymentsPage() {
     setLoading(true);
     setError('');
     try {
-      const [{ getAllPayments, getAllClaims, getAllPaymentPlans }, { getAllBills }] = await Promise.all([
+      const [{ getAllPayments, getAllClaims, getAllPaymentPlans }, { getAllBills }, { getAllEncounters }] = await Promise.all([
         import('@/lib/services/payment-service'),
         import('@/lib/services/billing-service'),
+        import('@/lib/services/encounter-service'),
       ]);
-      const [payments, claims, plans, bills] = await Promise.all([
+      const [payments, claims, plans, bills, encounters] = await Promise.all([
         getAllPayments(scope),
         getAllClaims(scope),
         getAllPaymentPlans(scope),
         getAllBills(scope),
+        getAllEncounters(scope),
       ]);
-      setData({ payments: payments || [], claims: claims || [], plans: plans || [], bills: bills || [] });
+      setData({ payments: payments || [], claims: claims || [], plans: plans || [], bills: bills || [], encounters: encounters || [] });
     } catch (err) {
       console.error('Error loading payments data:', err);
       setError(t('payments.errorLoad'));
@@ -251,6 +293,86 @@ export default function PaymentsPage() {
     return buckets;
   }, [data.bills]);
 
+  // A/R aging, reshaped for the bar chart — same buckets/amounts as `aging`
+  // above (d91 + d120 folded into a single >90d bucket), colored by how
+  // urgent the receivable is (blue → amber → red).
+  const arAgingChartData = useMemo(() => ([
+    { bucket: '0–30d', amount: aging.current, fill: '#2a78d6' },
+    { bucket: '31–60d', amount: aging.d31, fill: '#eda100' },
+    { bucket: '61–90d', amount: aging.d61, fill: '#eda100' },
+    { bucket: '>90d', amount: aging.d91 + aging.d120, fill: '#e34948' },
+  ]), [aging]);
+
+  // ── Today's collections by payment method ──────────────────────────
+  // Real posted payments only, grouped by method, for the local calendar day
+  // (matches the cashier's shift, not UTC — see date-conventions memory).
+  const todayCollections = useMemo(() => {
+    const todayIso = toIsoDate(new Date());
+    const byMethod = new Map<PaymentMethodType, number>();
+    let total = 0;
+    for (const p of data.payments) {
+      if (p.status !== 'posted' || !p.processedAt) continue;
+      if (toIsoDate(new Date(p.processedAt)) !== todayIso) continue;
+      byMethod.set(p.method, (byMethod.get(p.method) || 0) + p.amount);
+      total += p.amount;
+    }
+    return { byMethod, total };
+  }, [data.payments]);
+
+  // Daily posted-collections total for the last 14 days (today inclusive).
+  const dailyCollections = useMemo(() => {
+    const byIso = new Map<string, number>();
+    for (const p of data.payments) {
+      if (p.status !== 'posted' || !p.processedAt) continue;
+      const iso = toIsoDate(new Date(p.processedAt));
+      byIso.set(iso, (byIso.get(iso) || 0) + p.amount);
+    }
+    const today = new Date();
+    const days: { iso: string; label: string; amount: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = addDays(today, -i);
+      const iso = toIsoDate(d);
+      days.push({ iso, label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), amount: byIso.get(iso) || 0 });
+    }
+    return days;
+  }, [data.payments]);
+
+  // Revenue by service line (Pareto) — sum of every bill line item's
+  // totalPrice, grouped by charge category, sorted descending, with a
+  // running cumulative-% series for the Pareto reference line.
+  const revenueByCategory = useMemo(() => {
+    const byCategory = new Map<string, number>();
+    for (const b of data.bills) {
+      for (const item of b.items || []) {
+        byCategory.set(item.category, (byCategory.get(item.category) || 0) + (item.totalPrice || 0));
+      }
+    }
+    const rows = Array.from(byCategory.entries())
+      .map(([category, amount]) => ({ category: CHARGE_CATEGORY_LABELS[category as ChargeCategory] || category, amount }))
+      .sort((a, b) => b.amount - a.amount);
+    const grandTotal = rows.reduce((sum, r) => sum + r.amount, 0);
+    let running = 0;
+    return rows.map(r => {
+      running += r.amount;
+      return { ...r, cumulativePct: grandTotal > 0 ? Math.round((running / grandTotal) * 100) : 0 };
+    });
+  }, [data.bills]);
+
+  // Unbilled encounters — clinically-completed visits (discharged, in the
+  // last 30 days) whose encounter id never shows up on any bill. Best-effort:
+  // facilities that don't bill per-encounter (fee-free public sites) will
+  // just show 0 here rather than a misleading count.
+  const unbilledEncounters = useMemo(() => {
+    const billedEncounterIds = new Set(data.bills.map(b => b.encounterId).filter(Boolean) as string[]);
+    const cutoff = Date.now() - 30 * 86_400_000;
+    return data.encounters.filter(e => {
+      if (!ENCOUNTER_COMPLETION_STATUSES.has(e.status)) return false;
+      const closed = e.closedAt || e.startedAt;
+      if (!closed || new Date(closed).getTime() < cutoff) return false;
+      return !billedEncounterIds.has(e._id);
+    }).length;
+  }, [data.encounters, data.bills]);
+
   // Derive the open patient's line from the live aggregates so the drawer's
   // balance/totals refresh automatically after a payment is recorded.
   const selectedLine = useMemo(
@@ -365,6 +487,117 @@ export default function PaymentsPage() {
           </div>
         )}
 
+        {/* Today's Collections — posted payments broken down by method, plus a
+            14-day daily trend so the cashier/finance lead can see today in
+            context. Unbilled encounters (a revenue-leakage signal) rides
+            along in the same tile grid. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4 lg:items-stretch">
+          <div className="dash-card p-2.5 flex flex-col">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Today&rsquo;s Collections</h3>
+            {todayCollections.total === 0 && unbilledEncounters === 0 ? (
+              <p className="text-[12px] py-2 flex-1" style={{ color: 'var(--text-muted)' }}>No payments posted yet today</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                <DataTile
+                  style={COMPACT_TILE_STYLE}
+                  label="Total Today"
+                  value={formatMoney(todayCollections.total)}
+                  tone={todayCollections.total > 0 ? 'ok' : 'default'}
+                />
+                {Array.from(todayCollections.byMethod.entries())
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([method, amount]) => (
+                    <DataTile key={method} style={COMPACT_TILE_STYLE} label={getMethodConfig(method).shortLabel} value={formatMoney(amount)} />
+                  ))}
+                <DataTile
+                  style={COMPACT_TILE_STYLE}
+                  label="Unbilled Encounters (30d)"
+                  value={unbilledEncounters}
+                  tone={unbilledEncounters > 0 ? 'warning' : 'default'}
+                />
+              </div>
+            )}
+          </div>
+
+          <ChartCard
+            title="Daily Collections"
+            subtitle="Posted payments · last 14 days"
+            chartTypes={['line', 'bar']}
+            periods={[]}
+            defaultType="line"
+          >
+            {({ chartType }) => {
+              if (dailyCollections.every(d => d.amount === 0)) {
+                return (
+                  <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                    No collections in the last 14 days
+                  </div>
+                );
+              }
+              const commonProps = { data: dailyCollections, margin: { top: 8, right: 8, left: 0, bottom: 0 } };
+              if (chartType === 'bar') {
+                return (
+                  <ResponsiveContainer width="100%" height={190}>
+                    <BarChart {...commonProps}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                      <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                      <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={44} />
+                      <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Collected']} />
+                      <Bar dataKey="amount" fill="#2a78d6" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                );
+              }
+              return (
+                <ResponsiveContainer width="100%" height={190}>
+                  <LineChart {...commonProps}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                    <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={44} />
+                    <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Collected']} />
+                    <Line type="monotone" dataKey="amount" stroke="#2a78d6" strokeWidth={2} dot={{ r: 2.5 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              );
+            }}
+          </ChartCard>
+        </div>
+
+        {/* Revenue by Service Line (Pareto) — sum of billed line items grouped
+            by charge category, sorted descending, with a cumulative-% line so
+            finance can see which service lines drive most of the revenue. */}
+        <ChartCard
+          title="Revenue by Service Line"
+          subtitle="All bills · sorted by total billed"
+          chartTypes={['bar']}
+          periods={[]}
+          defaultType="bar"
+          className="mb-4"
+        >
+          {() => {
+            if (revenueByCategory.length === 0) {
+              return (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                  No billed service lines yet
+                </div>
+              );
+            }
+            return (
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={revenueByCategory} margin={{ top: 8, right: 24, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                  <XAxis dataKey="category" tick={axisTick} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="amount" tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={48} />
+                  <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={(v: number) => `${v}%`} width={40} />
+                  <Tooltip {...tooltipStyle} formatter={(value: number | undefined, name: string | undefined) => (name === 'Cumulative %' ? [`${value ?? 0}%`, name] : [formatMoney(value ?? 0), name ?? ''])} />
+                  <Bar yAxisId="amount" dataKey="amount" name="Revenue" fill="#2a78d6" radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="pct" type="monotone" dataKey="cumulativePct" name="Cumulative %" stroke="#eda100" strokeWidth={2} dot={{ r: 3 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            );
+          }}
+        </ChartCard>
+
         {/* Payment Plans + A/R Aging — side by side, styled like the front-desk
             Quick Actions / Appointments cards (dash-card + uppercase header). */}
         {(() => {
@@ -393,6 +626,22 @@ export default function PaymentsPage() {
                   <DataTile style={tile} label={t('billing.agingAtRisk')} value={formatMoney(aging.d91)} />
                   <DataTile style={tile} label={t('billing.agingCollections')} value={formatMoney(aging.d120)} />
                 </div>
+                {arAgingChartData.some(d => d.amount > 0) && (
+                  <div style={{ marginTop: 10 }}>
+                    <ResponsiveContainer width="100%" height={130}>
+                      <BarChart data={arAgingChartData} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
+                        <XAxis dataKey="bucket" tick={axisTick} axisLine={false} tickLine={false} />
+                        <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={48} />
+                        <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Balance due']} />
+                        <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                          {arAgingChartData.map((d, i) => (
+                            <Cell key={i} fill={d.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
             </div>
           );

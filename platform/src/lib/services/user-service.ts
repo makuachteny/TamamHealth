@@ -293,3 +293,25 @@ export async function deactivateUser(
   const { logAudit } = await import('./audit-service');
   await logAudit('user_deactivated', actorId, actorUsername, `Deactivated user "${existing.username}"`, true);
 }
+
+/**
+ * Permanently remove a user account. Prefer deactivateUser for routine
+ * offboarding — deletion is for accounts created in error. Tenant/role guards
+ * live in POST /api/users (action: 'delete').
+ */
+export async function deleteUser(
+  id: string,
+  actorId?: string,
+  actorUsername?: string
+): Promise<void> {
+  if (isBrowserRuntime()) {
+    await postUsersApi({ action: 'delete', userId: id });
+    return;
+  }
+
+  const db = usersDB();
+  const existing = await db.get(id) as UserDoc;
+  await db.remove(existing._id, existing._rev!);
+  const { logAudit } = await import('./audit-service');
+  await logAudit('user_deleted', actorId, actorUsername, `Deleted user "${existing.username}"`, true);
+}

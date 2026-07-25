@@ -48,7 +48,7 @@ export default function ImmunizationsPage() {
   // Coverage analytics (summary cards, coverage-by-antigen, coverage-by-age) are
   // a population-health view for facility management and the Ministry of Health.
   // Clinical roles (doctors, nurses, etc.) just work the records and defaulters.
-  const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
+  const canViewCoverage = ['hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
   const [showModal, setShowModal] = useState(false);
   // Header "vaccine" filter — scopes both the KPI stat cards and the main
   // per-child table to a single antigen. 'all' = no filter.

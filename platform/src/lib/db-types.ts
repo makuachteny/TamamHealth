@@ -19,7 +19,7 @@ export interface BaseDoc {
 
 export type UserRole = 'super_admin' | 'org_admin' | 'doctor' | 'clinical_officer' | 'nurse' | 'midwife' | 'lab_tech' | 'pharmacist' | 'front_desk' | 'cashier' | 'government' | 'county_health_director' | 'data_entry_clerk' | 'medical_superintendent' | 'hrio' | 'nutritionist' | 'radiologist' | 'hospital_manager' | 'medical_biller'
   // Clinical-flow workflow roles (EHR Clinical Flow doc §4) — capability-gated stations.
-  | 'central_registration_clerk' | 'clinic_clerk' | 'triage_nurse' | 'rooming_nurse' | 'clinician' | 'records_hmis_officer' | 'facility_administrator';
+  | 'central_registration_clerk' | 'clinic_clerk' | 'triage_nurse' | 'rooming_nurse' | 'clinician' | 'records_hmis_officer';
 
 export interface UserDoc extends BaseDoc {
   type: 'user';
@@ -1475,6 +1475,24 @@ export interface PlatformConfigDoc extends BaseDoc {
   };
   defaultPrimaryColor: string;
   defaultSecondaryColor: string;
+  superAdminPolicies?: {
+    mfaRequired: boolean;
+    passwordMinLength: number;
+    sessionTimeoutMinutes: number;
+    emergencyAccessEnabled: boolean;
+    emergencyAccessReviewHours: number;
+    impersonationEnabled: boolean;
+    impersonationMaxMinutes: number;
+    dualApprovalForHighRisk: boolean;
+    auditRetentionYears: number;
+    phiExportRequiresReason: boolean;
+    dataDeletionRequiresApproval: boolean;
+    ssoEnabled: boolean;
+    apiKeysEnabled: boolean;
+    backupRpoHours: number;
+    backupRtoHours: number;
+    supportAccessRequiresTicket: boolean;
+  };
 }
 
 // ===== Staff Scheduling =====

@@ -29,7 +29,6 @@ export const ROLE_TITLE: Record<UserRole, string> = {
   rooming_nurse: 'Nurse',
   clinician: 'Dr.',
   records_hmis_officer: 'HMIS',
-  facility_administrator: '',
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {
@@ -58,7 +57,6 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   rooming_nurse: 'Rooming Nurse',
   clinician: 'Doctor',
   records_hmis_officer: 'Records / HMIS Officer',
-  facility_administrator: 'Facility Administrator',
 };
 
 /** Roles that count as "physician" for filtering. */

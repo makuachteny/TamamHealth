@@ -336,19 +336,20 @@ export default function PatientsPage() {
                   <button
                     onClick={() => setShowFilters(s => !s)}
                     aria-expanded={showFilters}
+                    aria-label={t('patients.filtersTitle')}
+                    title={t('patients.filtersTitle')}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 14px',
-                      borderRadius: 999,
+                      position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 38, height: 38, padding: 0, borderRadius: 999,
                       border: `1px solid ${activeFilterCount ? 'var(--accent-primary)' : 'var(--border-light)'}`,
                       background: activeFilterCount ? 'rgba(33,145,208,0.08)' : 'var(--bg-card-solid)',
                       color: activeFilterCount ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                      fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+                      cursor: 'pointer', flexShrink: 0,
                     }}
                   >
-                    <Filter className="w-3.5 h-3.5" />
-                    {t('patients.filtersTitle')}
+                    <Filter className="w-4 h-4" />
                     {activeFilterCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+                      <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-bold" style={{ top: -4, right: -4, background: '#2191D0', color: '#fff' }}>
                         {activeFilterCount}
                       </span>
                     )}
@@ -425,15 +426,17 @@ export default function PatientsPage() {
                 <button
                   type="button"
                   onClick={handleDownloadCsv}
+                  aria-label="Download"
+                  title="Download"
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 38, height: 38, padding: 0,
                     borderRadius: 999, background: 'var(--bg-card-solid)', color: 'var(--text-secondary)',
                     border: '1px solid var(--border-light)',
-                    fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                    cursor: 'pointer', flexShrink: 0,
                   }}
                 >
                   <Download className="w-4 h-4" />
-                  Download
                 </button>
               </div>
             </div>

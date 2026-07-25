@@ -12,6 +12,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import { useToast } from '@/components/Toast';
 import { CONFLICT_RESOLUTION_ROLES } from '@/lib/permissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import TopBar from '@/components/TopBar';
 
 const RISK_STYLES: Record<ConflictQueueDoc['risk'], { bg: string; fg: string; border: string; label: string }> = {
   high:   { bg: 'rgba(229,46,66,0.08)',  fg: '#C44536', border: 'rgba(229,46,66,0.25)', label: 'HIGH' },
@@ -105,102 +106,90 @@ export default function ConflictsPage() {
 
   if (!allowed) {
     return (
-      <div style={{ padding: 32 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>{t('conflicts.title')}</h1>
-        <p style={{ color: 'var(--text-muted)' }}>{t('conflicts.accessRestricted')}</p>
-      </div>
+      <>
+        <TopBar title={t('conflicts.title')} />
+        <main className="page-container page-enter admin-detail-page">
+          <section className="admin-detail-empty">
+            <h1>{t('conflicts.title')}</h1>
+            <p>{t('conflicts.accessRestricted')}</p>
+          </section>
+        </main>
+      </>
     );
   }
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 6px' }}>{t('conflicts.eyebrow')}</p>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 6px' }}>{t('conflicts.title')}</h1>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: 0 }}>
-            {t('conflicts.subtitle')}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {(['pending', 'resolved', 'dismissed'] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setFilterStatus(s)}
-              style={{
-                padding: '8px 14px',
-                borderRadius: 999,
-                border: `1.5px solid ${filterStatus === s ? 'var(--accent-primary, #2191D0)' : 'var(--border-medium)'}`,
-                background: filterStatus === s ? 'var(--accent-primary, #2191D0)' : 'transparent',
-                color: filterStatus === s ? '#fff' : 'var(--text-secondary)',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize',
-              }}>
-              {t(`conflicts.status_${s}`)}
-            </button>
-          ))}
-        </div>
-      </div>
+    <>
+      <TopBar title={t('conflicts.title')} />
+      <main className="page-container page-enter admin-detail-page">
+        <section className="admin-detail-header">
+          <div>
+            <p>{t('conflicts.eyebrow')}</p>
+            <h1>{t('conflicts.title')}</h1>
+            <span>{t('conflicts.subtitle')}</span>
+          </div>
+          <div className="admin-detail-tabs" role="tablist" aria-label="Conflict status">
+            {(['pending', 'resolved', 'dismissed'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                role="tab"
+                aria-selected={filterStatus === s}
+                className={filterStatus === s ? 'active' : undefined}
+                onClick={() => setFilterStatus(s)}
+              >
+                {t(`conflicts.status_${s}`)}
+              </button>
+            ))}
+          </div>
+        </section>
 
       {errorMsg && (
         <div
           role="alert"
-          style={{
-            padding: '12px 16px',
-            marginBottom: 16,
-            borderRadius: 8,
-            background: 'rgba(229,46,66,0.08)',
-            border: '1px solid rgba(229,46,66,0.25)',
-            color: '#C44536',
-            fontSize: 13,
-          }}>
+          className="admin-detail-alert"
+        >
           {errorMsg}
         </div>
       )}
 
       {loading ? (
-        <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>{t('syncConflicts.loading')}</div>
+        <div className="admin-detail-empty">{t('syncConflicts.loading')}</div>
       ) : conflicts.length === 0 ? (
-        <div style={{
-          padding: 48, textAlign: 'center',
-          background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', borderRadius: 10,
-          color: 'var(--text-muted)',
-        }}>
+        <div className="admin-detail-empty">
           {t('conflicts.emptyState', { status: t(`conflicts.status_${filterStatus}`) })}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="admin-conflict-list">
           {conflicts.map((c) => {
             const risk = RISK_STYLES[c.risk];
             return (
-              <div key={c._id} style={{
-                background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', borderRadius: 10, padding: 18,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
+              <article key={c._id} className="admin-conflict-card">
+                <div className="admin-conflict-card-grid">
+                  <div className="admin-conflict-body">
+                    <div className="admin-conflict-meta">
                       <span style={{
                         fontSize: 11, fontWeight: 700, letterSpacing: '0.1em',
                         padding: '3px 10px', borderRadius: 999,
                         background: risk.bg, color: risk.fg, border: `1px solid ${risk.border}`,
                       }}>{t(`conflicts.risk_${c.risk}`)}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                      <span className="admin-conflict-resource">
                         {c.resourceType}
                       </span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-platform-mono)' }}>
+                      <span className="admin-conflict-id">
                         {c.resourceId}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    <div className="admin-conflict-line">
                       {t('conflicts.defaultWinner')} <span style={{ fontFamily: 'var(--font-platform-mono)', color: 'var(--text-primary)' }}>{c.winningRev}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    <div className="admin-conflict-line">
                       {t('conflicts.losingRevisions')} {c.losingRevs.map((r) => (
                         <span key={r} style={{ fontFamily: 'var(--font-platform-mono)', color: 'var(--text-primary)', marginRight: 8 }}>{r}</span>
                       ))}
                     </div>
                     {c.status !== 'pending' && (
-                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                      <div className="admin-conflict-resolution">
                         {t('conflicts.resolvedBy', {
                           action: c.status === 'resolved' ? t('conflicts.actionResolved') : t('conflicts.actionDismissed'),
                           user: c.resolvedBy || t('syncConflicts.unknownUser'),
@@ -212,15 +201,12 @@ export default function ConflictsPage() {
                     )}
                   </div>
                   {c.status === 'pending' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                    <div className="admin-conflict-actions">
                       <button
                         type="button"
                         onClick={() => handleResolve(c._id, c.winningRev)}
-                        style={{
-                          padding: '6px 14px', borderRadius: 6,
-                          background: 'var(--accent-primary, #2191D0)', color: '#fff',
-                          border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        }}>
+                        className="primary"
+                      >
                         {t('conflicts.keepWinner')}
                       </button>
                       {c.losingRevs.map((rev) => (
@@ -228,32 +214,25 @@ export default function ConflictsPage() {
                           key={rev}
                           type="button"
                           onClick={() => handleResolve(c._id, rev)}
-                          style={{
-                            padding: '6px 14px', borderRadius: 6,
-                            background: 'transparent', color: 'var(--text-primary)',
-                            border: '1.5px solid var(--border-medium)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                          }}>
+                        >
                           {t('conflicts.useRev', { rev: rev.slice(0, 6) })}
                         </button>
                       ))}
                       <button
                         type="button"
                         onClick={() => handleDismiss(c._id)}
-                        style={{
-                          padding: '6px 14px', borderRadius: 6,
-                          background: 'transparent', color: 'var(--text-muted)',
-                          border: '1.5px solid var(--border-medium)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        }}>
+                      >
                         {t('syncConflicts.dismissButton')}
                       </button>
                     </div>
                   )}
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>
       )}
-    </div>
+      </main>
+    </>
   );
 }

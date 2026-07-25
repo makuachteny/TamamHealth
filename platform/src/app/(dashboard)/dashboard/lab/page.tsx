@@ -7,16 +7,78 @@ import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import Modal from '@/components/Modal';
+import ChartCard, { tooltipStyle, axisTick } from '@/components/ChartCard';
+import EmptyState from '@/components/EmptyState';
+import {
+  ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell,
+  XAxis, YAxis, Tooltip, ReferenceLine,
+} from 'recharts';
 import type { LabResultDoc } from '@/lib/db-types';
 import {
   CheckCircle2, AlertTriangle,
   Microscope,
   Loader2,
-  X, Save, Table, List, BellOff,
+  X, Save, Table, List, BellOff, TrendingUp,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
 
 const ACCENT = 'var(--accent-primary)';
+
+// ===== Lab Performance Analytics (turnaround-time + volume charts) =====
+// Target order→result turnaround time. 24h is the standard routine-lab TAT
+// benchmark (same order of magnitude as the routine result-review SLA used
+// elsewhere in lab-service.ts) and gives a legible reference line without
+// hardcoding per-test SLAs we don't otherwise track.
+const LAB_TAT_TARGET_HOURS = 24;
+
+const VOLUME_SERIES_COLORS = [
+  'var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)',
+  'var(--color-chart-4)', 'var(--color-chart-5)', 'var(--color-chart-6)',
+];
+
+// Collapses near-duplicate test names (e.g. "Blood Glucose (Fasting)" /
+// "Blood Glucose (Random)") into one category for the grouped charts below.
+function normalizeTestCategory(testName: string): string {
+  const stripped = (testName || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  return stripped || testName || 'Unknown';
+}
+
+function medianOf(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// Monday-start week bucket for a given ISO date string.
+function weekStartOf(iso: string): Date | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function dayKeyOf(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+// Turnaround time in hours from order to result, computed from `updatedAt`
+// (guaranteed ISO everywhere lab-service.ts writes it — see updateLabResult /
+// advanceLabOrder) rather than `completedAt`, which some code paths write via
+// toLocaleString() and is therefore not reliably parseable.
+function tatHours(r: LabResultDoc): number | null {
+  if (r.status !== 'completed' || !r.orderedAt || !r.updatedAt) return null;
+  const ordered = new Date(r.orderedAt).getTime();
+  const updated = new Date(r.updatedAt).getTime();
+  if (!Number.isFinite(ordered) || !Number.isFinite(updated)) return null;
+  const hours = (updated - ordered) / 3_600_000;
+  return hours >= 0 ? hours : null;
+}
 
 // ===== Reference Ranges for Auto-Flagging =====
 interface ReferenceRange {
@@ -183,6 +245,97 @@ export default function LabDashboardPage() {
     const unacknowledgedCritical = criticalAlerts.filter(a => !a.acknowledged).length;
     return { pending, inProgress, completed, critical, abnormal, avgTurnaround, specimens, total: results.length, unacknowledgedCritical };
   }, [results, criticalAlerts]);
+
+  // --- Lab Performance Analytics: chart data (real data only, see tatHours) ---
+
+  // (a) Median TAT per week, across whatever completed-result history exists.
+  const weeklyTatData = useMemo(() => {
+    const buckets = new Map<string, { label: string; sortKey: number; hours: number[] }>();
+    for (const r of results) {
+      const hours = tatHours(r);
+      if (hours === null) continue;
+      const weekStart = weekStartOf(r.updatedAt);
+      if (!weekStart) continue;
+      const key = weekStart.toISOString().slice(0, 10);
+      if (!buckets.has(key)) {
+        buckets.set(key, {
+          label: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          sortKey: weekStart.getTime(),
+          hours: [],
+        });
+      }
+      buckets.get(key)!.hours.push(hours);
+    }
+    return Array.from(buckets.values())
+      .sort((a, b) => a.sortKey - b.sortKey)
+      .map(b => ({ label: b.label, medianHours: Math.round(medianOf(b.hours) * 10) / 10 }));
+  }, [results]);
+
+  // (b) % of this month's completed results within the target TAT, by test type.
+  const testTypeTargetData = useMemo(() => {
+    const now = new Date();
+    const buckets = new Map<string, { total: number; withinTarget: number }>();
+    for (const r of results) {
+      const hours = tatHours(r);
+      if (hours === null) continue;
+      const updated = new Date(r.updatedAt);
+      if (updated.getFullYear() !== now.getFullYear() || updated.getMonth() !== now.getMonth()) continue;
+      const category = normalizeTestCategory(r.testName);
+      if (!buckets.has(category)) buckets.set(category, { total: 0, withinTarget: 0 });
+      const b = buckets.get(category)!;
+      b.total += 1;
+      if (hours <= LAB_TAT_TARGET_HOURS) b.withinTarget += 1;
+    }
+    return Array.from(buckets.entries())
+      .map(([testName, b]) => ({ testName, pct: Math.round((b.withinTarget / b.total) * 100), total: b.total }))
+      .sort((a, b) => b.total - a.total);
+  }, [results]);
+
+  // (c) Test volume by type, stacked per day, for the most recent days present in the data.
+  const volumeByDay = useMemo(() => {
+    const dayKeys = Array.from(new Set(
+      results.map(r => dayKeyOf(r.orderedAt)).filter((k): k is string => k !== null),
+    )).sort();
+    const recentDays = dayKeys.slice(-14);
+    const recentDaySet = new Set(recentDays);
+
+    const inWindow = results.filter(r => {
+      const k = dayKeyOf(r.orderedAt);
+      return k !== null && recentDaySet.has(k);
+    });
+
+    // Top 5 test categories by volume in this window; everything else -> "Other".
+    const volumeByCategory = new Map<string, number>();
+    for (const r of inWindow) {
+      const cat = normalizeTestCategory(r.testName);
+      volumeByCategory.set(cat, (volumeByCategory.get(cat) || 0) + 1);
+    }
+    const topCategories = Array.from(volumeByCategory.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+    const hasOther = volumeByCategory.size > topCategories.length;
+    const seriesKeys = hasOther ? [...topCategories, 'Other'] : topCategories;
+
+    const rows = recentDays.map(dayKey => {
+      const row: Record<string, string | number> = {
+        label: new Date(`${dayKey}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      };
+      for (const key of seriesKeys) row[key] = 0;
+      return row;
+    });
+    const rowIndexByDay = new Map(recentDays.map((d, i) => [d, i]));
+    for (const r of inWindow) {
+      const dayKey = dayKeyOf(r.orderedAt);
+      if (dayKey === null) continue;
+      const idx = rowIndexByDay.get(dayKey);
+      if (idx === undefined) continue;
+      const cat = normalizeTestCategory(r.testName);
+      const seriesKey = topCategories.includes(cat) ? cat : 'Other';
+      rows[idx][seriesKey] = (Number(rows[idx][seriesKey]) || 0) + 1;
+    }
+    return { rows, seriesKeys };
+  }, [results]);
 
   // Initialize critical alerts from existing results
   useEffect(() => {
@@ -614,6 +767,108 @@ export default function LabDashboardPage() {
             ))}
           </div>
         )}
+
+        {/* --- Lab Performance Analytics --- */}
+        <div className="dash-card" style={{ padding: 16 }}>
+          <h3 style={{ fontFamily: 'var(--font-platform)', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', letterSpacing: -0.2, marginBottom: 12 }}>
+            Lab Performance Analytics
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <ChartCard title="Median Turnaround Time" subtitle="Order to result, by week" chartTypes={['line']} periods={[]}>
+              {() => (
+                weeklyTatData.length === 0 ? (
+                  <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <EmptyState icon={TrendingUp} title="No data yet" message="No completed results with a turnaround time yet." />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={weeklyTatData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                      <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} />
+                      <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={32} />
+                      <Tooltip {...tooltipStyle} formatter={(v?: number) => [`${v ?? 0}h`, 'Median TAT']} />
+                      <ReferenceLine
+                        y={LAB_TAT_TARGET_HOURS}
+                        stroke="#e34948"
+                        strokeDasharray="4 4"
+                        label={{ value: `Target ${LAB_TAT_TARGET_HOURS}h`, position: 'insideTopRight', fill: '#e34948', fontSize: 10 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="medianHours"
+                        name="Median TAT (h)"
+                        stroke="#2a78d6"
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: '#2a78d6' }}
+                        activeDot={{ r: 5 }}
+                        isAnimationActive={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )
+              )}
+            </ChartCard>
+
+            <ChartCard title="% Within Target TAT" subtitle={`This month, by test type (≤${LAB_TAT_TARGET_HOURS}h)`} chartTypes={['bar']} periods={[]}>
+              {() => (
+                testTypeTargetData.length === 0 ? (
+                  <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <EmptyState icon={TrendingUp} title="No data yet" message="No completed results this month." />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={testTypeTargetData} margin={{ top: 8, right: 12, left: 0, bottom: 24 }}>
+                      <XAxis
+                        dataKey="testName"
+                        tick={{ ...axisTick, fontSize: 10 }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval={0}
+                        angle={-20}
+                        textAnchor="end"
+                        height={50}
+                      />
+                      <YAxis domain={[0, 100]} tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={32} />
+                      <Tooltip {...tooltipStyle} formatter={(v?: number, _name?: unknown, item?: { payload?: { total?: number } }) => [`${v ?? 0}% (n=${item?.payload?.total ?? '?'})`, 'Within target']} />
+                      <Bar dataKey="pct" name="% within target" radius={[4, 4, 0, 0]}>
+                        {testTypeTargetData.map((d) => (
+                          <Cell key={d.testName} fill={d.pct >= 90 ? '#199e70' : d.pct >= 70 ? '#eda100' : '#e34948'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )
+              )}
+            </ChartCard>
+
+            <ChartCard title="Test Volume by Type" subtitle="Orders per day, most recent days" chartTypes={['bar']} periods={[]}>
+              {() => (
+                volumeByDay.rows.length === 0 ? (
+                  <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <EmptyState icon={TrendingUp} title="No data yet" message="No lab orders yet." />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={volumeByDay.rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                      <XAxis dataKey="label" tick={{ ...axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
+                      <Tooltip {...tooltipStyle} />
+                      {volumeByDay.seriesKeys.map((key, i) => (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          name={key}
+                          stackId="volume"
+                          fill={VOLUME_SERIES_COLORS[i % VOLUME_SERIES_COLORS.length]}
+                          radius={i === volumeByDay.seriesKeys.length - 1 ? [4, 4, 0, 0] : undefined}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                )
+              )}
+            </ChartCard>
+          </div>
+        </div>
 
         </EhrCareDashboard>
       </main>

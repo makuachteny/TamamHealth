@@ -69,7 +69,6 @@ export const DEMO_USER_PROFILES: SeedUserProfile[] = [
   { username: 'rooming.sara',    name: 'Sara Aluel Bol',             role: 'rooming_nurse',          hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'clinician.peter', name: 'Dr. Peter Garang Deng',      role: 'clinician',              hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'hmis.john',       name: 'John Majok Chol',            role: 'records_hmis_officer',   hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
-  { username: 'facadmin.rita',   name: 'Rita Akello Ojok',           role: 'facility_administrator', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'org.admin',       name: 'Mercy Org Administrator',    role: 'org_admin',                                                                                  orgId: PRIVATE_ORG_ID },
   { username: 'dr.mercy',        name: 'Dr. Grace Lado',             role: 'doctor',                 hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PRIVATE_ORG_ID },
 ];

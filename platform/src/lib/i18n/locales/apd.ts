@@ -3953,7 +3953,6 @@ const apd: TranslationMap = {
   'adminUsers.role_rooming_nurse': 'ممرض الاستقبال',
   'adminUsers.role_clinician': 'دكتور',
   'adminUsers.role_records_hmis_officer': 'موظف السجلات / نظام المعلومات الصحية',
-  'adminUsers.role_facility_administrator': 'مدير المرفق',
   'orgAdmin.pageTitle': 'لوحة المنظمة',
   'orgAdmin.organization': 'المنظمة',
   'orgAdmin.subtitle': 'منظمتك بنظرة واحدة.',

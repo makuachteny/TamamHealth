@@ -8,7 +8,6 @@ import {
   BedDouble, ArrowRightLeft, Plus, Printer,
   Syringe, Users, Calendar, Activity, Baby, UserX,
 } from '@/components/icons/lucide';
-import type { WardDoc } from '@/lib/db-types-ward';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useWards } from '@/lib/hooks/useWards';
@@ -23,46 +22,6 @@ import TriageWorkflow from './TriageWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
 
 type StationTab = 'ward' | 'mar' | 'triage';
-
-/* ── Ward occupancy (left rail, design 02) ──
-   One meter per active ward: occupied beds over capacity, "N free" beside it.
-   Amber once a ward is down to its last free bed; the in-bar count flips to
-   white when the fill reaches it. Hidden entirely when no ward carries bed
-   counts (small facilities). */
-function WardOccupancyCard({ wards }: { wards: WardDoc[] }) {
-  const active = wards.filter(ward => ward.isActive !== false && (ward.totalBeds || 0) > 0);
-  if (active.length === 0) return null;
-  const total = active.reduce((sum, ward) => sum + ward.totalBeds, 0);
-  const used = active.reduce((sum, ward) => sum + (ward.occupiedBeds || 0), 0);
-  return (
-    <div className="ehr-occupancy-card">
-      <div className="ehr-occupancy-head">
-        <h3>Ward occupancy</h3>
-        <b>{used}/{total}</b>
-      </div>
-      <div className="ehr-occupancy-rows">
-        {active.slice(0, 6).map(ward => {
-          const occupied = ward.occupiedBeds || 0;
-          const free = Math.max(0, ward.totalBeds - occupied);
-          const pct = Math.min(100, Math.round((occupied / ward.totalBeds) * 100));
-          const tight = free <= 1;
-          return (
-            <div key={ward._id} className="ehr-occupancy-row">
-              <div className="ehr-occupancy-row-name">
-                <span title={ward.name}>{ward.name}</span>
-                <b className={tight ? 'is-tight' : undefined}>{free} free</b>
-              </div>
-              <div className={`ehr-occupancy-bar${tight ? ' is-tight' : ''}${pct >= 92 ? ' is-full' : ''}`}>
-                <i style={{ width: `${pct}%` }} />
-                <span>{occupied}/{ward.totalBeds}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // Only plots a time when the source field is a full timestamp (contains a
 // clock component) — registration/admission dates are sometimes date-only,
@@ -79,7 +38,12 @@ export default function NurseDashboard() {
   const router = useRouter();
   const { patients } = usePatients();
   const { triages } = useTriage();
-  const { activeAdmissions, wards } = useWards();
+  const { activeAdmissions } = useWards();
+  // ANC continuum funnel — midwife-only section (rendered below). Hook is
+  // called unconditionally per rules-of-hooks; the section itself is gated
+  // on role.
+  const { stats: ancStats } = useANC();
+  const isMidwife = currentUser?.role === 'midwife';
   const today = new Date().toISOString().slice(0, 10);
   const triageToday = triages.filter(tr => (tr.triagedAt || '').startsWith(today));
   const criticalTriage = triageToday.filter(tr => tr.priority === 'RED').length;
@@ -88,6 +52,39 @@ export default function NurseDashboard() {
   const urgentTriage = triageToday.filter(tr => tr.priority === 'YELLOW').length;
   const waitingTriage = triageToday.filter(tr => tr.status === 'pending').length;
   const inConsultTriage = triageToday.filter(tr => tr.status === 'seen').length;
+  const routineTriage = triageToday.filter(tr => tr.priority === 'GREEN').length;
+
+  // Triage queue by acuity — today's RED/YELLOW/GREEN split, straight from
+  // triage-service data already loaded above (no extra fetch).
+  const acuityData = useMemo(() => ([
+    { name: 'Red', value: criticalTriage, color: CHART_RED },
+    { name: 'Yellow', value: urgentTriage, color: CHART_AMBER },
+    { name: 'Green', value: routineTriage, color: CHART_GREEN },
+  ]), [criticalTriage, urgentTriage, routineTriage]);
+  const acuityTotal = criticalTriage + urgentTriage + routineTriage;
+
+  // Wait time by stage — median minutes-waiting per queue stage, derived from
+  // today's active (pending/seen) triage records via the same
+  // buildQueueFromTriage helper the front-desk board uses. No lab/pharmacy
+  // status is loaded on this dashboard, so entries never advance past
+  // awaiting_consultation — that's a real reflection of what this station can
+  // observe, not a fabricated gap.
+  const waitByStageData = useMemo(() => {
+    const entries = buildQueueFromTriage(triageToday.filter(tr => tr.status === 'pending' || tr.status === 'seen'));
+    const groups = new Map<QueueStage, number[]>();
+    for (const entry of entries) {
+      const list = groups.get(entry.stage);
+      if (list) list.push(entry.minutesWaiting);
+      else groups.set(entry.stage, [entry.minutesWaiting]);
+    }
+    return QUEUE_STAGE_ORDER
+      .filter(stage => groups.has(stage))
+      .map(stage => ({
+        stage: STAGE_LABELS[stage],
+        minutes: median(groups.get(stage)!),
+        count: groups.get(stage)!.length,
+      }));
+  }, [triageToday]);
 
   // The Quick Actions cards act as the station switcher — each swaps the inline
   // body below (the clinical-officer dashboard pattern: quick-action cards drive
@@ -251,6 +248,23 @@ export default function NurseDashboard() {
   ]), [triageToday, currentUser?._id]);
   const { checklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
+  // ANC visit funnel — mothers reaching each visit number, straight from
+  // getANCStats().continuum (already computed server-side, no re-derivation).
+  // No reliable mother→delivery linkage exists in birth-service today, so the
+  // funnel stops at ANC5+ rather than inventing a delivery step.
+  // TODO(viz): add a delivery-count stage once births are linkable to a
+  // specific mother's ANC record.
+  const ancFunnelData = useMemo(() => {
+    if (!ancStats) return [];
+    return [
+      { stage: 'ANC1', count: ancStats.continuum.anc1 },
+      { stage: 'ANC2', count: ancStats.continuum.anc2 },
+      { stage: 'ANC3', count: ancStats.continuum.anc3 },
+      { stage: 'ANC4', count: ancStats.continuum.anc4 },
+      { stage: 'ANC5+', count: ancStats.continuum.anc5plus },
+    ];
+  }, [ancStats]);
+
   if (!currentUser) return null;
 
   return (
@@ -277,7 +291,6 @@ export default function NurseDashboard() {
           // three stations' rows ever reach a 'done' statusTone.
           chartTitle="Triage activity"
           chartSeriesNames={['Acute', 'Routine']}
-          railContent={<WardOccupancyCard wards={wards} />}
           actionStrip={[
             ...(canUseRoute('/patients') ? [{ label: 'Patient search', icon: Users, onClick: () => router.push('/patients') }] : []),
             ...(canUseRoute('/wards') ? [{ label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') }] : []),
@@ -311,6 +324,7 @@ export default function NurseDashboard() {
             {activeTab === 'triage' && <TriageWorkflow />}
           </div>
         </EhrCareDashboard>
+
         {handoffOpen && (
           <HandoffWorkflow
             variant="modal"

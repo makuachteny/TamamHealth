@@ -527,39 +527,6 @@ const MANAGER_STEPS: TourStep[] = [
   finishStep('/facility-management'),
 ];
 
-// ── Facility administrator — role directory + §11.3 ────────────────────────
-const FACILITY_ADMIN_STEPS: TourStep[] = [
-  {
-    id: 'welcome',
-    route: '/facility-overview',
-    target: '',
-    title: 'Welcome to your Facility Overview',
-    body: 'Facility administration: settings, staff, payments, and MoH submissions. Let’s walk the essentials.',
-  },
-  {
-    id: 'settings',
-    route: '/facility-settings',
-    target: '',
-    title: 'Facility settings',
-    body: 'Payment methods, tax rate, rooms, and feature flags for this facility.',
-  },
-  {
-    id: 'payments',
-    route: '/payments',
-    target: '',
-    title: 'Payments oversight',
-    body: 'The full collections view — including the pending-verification queue for pay-by-link and portal payments.',
-  },
-  {
-    id: 'my-facility',
-    route: '/my-facility',
-    target: '',
-    title: 'Submit to MoH',
-    body: 'Your facility’s self-profile plus assessment and census submissions to the Ministry.',
-  },
-  finishStep('/facility-overview'),
-];
-
 // ── Org admin — §11.2 ──────────────────────────────────────────────────────
 const ORG_ADMIN_STEPS: TourStep[] = [
   {
@@ -755,7 +722,6 @@ const JOURNEY_STEPS: Partial<Record<UserRole, TourStep[]>> = {
   data_entry_clerk: RECORDS_STEPS,
   // Management & admin
   hospital_manager: MANAGER_STEPS,
-  facility_administrator: FACILITY_ADMIN_STEPS,
   org_admin: ORG_ADMIN_STEPS,
   county_health_director: COUNTY_STEPS,
   government: GOVERNMENT_STEPS,

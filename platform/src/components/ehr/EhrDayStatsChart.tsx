@@ -172,18 +172,19 @@ export function EhrWeekActivityChart({
 }) {
   const selected = parseIsoDate(selectedDate);
   // Sunday-start week, matching the mini-calendar's S M T W T F S header.
-  const weekStart = addDays(selected, -selected.getDay());
-  const weekEnd = addDays(weekStart, 6);
-  const days = Array.from({ length: 7 }, (_, index) => {
-    const date = addDays(weekStart, index);
-    return {
-      iso: toIsoDate(date),
-      letter: 'SMTWTFS'[index],
-      dateNumber: String(date.getDate()),
-      counts: [0, 0] as [number, number],
-      date,
-    };
-  });
+  const selectedWeekStart = addDays(selected, -selected.getDay());
+  const itemDates = items
+    .map(item => item.date || todayIso)
+    .filter((date): date is string => Boolean(date) && /^\d{4}-\d{2}-\d{2}$/.test(date))
+    .sort();
+  const selectedWeekEndIso = toIsoDate(addDays(selectedWeekStart, 6));
+  const selectedWeekHasData = itemDates.some(date => date >= toIsoDate(selectedWeekStart) && date <= selectedWeekEndIso);
+  const latestItemDate = itemDates[itemDates.length - 1];
+  const activeDate = selectedWeekHasData || !latestItemDate ? selected : parseIsoDate(latestItemDate);
+  const activeWeekStart = addDays(activeDate, -activeDate.getDay());
+  const activeSelectedIso = selectedWeekHasData ? selectedDate : toIsoDate(activeDate);
+  const activeWeekIsCurrent = toIsoDate(activeWeekStart) === toIsoDate(addDays(parseIsoDate(todayIso), -parseIsoDate(todayIso).getDay()));
+  const days = buildWeekDays(activeWeekStart);
   const dayByIso = new Map(days.map(day => [day.iso, day]));
   for (const item of items) {
     const day = dayByIso.get(item.date || todayIso);
@@ -191,12 +192,9 @@ export function EhrWeekActivityChart({
   }
   const maxTotal = Math.max(1, ...days.map(day => day.counts[0] + day.counts[1]));
   const total = days.reduce((sum, day) => sum + day.counts[0] + day.counts[1], 0);
-  const selectedDay = days.find(day => day.iso === selectedDate);
-  const selectedTotal = selectedDay ? selectedDay.counts[0] + selectedDay.counts[1] : 0;
-  const weekRangeLabel = `${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(weekStart)}-${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(weekEnd)}`;
   // Tallest stack tops out at ~84% of the plot; non-zero segments keep a
   // visible minimum so a single visit never rounds away to nothing.
-  const pct = (count: number) => (count === 0 ? 0 : Math.max(10, Math.round((count / maxTotal) * 86)));
+  const pct = (count: number) => (count === 0 ? 0 : Math.max(11, Math.round((count / maxTotal) * 88)));
   const dayTitle = (day: (typeof days)[number]) => {
     const label = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(day.date);
     return `${label} — ${day.counts[0]} ${seriesNames[0].toLowerCase()} · ${day.counts[1]} ${seriesNames[1].toLowerCase()}`;
@@ -206,13 +204,7 @@ export function EhrWeekActivityChart({
     <div className="ehr-day-stats ehr-week-activity">
       <div className="ehr-day-stats-head">
         <h3>{title}</h3>
-        <span className="ehr-week-activity-caption">{weekRangeLabel}</span>
-      </div>
-      <div className="ehr-week-activity-summary">
-        <strong>{selectedTotal}</strong>
-        <span>selected day</span>
-        <b>{total}</b>
-        <span>week total</span>
+        <span className="ehr-week-activity-caption">{activeWeekIsCurrent ? 'This week' : 'Latest week'}</span>
       </div>
       {total === 0 ? (
         <p className="ehr-day-stats-empty">No activity this week.</p>
@@ -221,7 +213,7 @@ export function EhrWeekActivityChart({
           {days.map(day => {
             const dayTotal = day.counts[0] + day.counts[1];
             const className = [
-              day.iso === selectedDate ? 'is-selected' : '',
+              day.iso === activeSelectedIso ? 'is-selected' : '',
               day.iso === todayIso ? 'is-today' : '',
               dayTotal === 0 ? 'is-empty' : '',
             ].filter(Boolean).join(' ') || undefined;
@@ -231,11 +223,10 @@ export function EhrWeekActivityChart({
                 type="button"
                 className={className}
                 aria-label={dayTitle(day)}
-                aria-pressed={day.iso === selectedDate}
+                aria-pressed={day.iso === activeSelectedIso}
                 title={dayTitle(day)}
                 onClick={() => onSelectDate?.(day.iso)}
               >
-                <span className="ehr-week-activity-count">{dayTotal || ''}</span>
                 <span className="ehr-week-activity-track">
                   {day.counts[1] > 0 && <i className="ehr-week-seg-out" style={{ height: `${pct(day.counts[1])}%` }} />}
                   {day.counts[0] > 0 && <i className="ehr-week-seg-in" style={{ height: `${pct(day.counts[0])}%` }} />}
@@ -247,9 +238,8 @@ export function EhrWeekActivityChart({
       )}
       <div className="ehr-week-activity-days" aria-hidden="true">
         {days.map(day => (
-          <span key={day.iso} className={day.iso === selectedDate ? 'is-selected' : undefined}>
-            <b>{day.letter}</b>
-            <small>{day.dateNumber}</small>
+          <span key={day.iso} className={day.iso === activeSelectedIso ? 'is-selected' : undefined}>
+            {day.letter}
           </span>
         ))}
       </div>
@@ -259,6 +249,18 @@ export function EhrWeekActivityChart({
       </div>
     </div>
   );
+}
+
+function buildWeekDays(weekStart: Date) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(weekStart, index);
+    return {
+      iso: toIsoDate(date),
+      letter: 'SMTWTFS'[index],
+      counts: [0, 0] as [number, number],
+      date,
+    };
+  });
 }
 
 /** Hour-of-day from "08:20", "8:20 AM" or "20:05"; null when absent/unparseable. */

@@ -129,6 +129,35 @@ async function postHandler(request: NextRequest) {
       await deactivateUser(body.userId as string, auth.sub, auth.username);
       return NextResponse.json({ success: true });
     }
+    // Delete user (permanent). Confined like other mutations: org_admin only
+    // within their own tenant, never a platform/national account, never self.
+    if (action === 'delete') {
+      if (!body.userId) {
+        return NextResponse.json(
+          { error: 'userId is required' },
+          { status: 400 }
+        );
+      }
+      if (body.userId === auth.sub) {
+        return NextResponse.json(
+          { error: 'You cannot delete your own account' },
+          { status: 400 }
+        );
+      }
+      const target = await getUserById(body.userId as string);
+      if (!target) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+      if (auth.role !== 'super_admin' && PRIVILEGED_ASSIGNABLE_ROLES.includes(target.role)) {
+        return forbidden('You are not permitted to delete platform or national accounts.');
+      }
+      if (auth.role === 'org_admin' && target.orgId && auth.orgId && target.orgId !== auth.orgId) {
+        return forbidden('Cannot modify users outside your own organization');
+      }
+      const { deleteUser } = await import('@/lib/services/user-service');
+      await deleteUser(body.userId as string, auth.sub, auth.username);
+      return NextResponse.json({ success: true });
+    }
     // Update existing user
     if (action === 'update' && body.userId) {
       const roleError = assignableRoleError(auth.role, body.role as UserRole | undefined);

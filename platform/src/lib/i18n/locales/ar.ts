@@ -3969,7 +3969,6 @@ const ar: TranslationMap = {
   'adminUsers.role_rooming_nurse': 'ممرض الاستقبال',
   'adminUsers.role_clinician': 'طبيب',
   'adminUsers.role_records_hmis_officer': 'مسؤول السجلات / نظام المعلومات الصحية',
-  'adminUsers.role_facility_administrator': 'مدير المرفق',
   'orgAdmin.pageTitle': 'لوحة تحكم المؤسسة',
   'orgAdmin.organization': 'المؤسسة',
   'orgAdmin.subtitle': 'نظرة عامة على مؤسستك.',
