@@ -1306,6 +1306,159 @@ a, button, input, select, textarea, .card, .card-elevated, .btn, .nav-item, .bad
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
+/* Every vertical list scroller keeps a visible position indicator — the same
+   thin blue-tinted thumb as .show-scrollbar — so scrolling any list always
+   shows where you are. Horizontal pill/tab strips stay hidden via the global
+   default above. */
+.page-container,
+.ehr-center-panel:has(> .ehr-care-footer),
+.ehr-care-list,
+.ehr-appointment-list,
+.ehr-chart-details,
+.ehr-soap-scroll,
+.ehr-handoff-body,
+.ehr-module-menu-scroll,
+.ehr-find-patient-results,
+.assign-doctor-provider-list,
+.popup-select-list,
+.ehr-set-rail,
+.ehr-set-main,
+.modal-content,
+.th-chat-body,
+.mobile-shell-body,
+.mobile-patients-list,
+.mobile-calendar-list,
+.mobile-inbox {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.page-container::-webkit-scrollbar,
+.ehr-center-panel:has(> .ehr-care-footer)::-webkit-scrollbar,
+.ehr-care-list::-webkit-scrollbar,
+.ehr-appointment-list::-webkit-scrollbar,
+.ehr-chart-details::-webkit-scrollbar,
+.ehr-soap-scroll::-webkit-scrollbar,
+.ehr-handoff-body::-webkit-scrollbar,
+.ehr-module-menu-scroll::-webkit-scrollbar,
+.ehr-find-patient-results::-webkit-scrollbar,
+.assign-doctor-provider-list::-webkit-scrollbar,
+.popup-select-list::-webkit-scrollbar,
+.ehr-set-rail::-webkit-scrollbar,
+.ehr-set-main::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar,
+.th-chat-body::-webkit-scrollbar,
+.mobile-shell-body::-webkit-scrollbar,
+.mobile-patients-list::-webkit-scrollbar,
+.mobile-calendar-list::-webkit-scrollbar,
+.mobile-inbox::-webkit-scrollbar {
+  display: block;
+  width: 7px;
+  height: 7px;
+}
+.page-container::-webkit-scrollbar-track,
+.ehr-center-panel:has(> .ehr-care-footer)::-webkit-scrollbar-track,
+.ehr-care-list::-webkit-scrollbar-track,
+.ehr-appointment-list::-webkit-scrollbar-track,
+.ehr-chart-details::-webkit-scrollbar-track,
+.ehr-soap-scroll::-webkit-scrollbar-track,
+.ehr-handoff-body::-webkit-scrollbar-track,
+.ehr-module-menu-scroll::-webkit-scrollbar-track,
+.ehr-find-patient-results::-webkit-scrollbar-track,
+.assign-doctor-provider-list::-webkit-scrollbar-track,
+.popup-select-list::-webkit-scrollbar-track,
+.ehr-set-rail::-webkit-scrollbar-track,
+.ehr-set-main::-webkit-scrollbar-track,
+.modal-content::-webkit-scrollbar-track,
+.th-chat-body::-webkit-scrollbar-track,
+.mobile-shell-body::-webkit-scrollbar-track,
+.mobile-patients-list::-webkit-scrollbar-track,
+.mobile-calendar-list::-webkit-scrollbar-track,
+.mobile-inbox::-webkit-scrollbar-track {
+  background: transparent;
+}
+.page-container::-webkit-scrollbar-thumb,
+.ehr-center-panel:has(> .ehr-care-footer)::-webkit-scrollbar-thumb,
+.ehr-care-list::-webkit-scrollbar-thumb,
+.ehr-appointment-list::-webkit-scrollbar-thumb,
+.ehr-chart-details::-webkit-scrollbar-thumb,
+.ehr-soap-scroll::-webkit-scrollbar-thumb,
+.ehr-handoff-body::-webkit-scrollbar-thumb,
+.ehr-module-menu-scroll::-webkit-scrollbar-thumb,
+.ehr-find-patient-results::-webkit-scrollbar-thumb,
+.assign-doctor-provider-list::-webkit-scrollbar-thumb,
+.popup-select-list::-webkit-scrollbar-thumb,
+.ehr-set-rail::-webkit-scrollbar-thumb,
+.ehr-set-main::-webkit-scrollbar-thumb,
+.modal-content::-webkit-scrollbar-thumb,
+.th-chat-body::-webkit-scrollbar-thumb,
+.mobile-shell-body::-webkit-scrollbar-thumb,
+.mobile-patients-list::-webkit-scrollbar-thumb,
+.mobile-calendar-list::-webkit-scrollbar-thumb,
+.mobile-inbox::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 10px;
+}
+/* Inline-styled scrollers (style={{ overflowY: 'auto' }}) — matched via the
+   style attribute (both the SSR "overflow-y:auto" and the hydrated
+   "overflow-y: auto" serializations) so panel/modal lists built with inline
+   styles get the same position indicator without per-component classes. */
+[style*="overflow-y: auto"],
+[style*="overflow-y:auto"],
+[style*="overflow: auto"],
+[style*="overflow:auto"] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+[style*="overflow-y: auto"]::-webkit-scrollbar,
+[style*="overflow-y:auto"]::-webkit-scrollbar,
+[style*="overflow: auto"]::-webkit-scrollbar,
+[style*="overflow:auto"]::-webkit-scrollbar {
+  display: block;
+  width: 7px;
+  height: 7px;
+}
+[style*="overflow-y: auto"]::-webkit-scrollbar-track,
+[style*="overflow-y:auto"]::-webkit-scrollbar-track,
+[style*="overflow: auto"]::-webkit-scrollbar-track,
+[style*="overflow:auto"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+[style*="overflow-y: auto"]::-webkit-scrollbar-thumb,
+[style*="overflow-y:auto"]::-webkit-scrollbar-thumb,
+[style*="overflow: auto"]::-webkit-scrollbar-thumb,
+[style*="overflow:auto"]::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 10px;
+}
+[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover,
+[style*="overflow-y:auto"]::-webkit-scrollbar-thumb:hover,
+[style*="overflow: auto"]::-webkit-scrollbar-thumb:hover,
+[style*="overflow:auto"]::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+.page-container::-webkit-scrollbar-thumb:hover,
+.ehr-center-panel:has(> .ehr-care-footer)::-webkit-scrollbar-thumb:hover,
+.ehr-care-list::-webkit-scrollbar-thumb:hover,
+.ehr-appointment-list::-webkit-scrollbar-thumb:hover,
+.ehr-chart-details::-webkit-scrollbar-thumb:hover,
+.ehr-soap-scroll::-webkit-scrollbar-thumb:hover,
+.ehr-handoff-body::-webkit-scrollbar-thumb:hover,
+.ehr-module-menu-scroll::-webkit-scrollbar-thumb:hover,
+.ehr-find-patient-results::-webkit-scrollbar-thumb:hover,
+.assign-doctor-provider-list::-webkit-scrollbar-thumb:hover,
+.popup-select-list::-webkit-scrollbar-thumb:hover,
+.ehr-set-rail::-webkit-scrollbar-thumb:hover,
+.ehr-set-main::-webkit-scrollbar-thumb:hover,
+.modal-content::-webkit-scrollbar-thumb:hover,
+.th-chat-body::-webkit-scrollbar-thumb:hover,
+.mobile-shell-body::-webkit-scrollbar-thumb:hover,
+.mobile-patients-list::-webkit-scrollbar-thumb:hover,
+.mobile-calendar-list::-webkit-scrollbar-thumb:hover,
+.mobile-inbox::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
 /* Brand-tinted text selection */
 ::selection { background: var(--accent-light); color: var(--accent-text); }
 
@@ -1679,6 +1832,16 @@ select {
 select option {
   background: var(--bg-card-solid);
   color: var(--text-primary);
+}
+
+/* Dropdown option highlight — a visible blue tint instead of flat white.
+   (Engines that honor option styling only; macOS native popups keep the
+   system highlight.) */
+select option:hover,
+select option:focus,
+select option:checked {
+  background: rgba(33, 145, 208, 0.14);
+  color: var(--tb-blue-800, #015697);
 }
 
 label {
@@ -4079,8 +4242,12 @@ thead th {
 .ehr-module-menu section > button:hover,
 .ehr-module-menu section > button.active {
   border-color: transparent;
-  background: var(--nav-active-bg);
-  color: var(--nav-active-text);
+  /* Not --nav-active-bg: org branding rewrites that var at runtime, and a
+     light org primary rendered the hovered/selected row white-on-white.
+     --tb-blue-900 is the same pill the doctor's dropdown shows and is never
+     rebranded. */
+  background: var(--tb-blue-900);
+  color: #fff;
 }
 
 .ehr-top-search {
@@ -10358,17 +10525,6 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   overflow-y: auto;
 }
 
-.modal-content::-webkit-scrollbar {
-  width: 6px;
-}
-.modal-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-.modal-content::-webkit-scrollbar-thumb {
-  background: var(--border-medium);
-  border-radius: 3px;
-}
-
 .assign-doctor-search {
   width: 100%;
   min-width: 0;
@@ -15540,12 +15696,13 @@ textarea.ehr-handoff-input {
   background: var(--ehr-blue-light);
 }
 
-/* Right-rail clinical cards: inset content and restore the outstanding-row
-   divider/pressed treatment. Placed late so it wins over generic side-card
-   resets. */
+/* Right-rail clinical cards: restore the outstanding-row divider/pressed
+   treatment. Horizontal padding matches the 14px of every other side card so
+   the card headers all start at the same left edge. Placed late so it wins
+   over generic side-card resets. */
 .ehr-right-rail .ehr-outstanding-card,
 .ehr-right-rail .ehr-capabilities-card {
-  padding: 22px 28px 24px;
+  padding: 22px 14px 24px;
 }
 
 .ehr-right-rail .ehr-outstanding-card .ehr-side-card-head,
@@ -17701,7 +17858,9 @@ textarea.ehr-handoff-input {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  justify-content: flex-end;
+  /* Centered (not bottom-hung) so the status pill sits on the same line as
+     the stage/department pill in the neighbouring column. */
+  justify-content: center;
   gap: 4px;
   width: 100%;
   min-width: 0;
@@ -17711,6 +17870,10 @@ textarea.ehr-handoff-input {
   display: block;
   max-width: 100%;
   overflow: hidden;
+  /* Align the cue with the pill's inner TEXT (13px pill padding + 1px
+     border), not the pill's border, so Routine/Urgent stacks directly
+     under the status label. */
+  padding-right: 14px;
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 800;
@@ -17724,14 +17887,15 @@ textarea.ehr-handoff-input {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 118px;
-  min-height: 30px;
-  padding: 0 18px;
+  /* Same compact metrics as .ehr-department-pill (stage chips like "Awaiting
+     Triage") so every pill in a row shares one size and padding. */
+  min-height: 26px;
+  padding: 0 11px;
   border: 1px solid var(--ehr-border, var(--border-light));
   border-radius: 999px;
   background: #fff;
   color: var(--ehr-text, var(--text-primary));
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -20761,12 +20925,8 @@ textarea.ehr-handoff-input {
   min-width: 740px;
 }
 
-.ehr-care-list .appointment-status-pill {
-  min-width: 0;
-  min-height: 28px;
-  padding: 0 13px;
-  font-size: 12px;
-}
+/* Status pills inherit the shared compact pill metrics (26px / 11px padding)
+   from the base .appointment-status-pill rule — no per-list override. */
 
 /* No white seams inside the centre panel: the daybar's divider separates it
    from the list, and the footer strip sits flush beneath. */
@@ -20802,3 +20962,492 @@ textarea.ehr-handoff-input {
   padding: 10px;
   background: #fff;
 }
+
+/* ============ Super-admin command center (sa-*) ============
+   Platform-governance surfaces: dense, flat, operational. Shares the app's
+   tokens (12px radius, --ehr-border, DM Sans) but is deliberately tighter
+   than the clinical dashboards — tables and status rails, not KPI heroes. */
+.sa-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sa-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sa-page-head h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.sa-page-head p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.sa-page-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.sa-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--ehr-border);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sa-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--ehr-border);
+}
+
+.sa-card-title {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sa-card-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sa-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.sa-card > *:not(.sa-card-head):not(.sa-table-scroll) {
+  padding-inline: 14px;
+}
+
+/* Stat strip: a single bordered card split into equal metric cells. */
+.sa-stat-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border: 1px solid var(--ehr-border);
+  border-radius: 12px;
+  background: #fff;
+  overflow-x: auto;
+}
+
+.sa-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 108px;
+  padding: 11px 14px 10px;
+}
+
+.sa-stat + .sa-stat {
+  border-left: 1px solid var(--ehr-border);
+}
+
+.sa-stat-label {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sa-stat-value {
+  color: var(--text-primary);
+  font-family: var(--font-platform-mono);
+  font-size: 21px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.sa-stat[data-tone='ok'] .sa-stat-value { color: #167755; }
+.sa-stat[data-tone='warn'] .sa-stat-value { color: #B55E13; }
+.sa-stat[data-tone='danger'] .sa-stat-value { color: #C24135; }
+.sa-stat[data-tone='muted'] .sa-stat-value { color: var(--text-muted); }
+
+.sa-stat-note {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+/* Status dot + label. */
+.sa-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sa-status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ehr-muted);
+}
+
+.sa-status[data-tone='ok'] i { background: #00A95D; }
+.sa-status[data-tone='warn'] i { background: #FF7F00; }
+.sa-status[data-tone='danger'] i { background: #F8593E; }
+
+/* Toned pills (statuses, severities, plans). */
+.sa-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  background: #EEF4F6;
+  color: #3D5967;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sa-pill[data-tone='ok'] { border-color: #BFE7D8; background: #E8F7F1; color: #167755; }
+.sa-pill[data-tone='warn'] { border-color: #F5C38E; background: #FFF4E9; color: #B55E13; }
+.sa-pill[data-tone='danger'] { border-color: #F3B9B2; background: #FFF0EF; color: #C24135; }
+.sa-pill[data-tone='info'] { border-color: #BBDDF1; background: #EAF4FB; color: #015697; }
+
+/* Dense tables. */
+.sa-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.sa-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sa-table th {
+  padding: 8px 14px 7px;
+  border-bottom: 1px solid var(--ehr-border);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sa-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.sa-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.sa-table tbody tr:hover td {
+  background: rgba(33, 145, 208, 0.05);
+}
+
+.sa-table td:first-child,
+.sa-table td strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.sa-table .sa-num {
+  font-family: var(--font-platform-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sa-empty {
+  padding: 22px 14px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Command-dashboard grid: stat strip on top, then a 3-column operational
+   grid (left risk rail / centre matrix+trend / right status rail) that
+   collapses gracefully. */
+.sa-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(420px, 1.5fr) minmax(280px, 0.85fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.sa-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+@media (max-width: 1180px) {
+  .sa-grid { grid-template-columns: 1fr 1fr; }
+  .sa-grid .sa-col:last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 780px) {
+  .sa-grid { grid-template-columns: 1fr; }
+}
+
+/* Risk queue rows (dashboard zone 2 + Risk Center). */
+.sa-risk-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.sa-risk-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border-light);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sa-risk-row:last-child { border-bottom: 0; }
+.sa-risk-row:hover { background: rgba(33, 145, 208, 0.05); }
+
+.sa-risk-row .sa-risk-text {
+  min-width: 0;
+}
+
+.sa-risk-row .sa-risk-text strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sa-risk-row .sa-risk-text span {
+  display: block;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sa-risk-row time {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Compact key→value rows for status rails. */
+.sa-kv {
+  display: flex;
+  flex-direction: column;
+  padding-block: 4px;
+}
+
+.sa-kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  padding-block: 2px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.sa-kv-row:last-child { border-bottom: 0; }
+
+.sa-kv-row > span:first-child {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sa-kv-row > :last-child {
+  color: var(--text-primary);
+  font-family: var(--font-platform-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Quick command navigation chips (dashboard zone 8). */
+.sa-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+
+.sa-nav-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 11px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 10px;
+  background: #fff;
+  text-decoration: none;
+}
+
+.sa-nav-chip:hover { border-color: var(--tb-blue-900); }
+
+.sa-nav-chip strong {
+  color: #015697;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sa-nav-chip span {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* Small action buttons on sa surfaces (pinned literals — org branding must
+   not wash these out). */
+.sa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sa-btn:hover { border-color: var(--tb-blue-900); color: #015697; }
+
+.sa-btn.primary {
+  border-color: var(--tb-blue-900);
+  background: var(--tb-blue-900);
+  color: #fff;
+}
+
+.sa-btn.primary:hover { opacity: 0.92; }
+
+/* Policy/settings rows (Security & Compliance, Configuration). */
+.sa-policy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.sa-policy-row:last-child { border-bottom: 0; }
+
+.sa-policy-row .sa-policy-text strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.sa-policy-row .sa-policy-text span {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sa-policy-row input[type='number'],
+.sa-policy-row select,
+.sa-policy-row input[type='text'] {
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px !important;
+  background: #fff;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* Filter bars above tables. */
+.sa-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ehr-border);
+}
+
+.sa-filter-bar input[type='search'],
+.sa-filter-bar input[type='text'] {
+  flex: 1 1 200px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px !important;
+  font-size: 12.5px;
+}
+
+.sa-filter-bar select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 8px !important;
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Two-column module layout for settings-style pages. */
+.sa-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+

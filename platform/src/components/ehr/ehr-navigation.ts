@@ -53,7 +53,10 @@ const PRIMARY_SHORTCUT_PRIORITY = [
 ];
 
 export function isHrefAllowed(href: string, allowedRoutes: readonly string[]) {
-  return allowedRoutes.some(route => href === route || href.startsWith(route + '/'));
+  // Nav items may deep-link with a query string (e.g. /data-quality?view=x) —
+  // permission is decided by the path alone.
+  const path = href.split('?')[0];
+  return allowedRoutes.some(route => path === route || path.startsWith(route + '/'));
 }
 
 export function uniqueAllowedNavItems(items: NavItem[], allowedRoutes: readonly string[]) {

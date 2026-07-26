@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '@/components/Modal';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  Users, Plus, X, Trash2, Search, Download,
+  Users, Plus, X, Trash2, Download, ClipboardList, CalendarClock, Wallet,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import { useApp } from '@/lib/context';
@@ -46,6 +46,51 @@ const SHIFT_TYPES: StaffScheduleDoc['shiftType'][] = ['morning', 'afternoon', 'n
 
 type TabId = 'roster' | 'leave' | 'schedule' | 'payroll';
 
+// ── Shared "All staff"-style section chrome ──────────────────────────
+// 24px card title (same as the patients registry / roster header).
+const SECTION_TITLE_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000',
+};
+
+const staffInitials = (name: string) =>
+  name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?';
+
+function StatDots({ stats }: { stats: { label: string; value: number | string; color: string }[] }) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+      {stats.map(s => (
+        <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+          {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
+  return (
+    <th className={`${right ? 'text-right' : 'text-left'} px-4 py-2.5`} style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
+      <span className="text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">{children}</span>
+    </th>
+  );
+}
+
+/** Staff table cell — 40px square avatar + 14/800 name + muted subline.
+ *  `capitalizeSub` for role sublines ("front desk" → "Front Desk"); off for
+ *  usernames, which must keep their exact casing. */
+function StaffCell({ name, sub, capitalizeSub = false }: { name: string; sub?: string; capitalizeSub?: boolean }) {
+  return (
+    <div className="flex items-center gap-2.5 min-w-0">
+      <div className="ehr-patient-icon">{staffInitials(name)}</div>
+      <div className="min-w-0">
+        <div className="text-[14px] truncate" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{name}</div>
+        {sub && <div className={`text-[11px] truncate ${capitalizeSub ? 'capitalize' : ''}`.trim()} style={{ color: 'var(--text-muted)' }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
 export default function HRPage() {
   const { t } = useTranslation();
   const { currentUser } = useApp();
@@ -60,6 +105,8 @@ export default function HRPage() {
   // Roster search + role filter
   const [rosterSearch, setRosterSearch] = useState('');
   const [rosterRole, setRosterRole] = useState('all');
+  // Leave-request search (same toolbar pattern as the roster).
+  const [leaveSearch, setLeaveSearch] = useState('');
 
   // Sync tab → URL so deep links from dashboard work both ways
   useEffect(() => { setTab((searchParams?.get('tab') as TabId) || 'roster'); }, [searchParams]);
@@ -321,128 +368,109 @@ export default function HRPage() {
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        {/* ── Page header ── */}
-        <div className="listpage-header">
-          <div className="listpage-header-title">
-            <div className="listpage-header-icon"><Users size={22} /></div>
-            <div>
-              <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
-              <h1 className="listpage-title">Staff &amp; HR</h1>
-            </div>
-          </div>
-          <div className="listpage-header-controls">
-            <select
-              value={rosterRole}
-              onChange={e => setRosterRole(e.target.value)}
-              className="listpage-service-select"
-              aria-label={t('hr.colRole')}
-            >
-              <option value="all">{t('hr.allRoles')} ({facilityUsers.length})</option>
-              {Object.entries(roleCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([role, count]) => (
-                <option key={role} value={role} className="capitalize">
-                  {role.replace(/_/g, ' ')} ({count})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* ── Actions row ── */}
-        {tab !== 'roster' && (
-          <div className="listpage-actions-row">
-            {tab === 'leave' && (
-              <button onClick={() => setLeaveOpen(true)} className="btn btn-primary">
-                <Plus className="w-4 h-4" /> {t('hr.requestLeave')}
-              </button>
-            )}
-            {tab === 'schedule' && (
-              <button onClick={() => setScheduleOpen(true)} className="btn btn-primary">
-                <Plus className="w-4 h-4" /> {t('hr.scheduleShift')}
-              </button>
-            )}
-            {tab === 'payroll' && (
-              <button onClick={() => setPayrollOpen(true)} className="btn btn-primary">
-                <Plus className="w-4 h-4" /> {t('hr.addPayrollEntry')}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="flex gap-2 mb-4 flex-wrap" style={{ marginTop: tab === 'roster' ? 16 : 0 }}>
-          {([
-            { id: 'roster', label: t('hr.staffRoster') },
-            { id: 'leave', label: t('hr.leaveRequests') },
-            { id: 'schedule', label: t('hr.shiftSchedule') },
-            { id: 'payroll', label: t('hr.payrollTab') },
-          ] as { id: TabId; label: string }[]).map(tabItem => {
-            const isActive = tab === tabItem.id;
-            return (
-              <button
-                key={tabItem.id}
-                onClick={() => setTabAndUrl(tabItem.id)}
-                className="text-[12px] font-semibold px-3.5 py-1.5 rounded-full transition-colors"
-                style={{
-                  background: isActive ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
-                  color: isActive ? '#fff' : 'var(--text-secondary)',
-                  border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                }}
-              >
-                {tabItem.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ── ROSTER ──────────────────────────────────────── */}
-        {tab === 'roster' && (
-          <div className="dash-card overflow-hidden">
-            <div className="px-4 pt-4">
-              {/* Title + staff/leave/shift stats (inline, right-aligned — mirrors the
-                  wards "Current Admissions" header instead of separate stat cards). */}
-              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
-                <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
-                  {sectionTitles[tab]}
-                </span>
-                <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
-                  {[
-                    { label: 'Total staff', value: facilityUsers.length, color: 'var(--text-muted)' },
-                    { label: 'Active', value: activeStaffCount, color: 'var(--color-success)' },
-                    { label: 'Inactive', value: inactiveStaffCount, color: 'var(--color-danger)' },
-                    { label: 'Pending leave requests', value: leaveSummary?.pending ?? 0, color: '#B8741C' },
-                    { label: 'Shifts scheduled today', value: schedules.length, color: '#2191D0' },
-                  ].map((s, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                      {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
-                    </span>
-                  ))}
+        <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0, alignItems: 'stretch' }}>
+          {/* ── Section rail — Staff & HR areas as a sidebar (settings-rail style),
+              replacing the old pill-tab strip. ── */}
+          <aside style={{ width: 224, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="dash-card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="listpage-header-icon"><Users size={20} /></div>
+                <div style={{ minWidth: 0 }}>
+                  <p className="listpage-eyebrow" style={{ margin: 0 }}>{currentUser?.hospitalName || 'Clinic'}</p>
+                  <h1 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Staff &amp; HR</h1>
                 </div>
               </div>
             </div>
-            <div className="listpage-table-toolbar">
-              <div className="listpage-table-search">
-                <Search className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                <input
-                  type="text"
-                  value={rosterSearch}
-                  onChange={e => setRosterSearch(e.target.value)}
-                  placeholder={t('hr.searchStaffPlaceholder')}
-                />
+            <nav className="ehr-set-nav" aria-label="Staff & HR sections">
+              {([
+                { id: 'roster', label: t('hr.staffRoster'), icon: Users },
+                { id: 'leave', label: t('hr.leaveRequests'), icon: ClipboardList },
+                { id: 'schedule', label: t('hr.shiftSchedule'), icon: CalendarClock },
+                { id: 'payroll', label: t('hr.payrollTab'), icon: Wallet },
+              ] as { id: TabId; label: string; icon: typeof Users }[]).map(item => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={tab === item.id ? 'active' : undefined}
+                    onClick={() => setTabAndUrl(item.id)}
+                  >
+                    <Icon />
+                    <em>{item.label}</em>
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          {/* ── Section content — full-height card in the patients-list layout ── */}
+          <section style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, gap: 12 }}>
+
+        {/* ── ROSTER ──────────────────────────────────────── */}
+        {tab === 'roster' && (
+          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              {/* Title + staff/leave/shift stats (inline, right-aligned — mirrors the
+                  patients "All patients" header). */}
+              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+                <span style={SECTION_TITLE_STYLE}>{sectionTitles[tab]}</span>
+                <StatDots stats={[
+                  { label: 'Total staff', value: facilityUsers.length, color: 'var(--text-muted)' },
+                  { label: 'Active', value: activeStaffCount, color: 'var(--color-success)' },
+                  { label: 'Inactive', value: inactiveStaffCount, color: 'var(--color-danger)' },
+                  { label: 'Pending leave requests', value: leaveSummary?.pending ?? 0, color: '#B8741C' },
+                  { label: 'Shifts scheduled today', value: schedules.length, color: '#2191D0' },
+                ]} />
               </div>
-              <button type="button" onClick={handleDownloadCsv} className="btn btn-secondary btn-sm">
-                <Download className="w-4 h-4" /> Download
-              </button>
+              {/* Search + role filter + download row (patients-list toolbar) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <input
+                    type="text"
+                    value={rosterSearch}
+                    onChange={e => setRosterSearch(e.target.value)}
+                    placeholder={t('hr.searchStaffPlaceholder')}
+                    style={{ padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
+                  />
+                </div>
+                <select
+                  value={rosterRole}
+                  onChange={e => setRosterRole(e.target.value)}
+                  aria-label={t('hr.colRole')}
+                  style={{ height: 38, width: 'auto', flexShrink: 0, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-secondary)', padding: '0 14px', outline: 'none' }}
+                >
+                  <option value="all">{t('hr.allRoles')} ({facilityUsers.length})</option>
+                  {Object.entries(roleCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([role, count]) => (
+                    <option key={role} value={role} className="capitalize">
+                      {role.replace(/_/g, ' ')} ({count})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleDownloadCsv}
+                  aria-label="Download"
+                  title="Download"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 38, height: 38, padding: 0,
+                    borderRadius: 999, background: 'var(--bg-card-solid)', color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-light)',
+                    cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-            <table className="data-table" style={{ minWidth: 600 }}>
+            <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
+            <table className="w-full" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
-                  <th>{t('hr.colStaff')}</th>
-                  <th>{t('hr.colRole')}</th>
-                  <th>{t('hr.colUsername')}</th>
-                  <th>{t('hr.colFacility')}</th>
-                  <th>{t('hr.colStatus')}</th>
+                  {[t('hr.colStaff'), t('hr.colRole'), t('hr.colUsername'), t('hr.colFacility'), t('hr.colStatus')].map(h => (
+                    <Th key={h}>{h}</Th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -452,22 +480,13 @@ export default function HRPage() {
                   </td></tr>
                 )}
                 {filteredRosterUsers.map(u => {
-                  const initials = u.name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
                   return (
-                    <tr key={u._id}>
-                      <td>
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #2191D0 0%, #015697 100%)' }}>{initials || '?'}</div>
-                          <div>
-                            <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{u.name}</div>
-                            <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>@{u.username}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>{u.role.replace(/_/g, ' ')}</td>
-                      <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>@{u.username}</td>
-                      <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{u.hospitalName || '—'}</td>
-                      <td>
+                    <tr key={u._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td className="px-4 py-2.5"><StaffCell name={u.name} sub={`@${u.username}`} /></td>
+                      <td className="px-4 py-2.5 text-[13px] capitalize" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{u.role.replace(/_/g, ' ')}</td>
+                      <td className="px-4 py-2.5 text-[13px] font-mono" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>@{u.username}</td>
+                      <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{u.hospitalName || '—'}</td>
+                      <td className="px-4 py-2.5">
                         <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md" style={{
                           background: u.isActive === false ? 'rgba(196, 69, 54, 0.14)' : 'rgba(27, 158, 119, 0.12)',
                           color: u.isActive === false ? 'var(--color-danger-text)' : 'var(--color-success-text)',
@@ -485,60 +504,129 @@ export default function HRPage() {
         )}
 
         {/* ── LEAVE ──────────────────────────────────────── */}
-        {tab === 'leave' && (
-          <div className="dash-card">
-            <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-              <h3 className="font-semibold text-sm">{t('hr.leaveRequests')}</h3>
-              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('hr.totalCount', { count: leave.length })}</span>
+        {tab === 'leave' && (() => {
+          const q = leaveSearch.trim().toLowerCase();
+          const visibleLeave = q
+            ? leave.filter(r => `${r.userName} ${r.role} ${r.leaveType} ${r.status}`.toLowerCase().includes(q))
+            : leave;
+          return (
+          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+                <span style={SECTION_TITLE_STYLE}>{sectionTitles.leave}</span>
+                <StatDots stats={[
+                  { label: 'Total', value: leave.length, color: 'var(--text-muted)' },
+                  { label: 'Pending', value: leave.filter(r => r.status === 'pending').length, color: '#B8741C' },
+                  { label: 'Approved', value: leave.filter(r => r.status === 'approved').length, color: 'var(--color-success)' },
+                  { label: 'Rejected', value: leave.filter(r => r.status === 'rejected').length, color: 'var(--color-danger)' },
+                ]} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <input
+                    type="text"
+                    value={leaveSearch}
+                    onChange={e => setLeaveSearch(e.target.value)}
+                    placeholder="Search leave requests…"
+                    style={{ width: '100%', padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
+                  />
+                </div>
+                <button onClick={() => setLeaveOpen(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <Plus className="w-4 h-4" /> {t('hr.requestLeave')}
+                </button>
+              </div>
             </div>
             {leave.length === 0 ? (
               <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
                 {t('hr.noLeaveRequestsYet')} <strong>{t('hr.requestLeave')}</strong> {t('hr.above')}
               </div>
             ) : (
-              <div>
-                {leave.map(r => {
-                  const tok = STATUS_TOKENS[r.status];
-                  return (
-                    <div key={r._id} className={`data-row ${r.status === 'pending' ? 'data-row--warning' : ''}`}>
-                      <div className="flex-1 min-w-0">
-                        <div className="data-row__label">{r.userName} · <span className="capitalize">{r.role.replace(/_/g, ' ')}</span></div>
-                        <div className="data-row__value">
-                          <span className="capitalize">{r.leaveType}</span> · {r.days}d · {r.startDate} → {r.endDate}
-                        </div>
-                        {r.reason && <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>“{r.reason}”</div>}
-                        {r.decisionNotes && <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('hr.noteLabel', { note: r.decisionNotes })}</div>}
-                      </div>
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{ background: tok.bg, color: tok.color, border: `1px solid ${tok.color}40` }}>
-                        {t(`hr.leaveStatus_${r.status}`)}
-                      </span>
-                      {isApprover && r.status === 'pending' && (
-                        <div className="ml-2">
-                          <RowActionsMenu
-                            actions={[
-                              { key: 'approve', label: t('hr.approve'), tone: 'success', onClick: () => decideLeave(r._id, 'approved') },
-                              { key: 'reject', label: t('hr.reject'), tone: 'danger', onClick: () => decideLeave(r._id, 'rejected') },
-                            ]}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
+                <table className="w-full" style={{ minWidth: 760 }}>
+                  <thead>
+                    <tr>
+                      <Th>{t('hr.colStaff')}</Th>
+                      <Th>{t('hr.labelType')}</Th>
+                      <Th>Dates</Th>
+                      <Th right>Days</Th>
+                      <Th>{t('hr.colStatus')}</Th>
+                      {isApprover && <Th />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleLeave.length === 0 && (
+                      <tr><td colSpan={6} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No leave requests match “{leaveSearch}”.</td></tr>
+                    )}
+                    {visibleLeave.map(r => {
+                      const tok = STATUS_TOKENS[r.status];
+                      return (
+                        <tr key={r._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <td className="px-4 py-2.5"><StaffCell name={r.userName} sub={r.role.replace(/_/g, ' ')} /></td>
+                          <td className="px-4 py-2.5">
+                            <div className="text-[13px] capitalize" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{t(`hr.leaveType_${r.leaveType}`)}</div>
+                            {r.reason && <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)', maxWidth: 220 }} title={r.reason}>“{r.reason}”</div>}
+                          </td>
+                          <td className="px-4 py-2.5 text-[13px] whitespace-nowrap" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{r.startDate} → {r.endDate}</td>
+                          <td className="px-4 py-2.5 text-[13px] text-right tabular-nums" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{r.days}</td>
+                          <td className="px-4 py-2.5">
+                            <span
+                              className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap"
+                              style={{ background: tok.bg, color: tok.color, border: `1px solid ${tok.color}40` }}
+                              title={r.decisionNotes ? t('hr.noteLabel', { note: r.decisionNotes }) : undefined}
+                            >
+                              {t(`hr.leaveStatus_${r.status}`)}
+                            </span>
+                          </td>
+                          {isApprover && (
+                            <td className="px-4 py-2.5">
+                              <div className="flex justify-end">
+                                {r.status === 'pending' && (
+                                  <RowActionsMenu
+                                    actions={[
+                                      { key: 'approve', label: t('hr.approve'), tone: 'success', onClick: () => decideLeave(r._id, 'approved') },
+                                      { key: 'reject', label: t('hr.reject'), tone: 'danger', onClick: () => decideLeave(r._id, 'rejected') },
+                                    ]}
+                                  />
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ── SCHEDULE ───────────────────────────────────── */}
         {tab === 'schedule' && (
-          <div className="dash-card overflow-hidden">
-            <div className="px-5 py-3 border-b flex items-center justify-between flex-wrap gap-2" style={{ borderColor: 'var(--border-light)' }}>
-              <h3 className="font-semibold text-sm">{t('hr.shiftSchedule')}</h3>
-              <div className="flex items-center gap-2">
-                <label className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('hr.date')}</label>
-                <input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} style={{ width: 160 }} />
-                <span className="text-[11px] ml-2" style={{ color: 'var(--text-muted)' }}>{t('hr.shiftsCount', { count: schedules.length })}</span>
+          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+                <span style={SECTION_TITLE_STYLE}>{sectionTitles.schedule}</span>
+                <StatDots stats={[
+                  { label: 'Shifts', value: schedules.length, color: 'var(--text-muted)' },
+                  { label: t('hr.shiftType_morning'), value: schedules.filter(s => s.shiftType === 'morning').length, color: 'var(--color-success)' },
+                  { label: t('hr.shiftType_afternoon'), value: schedules.filter(s => s.shiftType === 'afternoon').length, color: '#B8741C' },
+                  { label: t('hr.shiftType_night'), value: schedules.filter(s => s.shiftType === 'night').length, color: '#015697' },
+                  { label: t('hr.shiftType_on_call'), value: schedules.filter(s => s.shiftType === 'on_call').length, color: '#2191D0' },
+                ]} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={e => setScheduleDate(e.target.value)}
+                  aria-label={t('hr.date')}
+                  style={{ flex: 1, minWidth: 0, padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
+                />
+                <button onClick={() => setScheduleOpen(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <Plus className="w-4 h-4" /> {t('hr.scheduleShift')}
+                </button>
               </div>
             </div>
             {schedules.length === 0 ? (
@@ -546,40 +634,46 @@ export default function HRPage() {
                 {t('hr.noShiftsScheduled', { date: scheduleDate })} <strong>{t('hr.scheduleShift')}</strong> {t('hr.aboveToAddOne')}
               </div>
             ) : (
-              <div>
-                {SHIFT_TYPES.map(shift => {
-                  const list = schedules.filter(s => s.shiftType === shift);
-                  if (list.length === 0) return null;
-                  const shiftColor = shift === 'morning' ? 'var(--color-success-text)' : shift === 'afternoon' ? 'var(--color-warning-400)' : shift === 'night' ? '#015697' : 'var(--accent-primary)';
-                  return (
-                    <div key={shift}>
-                      <div className="px-5 py-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: shiftColor, background: 'var(--overlay-subtle)', borderTop: '1px solid var(--border-light)', borderBottom: '1px solid var(--border-light)' }}>
-                        <span className="inline-flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full" style={{ background: shiftColor }} />
-                          {t(`hr.shiftType_${shift}`)} · {list.length}
-                        </span>
-                      </div>
-                      {list.map(s => (
-                        <div key={s._id} className="data-row">
-                          <div className="flex-1 min-w-0">
-                            <div className="data-row__value">{s.userName}</div>
-                            <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                              <span className="capitalize">{s.role.replace(/_/g, ' ')}</span>
-                              {s.department && ` · ${s.department}`}
-                              {' · '}{s.startTime}–{s.endTime}
-                              {s.isOnCall && <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246, 0.16)', color: 'var(--accent-primary)' }}>{t('hr.onCall')}</span>}
+              <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
+                <table className="w-full" style={{ minWidth: 720 }}>
+                  <thead>
+                    <tr>
+                      <Th>{t('hr.colStaff')}</Th>
+                      <Th>{t('hr.labelShift')}</Th>
+                      <Th>Time</Th>
+                      <Th>{t('hr.labelDepartment')}</Th>
+                      <Th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SHIFT_TYPES.flatMap(shift => schedules.filter(s => s.shiftType === shift)).map(s => {
+                      const shiftColor = s.shiftType === 'morning' ? 'var(--color-success-text)' : s.shiftType === 'afternoon' ? '#B8741C' : s.shiftType === 'night' ? '#015697' : 'var(--accent-primary)';
+                      return (
+                        <tr key={s._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <td className="px-4 py-2.5"><StaffCell name={s.userName} sub={s.role.replace(/_/g, ' ')} /></td>
+                          <td className="px-4 py-2.5">
+                            <span className="inline-flex items-center gap-1.5 text-[13px] capitalize" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>
+                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: shiftColor }} />
+                              {t(`hr.shiftType_${s.shiftType}`)}
+                              {s.isOnCall && <span className="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246, 0.16)', color: 'var(--accent-primary)' }}>{t('hr.onCall')}</span>}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-[13px] whitespace-nowrap tabular-nums" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{s.startTime}–{s.endTime}</td>
+                          <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{s.department || '—'}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex justify-end">
+                              <RowActionsMenu
+                                actions={[
+                                  { key: 'remove', label: t('hr.removeShift'), tone: 'danger', icon: <Trash2 className="w-4 h-4" />, onClick: () => removeShift(s._id) },
+                                ]}
+                              />
                             </div>
-                          </div>
-                          <RowActionsMenu
-                            actions={[
-                              { key: 'remove', label: t('hr.removeShift'), tone: 'danger', icon: <Trash2 className="w-4 h-4" />, onClick: () => removeShift(s._id) },
-                            ]}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -587,62 +681,65 @@ export default function HRPage() {
 
         {/* ── PAYROLL ───────────────────────────────────── */}
         {tab === 'payroll' && (
-          <>
-            <div className="dash-card p-3 mb-3 flex items-center gap-3 flex-wrap">
-              <label className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('hr.period')}</label>
-              <input type="month" value={payrollPeriod} onChange={e => setPayrollPeriod(e.target.value)} style={{ width: 160 }} />
-              {payrollSummary && (
-                <div className="flex gap-2 flex-wrap ml-auto">
-                  <Pill label={t('hr.pillEntries')} value={String(payrollSummary.total)} />
-                  <Pill label={t('hr.pillGross')} value={formatMoney(payrollSummary.totalGross)} accent="var(--accent-primary)" />
-                  <Pill label={t('hr.pillDeductions')} value={formatMoney(payrollSummary.totalDeductions)} accent="var(--color-warning-text)" />
-                  <Pill label={t('hr.pillNet')} value={formatMoney(payrollSummary.totalNet)} accent="var(--color-success-text)" />
-                  <Pill label={t('hr.pillPaid')} value={`${payrollSummary.paid}/${payrollSummary.total}`} accent="var(--color-success-text)" />
-                </div>
-              )}
-            </div>
-            <div className="dash-card overflow-hidden">
-              <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm">{t('hr.payrollRegisterPeriod', { period: payrollPeriod })}</h3>
-                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('hr.entriesCount', { count: payroll.length })}</span>
+          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+                <span style={SECTION_TITLE_STYLE}>{sectionTitles.payroll}</span>
+                <StatDots stats={payrollSummary ? [
+                  { label: t('hr.pillEntries'), value: payrollSummary.total, color: 'var(--text-muted)' },
+                  { label: t('hr.pillGross'), value: formatMoney(payrollSummary.totalGross), color: '#2191D0' },
+                  { label: t('hr.pillDeductions'), value: formatMoney(payrollSummary.totalDeductions), color: '#B8741C' },
+                  { label: t('hr.pillNet'), value: formatMoney(payrollSummary.totalNet), color: 'var(--color-success)' },
+                  { label: t('hr.pillPaid'), value: `${payrollSummary.paid}/${payrollSummary.total}`, color: 'var(--color-success)' },
+                ] : [{ label: t('hr.pillEntries'), value: payroll.length, color: 'var(--text-muted)' }]} />
               </div>
-              {payroll.length === 0 ? (
-                <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
-                  {t('hr.noPayrollEntries', { period: payrollPeriod })} <strong>{t('hr.addPayrollEntry')}</strong> {t('hr.aboveToStartRegister')}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                <table className="data-table" style={{ minWidth: 840 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="month"
+                  value={payrollPeriod}
+                  onChange={e => setPayrollPeriod(e.target.value)}
+                  aria-label={t('hr.period')}
+                  style={{ flex: 1, minWidth: 0, padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
+                />
+                <button onClick={() => setPayrollOpen(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <Plus className="w-4 h-4" /> {t('hr.addPayrollEntry')}
+                </button>
+              </div>
+            </div>
+            {payroll.length === 0 ? (
+              <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                {t('hr.noPayrollEntries', { period: payrollPeriod })} <strong>{t('hr.addPayrollEntry')}</strong> {t('hr.aboveToStartRegister')}
+              </div>
+            ) : (
+              <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
+                <table className="w-full" style={{ minWidth: 840 }}>
                   <thead>
                     <tr>
-                      <th>{t('hr.colStaff')}</th>
-                      <th className="text-right">{t('hr.colBase')}</th>
-                      <th className="text-right">{t('hr.colAllowances')}</th>
-                      <th className="text-right">{t('hr.colDeductions')}</th>
-                      <th className="text-right">{t('hr.colNetPay')}</th>
-                      <th>{t('hr.colStatus')}</th>
-                      <th></th>
+                      <Th>{t('hr.colStaff')}</Th>
+                      <Th right>{t('hr.colBase')}</Th>
+                      <Th right>{t('hr.colAllowances')}</Th>
+                      <Th right>{t('hr.colDeductions')}</Th>
+                      <Th right>{t('hr.colNetPay')}</Th>
+                      <Th>{t('hr.colStatus')}</Th>
+                      <Th />
                     </tr>
                   </thead>
                   <tbody>
                     {payroll.map(e => {
                       const tok = PAYROLL_STATUS_TOKENS[e.status];
                       return (
-                        <tr key={e._id}>
-                          <td>
-                            <div className="font-semibold text-sm">{e.userName}</div>
-                            <div className="text-[11px] capitalize" style={{ color: 'var(--text-muted)' }}>{e.role.replace(/_/g, ' ')}</div>
-                          </td>
-                          <td className="text-xs text-right font-mono" style={{ color: 'var(--text-primary)' }}>{formatMoney(e.baseSalary, { currency: e.currency })}</td>
-                          <td className="text-xs text-right font-mono" style={{ color: 'var(--accent-primary)' }}>+{formatMoney(e.allowances, { currency: e.currency })}</td>
-                          <td className="text-xs text-right font-mono" style={{ color: 'var(--color-warning-text)' }}>-{formatMoney(e.deductions, { currency: e.currency })}</td>
-                          <td className="text-sm text-right font-mono font-bold" style={{ color: 'var(--color-success-text)' }}>{formatMoney(e.netPay, { currency: e.currency })}</td>
-                          <td>
+                        <tr key={e._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <td className="px-4 py-2.5"><StaffCell name={e.userName} sub={e.role.replace(/_/g, ' ')} /></td>
+                          <td className="px-4 py-2.5 text-[13px] text-right font-mono" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{formatMoney(e.baseSalary, { currency: e.currency })}</td>
+                          <td className="px-4 py-2.5 text-[13px] text-right font-mono" style={{ color: 'var(--accent-primary)' }}>+{formatMoney(e.allowances, { currency: e.currency })}</td>
+                          <td className="px-4 py-2.5 text-[13px] text-right font-mono" style={{ color: 'var(--color-warning-text)' }}>-{formatMoney(e.deductions, { currency: e.currency })}</td>
+                          <td className="px-4 py-2.5 text-[13px] text-right font-mono font-bold" style={{ color: 'var(--color-success-text)' }}>{formatMoney(e.netPay, { currency: e.currency })}</td>
+                          <td className="px-4 py-2.5">
                             <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md" style={{ background: tok.bg, color: tok.color, border: `1px solid ${tok.color}40` }}>
                               {t(`hr.payrollStatus_${e.status}`)}
                             </span>
                           </td>
-                          <td>
+                          <td className="px-4 py-2.5">
                             <div className="flex justify-end">
                               <RowActionsMenu
                                 actions={[
@@ -658,11 +755,12 @@ export default function HRPage() {
                     })}
                   </tbody>
                 </table>
-                </div>
-              )}
-            </div>
-          </>
+              </div>
+            )}
+          </div>
         )}
+          </section>
+        </div>
 
         {/* ── Modals ────────────────────────────────────── */}
         {leaveOpen && (
@@ -835,11 +933,3 @@ export default function HRPage() {
   );
 }
 
-function Pill({ label, value, accent }: { label: string; value: string; accent?: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px]" style={{ background: 'var(--overlay-subtle)' }}>
-      <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{label}</span>
-      <span className="font-bold font-mono" style={{ color: accent || 'var(--text-primary)' }}>{value}</span>
-    </span>
-  );
-}

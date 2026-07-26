@@ -1,19 +1,102 @@
 'use client';
 
+import { useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useDataQuality } from '@/lib/hooks/useDataQuality';
+import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { Wifi, Users, TrendingUp, BarChart3 } from '@/components/icons/lucide';
-import Badge from '@/components/Badge';
+import { Wifi, Users, TrendingUp, AlertTriangle } from '@/components/icons/lucide';
+import { FilterBar, FilterTabs } from '@/components/filters';
+import type { DataCompletenessEntry } from '@/lib/services/data-quality-service';
+
+type View = 'completeness' | 'timeliness' | 'outliers' | 'scores';
+const VIEWS: { key: View; label: string }[] = [
+  { key: 'completeness', label: 'Completeness' },
+  { key: 'timeliness', label: 'Timeliness' },
+  { key: 'scores', label: 'Quality scores' },
+  { key: 'outliers', label: 'Possible outliers' },
+];
+
+const RED = '#e34948';
+const AMBER = '#eda100';
+const GREEN = '#199e70';
+
+function thresholdColor(value: number) {
+  return value < 60 ? RED : value < 80 ? AMBER : GREEN;
+}
+
+function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
+  return (
+    <th className={`${right ? 'text-right' : 'text-left'} px-4 py-2.5`} style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
+      <span className="text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">{children}</span>
+    </th>
+  );
+}
+
+function MetricBar({ value }: { value: number }) {
+  const color = thresholdColor(value);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-2 rounded-full flex-shrink-0" style={{ width: 90, background: 'var(--overlay-light)' }}>
+        <div className="h-full rounded-full" style={{ width: `${Math.min(100, value)}%`, background: color }} />
+      </div>
+      <span className="text-[13px] font-bold" style={{ color }}>{value}%</span>
+    </div>
+  );
+}
 
 export default function DataQualityPage() {
   const { t } = useTranslation();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { data, loading } = useDataQuality();
+  const { alerts, loading: alertsLoading } = useSurveillance();
+
+  const viewParam = searchParams?.get('view');
+  const view: View = (viewParam === 'timeliness' || viewParam === 'outliers' || viewParam === 'scores') ? viewParam : 'completeness';
+  const setView = (v: View) => {
+    const params = new URLSearchParams(searchParams?.toString() || '');
+    params.set('view', v);
+    router.replace(`/data-quality?${params.toString()}`, { scroll: false });
+  };
+
+  const assessedEntries = useMemo(() => (data?.entries || []).filter(e => e.lastAssessmentDate), [data]);
+  const completenessRows = useMemo(() => [...assessedEntries].sort((a, b) => a.reportingCompleteness - b.reportingCompleteness), [assessedEntries]);
+  const timelinessRows = useMemo(() => [...assessedEntries].sort((a, b) => a.reportingTimeliness - b.reportingTimeliness), [assessedEntries]);
+  const scoreRows = useMemo(() => [...assessedEntries].sort((a, b) => b.dataQualityScore - a.dataQualityScore), [assessedEntries]);
+  const belowCompleteness80 = useMemo(() => assessedEntries.filter(e => e.reportingCompleteness < 80).length, [assessedEntries]);
+  const belowTimeliness80 = useMemo(() => assessedEntries.filter(e => e.reportingTimeliness < 80).length, [assessedEntries]);
+
+  // Honest, simple outlier check: an alert's cases are >3x the median cases
+  // reported for that same disease across all alerts on file. No validation
+  // ruleset exists yet — this is a heuristic flag to verify at source, not a
+  // confirmed data-quality finding.
+  const outliers = useMemo(() => {
+    const byDisease = new Map<string, number[]>();
+    for (const a of alerts) {
+      const list = byDisease.get(a.disease) || [];
+      list.push(a.cases);
+      byDisease.set(a.disease, list);
+    }
+    const median = (nums: number[]) => {
+      const sorted = [...nums].sort((x, y) => x - y);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    };
+    const medianByDisease = new Map<string, number>();
+    for (const [disease, list] of byDisease) medianByDisease.set(disease, median(list));
+    return alerts
+      .filter(a => {
+        const med = medianByDisease.get(a.disease) || 0;
+        return med > 0 && a.cases > med * 3;
+      })
+      .sort((a, b) => b.cases - a.cases);
+  }, [alerts]);
 
   if (loading || !data) return <><TopBar title={t('dataQuality.topBarTitle')} /><main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.loading')}</p></main></>;
 
   const scoreColor = (score: number) => score >= 70 ? 'var(--accent-primary)' : score >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-  const scoreBg = (score: number) => score >= 70 ? 'rgba(33, 145, 208, 0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
 
   return (
     <>
@@ -81,68 +164,119 @@ export default function DataQualityPage() {
           </div>
         </div>
 
-        {/* Per-facility table */}
-        <div className="card-elevated overflow-hidden">
-          <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              {t('dataQuality.facilityLevelTitle')}
-            </h3>
-            <div className="flex items-center gap-3 text-[10px]">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--accent-primary)' }} /> ≥70%</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-warning)' }} /> 50–69%</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-danger)' }} /> &lt;50%</span>
+        {/* Facility-level views */}
+        <div className="dash-card overflow-hidden">
+          <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <FilterBar>
+              <FilterTabs ariaLabel="Data quality view" active={view} onChange={k => setView(k as View)} tabs={VIEWS.map(v => ({ key: v.key, label: v.label }))} />
+            </FilterBar>
+            {view === 'completeness' && (
+              <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: AMBER }} /> Below 80% ({belowCompleteness80})
+              </span>
+            )}
+            {view === 'timeliness' && (
+              <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: AMBER }} /> Below 80% ({belowTimeliness80})
+              </span>
+            )}
+          </div>
+
+          {view === 'completeness' && (
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ minWidth: 640 }}>
+                <thead><tr><Th>Facility</Th><Th>State</Th><Th>Reporting completeness</Th><Th>Last assessment</Th></tr></thead>
+                <tbody>
+                  {completenessRows.length === 0 && (
+                    <tr><td colSpan={4} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No facility assessments on file.</td></tr>
+                  )}
+                  {completenessRows.map((e: DataCompletenessEntry) => (
+                    <tr key={e.facilityId} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td className="px-4 py-2.5 text-[14px]" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{e.facilityName}</td>
+                      <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{e.state}</td>
+                      <td className="px-4 py-2.5"><MetricBar value={e.reportingCompleteness} /></td>
+                      <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>{e.lastAssessmentDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-          <div className="overflow-x-auto">
-          <table className="data-table" style={{ minWidth: 960 }}>
-            <thead>
-              <tr>
-                <th>{t('dataQuality.thFacility')}</th>
-                <th>{t('dataQuality.thState')}</th>
-                <th>{t('dataQuality.thCompleteness')}</th>
-                <th>{t('dataQuality.thTimeliness')}</th>
-                <th>{t('dataQuality.thDataQuality')}</th>
-                <th>{t('dataQuality.thDhis2')}</th>
-                <th>{t('dataQuality.thHisStaff')}</th>
-                <th>{t('dataQuality.thLastAssessment')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data.entries || []).map(e => (
-                <tr key={e.facilityId}>
-                  <td className="font-medium text-sm">{e.facilityName.replace(' Hospital', '').replace(' Teaching', '')}</td>
-                  <td className="text-xs">{e.state}</td>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 rounded-full" style={{ background: 'var(--overlay-light)', maxWidth: '60px' }}>
-                        <div className="h-full rounded-full" style={{ width: `${e.reportingCompleteness}%`, background: scoreColor(e.reportingCompleteness) }} />
-                      </div>
-                      <span className="text-xs font-bold" style={{ color: scoreColor(e.reportingCompleteness) }}>{e.reportingCompleteness}%</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="text-xs font-bold" style={{ color: scoreColor(e.reportingTimeliness) }}>{e.reportingTimeliness}%</span>
-                  </td>
-                  <td>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: scoreBg(e.dataQualityScore), color: scoreColor(e.dataQualityScore) }}>{e.dataQualityScore}%</span>
-                  </td>
-                  <td>
-                    {e.hasDHIS2 ? (
-                      <Badge tone="success">{t('dataQuality.yes')}</Badge>
-                    ) : (
-                      <Badge tone="warning">{t('dataQuality.no')}</Badge>
-                    )}
-                  </td>
-                  <td className="text-sm text-center">{e.hisStaffCount}</td>
-                  <td className="text-xs font-mono" style={{ color: e.lastAssessmentDate ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                    {e.lastAssessmentDate || t('dataQuality.notAssessed')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
+          )}
+
+          {view === 'timeliness' && (
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ minWidth: 640 }}>
+                <thead><tr><Th>Facility</Th><Th>State</Th><Th>Reporting timeliness</Th><Th>Last assessment</Th></tr></thead>
+                <tbody>
+                  {timelinessRows.length === 0 && (
+                    <tr><td colSpan={4} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No facility assessments on file.</td></tr>
+                  )}
+                  {timelinessRows.map((e: DataCompletenessEntry) => (
+                    <tr key={e.facilityId} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td className="px-4 py-2.5 text-[14px]" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{e.facilityName}</td>
+                      <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{e.state}</td>
+                      <td className="px-4 py-2.5"><MetricBar value={e.reportingTimeliness} /></td>
+                      <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>{e.lastAssessmentDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {view === 'scores' && (
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ minWidth: 640 }}>
+                <thead><tr><Th>Rank</Th><Th>Facility</Th><Th>State</Th><Th>Data quality score</Th><Th>Last assessment</Th></tr></thead>
+                <tbody>
+                  {scoreRows.length === 0 && (
+                    <tr><td colSpan={5} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No facility assessments on file.</td></tr>
+                  )}
+                  {scoreRows.map((e: DataCompletenessEntry, i: number) => (
+                    <tr key={e.facilityId} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td className="px-4 py-2.5 text-[13px] font-mono" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                      <td className="px-4 py-2.5 text-[14px]" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{e.facilityName}</td>
+                      <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{e.state}</td>
+                      <td className="px-4 py-2.5"><MetricBar value={e.dataQualityScore} /></td>
+                      <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>{e.lastAssessmentDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {view === 'outliers' && (
+            <div>
+              <div className="px-4 py-3 flex items-start gap-2" style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: AMBER }} />
+                <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                  Possible data outliers — verify at source. Flagged where an alert&rsquo;s case count exceeds 3&times; the median for that disease. No validation rules are configured yet in TamamHealth; this is a heuristic, not a confirmed error.
+                </p>
+              </div>
+              {alertsLoading ? (
+                <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading surveillance alerts…</div>
+              ) : outliers.length === 0 ? (
+                <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No outliers detected against this heuristic.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full" style={{ minWidth: 640 }}>
+                    <thead><tr><Th>Disease</Th><Th>Location</Th><Th right>Cases</Th><Th>Reported</Th></tr></thead>
+                    <tbody>
+                      {outliers.map(a => (
+                        <tr key={a._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <td className="px-4 py-2.5 text-[14px]" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{a.disease}</td>
+                          <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{a.county}, {a.state}</td>
+                          <td className="px-4 py-2.5 text-[13px] text-right font-mono" style={{ color: RED }}>{a.cases.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>{a.reportDate}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </>

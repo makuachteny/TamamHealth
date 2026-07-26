@@ -178,7 +178,11 @@ const defaultUsers: SeedUserProfile[] = [
   { username: 'hmis.john', name: 'John Majok Chol', role: 'records_hmis_officer', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   // Private org admin (Mercy Hospital Group)
   { username: 'org.admin', name: 'Mercy Org Administrator', role: 'org_admin', orgId: PRIVATE_ORG_ID },
-  { username: 'dr.mercy', name: 'Dr. Grace Lado', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'dr.mercy', name: 'Dr. Grace Lado', role: 'doctor', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'nurse.mercy', name: 'Nurse Josephine Poni Wani', role: 'nurse', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'desk.mercy', name: 'Martha Yar Kuek', role: 'front_desk', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'pharma.mercy', name: 'Emmanuel Loro Wani', role: 'pharmacist', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'lab.mercy', name: 'Simon Machar Dhieu', role: 'lab_tech', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
 ];
 
 /**
@@ -515,6 +519,22 @@ const workflowShowcasePatients: (Partial<PatientDoc> & Record<string, unknown>)[
   { _id: 'pat-00305', type: 'patient', firstName: 'Peter', middleName: 'Lokiri', surname: 'Lado', gender: 'Male', dateOfBirth: '1993-08-14', age: 32, phone: '+211915400305', bloodType: 'A-', allergies: ['Iodine contrast'], chronicConditions: ['None'], nokName: 'Lokiri Lado', nokRelationship: 'Father', nokPhone: '+211915400315', registrationHospital: 'hosp-001', registrationHospitalName: 'Juba Teaching Hospital', hospitalNumber: 'JTH-003005', state: 'Central Equatoria', county: 'Juba', payam: 'Gudele', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-001', assignedDoctor: 'user-dr.wani', assignedDoctorName: 'Dr. James Wani Igga', assignedAt: daysAgo(0), assignedBy: 'user-triage.mary', assignedByName: 'Mary Nyaruai Gai', assignmentNote: 'Road traffic trauma. Demonstrates urgent imaging, theatre referral, payment due and controlled medication review.', isActive: true, createdAt: daysAgo(8), updatedAt: daysAgo(0) },
 ];
 
+// Mercy General Hospital (hosp-mercy-001, private org) patient roster. Gives
+// the private org (org.admin / dr.mercy / nurse.mercy / desk.mercy /
+// pharma.mercy / lab.mercy) a real, self-contained patient panel instead of
+// borrowing hosp-001 public patients — wards, admissions, pharmacy and
+// appointments below are all built on these ids.
+const mercyPatients: (Partial<PatientDoc> & Record<string, unknown>)[] = [
+  { _id: 'pat-mercy-001', type: 'patient', firstName: 'Elizabeth', middleName: 'Nyandit', surname: 'Bul', gender: 'Female', dateOfBirth: '1985-03-22', age: 41, phone: '+211917700001', bloodType: 'A+', allergies: ['None known'], chronicConditions: ['Hypertension'], nokName: 'Bul Ochan', nokRelationship: 'Spouse', nokPhone: '+211917700101', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000001', state: 'Central Equatoria', county: 'Juba', payam: 'Munuki', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(0), assignedDoctor: 'user-dr.mercy', assignedDoctorName: 'Dr. Grace Lado', assignedAt: daysAgo(0), assignedBy: 'user-nurse.mercy', assignedByName: 'Nurse Josephine Poni Wani', assignmentNote: 'Hypertensive urgency — admitted for BP stabilisation.', isActive: true, createdAt: daysAgo(35), updatedAt: daysAgo(0) },
+  { _id: 'pat-mercy-002', type: 'patient', firstName: 'Emmanuel', middleName: 'Kenyi', surname: 'Duku', gender: 'Male', dateOfBirth: '1979-11-05', age: 46, phone: '+211917700002', bloodType: 'O+', allergies: ['Penicillin'], chronicConditions: ['Diabetes Mellitus'], nokName: 'Duku Lomude', nokRelationship: 'Brother', nokPhone: '+211917700102', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000002', state: 'Central Equatoria', county: 'Juba', payam: 'Kator', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(0), assignedDoctor: 'user-dr.mercy', assignedDoctorName: 'Dr. Grace Lado', assignedAt: daysAgo(0), assignedBy: 'user-nurse.mercy', assignedByName: 'Nurse Josephine Poni Wani', assignmentNote: 'Decompensated type 2 diabetes — admitted for glycaemic control.', isActive: true, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'pat-mercy-003', type: 'patient', firstName: 'Grace', middleName: 'Nyibol', surname: 'Kur', gender: 'Female', dateOfBirth: '1998-07-14', age: 27, phone: '+211917700003', bloodType: 'B+', allergies: ['None known'], chronicConditions: ['Pregnancy - third trimester'], nokName: 'Kur Awan', nokRelationship: 'Spouse', nokPhone: '+211917700103', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000003', state: 'Central Equatoria', county: 'Juba', payam: 'Munuki', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(0), isActive: true, createdAt: daysAgo(15), updatedAt: daysAgo(0) },
+  { _id: 'pat-mercy-004', type: 'patient', firstName: 'Daniel', middleName: 'Wani', surname: 'Surur', gender: 'Male', dateOfBirth: '1962-02-18', age: 64, phone: '+211917700004', bloodType: 'AB+', allergies: ['Aspirin'], chronicConditions: ['Hypertension', 'Osteoarthritis'], nokName: 'Surur Elia', nokRelationship: 'Son', nokPhone: '+211917700104', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000004', state: 'Central Equatoria', county: 'Juba', payam: 'Gudele', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(1), isActive: true, createdAt: daysAgo(90), updatedAt: daysAgo(1) },
+  { _id: 'pat-mercy-005', type: 'patient', firstName: 'Josephine', middleName: 'Aciek', surname: 'Manyang', gender: 'Female', dateOfBirth: '2020-09-10', age: 5, phone: '', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Manyang Deng', nokRelationship: 'Mother', nokPhone: '+211917700105', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000005', state: 'Central Equatoria', county: 'Juba', payam: 'Munuki', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(0), assignedDoctor: 'user-dr.mercy', assignedDoctorName: 'Dr. Grace Lado', assignedAt: daysAgo(0), assignedBy: 'user-nurse.mercy', assignedByName: 'Nurse Josephine Poni Wani', assignmentNote: 'Severe malaria — admitted to paediatric ward.', isActive: true, createdAt: daysAgo(5), updatedAt: daysAgo(0) },
+  { _id: 'pat-mercy-006', type: 'patient', firstName: 'Simon', middleName: 'Loro', surname: 'Baba', gender: 'Male', dateOfBirth: '1991-05-30', age: 35, phone: '+211917700006', bloodType: 'A-', allergies: ['Sulfa drugs'], chronicConditions: ['Asthma'], nokName: 'Baba Elia', nokRelationship: 'Father', nokPhone: '+211917700106', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000006', state: 'Central Equatoria', county: 'Juba', payam: 'Kator', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(2), isActive: true, createdAt: daysAgo(70), updatedAt: daysAgo(2) },
+  { _id: 'pat-mercy-007', type: 'patient', firstName: 'Margaret', middleName: 'Nyanut', surname: 'Riek', gender: 'Female', dateOfBirth: '1988-12-02', age: 37, phone: '+211917700007', bloodType: 'O-', allergies: ['None known'], chronicConditions: ['Sickle cell disease'], nokName: 'Riek Manyok', nokRelationship: 'Spouse', nokPhone: '+211917700107', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000007', state: 'Central Equatoria', county: 'Juba', payam: 'Gudele', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(0), assignedDoctor: 'user-dr.mercy', assignedDoctorName: 'Dr. Grace Lado', assignedAt: daysAgo(0), assignedBy: 'user-nurse.mercy', assignedByName: 'Nurse Josephine Poni Wani', assignmentNote: 'Sickle cell crisis — admitted for pain control and transfusion review.', isActive: true, createdAt: daysAgo(120), updatedAt: daysAgo(0) },
+  { _id: 'pat-mercy-008', type: 'patient', firstName: 'Peter', middleName: 'Oyet', surname: 'Lomoro', gender: 'Male', dateOfBirth: '1975-08-08', age: 50, phone: '+211917700008', bloodType: 'B-', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Lomoro Santo', nokRelationship: 'Brother', nokPhone: '+211917700108', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000008', state: 'Central Equatoria', county: 'Juba', payam: 'Munuki', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(3), isActive: true, createdAt: daysAgo(45), updatedAt: daysAgo(3) },
+];
+
 // Helper: put a doc, silently skip if it already exists (409 conflict)
 async function safePut(db: PouchDB.Database, doc: Record<string, unknown>): Promise<void> {
   try {
@@ -797,14 +817,14 @@ export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-9', type: 'appointment', patientId: 'pat-00057', patientName: 'Achol Mayen Garang', patientPhone: '+211912555057', providerId: 'user-midwife.nyakong', providerName: 'Midwife Nyakong Gatkuoth', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(3), appointmentTime: '10:30', endTime: '11:00', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Maternity', reason: 'ANC visit 6', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: true, recurrencePattern: 'biweekly', bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(1) },
   { _id: 'appointment-10', type: 'appointment', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(6), appointmentTime: '11:30', endTime: '12:00', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Missed previous slot', status: 'cancelled', cancelledReason: 'Patient travelling', cancelledBy: 'user-desk.amira', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(13), updatedAt: daysAgo(7) },
   { _id: 'appointment-11', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(14), appointmentTime: '08:00', endTime: '08:30', duration: 30, appointmentType: 'specialist', priority: 'routine', department: 'Endocrinology', reason: 'Diabetes specialist review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
-  { _id: 'appointment-12', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(5), appointmentTime: '13:00', endTime: '13:30', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Cardiology', reason: 'Hypertension review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
+  { _id: 'appointment-12', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(5), appointmentTime: '13:00', endTime: '13:30', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Cardiology', reason: 'Hypertension review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
   // ── Today's scheduled arrivals so the reception queue shows appointments. ──
   { _id: 'appointment-13', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '08:00', endTime: '08:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Hypertension follow-up', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(0) },
   { _id: 'appointment-14', type: 'appointment', patientId: 'pat-00057', patientName: 'Achol Mayen Garang', patientPhone: '+211912555057', providerId: 'user-midwife.nyakong', providerName: 'Midwife Nyakong Gatkuoth', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '09:15', endTime: '09:45', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Maternity', reason: 'ANC visit', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
   { _id: 'appointment-15', type: 'appointment', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', patientPhone: '+211912555035', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '10:45', endTime: '11:15', duration: 30, appointmentType: 'general', priority: 'urgent', department: 'Outpatient', reason: 'Persistent fever', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
   { _id: 'appointment-16', type: 'appointment', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '11:30', endTime: '12:00', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Obstetrics & Gynecology', reason: 'Antenatal check-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
   { _id: 'appointment-30', type: 'appointment', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', patientPhone: '+211912555008', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '13:00', endTime: '13:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Medication refill and BP review', status: 'scheduled', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
-  { _id: 'appointment-31', type: 'appointment', patientId: 'pat-00015', patientName: 'Tut Chuol Both', patientPhone: '+211912555015', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '13:45', endTime: '14:15', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Nephrology', reason: 'Renal follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+  { _id: 'appointment-31', type: 'appointment', patientId: 'pat-00015', patientName: 'Tut Chuol Both', patientPhone: '+211912555015', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '13:45', endTime: '14:15', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Nephrology', reason: 'Renal follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-32', type: 'appointment', patientId: 'pat-00040', patientName: 'Majok Chol Wol', patientPhone: '+211912555040', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '14:30', endTime: '15:00', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Abdominal pain follow-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-33', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '15:15', endTime: '15:45', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Endocrinology', reason: 'Diabetes review', status: 'confirmed', reminderSent: true, reminderChannel: 'app', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-34', type: 'appointment', patientId: 'pat-00063', patientName: 'Santino Madut', patientPhone: '+211915200063', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '09:15', endTime: '09:45', duration: 30, appointmentType: 'follow_up', priority: 'urgent', department: 'Outpatient', reason: 'Chest pain reassessment', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
@@ -819,8 +839,14 @@ export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-27', type: 'appointment', patientId: 'pat-00065', patientName: 'Deng Wol', patientPhone: '+211915200065', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(2), appointmentTime: '10:45', endTime: '11:15', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Outpatient', reason: 'Diabetes review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
   { _id: 'appointment-28', type: 'appointment', patientId: 'pat-00066', patientName: 'Nyibol Atem', patientPhone: '+211915200066', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(3), appointmentTime: '12:15', endTime: '12:45', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Respiratory', reason: 'Asthma review', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
   { _id: 'appointment-29', type: 'appointment', patientId: 'pat-00067', patientName: 'Mabior Deng', patientPhone: '+211915200067', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(5), appointmentTime: '13:30', endTime: '14:00', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Routine consultation', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
-  { _id: 'appointment-21', type: 'appointment', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', patientPhone: '+211912555008', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(2), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Respiratory', reason: 'TB follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
-  { _id: 'appointment-22', type: 'appointment', patientId: 'pat-00015', patientName: 'Tut Chuol Both', patientPhone: '+211912555015', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(3), appointmentTime: '11:30', endTime: '12:00', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Nephrology', reason: 'Renal function review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(2) },
+  { _id: 'appointment-21', type: 'appointment', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', patientPhone: '+211912555008', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(2), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Respiratory', reason: 'TB follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
+  { _id: 'appointment-22', type: 'appointment', patientId: 'pat-00015', patientName: 'Tut Chuol Both', patientPhone: '+211912555015', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(3), appointmentTime: '11:30', endTime: '12:00', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Nephrology', reason: 'Renal function review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(2) },
+  // ── Mercy General Hospital: today's appointments so the org-admin's
+  //    /appointments Today view is populated (not just future bookings). ──
+  { _id: 'appointment-mercy-t1', type: 'appointment', patientId: 'pat-mercy-004', patientName: 'Daniel Wani Surur', patientPhone: '+211917700004', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '08:30', endTime: '09:00', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Cardiology', reason: 'Hypertension review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.mercy', bookedByName: 'Martha Yar Kuek', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+  { _id: 'appointment-mercy-t2', type: 'appointment', patientId: 'pat-mercy-008', patientName: 'Peter Oyet Lomoro', patientPhone: '+211917700008', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '09:15', endTime: '09:45', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Routine consultation', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.mercy', bookedByName: 'Martha Yar Kuek', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(0) },
+  { _id: 'appointment-mercy-t3', type: 'appointment', patientId: 'pat-mercy-006', patientName: 'Simon Loro Baba', patientPhone: '+211917700006', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Respiratory', reason: 'Asthma review', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.mercy', bookedByName: 'Martha Yar Kuek', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(1) },
+  { _id: 'appointment-mercy-t4', type: 'appointment', patientId: 'pat-mercy-002', patientName: 'Emmanuel Kenyi Duku', patientPhone: '+211917700002', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '15:00', endTime: '15:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Endocrinology', reason: 'Diabetes follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.mercy', bookedByName: 'Martha Yar Kuek', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
   { _id: 'appointment-23', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(3), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Blood pressure check', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(1) },
   { _id: 'appointment-24', type: 'appointment', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', patientPhone: '+211912555022', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(5), appointmentTime: '14:30', endTime: '15:00', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Haematology', reason: 'Post-transfusion review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
 ];
@@ -836,6 +862,10 @@ const seedWards: Omit<WardDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'ward-4', type: 'ward', name: 'Paediatric Ward', wardType: 'paediatric', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', floor: 'First', totalBeds: 16, occupiedBeds: 10, availableBeds: 6, isActive: true, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: daysAgo(0) },
   { _id: 'ward-5', type: 'ward', name: 'ICU', wardType: 'icu', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', floor: 'Second', totalBeds: 8, occupiedBeds: 7, availableBeds: 1, isActive: true, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: daysAgo(0) },
   { _id: 'ward-6', type: 'ward', name: 'General Ward', wardType: 'general_male', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', floor: 'Ground', totalBeds: 18, occupiedBeds: 11, availableBeds: 7, isActive: true, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: daysAgo(0) },
+  // Mercy General Hospital (hosp-mercy-001, private org)
+  { _id: 'ward-mercy-1', type: 'ward', name: 'General Ward', wardType: 'general_male', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', floor: 'Ground', totalBeds: 16, occupiedBeds: 3, availableBeds: 13, nurseInCharge: 'user-nurse.mercy', nurseInChargeName: 'Nurse Josephine Poni Wani', isActive: true, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'ward-mercy-2', type: 'ward', name: 'Maternity Ward', wardType: 'maternity', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', floor: 'First', totalBeds: 10, occupiedBeds: 1, availableBeds: 9, nurseInCharge: 'user-nurse.mercy', nurseInChargeName: 'Nurse Josephine Poni Wani', isActive: true, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'ward-mercy-3', type: 'ward', name: 'Paediatric Ward', wardType: 'paediatric', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', floor: 'First', totalBeds: 8, occupiedBeds: 1, availableBeds: 7, nurseInCharge: 'user-nurse.mercy', nurseInChargeName: 'Nurse Josephine Poni Wani', isActive: true, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
 ];
 
 const seedBeds: Omit<BedDoc, '_rev' | 'createdBy'>[] = [
@@ -848,6 +878,15 @@ const seedBeds: Omit<BedDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'bed-7', type: 'bed', bedNumber: 'ICU-B01', wardId: 'ward-5', wardName: 'ICU', facilityId: 'hosp-001', status: 'occupied', currentPatientId: 'pat-00030', currentPatientName: 'Achol Mayen Ring', currentAdmissionId: 'admission-4', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: daysAgo(2) },
   { _id: 'bed-8', type: 'bed', bedNumber: 'ICU-B02', wardId: 'ward-5', wardName: 'ICU', facilityId: 'hosp-001', status: 'maintenance', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: daysAgo(5) },
   { _id: 'bed-9', type: 'bed', bedNumber: 'W6-B01', wardId: 'ward-6', wardName: 'General Ward', facilityId: 'hosp-002', status: 'occupied', currentPatientId: 'pat-00063', currentPatientName: 'Santino Madut', currentAdmissionId: 'admission-6', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: daysAgo(2) },
+  // Mercy General Hospital (hosp-mercy-001, private org)
+  { _id: 'bed-mercy-1', type: 'bed', bedNumber: 'MG1-B01', wardId: 'ward-mercy-1', wardName: 'General Ward', facilityId: 'hosp-mercy-001', status: 'occupied', currentPatientId: 'pat-mercy-001', currentPatientName: 'Elizabeth Nyandit Bul', currentAdmissionId: 'admission-mercy-1', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'bed-mercy-2', type: 'bed', bedNumber: 'MG1-B02', wardId: 'ward-mercy-1', wardName: 'General Ward', facilityId: 'hosp-mercy-001', status: 'occupied', currentPatientId: 'pat-mercy-002', currentPatientName: 'Emmanuel Kenyi Duku', currentAdmissionId: 'admission-mercy-2', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'bed-mercy-3', type: 'bed', bedNumber: 'MG1-B03', wardId: 'ward-mercy-1', wardName: 'General Ward', facilityId: 'hosp-mercy-001', status: 'occupied', currentPatientId: 'pat-mercy-007', currentPatientName: 'Margaret Nyanut Riek', currentAdmissionId: 'admission-mercy-5', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'bed-mercy-4', type: 'bed', bedNumber: 'MG1-B04', wardId: 'ward-mercy-1', wardName: 'General Ward', facilityId: 'hosp-mercy-001', status: 'available', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(1) },
+  { _id: 'bed-mercy-5', type: 'bed', bedNumber: 'MM-B01', wardId: 'ward-mercy-2', wardName: 'Maternity Ward', facilityId: 'hosp-mercy-001', status: 'occupied', currentPatientId: 'pat-mercy-003', currentPatientName: 'Grace Nyibol Kur', currentAdmissionId: 'admission-mercy-3', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'bed-mercy-6', type: 'bed', bedNumber: 'MM-B02', wardId: 'ward-mercy-2', wardName: 'Maternity Ward', facilityId: 'hosp-mercy-001', status: 'available', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'bed-mercy-7', type: 'bed', bedNumber: 'MP-B01', wardId: 'ward-mercy-3', wardName: 'Paediatric Ward', facilityId: 'hosp-mercy-001', status: 'occupied', currentPatientId: 'pat-mercy-005', currentPatientName: 'Josephine Aciek Manyang', currentAdmissionId: 'admission-mercy-4', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
+  { _id: 'bed-mercy-8', type: 'bed', bedNumber: 'MP-B02', wardId: 'ward-mercy-3', wardName: 'Paediatric Ward', facilityId: 'hosp-mercy-001', status: 'available', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(0) },
 ];
 
 const seedAdmissions: Omit<AdmissionDoc, '_rev' | 'createdBy'>[] = [
@@ -862,6 +901,12 @@ const seedAdmissions: Omit<AdmissionDoc, '_rev' | 'createdBy'>[] = [
   // chart (previously 0 inpatient at hosp-002, since admission-5 above is
   // discharged and every other admission is at hosp-001).
   { _id: 'admission-6', type: 'admission', patientId: 'pat-00063', patientName: 'Santino Madut', hospitalNumber: 'WSH-000010', admissionDate: daysAgo(2), admittingDiagnosis: 'Hypertensive urgency', icd11Code: 'BA02', severity: 'moderate', admittedBy: 'user-co.deng', admittedByName: 'CO Deng Mabior Kuol', wardId: 'ward-6', wardName: 'General Ward', bedId: 'bed-9', bedNumber: 'W6-B01', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', attendingPhysician: 'user-co.deng', attendingPhysicianName: 'CO Deng Mabior Kuol', nurseAssigned: 'user-nurse.wau', nurseAssignedName: 'Nurse Grace Achai Lual', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(0) },
+  // Mercy General Hospital (hosp-mercy-001, private org) — active admissions
+  { _id: 'admission-mercy-1', type: 'admission', patientId: 'pat-mercy-001', patientName: 'Elizabeth Nyandit Bul', hospitalNumber: 'MGH-000001', admissionDate: daysAgo(2), admittingDiagnosis: 'Hypertensive urgency', icd11Code: 'BA02', severity: 'moderate', admittedBy: 'user-dr.mercy', admittedByName: 'Dr. Grace Lado', wardId: 'ward-mercy-1', wardName: 'General Ward', bedId: 'bed-mercy-1', bedNumber: 'MG1-B01', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', attendingPhysician: 'user-dr.mercy', attendingPhysicianName: 'Dr. Grace Lado', nurseAssigned: 'user-nurse.mercy', nurseAssignedName: 'Nurse Josephine Poni Wani', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
+  { _id: 'admission-mercy-2', type: 'admission', patientId: 'pat-mercy-002', patientName: 'Emmanuel Kenyi Duku', hospitalNumber: 'MGH-000002', admissionDate: daysAgo(1), admittingDiagnosis: 'Type 2 diabetes mellitus', icd11Code: '5A11', severity: 'severe', admittedBy: 'user-dr.mercy', admittedByName: 'Dr. Grace Lado', wardId: 'ward-mercy-1', wardName: 'General Ward', bedId: 'bed-mercy-2', bedNumber: 'MG1-B02', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', attendingPhysician: 'user-dr.mercy', attendingPhysicianName: 'Dr. Grace Lado', nurseAssigned: 'user-nurse.mercy', nurseAssignedName: 'Nurse Josephine Poni Wani', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+  { _id: 'admission-mercy-3', type: 'admission', patientId: 'pat-mercy-003', patientName: 'Grace Nyibol Kur', hospitalNumber: 'MGH-000003', admissionDate: daysAgo(0), admittingDiagnosis: 'Labour at term', icd11Code: 'JB40', severity: 'moderate', admittedBy: 'user-dr.mercy', admittedByName: 'Dr. Grace Lado', wardId: 'ward-mercy-2', wardName: 'Maternity Ward', bedId: 'bed-mercy-5', bedNumber: 'MM-B01', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', attendingPhysician: 'user-dr.mercy', attendingPhysicianName: 'Dr. Grace Lado', nurseAssigned: 'user-nurse.mercy', nurseAssignedName: 'Nurse Josephine Poni Wani', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+  { _id: 'admission-mercy-4', type: 'admission', patientId: 'pat-mercy-005', patientName: 'Josephine Aciek Manyang', hospitalNumber: 'MGH-000005', admissionDate: daysAgo(1), admittingDiagnosis: 'Severe malaria', icd11Code: '1A40', severity: 'severe', admittedBy: 'user-dr.mercy', admittedByName: 'Dr. Grace Lado', wardId: 'ward-mercy-3', wardName: 'Paediatric Ward', bedId: 'bed-mercy-7', bedNumber: 'MP-B01', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', attendingPhysician: 'user-dr.mercy', attendingPhysicianName: 'Dr. Grace Lado', nurseAssigned: 'user-nurse.mercy', nurseAssignedName: 'Nurse Josephine Poni Wani', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
+  { _id: 'admission-mercy-5', type: 'admission', patientId: 'pat-mercy-007', patientName: 'Margaret Nyanut Riek', hospitalNumber: 'MGH-000007', admissionDate: daysAgo(3), admittingDiagnosis: 'Severe anaemia (sickle cell crisis)', icd11Code: '3A51', severity: 'critical', admittedBy: 'user-dr.mercy', admittedByName: 'Dr. Grace Lado', wardId: 'ward-mercy-1', wardName: 'General Ward', bedId: 'bed-mercy-3', bedNumber: 'MG1-B03', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', attendingPhysician: 'user-dr.mercy', attendingPhysicianName: 'Dr. Grace Lado', nurseAssigned: 'user-nurse.mercy', nurseAssignedName: 'Nurse Josephine Poni Wani', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(0) },
 ];
 
 // Provider availability windows for TODAY (full-day) so the facility
@@ -901,6 +946,14 @@ const seedPharmacyInventory: Omit<PharmacyInventoryDoc, '_rev' | 'createdBy'>[] 
   { _id: 'inv-8', type: 'pharmacy_inventory', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', medicationName: 'Diazepam 5mg/mL injection', category: 'Sedative', stockLevel: 45, unit: 'vials', reorderLevel: 20, batchNumber: 'DZP-2026-003', expiryDate: dateFromNow(240), lastReceived: daysAgo(25), lastDispensed: daysAgo(3), dispensedToday: 1, controlledSchedule: 'IV', requiresWitness: true, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(3) },
   { _id: 'inv-9', type: 'pharmacy_inventory', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', medicationName: 'Ceftriaxone 1g injection', category: 'Antibiotic', stockLevel: 12, unit: 'vials', reorderLevel: 50, batchNumber: 'CFT-2025-077', expiryDate: dateFromNow(60), lastReceived: daysAgo(45), lastDispensed: daysAgo(0), dispensedToday: 3, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(90), updatedAt: daysAgo(0) },
   { _id: 'inv-10', type: 'pharmacy_inventory', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', medicationName: 'Magnesium Sulfate injection', category: 'Obstetric', stockLevel: 0, unit: 'vials', reorderLevel: 30, batchNumber: 'MGS-2025-041', expiryDate: dateFromNow(150), lastReceived: daysAgo(70), lastDispensed: daysAgo(6), dispensedToday: 0, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: daysAgo(6) },
+  // Mercy General Hospital (hosp-mercy-001, private org)
+  { _id: 'inv-mercy-1', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Artemether-Lumefantrine (Coartem)', category: 'Antimalarial', stockLevel: 480, unit: 'tablets', reorderLevel: 150, batchNumber: 'MGH-CTM-2026-002', expiryDate: dateFromNow(380), lastReceived: daysAgo(18), lastDispensed: daysAgo(0), dispensedToday: 6, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(50), updatedAt: daysAgo(0) },
+  { _id: 'inv-mercy-2', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Paracetamol 500mg', category: 'Analgesic', stockLevel: 1100, unit: 'tablets', reorderLevel: 400, batchNumber: 'MGH-PCM-2026-005', expiryDate: dateFromNow(280), lastReceived: daysAgo(12), lastDispensed: daysAgo(0), dispensedToday: 14, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(50), updatedAt: daysAgo(0) },
+  { _id: 'inv-mercy-3', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Amoxicillin 500mg', category: 'Antibiotic', stockLevel: 90, unit: 'capsules', reorderLevel: 200, batchNumber: 'MGH-AMX-2025-091', expiryDate: dateFromNow(100), lastReceived: daysAgo(35), lastDispensed: daysAgo(1), dispensedToday: 4, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(75), updatedAt: daysAgo(1) },
+  { _id: 'inv-mercy-4', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Metformin 500mg', category: 'Antidiabetic', stockLevel: 210, unit: 'tablets', reorderLevel: 100, batchNumber: 'MGH-MET-2025-034', expiryDate: dateFromNow(160), lastReceived: daysAgo(20), lastDispensed: daysAgo(0), dispensedToday: 3, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(75), updatedAt: daysAgo(0) },
+  { _id: 'inv-mercy-5', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Amlodipine 5mg', category: 'Antihypertensive', stockLevel: 340, unit: 'tablets', reorderLevel: 120, batchNumber: 'MGH-AML-2026-011', expiryDate: dateFromNow(300), lastReceived: daysAgo(10), lastDispensed: daysAgo(0), dispensedToday: 5, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(50), updatedAt: daysAgo(0) },
+  { _id: 'inv-mercy-6', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Magnesium Sulfate injection', category: 'Obstetric', stockLevel: 22, unit: 'vials', reorderLevel: 15, batchNumber: 'MGH-MGS-2025-018', expiryDate: dateFromNow(190), lastReceived: daysAgo(40), lastDispensed: daysAgo(0), dispensedToday: 1, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(75), updatedAt: daysAgo(0) },
+  { _id: 'inv-mercy-7', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Ferrous Sulfate + Folic Acid', category: 'Supplement', stockLevel: 60, unit: 'tablets', reorderLevel: 150, batchNumber: 'MGH-FEF-2025-027', expiryDate: dateFromNow(220), lastReceived: daysAgo(45), lastDispensed: daysAgo(2), dispensedToday: 0, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(75), updatedAt: daysAgo(2) },
 ];
 
 // ═══ Triage seed data ═════════════════════════════════════════════
@@ -934,6 +987,100 @@ const seedTriage: Omit<TriageDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'triage-m3', type: 'triage', patientId: 'pat-00202', patientName: 'Both Chuol', hospitalNumber: 'MTH-000012', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'GREEN', temperature: '37.0', pulse: '78', respiratoryRate: '16', systolic: '122', diastolic: '78', oxygenSaturation: '99', chiefComplaint: 'Wound dressing follow-up', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(1), facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', status: 'seen', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
   { _id: 'triage-m4', type: 'triage', patientId: 'pat-00203', patientName: 'Nyandeng Reath', hospitalNumber: 'MTH-000013', airway: 'clear', breathing: 'distressed', circulation: 'impaired', consciousness: 'alert', priority: 'YELLOW', temperature: '38.7', pulse: '112', respiratoryRate: '24', systolic: '100', diastolic: '64', oxygenSaturation: '91', chiefComplaint: 'Severe anaemia, fatigue', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
 ];
+
+// ═══ Overflow rows — enough same-day entries to scroll ════════════
+// Extra today's appointments and walk-in triages at Juba Teaching Hospital,
+// generated from patients that already exist in the seed (no new patient
+// docs). They push every queue/list view past its viewport so the list
+// scrollbars actually have something to indicate. Also safePut by
+// migrateDemoAppointmentsAndWalkins below, so an already-seeded browser DB
+// picks them up without a wipe.
+function minutesAgo(n: number): string {
+  return new Date(SEED_NOW - n * 60000).toISOString();
+}
+
+const overflowRoster = [
+  { id: 'pat-00001', name: 'Deng Mabior Garang', mrn: 'JTH-000001', phone: '+211912345678' },
+  { id: 'pat-00004', name: 'Mary Nyandeng Lado', mrn: 'JTH-000004', phone: '+211912555004' },
+  { id: 'pat-00005', name: 'Nyamal Koang Gatdet', mrn: 'JTH-000005', phone: '+211912555005' },
+  { id: 'pat-00008', name: 'Ayen Dut Malual', mrn: 'JTH-000008', phone: '+211912555008' },
+  { id: 'pat-00012', name: 'Gatluak Ruot Nyuon', mrn: 'JTH-000012', phone: '+211912555012' },
+  { id: 'pat-00015', name: 'Tut Chuol Both', mrn: 'JTH-000015', phone: '+211912555015' },
+  { id: 'pat-00018', name: 'Rose Tombura Gbudue', mrn: 'JTH-000018', phone: '+211912555018' },
+  { id: 'pat-00022', name: 'Kuol Akot Ajith', mrn: 'JTH-000022', phone: '+211912555022' },
+  { id: 'pat-00030', name: 'Achol Mayen Ring', mrn: 'JTH-000030', phone: '+211912555030' },
+  { id: 'pat-00035', name: 'Ladu Tombe Keji', mrn: 'JTH-000035', phone: '+211912555035' },
+  { id: 'pat-00040', name: 'Majok Chol Wol', mrn: 'JTH-000040', phone: '+211912555040' },
+  { id: 'pat-00057', name: 'Achol Mayen Garang', mrn: 'JTH-000057', phone: '+211912555057' },
+  { id: 'pat-00062', name: 'Nyandeng Chol Wol', mrn: 'JTH-000062', phone: '+211912555062' },
+];
+
+const overflowProviders = [
+  { id: 'user-dr.wani', name: 'Dr. James Wani Igga', department: 'Internal Medicine' },
+  { id: 'user-dr.achol', name: 'Dr. Achol Mayen Deng', department: 'Outpatient' },
+  { id: 'user-dr.mercy', name: 'Dr. Grace Lado', department: 'Cardiology' },
+];
+
+const overflowReasons = [
+  'Hypertension review', 'Diabetes check', 'Malaria follow-up', 'Chest pain assessment',
+  'Skin rash', 'Chronic cough', 'Back pain', 'Routine check-up',
+];
+
+const overflowAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = overflowRoster.map((p, i) => {
+  const provider = overflowProviders[i % overflowProviders.length];
+  const hour = 8 + Math.floor(i / 2);
+  const minute = i % 2 ? '30' : '00';
+  const statuses = ['scheduled', 'confirmed', 'checked_in'] as const;
+  const status = statuses[i % statuses.length];
+  return {
+    _id: `appointment-ovf-${i + 1}`,
+    type: 'appointment' as const,
+    patientId: p.id, patientName: p.name, patientPhone: p.phone,
+    providerId: provider.id, providerName: provider.name,
+    facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national' as const,
+    appointmentDate: dateAgo(0),
+    appointmentTime: `${String(hour).padStart(2, '0')}:${minute}`,
+    endTime: minute === '00' ? `${String(hour).padStart(2, '0')}:30` : `${String(hour + 1).padStart(2, '0')}:00`,
+    duration: 30,
+    appointmentType: 'general' as const,
+    priority: (i % 4 === 0 ? 'urgent' : 'routine') as 'urgent' | 'routine',
+    department: provider.department,
+    reason: overflowReasons[i % overflowReasons.length],
+    status,
+    ...(status === 'checked_in' ? { checkedInAt: minutesAgo(120 - i * 5) } : {}),
+    reminderSent: false, isRecurring: false,
+    bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan',
+    state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID,
+    createdAt: daysAgo(1), updatedAt: minutesAgo(180),
+  };
+});
+seedAppointments.push(...overflowAppointments);
+
+const overflowTriage: Omit<TriageDoc, '_rev' | 'createdBy'>[] = overflowRoster.map((p, i) => {
+  const priorities = ['GREEN', 'YELLOW', 'GREEN', 'YELLOW', 'RED'] as const;
+  const priority = priorities[i % priorities.length];
+  const status = (i % 3 === 2 ? 'seen' : 'pending') as 'seen' | 'pending';
+  const at = minutesAgo(15 + i * 14);
+  return {
+    _id: `triage-ovf-${i + 1}`,
+    type: 'triage' as const,
+    patientId: p.id, patientName: p.name, hospitalNumber: p.mrn,
+    airway: 'clear' as const,
+    breathing: (priority === 'RED' ? 'distressed' : 'normal') as 'distressed' | 'normal',
+    circulation: (priority === 'RED' ? 'impaired' : 'normal') as 'impaired' | 'normal',
+    consciousness: 'alert' as const,
+    priority,
+    temperature: '37.4', pulse: '92', respiratoryRate: '19',
+    systolic: '120', diastolic: '78', oxygenSaturation: '97',
+    chiefComplaint: overflowReasons[(i + 3) % overflowReasons.length],
+    modeOfArrival: 'walk-in',
+    triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi',
+    triagedAt: at,
+    facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital',
+    status, orgId: PUBLIC_ORG_ID, createdAt: at, updatedAt: at,
+  };
+});
+seedTriage.push(...overflowTriage);
 
 // ═══ Asset / equipment seed data ══════════════════════════════════
 const seedAssets: Omit<AssetDoc, '_rev' | 'createdBy'>[] = [
@@ -984,9 +1131,9 @@ const seedProblems: Omit<ProblemDoc, '_rev' | 'createdBy'>[] = [
 
 // ═══ Telehealth session seed data ═════════════════════════════════
 const seedTelehealth: Omit<TelehealthSessionDoc, '_rev' | 'createdBy'>[] = [
-  { _id: 'telehealth-1', type: 'telehealth_session', appointmentId: 'appointment-3', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', providerRole: 'doctor', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', sessionType: 'video', scheduledDate: dateFromNow(2), scheduledTime: '14:00', status: 'scheduled', roomId: 'room-th-001', joinUrl: 'https://telehealth.tamamhealth.org/join/room-th-001', chiefComplaint: 'HIV follow-up consultation', followUpRequired: false, referralRequired: false, connectionDrops: 0, patientConsentGiven: true, consentTimestamp: daysAgo(1), sessionRecorded: false, consultationFee: 5000, currency: 'SSP', paymentStatus: 'pending', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
-  { _id: 'telehealth-2', type: 'telehealth_session', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', providerRole: 'doctor', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', sessionType: 'video', scheduledDate: dateAgo(3), scheduledTime: '10:00', actualStartTime: daysAgo(3), actualEndTime: daysAgo(3), duration: 22, status: 'completed', roomId: 'room-th-002', chiefComplaint: 'Diabetes management review', clinicalNotes: 'Reviewed glucose logs, adjusted metformin dose.', diagnosis: 'Type 2 diabetes mellitus', icd10Code: 'E11', followUpRequired: true, followUpDate: dateFromNow(14), referralRequired: false, sessionQuality: 'good', connectionDrops: 1, patientConsentGiven: true, consentTimestamp: daysAgo(3), sessionRecorded: false, patientRating: 5, patientFeedback: 'Very convenient.', consultationFee: 5000, currency: 'SSP', paymentStatus: 'paid', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(3) },
-  { _id: 'telehealth-3', type: 'telehealth_session', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', providerRole: 'doctor', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', sessionType: 'audio', scheduledDate: dateAgo(0), scheduledTime: '16:00', status: 'waiting_room', roomId: 'room-th-003', chiefComplaint: 'Hypertension medication review', followUpRequired: false, referralRequired: false, connectionDrops: 0, patientConsentGiven: true, consentTimestamp: daysAgo(0), sessionRecorded: false, consultationFee: 3000, currency: 'SSP', paymentStatus: 'paid', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+  { _id: 'telehealth-1', type: 'telehealth_session', appointmentId: 'appointment-3', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', providerRole: 'doctor', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', sessionType: 'video', scheduledDate: dateFromNow(2), scheduledTime: '14:00', status: 'scheduled', roomId: 'room-th-001', joinUrl: 'https://telehealth.tamamhealth.org/join/room-th-001', chiefComplaint: 'HIV follow-up consultation', followUpRequired: false, referralRequired: false, connectionDrops: 0, patientConsentGiven: true, consentTimestamp: daysAgo(1), sessionRecorded: false, consultationFee: 5000, currency: 'SSP', paymentStatus: 'pending', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+  { _id: 'telehealth-2', type: 'telehealth_session', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', providerRole: 'doctor', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', sessionType: 'video', scheduledDate: dateAgo(3), scheduledTime: '10:00', actualStartTime: daysAgo(3), actualEndTime: daysAgo(3), duration: 22, status: 'completed', roomId: 'room-th-002', chiefComplaint: 'Diabetes management review', clinicalNotes: 'Reviewed glucose logs, adjusted metformin dose.', diagnosis: 'Type 2 diabetes mellitus', icd10Code: 'E11', followUpRequired: true, followUpDate: dateFromNow(14), referralRequired: false, sessionQuality: 'good', connectionDrops: 1, patientConsentGiven: true, consentTimestamp: daysAgo(3), sessionRecorded: false, patientRating: 5, patientFeedback: 'Very convenient.', consultationFee: 5000, currency: 'SSP', paymentStatus: 'paid', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(3) },
+  { _id: 'telehealth-3', type: 'telehealth_session', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', providerRole: 'doctor', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', sessionType: 'audio', scheduledDate: dateAgo(0), scheduledTime: '16:00', status: 'waiting_room', roomId: 'room-th-003', chiefComplaint: 'Hypertension medication review', followUpRequired: false, referralRequired: false, connectionDrops: 0, patientConsentGiven: true, consentTimestamp: daysAgo(0), sessionRecorded: false, consultationFee: 3000, currency: 'SSP', paymentStatus: 'paid', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
 ];
 
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
@@ -1105,10 +1252,10 @@ async function migrateDemoAppointmentsAndWalkins(): Promise<void> {
       ['triage-10', 'triage-11', 'triage-12', 'triage-13', 'triage-w5'].includes(t._id)
     );
 
-    for (const appt of demoAppointments) {
+    for (const appt of [...demoAppointments, ...overflowAppointments]) {
       await safePut(apptDB, appt as unknown as Record<string, unknown>);
     }
-    for (const triage of demoWalkIns) {
+    for (const triage of [...demoWalkIns, ...overflowTriage]) {
       await safePut(trDB, triage as unknown as Record<string, unknown>);
     }
   } catch (err) {
@@ -1329,7 +1476,7 @@ async function seedDatabaseExclusive(): Promise<void> {
     town: 'Juba', beds: 120, totalBeds: 120, icuBeds: 8, maternityBeds: 20,
     staff: 45, doctors: 12, nurses: 20, clinicalOfficers: 5, labTechs: 3, pharmacists: 2,
     specialists: [], services: ['Emergency', 'Outpatient', 'Inpatient', 'Laboratory', 'Pharmacy'],
-    equipment: ['X-ray', 'Ultrasound'], ambulances: 1, hasBloodBank: false,
+    equipment: ['X-ray', 'Ultrasound'], ambulances: 1, hasBloodBank: true,
     syncStatus: 'online', lastSync: now, patientCount: 0, todayVisits: 0,
     operatingStatus: 'operational', orgId: PRIVATE_ORG_ID,
     createdAt: now, updatedAt: now,
@@ -1507,6 +1654,13 @@ async function seedDatabaseExclusive(): Promise<void> {
   // lab/imaging, pharmacy, referrals and billing to these same patients.
   for (const wp of workflowShowcasePatients) {
     await safePut(pDB, withSampleChart({ ...wp, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>));
+  }
+
+  // Seed Mercy General Hospital (hosp-mercy-001, private org) roster so the
+  // org.admin / dr.mercy / nurse.mercy / desk.mercy / pharma.mercy / lab.mercy
+  // dashboards have their own real patients instead of borrowing hosp-001's.
+  for (const mp of mercyPatients) {
+    await safePut(pDB, withSampleChart({ ...mp, orgId: PRIVATE_ORG_ID } as unknown as Record<string, unknown>));
   }
 
   // ── Bentiu State Hospital (hosp-004) lab queue ──────────────────────────
@@ -1891,6 +2045,19 @@ async function seedDatabaseExclusive(): Promise<void> {
     } as unknown as Record<string, unknown>);
   }
 
+  // Mercy General Hospital (hosp-mercy-001, private org) prescriptions —
+  // prescriber dr.mercy, mix of pending/dispensed for the Mercy roster.
+  const mercyRx: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
+    { _id: 'rx-mercy-1', type: 'prescription', patientId: 'pat-mercy-001', patientName: 'Elizabeth Nyandit Bul', medication: 'Amlodipine 5mg', dose: '5mg OD x 30 days', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(1), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(2), updatedAt: daysAgo(1) },
+    { _id: 'rx-mercy-2', type: 'prescription', patientId: 'pat-mercy-002', patientName: 'Emmanuel Kenyi Duku', medication: 'Metformin 500mg', dose: '500mg BD x 30 days', route: 'Oral', frequency: 'BD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'pending', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+    { _id: 'rx-mercy-3', type: 'prescription', patientId: 'pat-mercy-005', patientName: 'Josephine Aciek Manyang', medication: 'Artemether-Lumefantrine (Coartem)', dose: '20/120mg BD x 3 days', route: 'Oral', frequency: 'BD', duration: '3 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(1), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+    { _id: 'rx-mercy-4', type: 'prescription', patientId: 'pat-mercy-007', patientName: 'Margaret Nyanut Riek', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg OD x 30 days', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'pending', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+    { _id: 'rx-mercy-5', type: 'prescription', patientId: 'pat-mercy-006', patientName: 'Simon Loro Baba', medication: 'Paracetamol 500mg', dose: '1g QDS PRN x 5 days', route: 'Oral', frequency: 'QDS PRN', duration: '5 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(2), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(2), updatedAt: daysAgo(2) },
+  ];
+  for (const rx of mercyRx) {
+    await safePut(rxDB, { ...rx, orgId: PRIVATE_ORG_ID } as unknown as Record<string, unknown>);
+  }
+
   // ── Generated clinical activity for the extended roster (pat-00087+) ────────
   // Each new patient gets a lab order, prescription, appointment and triage
   // entry so they flow through the Lab, Pharmacy, Appointments and Triage lists
@@ -1998,6 +2165,7 @@ async function seedDatabaseExclusive(): Promise<void> {
     };
     const DESK_JUBA: VisProvider = { id: 'user-desk.amira', name: 'Amira Juma Hassan' };
     const DESK_WAU: VisProvider = { id: 'user-desk.wau', name: 'Tabitha Nyandeng Kuol' };
+    const DESK_MERCY: VisProvider = { id: 'user-desk.mercy', name: 'Martha Yar Kuek' };
 
     const VIS_FACILITIES: VisFacility[] = [
       {
@@ -2034,15 +2202,15 @@ async function seedDatabaseExclusive(): Promise<void> {
         ],
         triager: { id: 'user-lab.gatluak', name: 'Lab Tech Gatluak Puok' }, desk: DESK_JUBA,
       },
-      // Private org (Mercy) shares the Juba facility but its own patients pool is
-      // empty, so borrow Juba patients tagged to the private org so Dr. Mercy /
-      // org-admin dashboards also populate.
+      // Private org (Mercy) — its own facility with its own patient roster
+      // (mercyPatients) so Dr. Mercy / org-admin dashboards populate from
+      // real Mercy General Hospital data, not borrowed Juba patients.
       {
-        fid: 'hosp-001', fname: 'Juba Teaching Hospital', level: 'national', org: PRIVATE_ORG_ID,
+        fid: 'hosp-mercy-001', fname: 'Mercy General Hospital', level: 'state', org: PRIVATE_ORG_ID,
         providers: [
           { id: 'user-dr.mercy', name: 'Dr. Grace Lado' },
         ],
-        triager: { id: 'user-triage.mary', name: 'Mary Nyaruai Gai' }, desk: DESK_JUBA,
+        triager: { id: 'user-nurse.mercy', name: 'Nurse Josephine Poni Wani' }, desk: DESK_MERCY,
       },
     ];
 
@@ -2105,9 +2273,26 @@ async function seedDatabaseExclusive(): Promise<void> {
     const patName = (p: { firstName: string; middleName?: string; surname: string }) =>
       `${p.firstName} ${p.middleName ? p.middleName + ' ' : ''}${p.surname}`.replace(/\s+/g, ' ').trim();
 
+    // Mercy General Hospital isn't part of the imported mock `patients` pool
+    // (that array only covers the public hospitals), so its own roster is
+    // adapted into the same shape the generator below expects.
+    const mercyVisPatients = mercyPatients.map((mp) => ({
+      id: mp._id as string,
+      firstName: mp.firstName as string,
+      middleName: mp.middleName as string | undefined,
+      surname: mp.surname as string,
+      phone: (mp.phone as string) || '',
+      registrationHospital: mp.registrationHospital as string,
+      hospitalNumber: mp.hospitalNumber as string,
+      state: mp.state as string,
+      county: mp.county as string,
+    }));
+
     for (let f = 0; f < VIS_FACILITIES.length; f++) {
       const fac = VIS_FACILITIES[f];
-      const facPatients = patients.filter((p) => p.registrationHospital === fac.fid);
+      const facPatients = fac.org === PRIVATE_ORG_ID
+        ? mercyVisPatients.filter((p) => p.registrationHospital === fac.fid)
+        : patients.filter((p) => p.registrationHospital === fac.fid);
       if (facPatients.length === 0) continue;
 
       // Today's appointments (13 per public facility, fewer where the roster is thin).
@@ -2770,10 +2955,12 @@ async function seedDatabaseExclusive(): Promise<void> {
   // Pricing page and the Collect Payment service picker both show prices.
   const feeDB = feeScheduleDB();
   for (const orgId of [PUBLIC_ORG_ID, PRIVATE_ORG_ID]) {
+    const feeFacilityId = orgId === PRIVATE_ORG_ID ? 'hosp-mercy-001' : 'hosp-001';
+    const feeFacilityName = orgId === PRIVATE_ORG_ID ? 'Mercy General Hospital' : 'Juba Teaching Hospital';
     for (const f of feeScheduleBase) {
       await safePut(feeDB, {
         _id: `fee-${orgId}-${f.serviceCode}`, type: 'fee_schedule',
-        facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital',
+        facilityId: feeFacilityId, facilityName: feeFacilityName,
         category: f.category, serviceCode: f.serviceCode, serviceName: f.serviceName,
         unitPrice: f.unitPrice, currency: 'SSP', isActive: true, effectiveFrom: now,
         orgId, createdAt: now, updatedAt: now,
@@ -3189,8 +3376,9 @@ async function seedDatabaseExclusive(): Promise<void> {
   {
     const bbDB = bloodBankDB();
     const BB_FACILITIES = [
-      { fid: 'hosp-001', fname: 'Juba Teaching Hospital', prefix: 'JTH', stock: { 'O+': 8, 'O-': 2, 'A+': 6, 'A-': 1, 'B+': 4, 'B-': 1, 'AB+': 2, 'AB-': 1 } },
-      { fid: 'hosp-002', fname: 'Wau State Hospital', prefix: 'WSH', stock: { 'O+': 3, 'A+': 2, 'B+': 1 } },
+      { fid: 'hosp-001', fname: 'Juba Teaching Hospital', prefix: 'JTH', org: PUBLIC_ORG_ID, stock: { 'O+': 8, 'O-': 2, 'A+': 6, 'A-': 1, 'B+': 4, 'B-': 1, 'AB+': 2, 'AB-': 1 } },
+      { fid: 'hosp-002', fname: 'Wau State Hospital', prefix: 'WSH', org: PUBLIC_ORG_ID, stock: { 'O+': 3, 'A+': 2, 'B+': 1 } },
+      { fid: 'hosp-mercy-001', fname: 'Mercy General Hospital', prefix: 'MGH', org: PRIVATE_ORG_ID, stock: { 'O+': 4, 'A+': 3, 'B+': 2, 'O-': 1 } },
     ] as const;
     const BB_COMPONENTS = ['whole_blood', 'whole_blood', 'packed_rbc', 'whole_blood', 'packed_rbc', 'platelets'] as const;
     for (const fac of BB_FACILITIES) {
@@ -3214,7 +3402,7 @@ async function seedDatabaseExclusive(): Promise<void> {
             ...(status === 'crossmatched' ? { crossmatchResult: 'compatible' } : {}),
             facilityId: fac.fid, facilityName: fac.fname,
             screeningResults: { hiv: false, hepatitisB: false, hepatitisC: false, syphilis: false, malaria: false },
-            orgId: PUBLIC_ORG_ID,
+            orgId: fac.org,
             createdAt: daysAgo(collectedDaysAgo), updatedAt: daysAgo(collectedDaysAgo),
           } as unknown as Record<string, unknown>);
         }

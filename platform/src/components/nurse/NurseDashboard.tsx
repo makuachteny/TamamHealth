@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   BedDouble, ArrowRightLeft, Plus, Printer,
-  Syringe, Users, Calendar, Activity, Baby, UserX,
+  Syringe, Users, Calendar, Activity, Baby, UserX, PieChart as PieChartIcon,
 } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -16,12 +17,18 @@ import { getRoleConfig } from '@/lib/permissions';
 import { DEMO_WARD_PATIENTS, IS_DEMO } from '@/components/nurse/shared';
 import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { tooltipStyle } from '@/components/ChartCard';
 import WardWorkflow from './WardWorkflow';
 import MarWorkflow from './MarWorkflow';
 import TriageWorkflow from './TriageWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
 
 type StationTab = 'ward' | 'mar' | 'triage';
+
+// Chart palette per design spec: flat clinical look, matched to triage colors.
+const CHART_GREEN = '#199e70';
+const CHART_RED = '#e34948';
+const CHART_AMBER = '#eda100';
 
 // Only plots a time when the source field is a full timestamp (contains a
 // clock component) — registration/admission dates are sometimes date-only,
@@ -39,11 +46,6 @@ export default function NurseDashboard() {
   const { patients } = usePatients();
   const { triages } = useTriage();
   const { activeAdmissions } = useWards();
-  // ANC continuum funnel — midwife-only section (rendered below). Hook is
-  // called unconditionally per rules-of-hooks; the section itself is gated
-  // on role.
-  const { stats: ancStats } = useANC();
-  const isMidwife = currentUser?.role === 'midwife';
   const today = new Date().toISOString().slice(0, 10);
   const triageToday = triages.filter(tr => (tr.triagedAt || '').startsWith(today));
   const criticalTriage = triageToday.filter(tr => tr.priority === 'RED').length;
@@ -62,29 +64,6 @@ export default function NurseDashboard() {
     { name: 'Green', value: routineTriage, color: CHART_GREEN },
   ]), [criticalTriage, urgentTriage, routineTriage]);
   const acuityTotal = criticalTriage + urgentTriage + routineTriage;
-
-  // Wait time by stage — median minutes-waiting per queue stage, derived from
-  // today's active (pending/seen) triage records via the same
-  // buildQueueFromTriage helper the front-desk board uses. No lab/pharmacy
-  // status is loaded on this dashboard, so entries never advance past
-  // awaiting_consultation — that's a real reflection of what this station can
-  // observe, not a fabricated gap.
-  const waitByStageData = useMemo(() => {
-    const entries = buildQueueFromTriage(triageToday.filter(tr => tr.status === 'pending' || tr.status === 'seen'));
-    const groups = new Map<QueueStage, number[]>();
-    for (const entry of entries) {
-      const list = groups.get(entry.stage);
-      if (list) list.push(entry.minutesWaiting);
-      else groups.set(entry.stage, [entry.minutesWaiting]);
-    }
-    return QUEUE_STAGE_ORDER
-      .filter(stage => groups.has(stage))
-      .map(stage => ({
-        stage: STAGE_LABELS[stage],
-        minutes: median(groups.get(stage)!),
-        count: groups.get(stage)!.length,
-      }));
-  }, [triageToday]);
 
   // The Quick Actions cards act as the station switcher — each swaps the inline
   // body below (the clinical-officer dashboard pattern: quick-action cards drive
@@ -248,23 +227,6 @@ export default function NurseDashboard() {
   ]), [triageToday, currentUser?._id]);
   const { checklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
-  // ANC visit funnel — mothers reaching each visit number, straight from
-  // getANCStats().continuum (already computed server-side, no re-derivation).
-  // No reliable mother→delivery linkage exists in birth-service today, so the
-  // funnel stops at ANC5+ rather than inventing a delivery step.
-  // TODO(viz): add a delivery-count stage once births are linkable to a
-  // specific mother's ANC record.
-  const ancFunnelData = useMemo(() => {
-    if (!ancStats) return [];
-    return [
-      { stage: 'ANC1', count: ancStats.continuum.anc1 },
-      { stage: 'ANC2', count: ancStats.continuum.anc2 },
-      { stage: 'ANC3', count: ancStats.continuum.anc3 },
-      { stage: 'ANC4', count: ancStats.continuum.anc4 },
-      { stage: 'ANC5+', count: ancStats.continuum.anc5plus },
-    ];
-  }, [ancStats]);
-
   if (!currentUser) return null;
 
   return (
@@ -291,6 +253,49 @@ export default function NurseDashboard() {
           // three stations' rows ever reach a 'done' statusTone.
           chartTitle="Triage activity"
           chartSeriesNames={['Acute', 'Routine']}
+          // Triage acuity donut — today's RED/YELLOW/GREEN split, rendered in
+          // the left rail directly below the Triage activity chart.
+          railContent={(
+            <div className="ehr-day-stats">
+              <div className="ehr-day-stats-head">
+                <h3 className="flex items-center gap-2">
+                  <PieChartIcon className="w-4 h-4" style={{ color: CHART_RED }} />
+                  Triage acuity today
+                </h3>
+              </div>
+              {acuityTotal === 0 ? (
+                <p className="ehr-day-stats-empty">No triages recorded today</p>
+              ) : (
+                <div className="flex items-center gap-4" style={{ marginTop: 12 }}>
+                  <div className="relative flex-shrink-0" style={{ width: 110, height: 110 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={acuityData} dataKey="value" innerRadius={36} outerRadius={52} paddingAngle={3} stroke="none">
+                          {acuityData.map(d => <Cell key={d.name} fill={d.color} />)}
+                        </Pie>
+                        <Tooltip {...tooltipStyle} formatter={(v, name) => [v ?? 0, String(name ?? '')]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{acuityTotal}</span>
+                      <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>seen today</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    {acuityData.map(d => (
+                      <div key={d.name} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: d.color }} />
+                          {d.name}
+                        </span>
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           actionStrip={[
             ...(canUseRoute('/patients') ? [{ label: 'Patient search', icon: Users, onClick: () => router.push('/patients') }] : []),
             ...(canUseRoute('/wards') ? [{ label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') }] : []),

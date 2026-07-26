@@ -572,8 +572,8 @@ export default function ReferralsPage() {
                     { v: 'cancelled', l: getStatusLabel('cancelled') },
                   ]}
                 />
-                <EhrListHeaderButton onClick={handleDownloadCsv}>
-                  <Download size={15} /> Download
+                <EhrListHeaderButton onClick={handleDownloadCsv} ariaLabel="Download">
+                  <Download className="w-4 h-4" />
                 </EhrListHeaderButton>
                 {canManageReferrals && (
                   <button type="button" className="btn btn-primary" style={{ gap: 8, flexShrink: 0 }} onClick={() => setShowNewReferral(true)}>

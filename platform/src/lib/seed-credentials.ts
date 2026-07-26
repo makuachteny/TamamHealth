@@ -70,7 +70,11 @@ export const DEMO_USER_PROFILES: SeedUserProfile[] = [
   { username: 'clinician.peter', name: 'Dr. Peter Garang Deng',      role: 'clinician',              hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'hmis.john',       name: 'John Majok Chol',            role: 'records_hmis_officer',   hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'org.admin',       name: 'Mercy Org Administrator',    role: 'org_admin',                                                                                  orgId: PRIVATE_ORG_ID },
-  { username: 'dr.mercy',        name: 'Dr. Grace Lado',             role: 'doctor',                 hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PRIVATE_ORG_ID },
+  { username: 'dr.mercy',        name: 'Dr. Grace Lado',             role: 'doctor',                 hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'nurse.mercy',     name: 'Nurse Josephine Poni Wani',  role: 'nurse',                   hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'desk.mercy',      name: 'Martha Yar Kuek',            role: 'front_desk',              hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'pharma.mercy',    name: 'Emmanuel Loro Wani',         role: 'pharmacist',              hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
+  { username: 'lab.mercy',       name: 'Simon Machar Dhieu',         role: 'lab_tech',                hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', orgId: PRIVATE_ORG_ID },
 ];
 
 const DEMO_USERNAMES = DEMO_USER_PROFILES.map(p => p.username);

@@ -704,10 +704,9 @@ export default function PharmacyPage() {
                   ariaExpanded={showHeaderFilters}
                   ariaLabel={t('patients.filtersTitle')}
                 >
-                  <Filter className="w-3.5 h-3.5" />
-                  {t('patients.filtersTitle')}
+                  <Filter className="w-4 h-4" />
                   {headerFilterCount > 0 && (
-                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+                    <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-bold" style={{ top: -4, right: -4, background: '#2191D0', color: '#fff' }}>
                       {headerFilterCount}
                     </span>
                   )}
@@ -754,8 +753,7 @@ export default function PharmacyPage() {
               </div>
               {anyColFilter && (
                 <EhrListHeaderButton onClick={clearColFilters} ariaLabel={t('nurse.clearAllFilters')}>
-                  <X className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
+                  <X className="w-4 h-4" />
                 </EhrListHeaderButton>
               )}
               {!(activeTab === 'patients' && activePatient) && activeTab === 'reorder' && canDispense && reorderList.length > 0 && (
@@ -764,8 +762,8 @@ export default function PharmacyPage() {
                 </button>
               )}
               {!(activeTab === 'patients' && activePatient) && (
-                <EhrListHeaderButton onClick={handleDownloadCsv}>
-                  <Download size={15} /> Download
+                <EhrListHeaderButton onClick={handleDownloadCsv} ariaLabel="Download">
+                  <Download className="w-4 h-4" />
                 </EhrListHeaderButton>
               )}
               {canDispense && (

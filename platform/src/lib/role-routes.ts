@@ -30,6 +30,10 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/facility-management',
       '/admin', '/admin/control', '/admin/organizations', '/admin/users', '/admin/system', '/admin/conflicts',
+      // Command-center modules (risk, audit, support, sync, interop, data
+      // governance, security, configuration, feature flags).
+      '/admin/risk', '/admin/audit', '/admin/support', '/admin/sync',
+      '/admin/interop', '/admin/data', '/admin/security', '/admin/config', '/admin/flags',
       '/it', '/system-admin',
       '/admin/billing', '/admin/analytics',
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
@@ -50,20 +54,22 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   org_admin: {
     allowed: [
+      '/org-admin',
       '/facility-management',
-      '/org-admin', '/org-admin/users', '/org-admin/hospitals',
+      '/org-admin/users', '/org-admin/hospitals',
       '/org-admin/branding', '/org-admin/settings', '/org-admin/analytics', '/org-admin/pricing',
       '/facility-settings',
       '/it', '/system-admin',
       '/hospitals', '/reports', '/settings',
-      // Facility-management sidebar destinations (see FACILITY_NAV in permissions.ts).
       '/patients', '/pharmacy', '/messages',
       '/appointments',
       '/payments', '/payments/claims',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
-    defaultDashboard: '/facility-management',
+    // Org admins land on the org-level command center, not the facility-heavy
+    // facility-management dashboard (still reachable under Facilities & Operations).
+    defaultDashboard: '/org-admin',
   },
 
   doctor: {

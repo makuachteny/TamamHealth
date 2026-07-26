@@ -2831,7 +2831,7 @@ const en: TranslationMap = {
   'nav.dashboard': 'Dashboard',
   'nav.deaths': 'Death Registration',
   'nav.government': 'Government',
-  'nav.hospitals': 'Hospitals',
+  'nav.hospitals': 'Facilities',
   'nav.immunizations': 'Immunizations',
   'nav.lab': 'Lab Results',
   'nav.messages': 'Messages',

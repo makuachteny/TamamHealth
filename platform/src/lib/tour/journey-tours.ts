@@ -531,7 +531,7 @@ const MANAGER_STEPS: TourStep[] = [
 const ORG_ADMIN_STEPS: TourStep[] = [
   {
     id: 'welcome',
-    route: '/facility-management',
+    route: '/org-admin',
     target: '',
     title: 'Welcome, Org Admin',
     body: 'You run the organization: facilities, staff accounts, branding, and the price list. Let’s walk each.',
@@ -564,7 +564,7 @@ const ORG_ADMIN_STEPS: TourStep[] = [
     title: 'Branding',
     body: 'Your logo and theme, applied across every facility in the organization.',
   },
-  finishStep('/facility-management'),
+  finishStep('/org-admin'),
 ];
 
 // ── County health director — §10 ───────────────────────────────────────────

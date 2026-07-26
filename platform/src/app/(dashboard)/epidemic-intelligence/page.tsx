@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
 import { useEpidemicIntelligence } from '@/lib/hooks/useEpidemicIntelligence';
@@ -22,6 +23,7 @@ const SEVERITY_TONE: Record<string, BadgeTone> = {
 };
 
 type TabView = 'overview' | 'curves' | 'syndromic' | 'geographic' | 'idsr' | 'alerts';
+const VALID_TABS: TabView[] = ['overview', 'curves', 'syndromic', 'geographic', 'idsr', 'alerts'];
 
 // South Sudan states for mini heatmap
 const STATES_GRID = [
@@ -42,8 +44,18 @@ if (process.env.NODE_ENV !== 'production') {
 
 export default function EpidemicIntelligencePage() {
   const { t } = useTranslation();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTabParam = searchParams?.get('tab');
+  const initialTab: TabView = VALID_TABS.includes(initialTabParam as TabView) ? (initialTabParam as TabView) : 'overview';
   const { data, loading } = useEpidemicIntelligence();
-  const [activeTab, setActiveTab] = useState<TabView>('overview');
+  const [activeTab, setActiveTab] = useState<TabView>(initialTab);
+  const setActiveTabAndUrl = (next: TabView) => {
+    setActiveTab(next);
+    const params = new URLSearchParams(searchParams?.toString() || '');
+    params.set('tab', next);
+    router.replace(`/epidemic-intelligence?${params.toString()}`, { scroll: false });
+  };
   const [selectedDisease, setSelectedDisease] = useState<string | null>(null);
   const [expandedAlert, setExpandedAlert] = useState<number | null>(null);
 
@@ -153,7 +165,7 @@ export default function EpidemicIntelligencePage() {
           {tabs.map(tab => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => setActiveTabAndUrl(tab.key)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
               style={{
                 background: activeTab === tab.key ? 'var(--bg-card)' : 'transparent',

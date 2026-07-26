@@ -737,8 +737,19 @@ export default function ImmunizationsPage() {
               <option value="up_to_date">Up to date</option>
               <option value="has_overdue">Has overdue doses</option>
             </select>
-            <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
-              <Download size={15} /> Download
+            <button
+              type="button"
+              onClick={handleDownloadCsv}
+              aria-label="Download"
+              title="Download"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 38, height: 38, padding: 0, flexShrink: 0,
+                borderRadius: 999, background: 'var(--bg-card-solid)', color: 'var(--text-secondary)',
+                border: '1px solid var(--border-light)', cursor: 'pointer',
+              }}
+            >
+              <Download className="w-4 h-4" />
             </button>
           </div>
 

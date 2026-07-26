@@ -45,6 +45,9 @@ import {
   Eye,
   TrendingUp,
   GitCompareArrows,
+  FileText,
+  RefreshCw,
+  Flag,
 } from '@/components/icons/lucide';
 import { BRAND_DARKER, BRAND_PRIMARY, BRAND_SECONDARY } from './theme-colors';
 
@@ -87,45 +90,33 @@ export interface RoleConfig {
   badgeLabel: string;
 }
 
-/**
- * Facility-management sidebar (the hospital-admin nav from the reference design),
- * mapped to the platform's real routes. Shared by the roles that own the
- * Facility Management dashboard so the nav is defined once (no duplicates).
- * Duplicate reference items are collapsed onto a single real feature:
- * "Medicines" → Pharmacy (with Prescriptions), "IPD/OPD" → Wards (with Bed
- * Management).
- */
-const FACILITY_NAV: NavItem[] = [
-  { href: '/facility-management', label: 'Dashboard', icon: HospitalIcon, section: 'HOSPITAL' },
-  { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'HOSPITAL' },
-  { href: '/wards', label: 'Bed Management', icon: BedDouble, section: 'HOSPITAL' },
-  { href: '/hr', label: 'Doctors & Staff', icon: Stethoscope, section: 'HOSPITAL' },
-  { href: '/patients', label: 'Patients', icon: Users, section: 'HOSPITAL' },
-  { href: '/pharmacy', label: 'Prescriptions & Medicines', icon: Pill, section: 'SERVICES' },
-  { href: '/blood-bank', label: 'Blood Bank', icon: Droplets, section: 'SERVICES' },
-  { href: '/messages', label: 'Enquiries', icon: MessageSquare, section: 'SERVICES' },
-  { href: '/reports', label: 'Reports', icon: BarChart3, section: 'SERVICES' },
-];
-
 export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
   super_admin: {
     label: 'Super Admin',
     defaultDashboard: ROLE_ROUTE_TABLE.super_admin.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.super_admin.allowed],
+    // Platform-governance IA: the super admin is a platform operator, not a
+    // hospital worker — primary nav is command/tenants/operations/business/
+    // governance. Clinical routes stay reachable (allowedRoutes) for support
+    // work but are deliberately NOT in this list.
     navItems: [
-      { href: '/admin', label: 'Platform Dashboard', icon: Gauge, section: 'OVERVIEW' },
-      { href: '/admin/control', label: 'Control Center', icon: Shield, section: 'OVERVIEW' },
+      { href: '/admin', label: 'Platform Dashboard', icon: Gauge, section: 'COMMAND' },
+      { href: '/admin/risk', label: 'Risk Center', icon: ShieldAlert, section: 'COMMAND' },
+      { href: '/admin/audit', label: 'Audit Logs', icon: FileText, section: 'COMMAND' },
       { href: '/admin/organizations', label: 'Organizations', icon: Building2, section: 'TENANTS' },
-      { href: '/admin/users', label: 'Users & Access', icon: Users, section: 'TENANTS' },
       { href: '/hospitals', label: 'Facilities', icon: HospitalIcon, section: 'TENANTS' },
-      { href: '/admin/billing', label: 'Billing & Plans', icon: CreditCard, section: 'FINANCE' },
-      { href: '/payments', label: 'Revenue & Payments', icon: Wallet, section: 'FINANCE' },
-      { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'FINANCE' },
-      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, section: 'INTELLIGENCE' },
-      { href: '/reports', label: 'Reports', icon: ClipboardCheck, section: 'INTELLIGENCE' },
-      { href: '/admin/system', label: 'System & Integrations', icon: Server, section: 'OPERATIONS' },
-      { href: '/it', label: 'IT Operations', icon: Wrench, section: 'OPERATIONS' },
-      { href: '/admin/conflicts', label: 'Conflict Queue', icon: GitCompareArrows, section: 'OPERATIONS' },
+      { href: '/admin/users', label: 'Users & Access', icon: Users, section: 'TENANTS' },
+      { href: '/admin/support', label: 'Support Operations', icon: MessageSquare, section: 'TENANTS' },
+      { href: '/admin/system', label: 'System Health', icon: Server, section: 'PLATFORM OPERATIONS' },
+      { href: '/admin/sync', label: 'Sync & Jobs', icon: RefreshCw, section: 'PLATFORM OPERATIONS' },
+      { href: '/admin/interop', label: 'Interoperability', icon: Globe, section: 'PLATFORM OPERATIONS' },
+      { href: '/admin/data', label: 'Data Governance', icon: Database, section: 'PLATFORM OPERATIONS' },
+      { href: '/admin/billing', label: 'Billing & Subscriptions', icon: CreditCard, section: 'BUSINESS' },
+      { href: '/admin/analytics', label: 'Usage Analytics', icon: TrendingUp, section: 'BUSINESS' },
+      { href: '/reports', label: 'Reports', icon: ClipboardCheck, section: 'BUSINESS' },
+      { href: '/admin/security', label: 'Security & Compliance', icon: Shield, section: 'GOVERNANCE' },
+      { href: '/admin/config', label: 'Configuration', icon: Settings, section: 'GOVERNANCE' },
+      { href: '/admin/flags', label: 'Feature Flags', icon: Flag, section: 'GOVERNANCE' },
     ],
     color: BRAND_SECONDARY,
     gradientFrom: BRAND_DARKER,
@@ -137,22 +128,34 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     label: 'Organization Admin',
     defaultDashboard: ROLE_ROUTE_TABLE.org_admin.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.org_admin.allowed],
+    // Grouping follows the FHIR administration module / DHIS2 admin split:
+    // overview → facility network → people & access → clinical service lines →
+    // finance → intelligence → risk/assets → IT & system controls.
     navItems: [
-      ...FACILITY_NAV,
-      // Organization administration (no href duplicates the facility nav above).
-      { href: '/org-admin', label: 'Org Dashboard', icon: LayoutDashboard, section: 'ORGANIZATION' },
-      { href: '/org-admin/users', label: 'Manage Users', icon: Users, section: 'ORGANIZATION' },
-      { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'ORGANIZATION' },
-      { href: '/equipment', label: 'Assets', icon: Wrench, section: 'ORGANIZATION' },
-      { href: '/org-admin/branding', label: 'Branding', icon: Palette, section: 'ORGANIZATION' },
-      { href: '/org-admin/pricing', label: 'Service Pricing', icon: Receipt, section: 'ORGANIZATION' },
-      { href: '/emergency-preparedness', label: 'Emergency Prep', icon: ShieldAlert, section: 'ORGANIZATION' },
-      { href: '/org-admin/analytics', label: 'Analytics', icon: BarChart3, section: 'ORGANIZATION' },
-      { href: '/payments', label: 'Bills', icon: Wallet, section: 'ORGANIZATION' },
-      { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'ORGANIZATION' },
-      { href: '/it', label: 'IT Operations', icon: Server, section: 'ORGANIZATION' },
-      { href: '/system-admin', label: 'System Administration', icon: Settings, section: 'ORGANIZATION' },
-      { href: '/org-admin/settings', label: 'Settings', icon: Settings, section: 'ORGANIZATION' },    ],
+      { href: '/org-admin', label: 'Dashboard', icon: Gauge, section: 'OVERVIEW' },
+      { href: '/messages', label: 'Enquiries', icon: MessageSquare, section: 'OVERVIEW' },
+      { href: '/hospitals', label: 'Facilities', icon: HospitalIcon, section: 'FACILITIES & OPERATIONS' },
+      { href: '/facility-management', label: 'Facility Operations', icon: Building2, section: 'FACILITIES & OPERATIONS' },
+      { href: '/wards', label: 'Bed Management', icon: BedDouble, section: 'FACILITIES & OPERATIONS' },
+      { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'FACILITIES & OPERATIONS' },
+      { href: '/org-admin/users', label: 'Manage Users', icon: Users, section: 'PEOPLE & ACCESS' },
+      { href: '/hr', label: 'Doctors & Staff', icon: Stethoscope, section: 'PEOPLE & ACCESS' },
+      { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL SERVICES' },
+      { href: '/pharmacy', label: 'Prescriptions & Medicines', icon: Pill, section: 'CLINICAL SERVICES' },
+      { href: '/blood-bank', label: 'Blood Bank', icon: Droplets, section: 'CLINICAL SERVICES' },
+      { href: '/payments', label: 'Billing & Payments', icon: Wallet, section: 'FINANCE' },
+      { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'FINANCE' },
+      { href: '/org-admin/pricing', label: 'Service Pricing', icon: CreditCard, section: 'FINANCE' },
+      // Analytics = live dashboards; Reports = export/scheduled/statutory outputs.
+      { href: '/org-admin/analytics', label: 'Analytics', icon: BarChart3, section: 'INTELLIGENCE & REPORTING' },
+      { href: '/reports', label: 'Reports', icon: ClipboardCheck, section: 'INTELLIGENCE & REPORTING' },
+      { href: '/equipment', label: 'Assets', icon: Wrench, section: 'RISK, ASSETS & PREPAREDNESS' },
+      { href: '/emergency-preparedness', label: 'Emergency Prep', icon: ShieldAlert, section: 'RISK, ASSETS & PREPAREDNESS' },
+      { href: '/it', label: 'IT Operations', icon: Server, section: 'IT & SYSTEM' },
+      { href: '/system-admin', label: 'System & Data Controls', icon: Database, section: 'IT & SYSTEM' },
+      { href: '/org-admin/branding', label: 'Branding', icon: Palette, section: 'IT & SYSTEM' },
+      { href: '/org-admin/settings', label: 'Settings', icon: Settings, section: 'IT & SYSTEM' },
+    ],
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,
     gradientTo: BRAND_PRIMARY,
@@ -332,30 +335,43 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
   },
 
   government: {
-    label: 'Government Admin',
+    label: 'Ministry of Health',
     defaultDashboard: ROLE_ROUTE_TABLE.government.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.government.allowed],
+    // Public-health intelligence IA (WHO RHIS / DHIS2-aligned): command,
+    // surveillance, system performance, programs, CRVS, data quality,
+    // exchange, equity. Query-string hrefs deep-link into a page's view.
     navItems: [
-      { href: '/government', label: 'National Dashboard', icon: LayoutDashboard, section: 'OVERVIEW' },
-      { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'OVERVIEW' },
-      { href: '/vital-statistics', label: 'Vital Statistics', icon: TrendingUp, section: 'POPULATION HEALTH' },
-      { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'POPULATION HEALTH' },
-      { href: '/anc', label: 'Maternal Health', icon: HeartPulse, section: 'POPULATION HEALTH' },
-      { href: '/births', label: 'Births', icon: Baby, section: 'POPULATION HEALTH' },
-      { href: '/deaths', label: 'Deaths', icon: UserX, section: 'POPULATION HEALTH' },
-      { href: '/epidemic-intelligence', label: 'Epidemic Intelligence', icon: Biohazard, section: 'INTELLIGENCE' },
-      { href: '/mch-analytics', label: 'MCH Analytics', icon: HeartPulse, section: 'INTELLIGENCE' },
-      { href: '/surveillance', label: 'Surveillance', icon: Eye, section: 'INTELLIGENCE' },
-      { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'GOVERNANCE' },
-      { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'GOVERNANCE' },
-      { href: '/reports', label: 'Reports', icon: BarChart3, section: 'GOVERNANCE' },
-      { href: '/dhis2-export', label: 'DHIS2 Export', icon: Download, section: 'GOVERNANCE' },
-      { href: '/public-stats', label: 'Public Statistics', icon: Globe, section: 'GOVERNANCE' },
+      { href: '/government', label: 'National Dashboard', icon: LayoutDashboard, section: 'NATIONAL COMMAND' },
+      { href: '/government/alerts', label: 'Priority Alerts', icon: Siren, section: 'NATIONAL COMMAND' },
+      { href: '/government/briefing', label: 'Executive Briefing', icon: ClipboardPen, section: 'NATIONAL COMMAND' },
+      { href: '/surveillance', label: 'Surveillance', icon: Eye, section: 'SURVEILLANCE & RESPONSE' },
+      { href: '/epidemic-intelligence', label: 'Epidemic Intelligence', icon: Biohazard, section: 'SURVEILLANCE & RESPONSE' },
+      { href: '/epidemic-intelligence?tab=alerts', label: 'Alert Verification', icon: ShieldAlert, section: 'SURVEILLANCE & RESPONSE' },
+      { href: '/hospitals', label: 'Facilities & Services', icon: HospitalIcon, section: 'HEALTH SYSTEM PERFORMANCE' },
+      { href: '/facility-assessments', label: 'Assessments & Readiness', icon: ClipboardCheck, section: 'HEALTH SYSTEM PERFORMANCE' },
+      { href: '/immunizations', label: 'Immunization', icon: Syringe, section: 'PROGRAMS' },
+      { href: '/anc', label: 'ANC / RMNCAH', icon: HeartPulse, section: 'PROGRAMS' },
+      { href: '/mch-analytics', label: 'MCH Analytics', icon: Baby, section: 'PROGRAMS' },
+      { href: '/government/programs', label: 'Disease Programs', icon: Shield, section: 'PROGRAMS' },
+      { href: '/births', label: 'Births', icon: Baby, section: 'VITAL EVENTS & CRVS' },
+      { href: '/deaths', label: 'Deaths', icon: UserX, section: 'VITAL EVENTS & CRVS' },
+      { href: '/vital-statistics', label: 'Vital Statistics', icon: TrendingUp, section: 'VITAL EVENTS & CRVS' },
+      { href: '/data-quality?view=completeness', label: 'Reporting Completeness', icon: Database, section: 'DATA QUALITY' },
+      { href: '/data-quality?view=timeliness', label: 'Reporting Timeliness', icon: Gauge, section: 'DATA QUALITY' },
+      { href: '/data-quality?view=outliers', label: 'Outliers & Validation', icon: ShieldAlert, section: 'DATA QUALITY' },
+      { href: '/data-quality?view=scores', label: 'Facility DQ Scores', icon: BarChart3, section: 'DATA QUALITY' },
+      { href: '/reports', label: 'Reports & Downloads', icon: ClipboardCheck, section: 'REPORTS & EXCHANGE' },
+      { href: '/dhis2-export', label: 'DHIS2 Export', icon: Download, section: 'REPORTS & EXCHANGE' },
+      { href: '/public-stats', label: 'Public Statistics', icon: Globe, section: 'REPORTS & EXCHANGE' },
+      { href: '/government/equity', label: 'County Comparison', icon: GitCompareArrows, section: 'EQUITY & PLANNING' },
+      { href: '/government/equity?view=burden', label: 'High Burden / Low Coverage', icon: TrendingUp, section: 'EQUITY & PLANNING' },
+      { href: '/government/equity?view=access', label: 'Service Access Gaps', icon: Building2, section: 'EQUITY & PLANNING' },
     ],
     color: BRAND_SECONDARY,
     gradientFrom: BRAND_DARKER,
     gradientTo: BRAND_SECONDARY,
-    badgeLabel: 'Gov Admin',
+    badgeLabel: 'MoH',
   },
 
   county_health_director: {

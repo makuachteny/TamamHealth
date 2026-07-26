@@ -1,1188 +1,619 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
-import {
-  Users,
-  TrendingUp,
-  ChevronDown,
-  Check, BarChart3, LineChart as LineChartIcon,
-  PieChart as PieChartIcon, Activity, Filter,
-  Layers, Target, Sliders, X, Maximize2, ChevronLeft
-} from '@/components/icons/lucide';
-import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  AreaChart, Area, RadarChart, Radar, PolarGrid, PolarAngleAxis,
-  PolarRadiusAxis, ComposedChart,
-} from 'recharts';
-import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useHospitals } from '@/lib/hooks/useHospitals';
-import { useSurveillance } from '@/lib/hooks/useSurveillance';
-import EmptyState from '@/components/EmptyState';
-import type { HospitalDoc, DiseaseAlertDoc } from '@/lib/db-types';
-
-// recharts 3.x seeds a ResponsiveContainer's size at {-1,-1} until its
-// ResizeObserver fires, so every percentage-sized container logs a dev-only
-// "width(-1) and height(-1) of chart should be greater than 0" warning on the
-// first paint. Seeding a positive initial dimension clears that first-render
-// check; the observer overwrites it with the real size on the next frame, so
-// there is no visible size change.
-const CHART_INIT_DIMENSION = { width: 1, height: 1 };
-
 /**
- * Aggregate computed dashboards
- * --------------------------------------------------------------------
- * `weeklyDiseaseData` and `casesByState` were previously imported from
- * a hard-coded mock module, which meant the national MoH dashboard
- * showed identical fake outbreak numbers regardless of the real
- * `disease_alert` documents in PouchDB. We now derive both shapes from
- * the live disease-alert feed (`useSurveillance`) so the charts and the
- * DHIS2 export reflect actual reporting.
+ * Ministry of Health — National Dashboard.
  *
- * Disease keys used by the chart components:
- *   - weeklyDiseaseData: { week, malaria, cholera, measles, pneumonia, diarrhea }
- *   - casesByState:      { state, malaria, cholera, measles, tb, hiv }
+ * Public-health intelligence workspace (WHO RHIS / DHIS2-aligned), answering:
+ * "What is happening nationally, where is action needed, and can we trust the
+ * data?" One screen of situation awareness — detailed work lives in the
+ * module pages (surveillance, programs, CRVS, data quality, exchange).
+ *
+ * Every panel states its period and geography, and no number is invented:
+ * each value is computed from the live local datasets (disease alerts,
+ * facility assessments, immunization/ANC records, birth/death registrations,
+ * DHIS2 sync log). Missing data renders as an explicit empty state.
  */
-type WeeklyDiseaseRow = { week: string; malaria: number; cholera: number; measles: number; pneumonia: number; diarrhea: number };
-type StateDiseaseRow = { state: string; malaria: number; cholera: number; measles: number; tb: number; hiv: number };
 
-// Map free-form disease names to chart keys. Anything not listed is
-// silently ignored — we do not invent numbers for diseases the chart
-// can't display.
-const DISEASE_KEY_MAP: Record<string, keyof Omit<WeeklyDiseaseRow, 'week'> | keyof Omit<StateDiseaseRow, 'state'>> = {
-  malaria: 'malaria',
-  cholera: 'cholera',
-  measles: 'measles',
-  pneumonia: 'pneumonia',
-  diarrhea: 'diarrhea',
-  'acute watery diarrhea': 'diarrhea',
-  awd: 'diarrhea',
-  tuberculosis: 'tb',
-  tb: 'tb',
-  hiv: 'hiv',
-  'hiv/aids': 'hiv',
-};
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+import { tooltipStyle, axisTick } from '@/components/ChartCard';
+import {
+  Siren, ClipboardPen, ChevronRight, Eye, Database, Download, Syringe, HeartPulse,
+} from '@/components/icons/lucide';
+import { useSurveillance } from '@/lib/hooks/useSurveillance';
+import { useHospitals } from '@/lib/hooks/useHospitals';
+import { useBirths } from '@/lib/hooks/useBirths';
+import { useDeaths } from '@/lib/hooks/useDeaths';
+import { getNationalDataQuality, type NationalDataQuality } from '@/lib/services/data-quality-service';
+import { getImmunizationStats, getDefaulterStats } from '@/lib/services/immunization-service';
+import { getANCStats } from '@/lib/services/anc-service';
+import { getDhis2SyncLog, isDhis2Configured, getDhis2BaseUrlHost, isFullySynced, type Dhis2SyncLogDoc } from '@/lib/services/dhis2-sync-log-service';
+import type { DiseaseAlertDoc } from '@/lib/db-types';
 
-function isoWeekLabel(iso: string): string {
-  // Convert an ISO date to a "Wnn MMM" label for the weekly chart axis.
-  // Falls back to the raw string if the date doesn't parse.
+// Restrained public-health palette.
+const BLUE = '#2a78d6';
+const GREEN = '#199e70';
+const RED = '#e34948';
+const AMBER = '#eda100';
+const DEEP = '#015697';
+
+type ImmunizationStats = Awaited<ReturnType<typeof getImmunizationStats>>;
+type ANCStats = Awaited<ReturnType<typeof getANCStats>>;
+type DefaulterStats = Awaited<ReturnType<typeof getDefaulterStats>>;
+
+// ── Ten-state tile-grid cartogram ────────────────────────────────────
+// Approximate geographic layout (4 cols × 3 rows). A tile grid keeps every
+// state readable and equal-weight — no distorted polygons, no fake precision.
+const STATE_TILES: { name: string; abbr: string; col: number; row: number }[] = [
+  { name: 'Northern Bahr el Ghazal', abbr: 'NBG', col: 0, row: 0 },
+  { name: 'Unity', abbr: 'UNY', col: 2, row: 0 },
+  { name: 'Upper Nile', abbr: 'UNL', col: 3, row: 0 },
+  { name: 'Western Bahr el Ghazal', abbr: 'WBG', col: 0, row: 1 },
+  { name: 'Warrap', abbr: 'WRP', col: 1, row: 1 },
+  { name: 'Lakes', abbr: 'LKS', col: 2, row: 1 },
+  { name: 'Jonglei', abbr: 'JGL', col: 3, row: 1 },
+  { name: 'Western Equatoria', abbr: 'WEQ', col: 1, row: 2 },
+  { name: 'Central Equatoria', abbr: 'CEQ', col: 2, row: 2 },
+  { name: 'Eastern Equatoria', abbr: 'EEQ', col: 3, row: 2 },
+];
+
+type MapLayer = 'alerts' | 'completeness' | 'immunization' | 'facilities';
+
+const MAP_LAYERS: { key: MapLayer; label: string; legend: string }[] = [
+  { key: 'alerts', label: 'Alert cases', legend: 'Active surveillance alert cases' },
+  { key: 'completeness', label: 'Reporting', legend: 'Avg reporting completeness (facility assessments)' },
+  { key: 'immunization', label: 'Immunization', legend: 'Immunization records on file' },
+  { key: 'facilities', label: 'Facilities', legend: 'Registered facilities' },
+];
+
+function isoWeekLabel(iso: string): { label: string; sortKey: string } {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso || 'Unknown';
-  // ISO week number (1-53)
+  if (Number.isNaN(d.getTime())) return { label: iso || '?', sortKey: iso || '' };
   const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   const dayNum = (target.getUTCDay() + 6) % 7;
   target.setUTCDate(target.getUTCDate() - dayNum + 3);
   const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
   const week = 1 + Math.round(((target.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
-  // Month is taken from the week's own Thursday (`target`), NOT the raw report
-  // date — otherwise reports on either side of a month boundary within the same
-  // ISO week produce two labels (e.g. "W27 Jun" and "W27 Jul") and the week
-  // appears twice with a bogus month jump.
   const month = target.toLocaleString('en', { month: 'short', timeZone: 'UTC' });
-  return `W${week} ${month}`;
+  return { label: `W${week} ${month}`, sortKey: target.toISOString().slice(0, 10) };
 }
 
-function buildWeeklyDiseaseData(alerts: DiseaseAlertDoc[]): WeeklyDiseaseRow[] {
-  const byWeek = new Map<string, WeeklyDiseaseRow & { _sortKey: string }>();
-  for (const a of alerts) {
-    if (!a.reportDate) continue;
-    const label = isoWeekLabel(a.reportDate);
-    const sortKey = a.reportDate.slice(0, 10);
-    const key = DISEASE_KEY_MAP[(a.disease || '').toLowerCase()] as keyof Omit<WeeklyDiseaseRow, 'week'> | undefined;
-    if (!key) continue;
-    if (!(['malaria', 'cholera', 'measles', 'pneumonia', 'diarrhea'] as const).includes(key as 'malaria' | 'cholera' | 'measles' | 'pneumonia' | 'diarrhea')) continue;
-    const existing = byWeek.get(label) ?? {
-      week: label, malaria: 0, cholera: 0, measles: 0, pneumonia: 0, diarrhea: 0, _sortKey: sortKey,
-    };
-    existing[key as Exclude<keyof WeeklyDiseaseRow, 'week'>] += (a.cases || 0);
-    if (sortKey < existing._sortKey) existing._sortKey = sortKey;
-    byWeek.set(label, existing);
-  }
-  return Array.from(byWeek.values())
-    .sort((a, b) => a._sortKey.localeCompare(b._sortKey))
-    .map(row => {
-      const { _sortKey: _drop, ...rest } = row;
-      void _drop;
-      return rest;
-    });
+function monthLabel(iso: string): { label: string; sortKey: string } | null {
+  if (!iso || iso.length < 7) return null;
+  const key = iso.slice(0, 7);
+  const d = new Date(`${key}-01T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  return { label: d.toLocaleString('en', { month: 'short', year: '2-digit', timeZone: 'UTC' }), sortKey: key };
 }
 
-function buildCasesByState(alerts: DiseaseAlertDoc[]): StateDiseaseRow[] {
-  const byState = new Map<string, StateDiseaseRow>();
-  for (const a of alerts) {
-    if (!a.state) continue;
-    const key = DISEASE_KEY_MAP[(a.disease || '').toLowerCase()] as keyof Omit<StateDiseaseRow, 'state'> | undefined;
-    if (!key) continue;
-    if (!(['malaria', 'cholera', 'measles', 'tb', 'hiv'] as const).includes(key as 'malaria' | 'cholera' | 'measles' | 'tb' | 'hiv')) continue;
-    const existing = byState.get(a.state) ?? {
-      state: a.state, malaria: 0, cholera: 0, measles: 0, tb: 0, hiv: 0,
-    };
-    existing[key as Exclude<keyof StateDiseaseRow, 'state'>] += (a.cases || 0);
-    byState.set(a.state, existing);
-  }
-  return Array.from(byState.values()).sort((a, b) => b.malaria - a.malaria);
+// Threshold tone for percentage indicators (WHO DQR-style traffic light).
+function pctTone(value: number, amberBelow: number, redBelow: number): string {
+  if (value < redBelow) return RED;
+  if (value < amberBelow) return AMBER;
+  return GREEN;
 }
 
-/**
- * Compress a state name into a short axis label.
- *
- * - Multi-word names → initials of each word ("Northern Bahr el Ghazal" → "NBEG").
- *   We strip a trailing period from initialized abbreviations like "W." so
- *   "W. Bahr el Ghazal" still becomes "WBEG" rather than "W.BEG".
- * - Single-word names → first 4 characters, upper-cased ("Jonglei" → "JONG").
- * - Names ≤ 4 chars are returned as-is.
- *
- * Replaces an earlier hard-coded map that silently passed through any state
- * not listed (e.g. "Jonglei", "Lakes"), crowding the chart axis.
- */
-function abbreviateStateLabel(name: string): string {
-  if (!name) return name;
-  const trimmed = name.trim();
-  if (trimmed.length <= 4) return trimmed;
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  if (words.length > 1) {
-    return words
-      .map(w => (w[0] || '').toUpperCase())
-      .join('');
-  }
-  return trimmed.slice(0, 4).toUpperCase();
-}
+// ── Small presentational pieces ──────────────────────────────────────
 
-/* ═══════════════════════════════════════════════════════════════════
-   SHARED COMPONENTS
-   ═══════════════════════════════════════════════════════════════════ */
-
-function ChartTooltip({ active, payload, label }: {
-  active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
-  label?: string;
-}) {
-  if (!active || !payload) return null;
+function PanelHead({ title, meta, action }: { title: string; meta?: string; action?: React.ReactNode }) {
   return (
-    <div className="card-elevated p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', fontSize: '0.75rem', borderRadius: '6px' }}>
-      <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{label}</p>
-      {payload.map((entry, i) => (
-        <div key={i} className="flex items-center gap-2 py-0.5">
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: entry.color }} />
-          <span style={{ color: 'var(--text-secondary)' }}>{entry.name}:</span>
-          <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CircularGauge({ value, label, color, size = 100, strokeWidth = 8 }: {
-  value: number; label: string; color: string; size?: number; strokeWidth?: number;
-}) {
-  const pct = Math.min(100, Math.max(0, value));
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (pct / 100) * circumference;
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative">
-        <svg width={size} height={size} className="transform -rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--border-light)" strokeWidth={strokeWidth} />
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={strokeWidth}
-            strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-            className="transition-all duration-1000 ease-out" />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lg font-bold" style={{ color }}>{pct}%</span>
-        </div>
+    <div className="px-4 pt-3.5 pb-2.5 flex items-baseline justify-between gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--border-light)' }}>
+      <h3 className="text-[13px] font-extrabold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+      <div className="flex items-center gap-3">
+        {meta && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{meta}</span>}
+        {action}
       </div>
-      <span className="text-[10px] font-medium mt-2 text-center" style={{ color: 'var(--text-muted)' }}>{label}</span>
     </div>
   );
 }
 
-/* ─── Tableau-style Dropdown Select ──────────────────────────────── */
-function TableauSelect({ label, value, options, onChange, icon: Icon, width }: {
-  label: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (v: string) => void;
-  icon?: React.ElementType;
-  width?: string;
-}) {
+/** Target-vs-actual bullet bar: filled actual, tick at target. */
+function BulletRow({ label, actual, target, denominator }: { label: string; actual: number; target: number; denominator?: string }) {
+  const tone = actual >= target ? GREEN : actual >= target - 15 ? AMBER : RED;
   return (
-    <div className="flex items-center gap-1.5">
-      {Icon && <Icon className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />}
-      <span className="text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="text-[11px] font-semibold rounded-lg px-2 py-1 outline-none cursor-pointer transition-all"
-        style={{
-          background: 'var(--overlay-subtle)',
-          border: '1px solid var(--border-light)',
-          color: 'var(--text-primary)',
-          minWidth: width || '90px',
-        }}
-      >
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+    <div>
+      <div className="flex items-baseline justify-between gap-2 mb-1">
+        <span className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
+        <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          <b style={{ color: tone }}>{actual}%</b> / target {target}%
+        </span>
+      </div>
+      <div className="relative" style={{ height: 8, borderRadius: 4, background: 'var(--overlay-subtle)' }}>
+        <div style={{ position: 'absolute', inset: 0, width: `${Math.min(100, actual)}%`, borderRadius: 4, background: tone }} />
+        <div style={{ position: 'absolute', top: -2, bottom: -2, left: `${Math.min(100, target)}%`, width: 2, background: 'var(--text-primary)', opacity: 0.55 }} />
+      </div>
+      {denominator && <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{denominator}</div>}
     </div>
   );
 }
 
-/* ─── Multi-Select Dropdown (Tableau filter) ─────────────────────── */
-function TableauMultiSelect({ label, options, selected, onChange, icon: Icon }: {
-  label: string;
-  options: Array<{ value: string; label: string; color: string }>;
-  selected: string[];
-  onChange: (selected: string[]) => void;
-  icon?: React.ElementType;
-}) {
-  const { t } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+export default function GovernmentNationalDashboard() {
+  const router = useRouter();
+  const { alerts } = useSurveillance();
+  const { hospitals } = useHospitals();
+  const { births } = useBirths();
+  const { deaths } = useDeaths();
+
+  const [dq, setDq] = useState<NationalDataQuality | null>(null);
+  const [imm, setImm] = useState<ImmunizationStats | null>(null);
+  const [anc, setAnc] = useState<ANCStats | null>(null);
+  const [defaulters, setDefaulters] = useState<DefaulterStats | null>(null);
+  const [dhis2, setDhis2] = useState<Dhis2SyncLogDoc | null>(null);
+  const [layer, setLayer] = useState<MapLayer>('alerts');
+  const [selectedState, setSelectedState] = useState<string | null>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    let cancelled = false;
+    (async () => {
+      const [dqRes, immRes, ancRes, defRes, logRes] = await Promise.all([
+        getNationalDataQuality().catch(() => null),
+        getImmunizationStats().catch(() => null),
+        getANCStats().catch(() => null),
+        getDefaulterStats().catch(() => null),
+        getDhis2SyncLog().catch(() => null),
+      ]);
+      if (cancelled) return;
+      setDq(dqRes); setImm(immRes); setAnc(ancRes); setDefaulters(defRes); setDhis2(logRes);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  const toggle = (v: string) => {
-    if (selected.includes(v)) {
-      if (selected.length > 1) onChange(selected.filter(s => s !== v));
-    } else {
-      onChange([...selected, v]);
-    }
-  };
-
-  return (
-    <div className="relative" ref={ref}>
-      <div className="flex items-center gap-1.5">
-        {Icon && <Icon className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />}
-        <span className="text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{label}</span>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1 text-[11px] font-semibold rounded-lg px-2 py-1 transition-all"
-          style={{
-            background: 'var(--overlay-subtle)',
-            border: '1px solid var(--border-light)',
-            color: 'var(--text-primary)',
-            minWidth: '120px',
-          }}
-        >
-          <span className="truncate flex-1 text-left">
-            {selected.length === options.length ? t('government.all') : t('government.countSelected', { count: selected.length })}
-          </span>
-          <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-        </button>
-      </div>
-      {isOpen && (
-        <div
-          className="absolute z-20 mt-1 right-0 rounded-xl shadow-lg overflow-hidden"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', minWidth: '180px' }}
-        >
-          {/* Select All / Clear */}
-          <div className="flex items-center justify-between px-3 py-1.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <button
-              onClick={() => onChange(options.map(o => o.value))}
-              className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}
-            >
-              {t('government.selectAll')}
-            </button>
-          </div>
-          {options.map(o => {
-            const checked = selected.includes(o.value);
-            return (
-              <button
-                key={o.value}
-                onClick={() => toggle(o.value)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] transition-colors hover:opacity-80"
-                style={{
-                  background: checked ? `${o.color}10` : 'transparent',
-                  borderBottom: '1px solid var(--border-light)',
-                }}
-              >
-                <span
-                  className="w-3.5 h-3.5 rounded flex items-center justify-center flex-shrink-0"
-                  style={{
-                    border: checked ? `2px solid ${o.color}` : '2px solid var(--border-light)',
-                    background: checked ? o.color : 'transparent',
-                  }}
-                >
-                  {checked && <Check className="w-2 h-2 text-white" strokeWidth={3} />}
-                </span>
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: o.color }} />
-                <span style={{ color: 'var(--text-primary)' }}>{o.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+  const activeAlerts = useMemo(
+    () => alerts.filter(a => a.alertLevel === 'watch' || a.alertLevel === 'warning' || a.alertLevel === 'emergency'),
+    [alerts],
   );
-}
+  const emergencyCount = activeAlerts.filter(a => a.alertLevel === 'emergency').length;
+  const warningCount = activeAlerts.filter(a => a.alertLevel === 'warning').length;
 
-/* ─── Chart Type Button Group ────────────────────────────────────── */
-function ChartTypeSelector({ value, options, onChange }: {
-  value: string;
-  options: Array<{ value: string; label: string; icon: React.ElementType }>;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex items-center rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
-      {options.map((opt, i) => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold transition-all"
-          title={opt.label}
-          style={{
-            background: value === opt.value ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
-            color: value === opt.value ? '#fff' : 'var(--text-muted)',
-            borderRight: i < options.length - 1 ? '1px solid var(--border-light)' : 'none',
-          }}
-        >
-          <opt.icon className="w-3 h-3" />
-          <span className="hidden sm:inline">{opt.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
+  // Outbreak risk — derived strictly from the worst active alert level.
+  const outbreakRisk = emergencyCount > 0
+    ? { label: 'High', tone: RED }
+    : warningCount > 0
+      ? { label: 'Elevated', tone: AMBER }
+      : activeAlerts.length > 0
+        ? { label: 'Guarded', tone: BLUE }
+        : { label: 'Low', tone: GREEN };
 
-/* ─── Inline Expanded Chart View (fills the content area beside sidebar) ── */
-function ExpandedChartView({ title, onClose, children, hasData = true, emptyMessage }: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  hasData?: boolean;
-  emptyMessage?: string;
-}) {
-  const { t } = useTranslation();
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+  // ── Per-state aggregates for the map layers ──
+  const stateAgg = useMemo(() => {
+    const agg = new Map<string, { alertCases: number; facilities: number; immRecords: number; completenessSum: number; completenessN: number }>();
+    const get = (s: string) => {
+      const cur = agg.get(s) || { alertCases: 0, facilities: 0, immRecords: 0, completenessSum: 0, completenessN: 0 };
+      agg.set(s, cur);
+      return cur;
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0" style={{ height: 'calc(100vh - 80px)' }}>
-      {/* Header bar */}
-      <div
-        className="flex items-center justify-between px-5 py-3 flex-shrink-0 rounded-t-xl"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderBottom: 'none' }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-            style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            {t('government.backToDashboard')}
-          </button>
-          <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
-        </div>
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:opacity-70"
-          style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
-          title={t('government.closeEsc')}
-        >
-          <X className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
-        </button>
-      </div>
-      {/* Chart fills the remaining space */}
-      <div
-        className="flex-1 min-h-0 p-5 rounded-b-xl"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderTop: '1px solid var(--border-light)' }}
-      >
-        {hasData ? (
-          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
-            {children as React.ReactElement}
-          </ResponsiveContainer>
-        ) : (
-          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <EmptyState icon={Activity} title="No data yet" message={emptyMessage || 'No data to display for this chart.'} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Expand Button ──────────────────────────────────────────────── */
-function ExpandButton({ onClick }: { onClick: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <button
-      onClick={onClick}
-      className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:opacity-70"
-      style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
-      title={t('government.enlargeChart')}
-    >
-      <Maximize2 className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-    </button>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════ */
-
-const FACILITY_COLORS = ['var(--color-success)', 'var(--color-brand-500)', '#A855F7', 'var(--color-warning)', 'var(--text-muted)'];
-
-const DISEASE_COLORS: Record<string, string> = {
-  malaria: '#E52E42', cholera: 'var(--color-success-500)', measles: '#A855F7',
-  pneumonia: '#FCD34D', diarrhea: 'var(--color-brand-500)', tb: '#F97316', hiv: '#EC4899',
-  'Malaria': '#E52E42', 'Cholera': 'var(--color-success-500)', 'Measles': '#A855F7',
-  'Pneumonia': '#FCD34D', 'Diarrhea': 'var(--color-brand-500)', 'Tuberculosis': '#F97316',
-  'HIV/AIDS': '#EC4899', 'Acute Watery Diarrhea': 'var(--color-brand-500)',
-  'Meningitis': 'var(--color-brand-400)', 'Kala-azar': 'var(--color-purple-500)', 'Hepatitis E': '#F43F5E',
-};
-
-const WEEKLY_DISEASE_KEYS = ['malaria', 'cholera', 'measles', 'pneumonia', 'diarrhea'] as const;
-const STATE_DISEASE_KEYS = ['malaria', 'cholera', 'measles', 'tb', 'hiv'] as const;
-
-/* ═══════════════════════════════════════════════════════════════════
-   MAIN COMPONENT
-   ═══════════════════════════════════════════════════════════════════ */
-export default function GovernmentDashboardPage() {
-  const { t } = useTranslation();
-  const router = useRouter();
-  const { currentUser } = useApp();
-  const { hospitals } = useHospitals();
-  const { alerts: diseaseAlerts } = useSurveillance();
-
-  // Live aggregations derived from the surveillance feed so the dashboard
-  // never falls back to hardcoded outbreak numbers (a previous prod issue).
-  const weeklyDiseaseData = useMemo(() => buildWeeklyDiseaseData(diseaseAlerts), [diseaseAlerts]);
-  const casesByState = useMemo(() => buildCasesByState(diseaseAlerts), [diseaseAlerts]);
-
-
-  /* ─── TABLEAU-STYLE SELECTOR STATES ──────────────────────────── */
-
-  // Global state filter
-  const [selectedState] = useState<string>('all');
-
-  // Disease Trends panel
-  const [dtChartType, setDtChartType] = useState('line');
-  const [dtSelectedDiseases, setDtSelectedDiseases] = useState<string[]>([...WEEKLY_DISEASE_KEYS]);
-
-  // Cases by State panel
-  const [csChartType, setCsChartType] = useState('bar');
-  const [csDisplayMode] = useState<'single' | 'multi'>('single');
-  const [csSingleDisease, setCsSingleDisease] = useState('malaria');
-  const [csSelectedDiseases, setCsSelectedDiseases] = useState<string[]>([...STATE_DISEASE_KEYS]);
-
-  // Health Visits panel
-  const [hvChartType, setHvChartType] = useState('line');
-  const [hvSelectedSeries, setHvSelectedSeries] = useState<string[]>(['OPD Visits', 'ANC Visits', 'Immunizations']);
-
-  // Staff Distribution panel
-  const [sdChartType, setSdChartType] = useState('bar');
-  const [sdMetric, setSdMetric] = useState<'count' | 'ratio'>('count');
-  const [sdSelectedRoles, setSdSelectedRoles] = useState<string[]>(['Doctors', 'Nurses', 'Clinical Officers']);
-
-  // Performance panel
-  const [perfView, setPerfView] = useState('gauges');
-
-  // Fullscreen chart states
-  const [fullscreenChart, setFullscreenChart] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (currentUser && currentUser.role !== 'government') {
-      router.push('/dashboard');
+    for (const a of alerts) { if (a.state) get(a.state).alertCases += a.cases || 0; }
+    for (const h of hospitals) { if (h.state) get(h.state).facilities += 1; }
+    for (const [state, count] of Object.entries(imm?.byState || {})) get(state).immRecords += count;
+    for (const e of dq?.entries || []) {
+      if (!e.state) continue;
+      const cur = get(e.state);
+      cur.completenessSum += e.reportingCompleteness;
+      cur.completenessN += 1;
     }
-  }, [currentUser, router]);
+    return agg;
+  }, [alerts, hospitals, imm, dq]);
 
-  // Ministry of Health reporting gate: facility data only counts toward the
-  // national picture once the facility has reviewed and submitted it from
-  // "My Facility". Facilities that have not yet submitted are excluded from
-  // every aggregate below (the banner near the filter bar reports how many are
-  // still pending).
-  // Filtered hospitals — all facilities, optionally scoped to a selected state.
-  const filteredHospitals = useMemo(() => {
-    if (selectedState === 'all') return hospitals;
-    return hospitals.filter(h => h.state === selectedState);
-  }, [hospitals, selectedState]);
+  const layerValue = (state: string): number | null => {
+    const a = stateAgg.get(state);
+    if (!a) return null;
+    switch (layer) {
+      case 'alerts': return a.alertCases;
+      case 'facilities': return a.facilities;
+      case 'immunization': return a.immRecords;
+      case 'completeness': return a.completenessN > 0 ? Math.round(a.completenessSum / a.completenessN) : null;
+    }
+  };
 
-  // KPI aggregates
-  const totalHospitals = filteredHospitals.length;
-  const totalDoctors = filteredHospitals.reduce((s, h) => s + h.doctors, 0);
-  const totalNurses = filteredHospitals.reduce((s, h) => s + h.nurses, 0);
-  const totalCOs = filteredHospitals.reduce((s, h) => s + h.clinicalOfficers, 0);
+  const layerMax = Math.max(1, ...STATE_TILES.map(s => layerValue(s.name) ?? 0));
 
-  // Facility distribution
-  const facilityDistribution = useMemo(() => {
-    const counts: Record<string, number> = {};
-    const labels: Record<string, string> = {
-      national_referral: t('government.facilityNationalReferral'), state_hospital: t('government.facilityStateHospital'),
-      county_hospital: t('government.facilityCountyHospital'), phcc: t('government.facilityPhcc'), phcu: t('government.facilityPhcu'),
+  const tileStyle = (state: string): React.CSSProperties => {
+    const v = layerValue(state);
+    if (v === null || v === 0) {
+      return { background: 'var(--overlay-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-light)' };
+    }
+    if (layer === 'completeness') {
+      // Threshold-colored (traffic light), not intensity — completeness is a
+      // target indicator, not a magnitude.
+      const tone = pctTone(v, 80, 60);
+      return { background: `color-mix(in srgb, ${tone} 18%, #fff)`, color: 'var(--text-primary)', border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)` };
+    }
+    const base = layer === 'alerts' ? RED : layer === 'immunization' ? GREEN : DEEP;
+    const intensity = v / layerMax;
+    const step = intensity > 0.75 ? 55 : intensity > 0.5 ? 40 : intensity > 0.25 ? 26 : 14;
+    return {
+      background: `color-mix(in srgb, ${base} ${step}%, #fff)`,
+      color: step >= 55 ? '#fff' : 'var(--text-primary)',
+      border: `1px solid color-mix(in srgb, ${base} 45%, transparent)`,
     };
-    filteredHospitals.forEach(h => {
-      const t = labels[h.facilityType] || h.facilityType;
-      counts[t] = (counts[t] || 0) + 1;
-    });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [filteredHospitals, t]);
-
-  // OPD trend data
-  const opdTrendData = useMemo(() => {
-    const months = ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02'];
-    const labels = ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'];
-    return months.map((m, i) => {
-      let opd = 0, anc = 0, imm = 0;
-      filteredHospitals.forEach(h => {
-        const tr = h.monthlyTrends?.find((row: { month: string }) => row.month === m);
-        if (tr) { opd += tr.opdVisits || 0; anc += tr.ancVisits || 0; imm += tr.immunizations || 0; }
-      });
-      return { month: labels[i], 'OPD Visits': opd, 'ANC Visits': anc, 'Immunizations': imm };
-    });
-  }, [filteredHospitals]);
-
-  // State cases data
-  const stateBarData = useMemo(() => {
-    const data = selectedState === 'all' ? [...casesByState] : casesByState.filter(s => s.state === selectedState);
-    return data
-      .sort((a, b) => b.malaria - a.malaria)
-      .slice(0, 10)
-      .map(s => ({
-        ...s,
-        state: abbreviateStateLabel(s.state),
-      }));
-  }, [selectedState, casesByState]);
-
-  // State disease pie data
-  const statePieData = useMemo(() => {
-    const totals: Record<string, number> = {};
-    csSelectedDiseases.forEach(d => {
-      totals[d] = stateBarData.reduce((s, row) => s + ((row as Record<string, unknown>)[d] as number || 0), 0);
-    });
-    return Object.entries(totals).map(([name, value]) => ({ name, value }));
-  }, [stateBarData, csSelectedDiseases]);
-
-  // Staff distribution
-  const staffDistribution = useMemo(() => {
-    return filteredHospitals
-      .sort((a, b) => (b.doctors + b.nurses + b.clinicalOfficers) - (a.doctors + a.nurses + a.clinicalOfficers))
-      .slice(0, 8)
-      .map(h => {
-        const total = h.doctors + h.nurses + h.clinicalOfficers;
-        const isRatio = sdMetric === 'ratio' && total > 0;
-        return {
-          name: h.name.replace(' Hospital', '').replace(' Teaching', '').replace('Juba ', 'J.').slice(0, 15),
-          Doctors: isRatio ? Math.round((h.doctors / total) * 100) : h.doctors,
-          Nurses: isRatio ? Math.round((h.nurses / total) * 100) : h.nurses,
-          'Clinical Officers': isRatio ? Math.round((h.clinicalOfficers / total) * 100) : h.clinicalOfficers,
-        };
-      });
-  }, [filteredHospitals, sdMetric]);
-
-  const staffPieData = useMemo(() => [
-    { name: 'Doctors', value: totalDoctors, color: 'var(--color-brand-500)' },
-    { name: 'Nurses', value: totalNurses, color: 'var(--color-success-500)' },
-    { name: 'Clinical Officers', value: totalCOs, color: '#A855F7' },
-  ], [totalDoctors, totalNurses, totalCOs]);
-
-  // Performance metrics
-  const avg = (key: keyof NonNullable<HospitalDoc['performance']>) => {
-    if (!filteredHospitals.length) return 0;
-    return Math.round(filteredHospitals.reduce((s, h) => s + ((h.performance as Record<string, number> | undefined)?.[key] || 0), 0) / filteredHospitals.length);
-  };
-  const avgReporting = avg('reportingCompleteness');
-  const avgReadiness = avg('serviceReadinessScore');
-  const avgImmCoverage = avg('immunizationCoverage');
-  const avgMedicine = avg('tracerMedicineAvailability');
-  const avgQualityScore = avg('qualityScore');
-  const functionalPct = useMemo(() => {
-    if (!filteredHospitals.length) return 0;
-    return Math.round((filteredHospitals.filter(h => h.operationalStatus === 'functional').length / filteredHospitals.length) * 100);
-  }, [filteredHospitals]);
-
-  const perfRadarData = useMemo(() => [
-    { metric: t('government.metricReporting'), value: avgReporting },
-    { metric: t('government.metricReadiness'), value: avgReadiness },
-    { metric: t('government.metricEpiCoverage'), value: avgImmCoverage },
-    { metric: t('government.metricFunctional'), value: functionalPct },
-    { metric: t('government.metricMedicine'), value: avgMedicine },
-    { metric: t('government.metricQuality'), value: avgQualityScore },
-  ], [avgReporting, avgReadiness, avgImmCoverage, functionalPct, avgMedicine, avgQualityScore, t]);
-
-  /* ─── Empty-state flags: whether each chart has anything to plot ── */
-  const diseaseTrendHasData = weeklyDiseaseData.length > 0
-    && dtSelectedDiseases.length > 0
-    && weeklyDiseaseData.some(row => WEEKLY_DISEASE_KEYS.some(k => dtSelectedDiseases.includes(k) && ((row as Record<string, unknown>)[k] as number) > 0));
-  const stateCasesHasData = stateBarData.length > 0
-    && (csChartType === 'pie'
-      ? statePieData.some(d => d.value > 0)
-      : stateBarData.some(row => Object.entries(row).some(([k, v]) => k !== 'state' && typeof v === 'number' && v > 0)));
-  const visitsHasData = hvSelectedSeries.length > 0
-    && opdTrendData.some(row => hvSelectedSeries.some(s => ((row as unknown as Record<string, number>)[s] || 0) > 0));
-  const staffHasData = staffDistribution.length > 0
-    && sdSelectedRoles.length > 0
-    && staffDistribution.some(row => sdSelectedRoles.some(r => ((row as Record<string, unknown>)[r] as number) > 0));
-  const performanceHasData = perfRadarData.some(d => d.value > 0);
-
-  if (!currentUser || currentUser.role !== 'government') return null;
-
-  /* ═══ CHART RENDERERS ═══ */
-
-  // Disease Trends
-  const renderDiseaseTrend = () => {
-    const activeKeys = WEEKLY_DISEASE_KEYS.filter(d => dtSelectedDiseases.includes(d));
-    const commonProps = { data: weeklyDiseaseData, margin: { top: 5, right: 20, left: 0, bottom: 5 } };
-    const xProps = { dataKey: 'week' as const, tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
-    const yProps = { tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
-    const gridProps = { strokeDasharray: '3 3', stroke: 'var(--border-light)' };
-    const legendProps = { iconType: 'circle' as const, iconSize: 8, wrapperStyle: { fontSize: '0.65rem', paddingTop: '4px' } };
-
-    if (dtChartType === 'area') {
-      return (
-        <AreaChart {...commonProps}>
-          <CartesianGrid {...gridProps} /><XAxis {...xProps} /><YAxis {...yProps} />
-          <Tooltip content={<ChartTooltip />} /><Legend {...legendProps} />
-          {activeKeys.map(d => <Area key={d} type="natural" dataKey={d} name={d.charAt(0).toUpperCase() + d.slice(1)} stroke={DISEASE_COLORS[d]} fill={DISEASE_COLORS[d]} fillOpacity={0.15} strokeWidth={2} />)}
-        </AreaChart>
-      );
-    }
-    if (dtChartType === 'bar') {
-      return (
-        <BarChart {...commonProps}>
-          <CartesianGrid {...gridProps} /><XAxis {...xProps} /><YAxis {...yProps} />
-          <Tooltip content={<ChartTooltip />} /><Legend {...{ ...legendProps, iconType: 'square' as const }} />
-          {activeKeys.map(d => <Bar key={d} dataKey={d} name={d.charAt(0).toUpperCase() + d.slice(1)} fill={DISEASE_COLORS[d]} radius={[3, 3, 0, 0]} barSize={10} />)}
-        </BarChart>
-      );
-    }
-    if (dtChartType === 'composed') {
-      return (
-        <ComposedChart {...commonProps}>
-          <CartesianGrid {...gridProps} /><XAxis {...xProps} /><YAxis {...yProps} />
-          <Tooltip content={<ChartTooltip />} /><Legend {...legendProps} />
-          {activeKeys.map((d, i) => {
-            const name = d.charAt(0).toUpperCase() + d.slice(1);
-            if (i === 0) return <Bar key={d} dataKey={d} name={name} fill={DISEASE_COLORS[d]} radius={[3, 3, 0, 0]} barSize={12} fillOpacity={0.7} />;
-            if (i === 1) return <Area key={d} type="natural" dataKey={d} name={name} stroke={DISEASE_COLORS[d]} fill={DISEASE_COLORS[d]} fillOpacity={0.1} strokeWidth={2} />;
-            return <Line key={d} type="natural" dataKey={d} name={name} stroke={DISEASE_COLORS[d]} strokeWidth={2} dot={{ r: 3 }} />;
-          })}
-        </ComposedChart>
-      );
-    }
-    // line
-    return (
-      <LineChart {...commonProps}>
-        <CartesianGrid {...gridProps} /><XAxis {...xProps} /><YAxis {...yProps} />
-        <Tooltip content={<ChartTooltip />} /><Legend {...legendProps} />
-        {activeKeys.map(d => <Line key={d} type="natural" dataKey={d} name={d.charAt(0).toUpperCase() + d.slice(1)} stroke={DISEASE_COLORS[d]} strokeWidth={d === 'malaria' ? 2.5 : 2} dot={{ r: 3 }} />)}
-      </LineChart>
-    );
   };
 
-  // Cases by State
-  const renderStateCases = () => {
-    if (csChartType === 'stacked' || csDisplayMode === 'multi') {
-      const activeKeys = STATE_DISEASE_KEYS.filter(d => csSelectedDiseases.includes(d));
-      return (
-        <BarChart data={stateBarData} layout="vertical" margin={{ top: 5, right: 15, left: 5, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-          <YAxis type="category" dataKey="state" tick={{ fontSize: 9, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} width={55} />
-          <Tooltip content={<ChartTooltip />} />
-          <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: '0.6rem', paddingTop: '4px' }} />
-          {activeKeys.map(d => <Bar key={d} dataKey={d} name={d.charAt(0).toUpperCase() + d.slice(1)} fill={DISEASE_COLORS[d]} stackId="diseases" barSize={16} />)}
-        </BarChart>
-      );
-    }
-    if (csChartType === 'radar') {
-      const activeKeys = STATE_DISEASE_KEYS.filter(d => csSelectedDiseases.includes(d));
-      return (
-        <RadarChart data={stateBarData} cx="50%" cy="50%" outerRadius="70%">
-          <PolarGrid stroke="var(--border-light)" />
-          <PolarAngleAxis dataKey="state" tick={{ fontSize: 8, fill: 'var(--text-muted)' }} />
-          <PolarRadiusAxis tick={{ fontSize: 8, fill: 'var(--text-muted)' }} />
-          <Tooltip />
-          {activeKeys.map(d => <Radar key={d} name={d.charAt(0).toUpperCase() + d.slice(1)} dataKey={d} stroke={DISEASE_COLORS[d]} fill={DISEASE_COLORS[d]} fillOpacity={0.15} />)}
-          <Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: '0.6rem' }} />
-        </RadarChart>
-      );
-    }
-    if (csChartType === 'pie') {
-      return (
-        <PieChart>
-          <Pie data={statePieData} dataKey="value" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${(name as string).charAt(0).toUpperCase() + (name as string).slice(1)}: ${(value as number).toLocaleString()}`}>
-            {statePieData.map((entry, i) => <Cell key={i} fill={DISEASE_COLORS[entry.name] || FACILITY_COLORS[i % FACILITY_COLORS.length]} />)}
-          </Pie>
-          <Tooltip /><Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '0.6rem' }} />
-        </PieChart>
-      );
-    }
-    // single disease bar
-    return (
-      <BarChart data={stateBarData} layout="vertical" margin={{ top: 5, right: 15, left: 5, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" horizontal={false} />
-        <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-        <YAxis type="category" dataKey="state" tick={{ fontSize: 9, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} width={55} />
-        <Tooltip content={<ChartTooltip />} />
-        <Bar dataKey={csSingleDisease} name={csSingleDisease.charAt(0).toUpperCase() + csSingleDisease.slice(1)} fill={DISEASE_COLORS[csSingleDisease] || '#E52E42'} radius={[0, 6, 6, 0]} barSize={14} />
-      </BarChart>
-    );
-  };
-
-  // Health Visits
-  const renderVisits = () => {
-    const activeVisits = hvSelectedSeries;
-    const visitColors: Record<string, string> = { 'OPD Visits': 'var(--color-brand-500)', 'ANC Visits': '#EC4899', 'Immunizations': '#A855F7' };
-    const commonProps = { data: opdTrendData, margin: { top: 5, right: 15, left: 0, bottom: 5 } };
-    const xProps = { dataKey: 'month' as const, tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
-    const yProps = { tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
-
-    if (hvChartType === 'area') {
-      return (
-        <AreaChart {...commonProps}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" /><XAxis {...xProps} /><YAxis {...yProps} />
-          <Tooltip content={<ChartTooltip />} /><Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: '0.6rem', paddingTop: '4px' }} />
-          {activeVisits.map(v => <Area key={v} type="monotone" dataKey={v} stroke={visitColors[v]} fill={visitColors[v]} fillOpacity={0.15} strokeWidth={2} />)}
-        </AreaChart>
-      );
-    }
-    if (hvChartType === 'bar') {
-      return (
-        <BarChart {...commonProps}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" /><XAxis {...xProps} /><YAxis {...yProps} />
-          <Tooltip content={<ChartTooltip />} /><Legend iconType="square" iconSize={6} wrapperStyle={{ fontSize: '0.6rem', paddingTop: '4px' }} />
-          {activeVisits.map(v => <Bar key={v} dataKey={v} fill={visitColors[v]} radius={[3, 3, 0, 0]} barSize={14} />)}
-        </BarChart>
-      );
-    }
-    return (
-      <LineChart {...commonProps}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" /><XAxis {...xProps} /><YAxis {...yProps} />
-        <Tooltip content={<ChartTooltip />} /><Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: '0.6rem', paddingTop: '4px' }} />
-        {activeVisits.map(v => <Line key={v} type="monotone" dataKey={v} stroke={visitColors[v]} strokeWidth={2.5} dot={{ r: 3, fill: visitColors[v] }} />)}
-      </LineChart>
-    );
-  };
-
-  // Staff
-  const renderStaff = () => {
-    const staffColors: Record<string, string> = { Doctors: 'var(--color-brand-500)', Nurses: 'var(--color-success-500)', 'Clinical Officers': '#A855F7' };
-    const activeRoles = sdSelectedRoles;
-
-    if (sdChartType === 'stacked') {
-      return (
-        <BarChart data={staffDistribution} margin={{ top: 5, right: 10, left: -5, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-          <XAxis dataKey="name" tick={{ fontSize: 7, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} angle={-35} textAnchor="end" height={45} />
-          <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-          <Tooltip content={<ChartTooltip />} /><Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: '0.6rem', paddingTop: '4px' }} />
-          {activeRoles.map(r => <Bar key={r} dataKey={r} fill={staffColors[r]} stackId="staff" barSize={18} />)}
-        </BarChart>
-      );
-    }
-    if (sdChartType === 'pie') {
-      const filtered = staffPieData.filter(d => activeRoles.includes(d.name));
-      return (
-        <PieChart>
-          <Pie data={filtered} dataKey="value" cx="50%" cy="50%" outerRadius={80} innerRadius={35} paddingAngle={3} label={({ name, value }) => `${name}: ${value}`}>
-            {filtered.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-          </Pie>
-          <Tooltip /><Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '0.6rem' }} />
-        </PieChart>
-      );
-    }
-    return (
-      <BarChart data={staffDistribution} margin={{ top: 5, right: 10, left: -5, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-        <XAxis dataKey="name" tick={{ fontSize: 7, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} angle={-35} textAnchor="end" height={45} />
-        <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-        <Tooltip content={<ChartTooltip />} /><Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: '0.6rem', paddingTop: '4px' }} />
-        {activeRoles.map(r => <Bar key={r} dataKey={r} fill={staffColors[r]} radius={[3, 3, 0, 0]} barSize={10} />)}
-      </BarChart>
-    );
-  };
-
-  // Performance
-  const renderPerformance = () => {
-    if ((perfView === 'radar' || perfView === 'bar') && !performanceHasData) {
-      return (
-        <div className="p-3" style={{ height: 224, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <EmptyState icon={Activity} title="No data yet" message="No performance metrics for the selected facilities." />
-        </div>
-      );
-    }
-    if (perfView === 'radar') {
-      return (
-        <div className="p-3">
-          <ResponsiveContainer width="100%" height={200}>
-            <RadarChart data={perfRadarData} cx="50%" cy="50%" outerRadius="70%">
-              <PolarGrid stroke="var(--border-light)" />
-              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 8, fill: 'var(--text-muted)' }} />
-              <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 8, fill: 'var(--text-muted)' }} />
-              <Radar name={t('government.performance')} dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
-              <Tooltip />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-      );
-    }
-    if (perfView === 'bar') {
-      return (
-        <div className="p-3">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={perfRadarData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-              <XAxis dataKey="metric" tick={{ fontSize: 7, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} angle={-20} textAnchor="end" height={40} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="value" name={t('government.scorePct')} radius={[4, 4, 0, 0]} barSize={24}>
-                {perfRadarData.map((e, i) => <Cell key={i} fill={e.value >= 80 ? 'var(--color-success-500)' : e.value >= 60 ? '#FCD34D' : '#E52E42'} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      );
-    }
-    return (
-      <div className="p-3 grid grid-cols-2 gap-2">
-        <CircularGauge value={avgReporting} label={t('government.metricReporting')} color="var(--color-brand-500)" size={96} strokeWidth={5} />
-        <CircularGauge value={avgReadiness} label={t('government.metricReadiness')} color="var(--accent-primary)" size={96} strokeWidth={5} />
-        <CircularGauge value={avgImmCoverage} label={t('government.metricEpiCoverage')} color="#A855F7" size={96} strokeWidth={5} />
-        <CircularGauge value={functionalPct} label={t('government.metricFunctional')} color="#FCD34D" size={96} strokeWidth={5} />
-      </div>
-    );
-  };
-
-  /* ═══ RENDER ═══ */
-
-  // When a chart is expanded, render it filling the entire content area
-  if (fullscreenChart) {
-    const closeExpanded = () => setFullscreenChart(null);
-
-    const expandedContent = (() => {
-      switch (fullscreenChart) {
-        case 'diseaseTrend':
-          return <ExpandedChartView title={t('government.weeklyDiseaseTrends')} onClose={closeExpanded} hasData={diseaseTrendHasData} emptyMessage="No disease trends for the selected diseases or period.">{renderDiseaseTrend()}</ExpandedChartView>;
-        case 'performance':
-          return (
-            <ExpandedChartView title={t('government.nationalPerformance')} onClose={closeExpanded} hasData={performanceHasData} emptyMessage="No performance metrics for the selected facilities.">
-              {perfView === 'radar' ? (
-                <RadarChart data={perfRadarData} cx="50%" cy="50%" outerRadius="70%">
-                  <PolarGrid stroke="var(--border-light)" />
-                  <PolarAngleAxis dataKey="metric" tick={{ fontSize: 14, fill: 'var(--text-primary)' }} />
-                  <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
-                  <Radar name={t('government.performance')} dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
-                  <Tooltip />
-                </RadarChart>
-              ) : (
-                <BarChart data={perfRadarData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                  <XAxis dataKey="metric" tick={{ fontSize: 12, fill: 'var(--text-primary)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="value" name={t('government.scorePct')} radius={[6, 6, 0, 0]} barSize={40}>
-                    {perfRadarData.map((e, i) => <Cell key={i} fill={e.value >= 80 ? 'var(--color-success-500)' : e.value >= 60 ? '#FCD34D' : '#E52E42'} />)}
-                  </Bar>
-                </BarChart>
-              )}
-            </ExpandedChartView>
-          );
-        case 'stateCases':
-          return <ExpandedChartView title={t('government.diseaseCasesByState')} onClose={closeExpanded} hasData={stateCasesHasData} emptyMessage="No cases reported for the selected states or diseases.">{renderStateCases()}</ExpandedChartView>;
-        case 'healthVisits':
-          return <ExpandedChartView title={t('government.nationalHealthVisits6m')} onClose={closeExpanded} hasData={visitsHasData} emptyMessage="No health-visit records for the selected metrics or period.">{renderVisits()}</ExpandedChartView>;
-        case 'staffDist':
-          return <ExpandedChartView title={t('government.staffDistributionByHospital')} onClose={closeExpanded} hasData={staffHasData} emptyMessage="No staffing data for the selected roles or facilities.">{renderStaff()}</ExpandedChartView>;
-        default:
-          return null;
+  // ── Priority watchlist (ranked action queue) ──
+  const watchlist = useMemo(() => {
+    type Item = { key: string; severity: number; title: string; detail: string; metric: string; tone: string; href: string };
+    const items: Item[] = [];
+    const rankedAlerts = [...activeAlerts].sort((a, b) => (b.cases || 0) - (a.cases || 0));
+    for (const a of rankedAlerts) {
+      if (a.alertLevel === 'emergency' || a.alertLevel === 'warning') {
+        items.push({
+          key: `alert-${(a as DiseaseAlertDoc & { _id?: string })._id || `${a.disease}-${a.county}`}`,
+          severity: a.alertLevel === 'emergency' ? 0 : 1,
+          title: `${a.disease} — ${a.county || a.state}`,
+          detail: `${a.alertLevel === 'emergency' ? 'Emergency' : 'Warning'} alert · ${a.state} · trend ${a.trend}`,
+          metric: `${(a.cases || 0).toLocaleString()} cases`,
+          tone: a.alertLevel === 'emergency' ? RED : AMBER,
+          href: '/government/alerts',
+        });
       }
-    })();
+    }
+    for (const e of [...(dq?.entries || [])].sort((a, b) => a.reportingCompleteness - b.reportingCompleteness)) {
+      if (e.reportingCompleteness < 80) {
+        items.push({
+          key: `dq-${e.facilityId}`,
+          severity: e.reportingCompleteness < 60 ? 1 : 2,
+          title: e.facilityName,
+          detail: `Reporting completeness below target · ${e.state}`,
+          metric: `${e.reportingCompleteness}%`,
+          tone: e.reportingCompleteness < 60 ? RED : AMBER,
+          href: '/data-quality?view=completeness',
+        });
+      }
+    }
+    if ((defaulters?.totalDefaulters ?? 0) > 0) {
+      items.push({
+        key: 'immunization-defaulters',
+        severity: 2,
+        title: 'Immunization defaulters need tracing',
+        detail: 'Children overdue for scheduled doses',
+        metric: `${defaulters!.uniqueChildren.toLocaleString()} children`,
+        tone: AMBER,
+        href: '/immunizations',
+      });
+    }
+    return items.sort((a, b) => a.severity - b.severity).slice(0, 8);
+  }, [activeAlerts, dq, defaulters]);
 
-    return (
-      <>
-        <div className="page-container page-enter flex flex-col flex-1 min-h-0">
-          {expandedContent}
-        </div>
-      </>
-    );
-  }
+  // ── Trends ──
+  const weeklyCases = useMemo(() => {
+    const byWeek = new Map<string, { week: string; cases: number; sortKey: string }>();
+    for (const a of alerts) {
+      if (!a.reportDate) continue;
+      const { label, sortKey } = isoWeekLabel(a.reportDate);
+      const cur = byWeek.get(label) || { week: label, cases: 0, sortKey };
+      cur.cases += a.cases || 0;
+      if (sortKey < cur.sortKey) cur.sortKey = sortKey;
+      byWeek.set(label, cur);
+    }
+    return Array.from(byWeek.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey)).slice(-12);
+  }, [alerts]);
+
+  const vitalMonthly = useMemo(() => {
+    const byMonth = new Map<string, { month: string; births: number; deaths: number; sortKey: string }>();
+    const bump = (iso: string, key: 'births' | 'deaths') => {
+      const m = monthLabel(iso);
+      if (!m) return;
+      const cur = byMonth.get(m.sortKey) || { month: m.label, births: 0, deaths: 0, sortKey: m.sortKey };
+      cur[key] += 1;
+      byMonth.set(m.sortKey, cur);
+    };
+    for (const b of births) bump(b.dateOfBirth || b.createdAt, 'births');
+    for (const d of deaths) bump(d.dateOfDeath || d.createdAt, 'deaths');
+    return Array.from(byMonth.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey)).slice(-6);
+  }, [births, deaths]);
+
+  // ── Registration completeness (certificate issued as proxy) ──
+  const birthCert = births.length > 0 ? Math.round((births.filter(b => !!b.certificateNumber).length / births.length) * 100) : null;
+  const deathCert = deaths.length > 0 ? Math.round((deaths.filter(d => !!d.certificateNumber).length / deaths.length) * 100) : null;
+
+  const now = new Date();
+  const periodLabel = now.toLocaleString('en', { month: 'long', year: 'numeric' });
+
+  // Situation strip — the only factoid row on the page; everything else is a
+  // working panel.
+  const situation: { label: string; value: string; sub: string; tone?: string }[] = [
+    { label: 'Reporting completeness', value: dq ? `${dq.avgCompleteness}%` : '—', sub: `${dq?.facilitiesReporting ?? 0}/${dq?.totalFacilities ?? 0} facilities`, tone: dq ? pctTone(dq.avgCompleteness, 80, 60) : undefined },
+    { label: 'Reporting timeliness', value: dq ? `${dq.avgTimeliness}%` : '—', sub: 'Latest assessments', tone: dq ? pctTone(dq.avgTimeliness, 80, 60) : undefined },
+    { label: 'Active alerts', value: String(activeAlerts.length), sub: `${emergencyCount} emergency · ${warningCount} warning`, tone: emergencyCount > 0 ? RED : warningCount > 0 ? AMBER : GREEN },
+    { label: 'Outbreak risk', value: outbreakRisk.label, sub: 'Worst active alert level', tone: outbreakRisk.tone },
+    { label: 'Fully immunized', value: imm ? `${imm.coverageRate}%` : '—', sub: `of ${imm?.totalChildren ?? 0} children with records`, tone: imm ? pctTone(imm.coverageRate, 90, 60) : undefined },
+    { label: 'ANC 4+ visits', value: anc ? `${anc.anc4PlusRate}%` : '—', sub: `of ${anc?.totalMothers ?? 0} mothers with records`, tone: anc ? pctTone(anc.anc4PlusRate, 80, 50) : undefined },
+    { label: 'Birth certificates', value: birthCert === null ? '—' : `${birthCert}%`, sub: `${births.length.toLocaleString()} births registered`, tone: birthCert === null ? undefined : pctTone(birthCert, 90, 60) },
+    { label: 'Death certificates', value: deathCert === null ? '—' : `${deathCert}%`, sub: `${deaths.length.toLocaleString()} deaths registered`, tone: deathCert === null ? undefined : pctTone(deathCert, 90, 60) },
+  ];
+
+  const dhis2Configured = isDhis2Configured();
+  const dhis2Host = getDhis2BaseUrlHost();
+  const dhis2Ok = dhis2 ? isFullySynced(dhis2) : false;
+
+  const selected = selectedState ? stateAgg.get(selectedState) : null;
 
   return (
-    <>
-      <main className="page-container page-enter flex flex-col flex-1 min-h-0 overflow-y-auto">
+    <main className="page-container page-enter">
+      {/* ── Header: what/where/when — no decorative hero ── */}
+      <div className="flex items-end justify-between gap-3 flex-wrap mb-3">
+        <div>
+          <h1 style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 24, lineHeight: 1.1, color: '#000' }}>
+            National situation
+          </h1>
+          <p className="text-[12px] mt-1" style={{ color: 'var(--text-muted)' }}>
+            South Sudan · National · {periodLabel} — computed live from facility-reported data
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => router.push('/government/briefing')}>
+            <ClipboardPen className="w-4 h-4" /> Executive briefing
+          </button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => router.push('/government/alerts')}>
+            <Siren className="w-4 h-4" /> Priority alerts
+          </button>
+        </div>
+      </div>
 
-        {/* ═══ ROW 1: Disease Trends + Facility Distribution + Performance ═══ */}
-        {/* Rows size to their content (charts have explicit heights below) and
-            the page scrolls — so the two rows never compress into the viewport
-            and overflow onto each other. */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
-
-          {/* Disease Trends (Tableau-style) */}
-          <div className="lg:col-span-2 glass-section flex flex-col">
-            <div className="glass-section-header flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.weeklyDiseaseTrends')}</span>
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)' }}>{t('government.surveillance')}</span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <ChartTypeSelector
-                  value={dtChartType}
-                  options={[
-                    { value: 'line', label: t('government.chartLine'), icon: LineChartIcon },
-                    { value: 'area', label: t('government.chartArea'), icon: Activity },
-                    { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
-                    { value: 'composed', label: t('government.chartMixed'), icon: Layers },
-                  ]}
-                  onChange={setDtChartType}
-                />
-                <TableauMultiSelect
-                  label={t('government.diseases')}
-                  options={WEEKLY_DISEASE_KEYS.map(d => ({
-                    value: d, label: d.charAt(0).toUpperCase() + d.slice(1), color: DISEASE_COLORS[d],
-                  }))}
-                  selected={dtSelectedDiseases}
-                  onChange={setDtSelectedDiseases}
-                  icon={Filter}
-                />
-                <ExpandButton onClick={() => setFullscreenChart('diseaseTrend')} />
-              </div>
+      {/* ── Situation strip ── */}
+      <div className="dash-card mb-3" style={{ padding: '10px 4px' }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
+          {situation.map((s, i) => (
+            <div key={s.label} className="px-3 py-1.5" style={{ borderLeft: i % 8 === 0 ? 'none' : '1px solid var(--border-light)' }}>
+              <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
+              <div className="text-[20px] font-extrabold tabular-nums leading-tight" style={{ color: s.tone || 'var(--text-primary)' }}>{s.value}</div>
+              <div className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }} title={s.sub}>{s.sub}</div>
             </div>
-            <div className="p-3 flex-1 min-h-[320px]">
-              {diseaseTrendHasData ? (
-                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
-                  {renderDiseaseTrend()}
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <EmptyState icon={TrendingUp} title="No data yet" message="No disease trends for the selected diseases or period." />
-                </div>
-              )}
-            </div>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          {/* Facility Types + Performance */}
-          <div className="space-y-3">
-            <div className="glass-section">
-              <div className="glass-section-header">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.facilityTypes')}</span>
+      {/* ── Row: national map + priority watchlist ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-3">
+        <div className="dash-card overflow-hidden lg:col-span-3">
+          <PanelHead
+            title="National map"
+            meta={`${MAP_LAYERS.find(l => l.key === layer)?.legend} · National`}
+            action={
+              <div className="flex gap-1">
+                {MAP_LAYERS.map(l => (
+                  <button
+                    key={l.key}
+                    type="button"
+                    onClick={() => setLayer(l.key)}
+                    className="text-[11px] font-bold px-2 py-1 rounded-full"
+                    style={{
+                      background: layer === l.key ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
+                      color: layer === l.key ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {l.label}
+                  </button>
+                ))}
               </div>
-              {facilityDistribution.length === 0 || facilityDistribution.every(d => !d.value) ? (
-                <div className="p-3" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 110 }}>
-                  <PieChartIcon className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
-                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No data yet</span>
-                </div>
-              ) : (
-              <div className="p-3 flex items-center gap-3">
-                <div className="relative flex-shrink-0">
-                  <ResponsiveContainer width={110} height={110}>
-                    <PieChart>
-                      <Pie data={facilityDistribution} dataKey="value" cx="50%" cy="50%" outerRadius={50} innerRadius={32} paddingAngle={2}>
-                        {facilityDistribution.map((_, i) => <Cell key={i} fill={FACILITY_COLORS[i % FACILITY_COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{totalHospitals}</span>
-                  </div>
-                </div>
-                <div className="flex-1 space-y-1">
-                  {facilityDistribution.map((entry, i) => (
-                    <div key={entry.name} className="flex items-center justify-between text-[10px]">
-                      <span className="flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                        <span className="w-2 h-2 rounded-full" style={{ background: FACILITY_COLORS[i % FACILITY_COLORS.length] }} />
-                        {entry.name}
-                      </span>
-                      <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{entry.value}</span>
+            }
+          />
+          <div className="p-4">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+              {Array.from({ length: 12 }, (_, i) => {
+                const col = i % 4; const row = Math.floor(i / 4);
+                const tile = STATE_TILES.find(s => s.col === col && s.row === row);
+                if (!tile) return <div key={i} />;
+                const v = layerValue(tile.name);
+                const isSelected = selectedState === tile.name;
+                return (
+                  <button
+                    key={tile.abbr}
+                    type="button"
+                    onClick={() => setSelectedState(cur => cur === tile.name ? null : tile.name)}
+                    title={tile.name}
+                    className="text-left rounded-xl px-2.5 py-2 transition-shadow"
+                    style={{
+                      ...tileStyle(tile.name),
+                      minHeight: 64,
+                      outline: isSelected ? `2px solid ${DEEP}` : 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div className="text-[10px] font-bold tracking-wider">{tile.abbr}</div>
+                    <div className="text-[17px] font-extrabold tabular-nums leading-tight">
+                      {v === null ? '—' : layer === 'completeness' ? `${v}%` : v.toLocaleString()}
                     </div>
-                  ))}
-                </div>
-              </div>
-              )}
+                  </button>
+                );
+              })}
             </div>
-
-            <div className="glass-section">
-              <div className="glass-section-header">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.performance')}</span>
-                <div className="flex items-center gap-1.5">
-                  <ChartTypeSelector
-                    value={perfView}
-                    options={[
-                      { value: 'gauges', label: t('government.chartGauges'), icon: Target },
-                      { value: 'radar', label: t('government.chartRadar'), icon: Activity },
-                      { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
-                    ]}
-                    onChange={setPerfView}
-                  />
-                  <ExpandButton onClick={() => setFullscreenChart('performance')} />
-                </div>
-              </div>
-              {renderPerformance()}
-            </div>
-          </div>
-        </div>
-
-        {/* ═══ ROW 2: Cases by State + Health Visits + Staff ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
-
-          {/* Cases by State */}
-          <div className="glass-section flex flex-col">
-            <div className="glass-section-header flex-wrap gap-2">
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.casesByState')}</span>
-              <div className="flex items-center gap-1.5">
-                <ChartTypeSelector
-                  value={csChartType}
-                  options={[
-                    { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
-                    { value: 'stacked', label: t('government.chartStacked'), icon: Layers },
-                    { value: 'radar', label: t('government.chartRadar'), icon: Activity },
-                    { value: 'pie', label: t('government.chartPie'), icon: PieChartIcon },
-                  ]}
-                  onChange={setCsChartType}
-                />
-                <ExpandButton onClick={() => setFullscreenChart('stateCases')} />
-              </div>
-            </div>
-            <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
-              {csChartType === 'bar' ? (
-                <TableauSelect
-                  label={t('government.disease')}
-                  value={csSingleDisease}
-                  options={[
-                    ...STATE_DISEASE_KEYS.map(d => ({ value: d, label: d.charAt(0).toUpperCase() + d.slice(1) })),
-                  ]}
-                  onChange={setCsSingleDisease}
-                  icon={Filter}
-                  width="110px"
-                />
+            {/* Drill-down strip for the selected state */}
+            <div className="mt-3 px-3 py-2 rounded-xl text-[12px] flex items-center gap-4 flex-wrap" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
+              {selected && selectedState ? (
+                <>
+                  <b style={{ color: 'var(--text-primary)' }}>{selectedState}</b>
+                  <span>{selected.facilities} facilities</span>
+                  <span style={{ color: selected.alertCases > 0 ? RED : 'inherit' }}>{selected.alertCases.toLocaleString()} alert cases</span>
+                  <span>{selected.immRecords.toLocaleString()} immunization records</span>
+                  <span>{selected.completenessN > 0 ? `${Math.round(selected.completenessSum / selected.completenessN)}% reporting completeness` : 'no assessment on file'}</span>
+                  <button type="button" className="ml-auto text-[11px] font-bold" style={{ color: 'var(--accent-primary)' }} onClick={() => router.push('/hospitals')}>
+                    Open facilities <ChevronRight className="w-3 h-3 inline" />
+                  </button>
+                </>
               ) : (
-                <TableauMultiSelect
-                  label={t('government.diseases')}
-                  options={STATE_DISEASE_KEYS.map(d => ({
-                    value: d, label: d.charAt(0).toUpperCase() + d.slice(1), color: DISEASE_COLORS[d],
-                  }))}
-                  selected={csSelectedDiseases}
-                  onChange={setCsSelectedDiseases}
-                  icon={Filter}
-                />
-              )}
-            </div>
-            <div className="p-3 h-[300px]">
-              {stateCasesHasData ? (
-                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
-                  {renderStateCases()}
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <EmptyState icon={BarChart3} title="No data yet" message="No cases reported for the selected states or diseases." />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Health Visits */}
-          <div className="glass-section flex flex-col">
-            <div className="glass-section-header flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.healthVisits')}</span>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.sixMonths')}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <ChartTypeSelector
-                  value={hvChartType}
-                  options={[
-                    { value: 'line', label: t('government.chartLine'), icon: LineChartIcon },
-                    { value: 'area', label: t('government.chartArea'), icon: Activity },
-                    { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
-                  ]}
-                  onChange={setHvChartType}
-                />
-                <ExpandButton onClick={() => setFullscreenChart('healthVisits')} />
-              </div>
-            </div>
-            <div className="px-3 pt-2">
-              <TableauMultiSelect
-                label={t('government.metrics')}
-                options={[
-                  { value: 'OPD Visits', label: t('government.opdVisits'), color: 'var(--color-brand-500)' },
-                  { value: 'ANC Visits', label: t('government.ancVisits'), color: '#EC4899' },
-                  { value: 'Immunizations', label: t('government.immunizations'), color: '#A855F7' },
-                ]}
-                selected={hvSelectedSeries}
-                onChange={setHvSelectedSeries}
-                icon={Filter}
-              />
-            </div>
-            <div className="p-3 h-[300px]">
-              {visitsHasData ? (
-                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
-                  {renderVisits()}
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <EmptyState icon={TrendingUp} title="No data yet" message="No health-visit records for the selected metrics or period." />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Staff Distribution */}
-          <div className="glass-section flex flex-col">
-            <div className="glass-section-header flex-wrap gap-2">
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.staffDistribution')}</span>
-              <div className="flex items-center gap-1.5">
-                <ChartTypeSelector
-                  value={sdChartType}
-                  options={[
-                    { value: 'bar', label: t('government.chartGrouped'), icon: BarChart3 },
-                    { value: 'stacked', label: t('government.chartStacked'), icon: Layers },
-                    { value: 'pie', label: t('government.chartPie'), icon: PieChartIcon },
-                  ]}
-                  onChange={setSdChartType}
-                />
-                <ExpandButton onClick={() => setFullscreenChart('staffDist')} />
-              </div>
-            </div>
-            <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
-              <TableauSelect
-                label={t('government.show')}
-                value={sdMetric}
-                options={[{ value: 'count', label: t('government.headcount') }, { value: 'ratio', label: t('government.ratioPct') }]}
-                onChange={v => setSdMetric(v as 'count' | 'ratio')}
-                icon={Sliders}
-                width="100px"
-              />
-              <TableauMultiSelect
-                label={t('government.roles')}
-                options={[
-                  { value: 'Doctors', label: t('government.roleDoctors'), color: 'var(--color-brand-500)' },
-                  { value: 'Nurses', label: t('government.roleNurses'), color: 'var(--color-success-500)' },
-                  { value: 'Clinical Officers', label: t('government.roleClinicalOfficers'), color: '#A855F7' },
-                ]}
-                selected={sdSelectedRoles}
-                onChange={setSdSelectedRoles}
-                icon={Users}
-              />
-            </div>
-            <div className="p-3 h-[300px]">
-              {staffHasData ? (
-                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
-                  {renderStaff()}
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <EmptyState icon={BarChart3} title="No data yet" message="No staffing data for the selected roles or facilities." />
-                </div>
+                <span style={{ color: 'var(--text-muted)' }}>Select a state to drill down · tile values follow the active layer</span>
               )}
             </div>
           </div>
         </div>
 
-      </main>
+        {/* Priority watchlist */}
+        <div className="dash-card overflow-hidden lg:col-span-2 flex flex-col">
+          <PanelHead title="Priority watchlist" meta="Needs follow-up · National" action={
+            <button type="button" className="text-[11px] font-bold" style={{ color: 'var(--accent-primary)' }} onClick={() => router.push('/government/alerts')}>
+              All alerts <ChevronRight className="w-3 h-3 inline" />
+            </button>
+          } />
+          {watchlist.length === 0 ? (
+            <p className="text-[12px] p-6 text-center" style={{ color: 'var(--text-muted)' }}>
+              Nothing needs national follow-up right now — no active warnings and all facilities at target.
+            </p>
+          ) : (
+            <div className="show-scrollbar" style={{ overflowY: 'auto', maxHeight: 330 }}>
+              {watchlist.map(item => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => router.push(item.href)}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-[var(--overlay-subtle)]"
+                  style={{ borderBottom: '1px solid var(--border-light)' }}
+                >
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: item.tone }} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-extrabold truncate" style={{ color: 'var(--text-primary)' }}>{item.title}</span>
+                    <span className="block text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>{item.detail}</span>
+                  </span>
+                  <span className="text-[12px] font-bold tabular-nums whitespace-nowrap" style={{ color: item.tone }}>{item.metric}</span>
+                  <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
-    </>
+      {/* ── Row: trends + program coverage ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
+        <div className="dash-card overflow-hidden">
+          <PanelHead title="Reported cases per week" meta="Last 12 reporting weeks · all diseases · National" action={
+            <button type="button" className="text-[11px] font-bold" style={{ color: 'var(--accent-primary)' }} onClick={() => router.push('/surveillance')}>
+              Surveillance <Eye className="w-3 h-3 inline" />
+            </button>
+          } />
+          <div className="p-3">
+            {weeklyCases.length === 0 ? (
+              <p className="text-[12px] p-6 text-center" style={{ color: 'var(--text-muted)' }}>No surveillance reports on file.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={170}>
+                <LineChart data={weeklyCases} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                  <XAxis dataKey="week" tick={axisTick} tickLine={false} axisLine={false} />
+                  <YAxis tick={axisTick} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [v ?? 0, 'Cases']} />
+                  <Line type="monotone" dataKey="cases" stroke={RED} strokeWidth={2} dot={{ r: 2.5, fill: RED }} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          <div className="px-3 pb-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Vital events per month</div>
+            {vitalMonthly.length === 0 ? (
+              <p className="text-[12px] p-4 text-center" style={{ color: 'var(--text-muted)' }}>No birth/death registrations on file.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={140}>
+                <LineChart data={vitalMonthly} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                  <XAxis dataKey="month" tick={axisTick} tickLine={false} axisLine={false} />
+                  <YAxis tick={axisTick} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip {...tooltipStyle} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
+                  <Line type="monotone" dataKey="births" name="Births" stroke={GREEN} strokeWidth={2} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="deaths" name="Deaths" stroke={DEEP} strokeWidth={2} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        <div className="dash-card overflow-hidden">
+          <PanelHead title="Programme coverage vs target" meta="Cumulative recorded data · National" action={
+            <span className="flex items-center gap-2">
+              <button type="button" className="text-[11px] font-bold" style={{ color: 'var(--accent-primary)' }} onClick={() => router.push('/immunizations')}>
+                <Syringe className="w-3 h-3 inline" /> EPI
+              </button>
+              <button type="button" className="text-[11px] font-bold" style={{ color: 'var(--accent-primary)' }} onClick={() => router.push('/anc')}>
+                <HeartPulse className="w-3 h-3 inline" /> ANC
+              </button>
+            </span>
+          } />
+          <div className="p-4 flex flex-col gap-4">
+            <BulletRow label="Children fully immunized (BCG + Penta3 + Measles1)" actual={imm?.coverageRate ?? 0} target={90} denominator={`Denominator: ${imm?.totalChildren ?? 0} children with immunization records (no census denominator on file)`} />
+            <BulletRow label="Mothers reaching ANC 4+" actual={anc?.anc4PlusRate ?? 0} target={80} denominator={`Denominator: ${anc?.totalMothers ?? 0} mothers with ANC records`} />
+            <BulletRow label="Birth registrations with certificate issued" actual={birthCert ?? 0} target={90} denominator={`Denominator: ${births.length} registered births`} />
+            <BulletRow label="Death registrations with certificate issued" actual={deathCert ?? 0} target={90} denominator={`Denominator: ${deaths.length} registered deaths`} />
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              Targets are national programme targets. Rates use facility-recorded denominators, not population estimates.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row: data quality + reports/exchange status ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="dash-card overflow-hidden flex flex-col">
+          <PanelHead title="Data quality warnings" meta={`Latest facility assessments · ${dq?.totalFacilities ?? 0} facilities`} action={
+            <button type="button" className="text-[11px] font-bold" style={{ color: 'var(--accent-primary)' }} onClick={() => router.push('/data-quality')}>
+              <Database className="w-3 h-3 inline" /> Data quality
+            </button>
+          } />
+          {!dq || dq.entries.length === 0 ? (
+            <p className="text-[12px] p-6 text-center" style={{ color: 'var(--text-muted)' }}>No facility assessments on file yet.</p>
+          ) : (
+            <div>
+              {dq.entries
+                .filter(e => e.reportingCompleteness < 80 || e.reportingTimeliness < 80)
+                .sort((a, b) => a.reportingCompleteness - b.reportingCompleteness)
+                .slice(0, 6)
+                .map(e => (
+                  <div key={e.facilityId} className="flex items-center gap-2.5 px-4 py-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: pctTone(Math.min(e.reportingCompleteness, e.reportingTimeliness), 80, 60) }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-extrabold truncate" style={{ color: 'var(--text-primary)' }}>{e.facilityName}</span>
+                      <span className="block text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>{e.state} · assessed {e.lastAssessmentDate ? e.lastAssessmentDate.slice(0, 10) : 'never'}</span>
+                    </span>
+                    <span className="text-[11px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                      compl <b style={{ color: pctTone(e.reportingCompleteness, 80, 60) }}>{e.reportingCompleteness}%</b>
+                      {' · '}timel <b style={{ color: pctTone(e.reportingTimeliness, 80, 60) }}>{e.reportingTimeliness}%</b>
+                    </span>
+                  </div>
+                ))}
+              {dq.entries.every(e => e.reportingCompleteness >= 80 && e.reportingTimeliness >= 80) && (
+                <p className="text-[12px] p-6 text-center" style={{ color: GREEN }}>All assessed facilities at or above the 80% reporting target.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="dash-card overflow-hidden flex flex-col">
+          <PanelHead title="Reports & exchange" meta={dhis2Host ? `DHIS2 · ${dhis2Host}` : 'DHIS2 not configured'} action={
+            <button type="button" className="text-[11px] font-bold" style={{ color: 'var(--accent-primary)' }} onClick={() => router.push('/dhis2-export')}>
+              <Download className="w-3 h-3 inline" /> DHIS2 export
+            </button>
+          } />
+          <div className="p-4 flex flex-col gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full" style={{ background: !dhis2Configured ? 'var(--text-muted)' : dhis2Ok ? GREEN : dhis2?.lastAttemptAt ? RED : AMBER }} />
+              <b style={{ color: 'var(--text-primary)' }}>
+                {!dhis2Configured ? 'DHIS2 connection not configured'
+                  : dhis2Ok ? 'Last export fully synced'
+                  : dhis2?.lastAttemptAt ? 'Last export attempt did not fully sync'
+                  : 'No export attempted yet'}
+              </b>
+            </div>
+            <div>Last successful push: {dhis2?.lastSyncedAt ? new Date(dhis2.lastSyncedAt).toLocaleString() : '—'}</div>
+            <div>Last attempt: {dhis2?.lastAttemptAt ? new Date(dhis2.lastAttemptAt).toLocaleString() : '—'}</div>
+            <div>
+              Last dataset: {dhis2?.lastDataset ? `${dhis2.lastDataset.period} · ${dhis2.lastDataset.totalValueCount.toLocaleString()} values` : 'none generated'}
+            </div>
+            <div>Facilities reporting: <b style={{ color: 'var(--text-primary)' }}>{dq?.facilitiesReporting ?? 0}/{dq?.totalFacilities ?? 0}</b> · DHIS2 adoption {dq ? `${dq.dhis2Adoption}%` : '—'}</div>
+            {(dhis2?.entries?.length ?? 0) > 0 && (
+              <div className="mt-1 pt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
+                <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Recent log</div>
+                {dhis2!.entries.slice(-4).reverse().map((e, i) => (
+                  <div key={i} className="flex items-center gap-2 py-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: e.status === 'error' ? RED : e.status === 'success' ? GREEN : BLUE }} />
+                    <span className="truncate" title={e.message}>{e.message}</span>
+                    <span className="ml-auto text-[10px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{new Date(e.time).toLocaleDateString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }

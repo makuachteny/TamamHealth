@@ -2,12 +2,11 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
-import { BedDouble, ChevronRight, Plus, X, AlertTriangle, CheckCircle2 } from '@/components/icons/lucide';
+import { BedDouble, ChevronRight, Plus, X, AlertTriangle, CheckCircle2, Filter } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useWards } from '@/lib/hooks/useWards';
@@ -153,7 +152,6 @@ export default function WardsPage() {
 
   return (
     <>
-      <TopBar title={t('ward.wards')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageInstructionCard />
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
@@ -170,10 +168,10 @@ export default function WardsPage() {
               <>
                 {facilityWards.length > 0 && (
                   <div className="relative" ref={wardFilterRef}>
-                    <EhrListHeaderButton onClick={() => setShowWardFilter(s => !s)} active={activeFilterCount > 0} ariaExpanded={showWardFilter}>
-                      Filters
+                    <EhrListHeaderButton onClick={() => setShowWardFilter(s => !s)} active={activeFilterCount > 0} ariaExpanded={showWardFilter} ariaLabel="Filters">
+                      <Filter className="w-4 h-4" />
                       {activeFilterCount > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+                        <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-bold" style={{ top: -4, right: -4, background: '#2191D0', color: '#fff' }}>
                           {activeFilterCount}
                         </span>
                       )}

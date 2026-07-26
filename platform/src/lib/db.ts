@@ -301,7 +301,12 @@ export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 // buckets with wavy sigmoid-style case factors for surveillance trend charts.
 // Bumped to 54: added more Juba Teaching Hospital assignable doctors so the
 // Assign provider popup demonstrates fixed-height scrolling and A-Z sorting.
-export const SEED_VERSION = 54;
+// Bumped to 55: Mercy General Hospital (hosp-mercy-001, private org) now has
+// its own real roster — 4 new staff users, 8 patients, wards/beds/admissions,
+// pharmacy inventory/prescriptions, blood bank stock and today's appointments
+// — instead of borrowed hosp-001 public data, so org.admin's dashboards show
+// a coherent Mercy-only dataset.
+export const SEED_VERSION = 55;
 
 export async function isSeeded(): Promise<boolean> {
   try {

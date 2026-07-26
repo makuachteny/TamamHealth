@@ -273,9 +273,11 @@ export default function FacilityManagementDashboard() {
 
   return (
     <>
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <DashboardGreetingHeader />
-        <div className="flex flex-col gap-3">
+        {/* flex:1 so the card rows stretch to fill the viewport — the Users &
+            Inquiries row absorbs the leftover height (its table scrolls). */}
+        <div className="flex flex-col gap-3" style={{ flex: 1, minHeight: 0 }}>
 
           {/* ═══ ROW 1 — Cash Flow · Stat cards · Weekly activity ═══ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
@@ -399,8 +401,8 @@ export default function FacilityManagementDashboard() {
           </div>
 
           {/* ═══ ROW 2 — Users & Inquiries ═══ */}
-          <div className="dash-card overflow-hidden">
-            <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div className="px-5 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div>
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Users & Inquiries</h3>
                 <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -416,7 +418,7 @@ export default function FacilityManagementDashboard() {
                 </button>
               </div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
               <table className="w-full" style={{ minWidth: 640 }}>
                 <thead>
                   <tr>

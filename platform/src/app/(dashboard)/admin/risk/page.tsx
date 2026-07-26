@@ -1,0 +1,286 @@
+'use client';
+
+/**
+ * Super-admin → Risk Center.
+ * Unifies open risk signals from every subsystem into a single queue: no
+ * fabricated owners or due-dates — each row is derived from a real service
+ * call, and severity is computed the same way the dashboard classifies it.
+ */
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useOrganizations } from '@/lib/hooks/useOrganizations';
+import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
+import { apiFetch } from '@/lib/api-fetch';
+import type { AuditLogDoc, ConflictQueueDoc, SyncEventDoc } from '@/lib/db-types';
+import {
+  SaPage, SaCard, SaStat, SaPill, SaTable,
+  classifyAuditRisk, SEVERITY_TONE, formatWhen,
+  type SaSeverity,
+} from '@/components/admin/sa-ui';
+
+type Source = 'Audit' | 'Sync' | 'Data' | 'Tenants' | 'Continuity' | 'Platform';
+
+interface RiskRow {
+  id: string;
+  severity: SaSeverity;
+  signal: string;
+  source: Source;
+  detail: string;
+  when?: string;
+  status: string;
+}
+
+const SOURCE_HREF: Record<Source, string> = {
+  Audit: '/admin/audit',
+  Sync: '/admin/sync',
+  Data: '/admin/conflicts',
+  Tenants: '/admin/organizations',
+  Continuity: '/admin/system',
+  Platform: '/admin/system',
+};
+
+const SEVERITY_ORDER: Record<SaSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+const SEVERITIES: SaSeverity[] = ['critical', 'high', 'medium', 'low'];
+const SOURCES: Source[] = ['Audit', 'Sync', 'Data', 'Tenants', 'Continuity', 'Platform'];
+
+export default function RiskCenterPage() {
+  const router = useRouter();
+  const { organizations } = useOrganizations();
+  const { config } = usePlatformConfig();
+
+  const [auditLogs, setAuditLogs] = useState<AuditLogDoc[]>([]);
+  const [syncFailed, setSyncFailed] = useState(0);
+  const [pendingSyncEvents, setPendingSyncEvents] = useState<SyncEventDoc[]>([]);
+  const [conflicts, setConflicts] = useState<ConflictQueueDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [severityFilter, setSeverityFilter] = useState<'all' | SaSeverity>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | Source>('all');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [{ getRecentAuditLogs }, { getSyncEventStats, getPendingSyncEvents }] = await Promise.all([
+          import('@/lib/services/audit-service'),
+          import('@/lib/services/sync-event-service'),
+        ]);
+        const [logs, stats] = await Promise.all([
+          getRecentAuditLogs(1000),
+          getSyncEventStats(),
+        ]);
+        if (!mounted) return;
+        setAuditLogs(logs);
+        setSyncFailed(stats.failed);
+        if (stats.failed > 0) {
+          const pending = await getPendingSyncEvents(200);
+          if (mounted) setPendingSyncEvents(pending);
+        }
+        try {
+          const res = await apiFetch('/api/admin/conflicts?status=pending');
+          if (res.ok && mounted) {
+            const body = await res.json();
+            setConflicts(Array.isArray(body.conflicts) ? body.conflicts : []);
+          }
+        } catch {
+          // Conflicts feed is an additional signal; its absence shouldn't
+          // block the rest of the risk queue from rendering.
+        }
+      } catch (err) {
+        console.error('Failed to load risk signals:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const backupAgeHours = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const last = localStorage.getItem('safeguard_last_backup');
+    if (!last) return null;
+    const ms = Date.now() - new Date(last).getTime();
+    return Number.isFinite(ms) ? ms / 3600000 : null;
+  }, []);
+
+  const rows: RiskRow[] = useMemo(() => {
+    const out: RiskRow[] = [];
+    const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
+
+    // (a) failed audit events, last 7 days
+    for (const log of auditLogs) {
+      if (log.success) continue;
+      const t = log.createdAt ? new Date(log.createdAt).getTime() : 0;
+      if (!t || t < cutoff) continue;
+      out.push({
+        id: `audit-${log._id}`,
+        severity: classifyAuditRisk(log.action, log.success),
+        signal: log.action,
+        source: 'Audit',
+        detail: log.details || log.username || 'No detail recorded',
+        when: log.createdAt,
+        status: 'failed',
+      });
+    }
+
+    // (b) sync backlog — only surfaced once the aggregate stats show a real
+    // failure count; rows are the currently pending backlog behind it.
+    if (syncFailed > 0) {
+      for (const ev of pendingSyncEvents) {
+        out.push({
+          id: `sync-${ev._id}`,
+          severity: 'medium',
+          signal: `${ev.operation} ${ev.resourceType}`,
+          source: 'Sync',
+          detail: `${ev.resourceId.slice(0, 24)} · ${ev.syncStatus}`,
+          when: ev.occurredAt,
+          status: ev.syncStatus,
+        });
+      }
+    }
+
+    // (c) pending conflicts
+    for (const c of conflicts) {
+      if (c.status !== 'pending') continue;
+      out.push({
+        id: `conflict-${c._id}`,
+        severity: c.risk === 'high' ? 'high' : c.risk === 'medium' ? 'medium' : 'low',
+        signal: `${c.resourceType} conflict`,
+        source: 'Data',
+        detail: `${c.losingRevs.length} competing revision${c.losingRevs.length === 1 ? '' : 's'}`,
+        when: c.createdAt,
+        status: 'pending',
+      });
+    }
+
+    // (d) tenant risk
+    for (const org of organizations) {
+      if (org.subscriptionStatus === 'suspended' || org.subscriptionStatus === 'cancelled' || !org.isActive) {
+        out.push({
+          id: `org-status-${org._id}`,
+          severity: 'medium',
+          signal: `${org.name} — ${org.subscriptionStatus}`,
+          source: 'Tenants',
+          detail: org.isActive ? 'Subscription is not active' : 'Organization deactivated',
+          when: org.updatedAt,
+          status: org.subscriptionStatus,
+        });
+      } else if (org.subscriptionStatus === 'trial') {
+        out.push({
+          id: `org-trial-${org._id}`,
+          severity: 'low',
+          signal: `${org.name} — trial`,
+          source: 'Tenants',
+          detail: `${org.subscriptionPlan} plan on trial subscription`,
+          when: org.createdAt,
+          status: 'trial',
+        });
+      }
+    }
+
+    // (e) backup overdue vs policy RPO
+    const rpo = config?.superAdminPolicies?.backupRpoHours;
+    if (rpo) {
+      if (backupAgeHours === null) {
+        out.push({
+          id: 'continuity-backup-missing',
+          severity: 'high',
+          signal: 'No backup on record',
+          source: 'Continuity',
+          detail: `Recovery point objective is ${rpo}h`,
+          status: 'unknown',
+        });
+      } else if (backupAgeHours > rpo) {
+        out.push({
+          id: 'continuity-backup-overdue',
+          severity: backupAgeHours > rpo * 2 ? 'high' : 'medium',
+          signal: 'Backup overdue',
+          source: 'Continuity',
+          detail: `Last backup ${Math.round(backupAgeHours)}h ago, RPO is ${rpo}h`,
+          status: 'overdue',
+        });
+      }
+    }
+
+    // (f) maintenance mode
+    if (config?.maintenanceMode) {
+      out.push({
+        id: 'platform-maintenance',
+        severity: 'low',
+        signal: 'Maintenance mode is on',
+        source: 'Platform',
+        detail: 'Platform is restricted to admin-only access',
+        status: 'on',
+      });
+    }
+
+    out.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+    return out;
+  }, [auditLogs, syncFailed, pendingSyncEvents, conflicts, organizations, config, backupAgeHours]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter(r => {
+      if (severityFilter !== 'all' && r.severity !== severityFilter) return false;
+      if (sourceFilter !== 'all' && r.source !== sourceFilter) return false;
+      if (q && !`${r.signal} ${r.detail} ${r.source}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [rows, severityFilter, sourceFilter, search]);
+
+  const counts = useMemo(() => {
+    const c: Record<SaSeverity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+    for (const r of rows) c[r.severity]++;
+    return c;
+  }, [rows]);
+
+  return (
+    <SaPage
+      title="Risk Center"
+      subtitle="Unified open-risk queue across audit, sync, data, tenants, and continuity signals."
+    >
+      <div className="sa-stat-strip">
+        <SaStat label="Critical" value={counts.critical} tone={counts.critical ? 'danger' : 'muted'} />
+        <SaStat label="High" value={counts.high} tone={counts.high ? 'danger' : 'muted'} />
+        <SaStat label="Medium" value={counts.medium} tone={counts.medium ? 'warn' : 'muted'} />
+        <SaStat label="Low" value={counts.low} tone="muted" />
+        <SaStat label="Total open" value={rows.length} />
+      </div>
+
+      <SaCard title="Risk queue" meta={`${filtered.length} of ${rows.length}`}>
+        <div className="sa-filter-bar">
+          <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value as 'all' | SaSeverity)}>
+            <option value="all">All severities</option>
+            {SEVERITIES.map(s => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+          </select>
+          <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value as 'all' | Source)}>
+            <option value="all">All sources</option>
+            {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <input
+            type="search"
+            placeholder="Search signal or detail…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <SaTable
+          columns={['Severity', 'Signal', 'Source', 'Detail', 'Age', 'Status']}
+          empty={loading ? 'Loading risk signals…' : 'No open risk signals — the platform is clean.'}
+        >
+          {filtered.map(r => (
+            <tr key={r.id} onClick={() => router.push(SOURCE_HREF[r.source])} style={{ cursor: 'pointer' }}>
+              <td><SaPill tone={SEVERITY_TONE[r.severity]}>{r.severity.toUpperCase()}</SaPill></td>
+              <td><strong>{r.signal}</strong></td>
+              <td>{r.source}</td>
+              <td>{r.detail}</td>
+              <td>{formatWhen(r.when)}</td>
+              <td>{r.status}</td>
+            </tr>
+          ))}
+        </SaTable>
+      </SaCard>
+    </SaPage>
+  );
+}

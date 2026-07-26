@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import TopBar from '@/components/TopBar';
 import {
   Building2, BedDouble, Users, Stethoscope, WifiOff,
   Zap, ZapOff, Sun, Truck, Signal, Clock, Activity,
@@ -240,7 +239,6 @@ function HospitalsPageInner() {
   if (loading) {
     return (
       <>
-        <TopBar title={t('hospitals.topBarTitle')} />
         <main className="page-container flex items-center justify-center page-enter">
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('hospitals.loadingFacilities')}</p>
         </main>
@@ -250,7 +248,6 @@ function HospitalsPageInner() {
 
   return (
     <>
-      <TopBar title={t('hospitals.topBarTitle')} />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* ── KPIs ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5" style={{ marginBottom: 12 }}>
@@ -279,10 +276,10 @@ function HospitalsPageInner() {
                 actions={
                   <>
                     <div className="relative" ref={filtersRef}>
-                      <EhrListHeaderButton onClick={() => setShowFilters(s => !s)} active={activeFilterCount > 0} ariaExpanded={showFilters}>
-                        <Filter style={{ width: 13, height: 13 }} /> {t('hospitals.filters')}
+                      <EhrListHeaderButton onClick={() => setShowFilters(s => !s)} active={activeFilterCount > 0} ariaExpanded={showFilters} ariaLabel={t('hospitals.filters')}>
+                        <Filter className="w-4 h-4" />
                         {activeFilterCount > 0 && (
-                          <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
+                          <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold" style={{ top: -4, right: -4, background: 'var(--accent-primary)', color: '#fff' }}>
                             {activeFilterCount}
                           </span>
                         )}
@@ -317,8 +314,8 @@ function HospitalsPageInner() {
                         </div>
                       )}
                     </div>
-                    <EhrListHeaderButton onClick={handleExport}>
-                      <Download style={{ width: 13, height: 13 }} /> {t('action.export')}
+                    <EhrListHeaderButton onClick={handleExport} ariaLabel={t('action.export')}>
+                      <Download className="w-4 h-4" />
                     </EhrListHeaderButton>
                   </>
                 }

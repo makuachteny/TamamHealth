@@ -1,7 +1,8 @@
 'use client';
 
 // Floating staff-messaging dock — a Messenger/Intercom-style launcher that lives
-// bottom-left on every dashboard screen so staff can read and reply to internal
+// bottom-right on the role dashboards (routes under /dashboard) so staff can
+// read and reply to internal
 // chat WITHOUT navigating away from their current task. It reuses the same
 // `useStaffChat` data layer (and styling tokens) as the full /messages page, so
 // the two stay in sync; the full page remains for power features (groups,
@@ -111,7 +112,7 @@ export default function MessagingDock() {
   const threadRef = useRef<HTMLDivElement>(null);
 
   // Drag-to-reposition for the floating launcher. The dock stays anchored at
-  // its default bottom-left corner (left: 20, bottom: 20) and this offset is
+  // its default bottom-right corner (right: 20, bottom: 20) and this offset is
   // applied on top via a transform, so dragging never touches layout — just a
   // translate, which is what lets us drag in real time without re-rendering.
   // The offset lives in state (not just a ref) so the expanded panel opens
@@ -125,7 +126,7 @@ export default function MessagingDock() {
   const clampDockOffset = (x: number, y: number) => {
     const size = 56;
     const margin = 20;
-    const originLeft = margin;
+    const originLeft = window.innerWidth - margin - size;
     const originTop = window.innerHeight - margin - size;
     return {
       x: Math.min(Math.max(x, -originLeft), window.innerWidth - size - originLeft),
@@ -224,7 +225,10 @@ export default function MessagingDock() {
   // the dock on top of it. Require an authenticated staff user whose role has
   // messaging access (same gating as the /messages route).
   const canMessage = !!currentUser && !!getRoleConfig(currentUser.role)?.allowedRoutes?.includes('/messages');
-  if (!canMessage || pathname === '/messages') return null;
+  // Dashboard-only: the floating launcher lives on the role dashboards, never
+  // on the working pages (patients, settings, …) where it crowds the content.
+  const onDashboard = pathname === '/dashboard' || pathname?.startsWith('/dashboard/');
+  if (!canMessage || !onDashboard) return null;
 
   const handleSend = async () => {
     const body = draft.trim();
@@ -270,7 +274,7 @@ export default function MessagingDock() {
         aria-label="Open messages"
         className="fixed z-[60] flex items-center justify-center rounded-full text-white shadow-lg"
         style={{
-          left: 20, bottom: 20, width: 56, height: 56, background: 'var(--accent-primary)', boxShadow: 'var(--card-shadow-lg)',
+          right: 20, bottom: 20, width: 56, height: 56, background: 'var(--accent-primary)', boxShadow: 'var(--card-shadow-lg)',
           transform: `translate3d(${dockOffset.x}px, ${dockOffset.y}px, 0)`, touchAction: 'none', cursor: 'grab',
         }}
       >
@@ -294,7 +298,7 @@ export default function MessagingDock() {
     <div
       className="fixed z-[60] flex flex-col overflow-hidden"
       style={{
-        left: 20, bottom: 20, width: 372, height: 540, maxHeight: 'calc(100vh - 40px)', maxWidth: 'calc(100vw - 40px)',
+        right: 20, bottom: 20, width: 372, height: 540, maxHeight: 'calc(100vh - 40px)', maxWidth: 'calc(100vw - 40px)',
         borderRadius: 'var(--card-radius)', border: '1px solid var(--glass-border)',
         background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
         boxShadow: 'var(--panel-shadow), var(--glass-highlight)',

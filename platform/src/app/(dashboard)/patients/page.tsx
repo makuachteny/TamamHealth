@@ -226,23 +226,24 @@ export default function PatientsPage() {
   const columns: PatientCol[] = [
     {
       key: 'patient', label: t('nurse.colPatientName'), width: 20,
+      // Dashboard row look: 40px square .ehr-patient-icon avatar + 14px/800 name.
       render: (p) => (
-        <div className="flex items-center gap-2 min-w-0">
-          <PatientAvatar patient={p} size={30} />
-          <span className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <PatientAvatar patient={p} size={40} />
+          <span className="text-[14px] truncate" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{patientFullName(p)}</span>
         </div>
       ),
     },
     {
       key: 'gender', label: t('nurse.colGender'), width: 9,
-      render: (p) => <span className="text-[12px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.gender || '—'}</span>,
+      render: (p) => <span className="text-[13px] whitespace-nowrap" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{p.gender || '—'}</span>,
     },
     {
       key: 'age', label: t('nurse.colAge'), width: 8,
-      render: (p) => <span className="text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patientAgeLabel(p)}</span>,
+      render: (p) => <span className="text-[13px] tabular-nums whitespace-nowrap" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{patientAgeLabel(p)}</span>,
     },
-    { key: 'hospitalNo', label: t('patients.colHospitalNo'), width: 13, render: (p) => <span className="text-[12px] font-mono tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.hospitalNumber || '—'}</span> },
-    { key: 'location', label: t('patient.location'), width: 16, render: (p) => <span className="text-[12px] block truncate" style={{ color: 'var(--text-secondary)' }}>{[p.county, p.state].filter(Boolean).join(', ') || '—'}</span> },
+    { key: 'hospitalNo', label: t('patients.colHospitalNo'), width: 13, render: (p) => <span className="text-[13px] font-mono tabular-nums whitespace-nowrap" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{p.hospitalNumber || '—'}</span> },
+    { key: 'location', label: t('patient.location'), width: 16, render: (p) => <span className="text-[13px] block truncate" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{[p.county, p.state].filter(Boolean).join(', ') || '—'}</span> },
   ];
 
   if (isBilling) {
@@ -251,8 +252,8 @@ export default function PatientsPage() {
       render: (p) => {
         const bal = balanceByPatient.get(p._id) || 0;
         return bal > 0
-          ? <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(bal)}</span>
-          : <span className="text-[11px]" style={{ color: 'var(--color-success)' }}>{t('billing.paidInFull')}</span>;
+          ? <span className="text-[13px] font-bold whitespace-nowrap" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(bal)}</span>
+          : <span className="text-[12px]" style={{ color: 'var(--color-success)' }}>{t('billing.paidInFull')}</span>;
       },
     });
   }
@@ -260,8 +261,8 @@ export default function PatientsPage() {
   columns.push({
     key: 'assigned', label: t('patients.colAssigned'), width: 12,
     render: (p) => p.assignedDoctorName
-      ? <span className="text-[12px] block truncate" style={{ color: 'var(--text-secondary)' }}>{p.assignedDoctorName}</span>
-      : <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>—</span>,
+      ? <span className="text-[13px] block truncate" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{p.assignedDoctorName}</span>
+      : <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>—</span>,
   });
 
   // The whole row is clickable (navigates to the patient), so there is no bare
@@ -453,10 +454,10 @@ export default function PatientsPage() {
                       <th
                         key={c.key}
                         className={`${c.align === 'right' ? 'text-right' : 'text-left'} px-4 py-2.5`}
-                        style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}
+                        style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}
                       >
                         <div className={`flex items-center gap-1.5 ${c.align === 'right' ? 'justify-end' : ''}`}>
-                          <span className="text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">{c.label}</span>
+                          <span className="text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">{c.label}</span>
                         </div>
                       </th>
                     ))}

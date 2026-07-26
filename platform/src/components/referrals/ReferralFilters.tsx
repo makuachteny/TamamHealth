@@ -45,21 +45,21 @@ export default function ReferralFilters({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="relative inline-flex items-center gap-2 px-3 py-2 text-[11px] font-semibold transition-colors hover:bg-[var(--overlay-subtle)]"
+        className="relative inline-flex items-center justify-center transition-colors hover:bg-[var(--overlay-subtle)]"
         style={{
-          border: '1px solid var(--border-medium)',
-          background: 'var(--bg-card-solid)',
-          borderRadius: 'var(--input-radius)',
-          boxShadow: 'var(--card-shadow)',
+          width: 38, height: 38, padding: 0, flexShrink: 0,
+          border: `1px solid ${activeCount ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+          background: activeCount ? 'rgba(33,145,208,0.08)' : 'var(--bg-card-solid)',
+          borderRadius: 999,
           color: activeCount ? 'var(--accent-primary)' : 'var(--text-secondary)',
         }}
         title={t('patients.filtersTitle')}
+        aria-label={t('patients.filtersTitle')}
         aria-expanded={open}
       >
-        <Filter className="w-4 h-4" style={{ color: activeCount ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-        <span>{t('patients.filtersTitle')}</span>
+        <Filter className="w-4 h-4" />
         {activeCount > 0 && (
-          <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
+          <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold" style={{ top: -4, right: -4, background: 'var(--accent-primary)', color: '#fff' }}>
             {activeCount}
           </span>
         )}

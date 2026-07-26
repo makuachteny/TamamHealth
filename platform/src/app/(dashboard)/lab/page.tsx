@@ -615,10 +615,9 @@ export default function LabPage() {
                       ariaExpanded={showHeaderFilters}
                       ariaLabel={t('patients.filtersTitle')}
                     >
-                      <Filter className="w-3.5 h-3.5" />
-                      {t('patients.filtersTitle')}
+                      <Filter className="w-4 h-4" />
                       {headerFilterCount > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+                        <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-bold" style={{ top: -4, right: -4, background: '#2191D0', color: '#fff' }}>
                           {headerFilterCount}
                         </span>
                       )}
@@ -662,16 +661,15 @@ export default function LabPage() {
                   </div>
                   {anyFilterActive && (
                     <EhrListHeaderButton onClick={clearColFilters} ariaLabel={t('nurse.clearAllFilters')}>
-                      <X className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
+                      <X className="w-4 h-4" />
                     </EhrListHeaderButton>
                   )}
-                  <EhrListHeaderButton onClick={handleDownloadCsv}>
-                    <Download size={15} /> Download
+                  <EhrListHeaderButton onClick={handleDownloadCsv} ariaLabel="Download">
+                    <Download className="w-4 h-4" />
                   </EhrListHeaderButton>
                   {canEnterLabResults && (
-                    <EhrListHeaderButton onClick={() => setShowImportModal(true)}>
-                      <Radio className="w-3.5 h-3.5" /> Import from analyzer
+                    <EhrListHeaderButton onClick={() => setShowImportModal(true)} ariaLabel="Import from analyzer">
+                      <Radio className="w-4 h-4" />
                     </EhrListHeaderButton>
                   )}
                   {canOrderLabs && (

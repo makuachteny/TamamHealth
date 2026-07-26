@@ -90,9 +90,10 @@ export default function EhrListHeader({
 }
 
 /**
- * EhrListHeaderButton — pill button matching the patients header's Filters /
- * Download controls. `active` renders the blue-tinted state used when filters
- * are applied.
+ * EhrListHeaderButton — icon-only round toolbar button matching the patients
+ * header's Filters / Download controls (38px circle, icon only — the meaning
+ * carries via `ariaLabel`, which also becomes the hover tooltip). `active`
+ * renders the blue-tinted state used when filters are applied.
  */
 export function EhrListHeaderButton({
   onClick,
@@ -103,6 +104,7 @@ export function EhrListHeaderButton({
 }: {
   onClick?: () => void;
   active?: boolean;
+  /** The icon (plus optional badge) — no text labels; use `ariaLabel`. */
   children: ReactNode;
   ariaExpanded?: boolean;
   ariaLabel?: string;
@@ -113,13 +115,15 @@ export function EhrListHeaderButton({
       onClick={onClick}
       aria-expanded={ariaExpanded}
       aria-label={ariaLabel}
+      title={ariaLabel}
       style={{
-        display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 14px',
+        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 38, height: 38, padding: 0, flexShrink: 0,
         borderRadius: 999,
         border: `1px solid ${active ? 'var(--accent-primary)' : 'var(--border-light)'}`,
         background: active ? 'rgba(33,145,208,0.08)' : 'var(--bg-card-solid)',
         color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
-        fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+        cursor: 'pointer', whiteSpace: 'nowrap',
       }}
     >
       {children}
@@ -167,10 +171,9 @@ export function EhrListFilters({
   return (
     <div className="relative" ref={ref}>
       <EhrListHeaderButton onClick={() => setOpen(o => !o)} active={activeCount > 0} ariaExpanded={open} ariaLabel={label}>
-        <Filter className="w-3.5 h-3.5" />
-        {label}
+        <Filter className="w-4 h-4" />
         {activeCount > 0 && (
-          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+          <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-bold" style={{ top: -4, right: -4, background: '#2191D0', color: '#fff' }}>
             {activeCount}
           </span>
         )}

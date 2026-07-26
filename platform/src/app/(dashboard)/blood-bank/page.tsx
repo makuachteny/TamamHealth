@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Modal from '@/components/Modal';
-import TopBar from '@/components/TopBar';
 import { Droplets, Plus, X, Search, UserCheck, FlaskConical, Syringe, Trash2, CheckCircle2, XCircle } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -22,6 +21,7 @@ import { formatDate } from '@/lib/format-utils';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import RowActionsMenu, { type RowAction } from '@/components/RowActionsMenu';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { useDataScope } from '@/lib/hooks/useDataScope';
 import { patientFullName } from '@/lib/patient-utils';
 import PatientAvatar from '@/components/patients/PatientAvatar';
 
@@ -57,6 +57,7 @@ export default function BloodBankPage() {
   const { currentUser } = useApp();
   const { showToast } = useToast();
   const { patients } = usePatients();
+  const scope = useDataScope();
 
   const [units, setUnits] = useState<BloodBankDoc[]>([]);
   const [unitSearch, setUnitSearch] = useState('');
@@ -85,9 +86,12 @@ export default function BloodBankPage() {
   const [form, setForm] = useState(emptyForm);
 
   const loadUnits = useCallback(async () => {
+    if (!scope) return; // pre-hydration — re-runs once the user is known
     setLoading(true);
     try {
-      const all = await getAllUnits();
+      // Scoped: the local DB holds every tenant's units in demo/offline mode,
+      // so an unscoped read leaked other orgs' stock to org admins.
+      const all = await getAllUnits(scope);
       setUnits(all);
     } catch (err) {
       console.error(err);
@@ -95,7 +99,7 @@ export default function BloodBankPage() {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, scope]);
 
   useEffect(() => { loadUnits(); }, [loadUnits]);
 
@@ -352,27 +356,6 @@ export default function BloodBankPage() {
 
   return (
     <>
-      <TopBar
-        title="Blood Bank"
-        hideSearch
-        titleActions={
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-              <input
-                type="search"
-                value={unitSearch}
-                onChange={e => setUnitSearch(e.target.value)}
-                placeholder="Search units by ID, group, status…"
-                style={{ height: 38, width: 280, paddingLeft: 36, background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 10 }}
-              />
-            </div>
-            <button onClick={openModal} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
-              <Plus className="w-4 h-4" /> Add unit
-            </button>
-          </div>
-        }
-      />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Availability by blood group — one tile per group, count of AVAILABLE units */}
         <div className="dash-card mb-4">
@@ -425,6 +408,12 @@ export default function BloodBankPage() {
               { label: 'Reserved', value: unitStats.reserved, color: LIST_STAT_COLORS.amber },
               { label: 'Expiring ≤7d', value: unitStats.expiringSoon, color: LIST_STAT_COLORS.green },
             ]}
+            search={{ value: unitSearch, onChange: setUnitSearch, placeholder: 'Filter table', ariaLabel: 'Search units by ID, group, status' }}
+            actions={
+              <button onClick={openModal} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <Plus className="w-4 h-4" /> Add unit
+              </button>
+            }
           />
           <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (

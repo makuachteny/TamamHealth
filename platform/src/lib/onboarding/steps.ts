@@ -83,7 +83,6 @@ export const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: num
   '/org-admin/branding': { verb: 'Brand your workspace', desc: 'Add your logo and colours so the app feels like yours.', est: 2 },
   '/org-admin/analytics': { verb: 'Review org analytics', desc: 'See performance across your organization’s facilities.', est: 2 },
   '/org-admin/settings': { verb: 'Configure org settings', desc: 'Set defaults, security, and preferences for your org.', est: 2 },
-  '/org-admin': { verb: 'Open your organization dashboard', desc: 'See org-wide stats, compare facilities, and jump to users, hospitals, and settings.', est: 2 },
   '/org-admin/pricing': { verb: 'Set your service pricing', desc: 'Add and edit the fee schedule for consultations, labs, pharmacy, and procedures.', est: 2 },
   // Front desk / clinical intake
   '/check-in': { verb: 'Check in a patient', desc: 'Find a patient, record their arrival, chief complaint, and acuity, and start their visit.', est: 2 },
