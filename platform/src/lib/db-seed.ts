@@ -96,9 +96,12 @@ const defaultOrganizations: Omit<OrganizationDoc, '_rev'>[] = [
     type: 'organization',
     name: 'Mercy Hospital Group',
     slug: 'mercy-hospital',
-    primaryColor: 'var(--accent-primary)',
-    secondaryColor: '#4F46E5',
-    accentColor: '#A78BFA',
+    // Default brand palette — orgs only carry a custom color when an admin
+    // deliberately rebrands (see branding.ts, which also rejects non-hex
+    // values so buttons never lose the default action blue).
+    primaryColor: BRAND_PRIMARY,
+    secondaryColor: BRAND_SECONDARY,
+    accentColor: BRAND_PRIMARY,
     subscriptionStatus: 'active',
     subscriptionPlan: 'professional',
     maxUsers: 50,
@@ -1364,6 +1367,34 @@ export async function seedDatabase(): Promise<void> {
   return seedDatabaseExclusive();
 }
 
+/** Repair org docs seeded with corrupt branding — an earlier seed stored the
+ *  literal string 'var(--accent-primary)' as a primary color, which broke the
+ *  accent cascade and repainted primary buttons indigo. Only docs whose
+ *  primary is not a real hex color are touched; an admin's deliberate rebrand
+ *  is a valid hex and stays. */
+async function migrateOrgBrandingColors(): Promise<void> {
+  try {
+    const orgDB = organizationsDB();
+    for (const seedOrg of defaultOrganizations) {
+      try {
+        const doc = await orgDB.get(seedOrg._id) as unknown as OrganizationDoc & { _rev: string };
+        const primaryOk = !!doc.primaryColor && /^#[0-9a-fA-F]{3,8}$/.test(doc.primaryColor.trim());
+        if (!primaryOk) {
+          await orgDB.put({
+            ...doc,
+            primaryColor: seedOrg.primaryColor,
+            secondaryColor: seedOrg.secondaryColor,
+            accentColor: seedOrg.accentColor,
+            updatedAt: new Date().toISOString(),
+          } as unknown as PouchDB.Core.PutDocument<object>);
+        }
+      } catch { /* org doc missing — nothing to repair */ }
+    }
+  } catch (err) {
+    console.warn('[db-seed] org branding repair failed', err);
+  }
+}
+
 async function seedDatabaseExclusive(): Promise<void> {
   if (await isSeeded()) {
     // Self-heal a corrupted "marked-seeded but empty" state. The seed marker is
@@ -1380,6 +1411,7 @@ async function seedDatabaseExclusive(): Promise<void> {
       // pick up the new photoUrl field without requiring a reset.
       await migratePatientPhotos();
       await migrateDemoAppointmentsAndWalkins();
+      await migrateOrgBrandingColors();
       return;
     }
   }

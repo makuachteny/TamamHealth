@@ -21,7 +21,7 @@ import {
   Syringe,
   HeartPulse,
   Globe,
-  Palette,
+  Sparkles,
   CreditCard,
   Settings,
   Calendar,
@@ -32,7 +32,7 @@ import {
   Wallet,
   BedDouble,
   Stethoscope,
-  Wrench,
+  Package,
   Microscope,
   Droplets,
   Biohazard,
@@ -132,10 +132,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     // overview → facility network → people & access → clinical service lines →
     // finance → intelligence → risk/assets → IT & system controls.
     navItems: [
-      { href: '/org-admin', label: 'Dashboard', icon: Gauge, section: 'OVERVIEW' },
+      { href: '/facility-management', label: 'Dashboard', icon: Gauge, section: 'OVERVIEW' },
+      // /org-admin (Org Overview) stays a reachable route for deep links but
+      // is deliberately not in the nav — the Facility Operations dashboard is
+      // the org admin's single home.
       { href: '/messages', label: 'Enquiries', icon: MessageSquare, section: 'OVERVIEW' },
       { href: '/hospitals', label: 'Facilities', icon: HospitalIcon, section: 'FACILITIES & OPERATIONS' },
-      { href: '/facility-management', label: 'Facility Operations', icon: Building2, section: 'FACILITIES & OPERATIONS' },
       { href: '/wards', label: 'Bed Management', icon: BedDouble, section: 'FACILITIES & OPERATIONS' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'FACILITIES & OPERATIONS' },
       { href: '/org-admin/users', label: 'Manage Users', icon: Users, section: 'PEOPLE & ACCESS' },
@@ -146,14 +148,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/payments', label: 'Billing & Payments', icon: Wallet, section: 'FINANCE' },
       { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'FINANCE' },
       { href: '/org-admin/pricing', label: 'Service Pricing', icon: CreditCard, section: 'FINANCE' },
-      // Analytics = live dashboards; Reports = export/scheduled/statutory outputs.
-      { href: '/org-admin/analytics', label: 'Analytics', icon: BarChart3, section: 'INTELLIGENCE & REPORTING' },
       { href: '/reports', label: 'Reports', icon: ClipboardCheck, section: 'INTELLIGENCE & REPORTING' },
-      { href: '/equipment', label: 'Assets', icon: Wrench, section: 'RISK, ASSETS & PREPAREDNESS' },
+      // Package (crate) for assets and Sparkles for branding — Wrench/Palette
+      // rendered as the same gear/settings-style glyphs as the Settings items.
+      { href: '/equipment', label: 'Assets', icon: Package, section: 'RISK, ASSETS & PREPAREDNESS' },
       { href: '/emergency-preparedness', label: 'Emergency Prep', icon: ShieldAlert, section: 'RISK, ASSETS & PREPAREDNESS' },
       { href: '/it', label: 'IT Operations', icon: Server, section: 'IT & SYSTEM' },
       { href: '/system-admin', label: 'System & Data Controls', icon: Database, section: 'IT & SYSTEM' },
-      { href: '/org-admin/branding', label: 'Branding', icon: Palette, section: 'IT & SYSTEM' },
+      { href: '/org-admin/branding', label: 'Branding', icon: Sparkles, section: 'IT & SYSTEM' },
       { href: '/org-admin/settings', label: 'Settings', icon: Settings, section: 'IT & SYSTEM' },
     ],
     color: BRAND_PRIMARY,
@@ -432,7 +434,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'ADMINISTRATION' },
       { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'ADMINISTRATION' },
       { href: '/facility-overview', label: 'Facility Overview', icon: Gauge, section: 'ADMINISTRATION' },      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'ADMINISTRATION' },
-      { href: '/equipment', label: 'Assets', icon: Wrench, section: 'ADMINISTRATION' },
+      { href: '/equipment', label: 'Assets', icon: Package, section: 'ADMINISTRATION' },
       { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'ADMINISTRATION' },
       { href: '/emergency-preparedness', label: 'Emergency Prep', icon: ShieldAlert, section: 'ADMINISTRATION' },
       { href: '/controlled-substances', label: 'Controlled Substances', icon: ClipboardCheck, section: 'SERVICES' },
@@ -534,7 +536,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'FACILITY' },
       { href: '/facility-overview', label: 'Facility Overview', icon: Gauge, section: 'FACILITY' },
       { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'FACILITY' },
-      { href: '/equipment', label: 'Assets & Equipment', icon: Wrench, section: 'FACILITY' },      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'FACILITY' },
+      { href: '/equipment', label: 'Assets & Equipment', icon: Package, section: 'FACILITY' },      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'FACILITY' },
       { href: '/payments', label: 'Revenue & Bills', icon: Wallet, section: 'FINANCE' },
       { href: '/payments/claims', label: 'Insurance Claims', icon: Receipt, section: 'FINANCE' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'REPORTING' },

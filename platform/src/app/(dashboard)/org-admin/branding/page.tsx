@@ -141,7 +141,7 @@ export default function OrgBrandingPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         <TopBar title={t('branding.title')} />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
@@ -151,7 +151,7 @@ export default function OrgBrandingPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0">
       <TopBar title="Branding" actions={
         <>
           <button

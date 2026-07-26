@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import TopBar from '@/components/TopBar';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  Users, Plus, KeyRound,
-  UserX, X, Eye, EyeOff, ChevronDown, AlertCircle,
-  Copy, Check, RefreshCw, ShieldCheck,
+  Plus, KeyRound, Users,
+  UserX, UserCheck, X, Eye, EyeOff, ChevronDown, AlertCircle,
+  Copy, Check, RefreshCw, ShieldCheck, Filter,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
+import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import { FilterSelect } from '@/components/filters';
+import EmptyState from '@/components/EmptyState';
 
 /**
  * Generate a strong, readable temporary password. Avoids look-alike
@@ -31,6 +33,10 @@ const MIN_PASSWORD_LENGTH = 8;
 import type { UserDoc, HospitalDoc, UserRole } from '@/lib/db-types';
 import type { DataScope } from '@/lib/services/data-scope';
 
+// Shared column template for the user list header + rows:
+// User · Role · Facility · Status · Actions
+const USER_GRID = 'minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.9fr) 56px';
+
 export default function OrgUsersPage() {
   const { currentUser, globalSearch } = useApp();
   const { t } = useTranslation();
@@ -44,6 +50,9 @@ export default function OrgUsersPage() {
   const [availableRoles, setAvailableRoles] = useState<UserRole[]>([]);
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const filtersRef = useRef<HTMLDivElement>(null);
 
   // Create form state
   const [formUsername, setFormUsername] = useState('');
@@ -64,6 +73,17 @@ export default function OrgUsersPage() {
   const [copied, setCopied] = useState(false);
 
   const brandColor = currentUser?.branding?.primaryColor || '#2191D0';
+
+  // Close the filters popover on outside click / Escape — same pattern as
+  // the hospitals/wards "Filters" pill.
+  useEffect(() => {
+    if (!showFilters) return;
+    const onDown = (e: MouseEvent) => { if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) setShowFilters(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFilters(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [showFilters]);
 
   const loadData = useCallback(async () => {
     if (!currentUser?.orgId) return;
@@ -167,6 +187,20 @@ export default function OrgUsersPage() {
     }
   };
 
+  const handleReactivate = async (userId: string) => {
+    try {
+      const { reactivateUser } = await import('@/lib/services/user-service');
+      await reactivateUser(userId, currentUser?._id, currentUser?.username);
+      setSuccess(t('orgUsers.successUserReactivated'));
+      await loadData();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err: unknown) {
+      const e = err as Error;
+      setError(e.message || t('orgUsers.errorReactivateFailed'));
+      setTimeout(() => setError(''), 4000);
+    }
+  };
+
   const handleResetPassword = async () => {
     if (!showResetModal || !resetPassword.trim()) return;
     if (resetPassword.length < MIN_PASSWORD_LENGTH) {
@@ -214,208 +248,205 @@ export default function OrgUsersPage() {
     return map[role] || role;
   };
 
-  const roleColor = (role: string) => {
-    const map: Record<string, string> = {
-      super_admin: 'var(--color-danger)',
-      org_admin: 'var(--accent-primary)',
-      doctor: 'var(--accent-primary)',
-      clinical_officer: '#8B5CF6',
-      nurse: '#EC4899',
-      lab_tech: '#369FDA',
-      pharmacist: 'var(--color-warning)',
-      front_desk: '#2191D0',
-      government: 'var(--accent-primary)',
-      data_entry_clerk: '#2191D0',
-      medical_superintendent: '#015697',
-      hrio: '#0F766E',
-      nutritionist: '#EA580C',
-      radiologist: 'var(--accent-primary)',
-      hospital_manager: '#015697',
-      medical_biller: '#2191D0',
-    };
-    return map[role] || '#6B7280';
-  };
-
-  // Filter users
+  // Filter users — role/status pills from the header's Filters popover, plus
+  // the header's own search box combined with any lingering platform-wide
+  // search (same merge pattern as the hospitals list).
   const filteredUsers = users.filter(u => {
     if (filterRole !== 'all' && u.role !== filterRole) return false;
     if (filterStatus === 'active' && !u.isActive) return false;
     if (filterStatus === 'inactive' && u.isActive) return false;
-    if (globalSearch) {
-      const q = globalSearch.toLowerCase();
-      if (
-        !u.name.toLowerCase().includes(q) &&
-        !u.username.toLowerCase().includes(q) &&
-        !u.role.toLowerCase().includes(q) &&
-        !(u.hospitalName || '').toLowerCase().includes(q)
-      ) return false;
+    const combined = [search, globalSearch].filter(Boolean).join(' ').toLowerCase().trim();
+    if (combined) {
+      const terms = combined.split(/\s+/);
+      const haystack = `${u.name} ${u.username} ${u.role} ${u.hospitalName || ''}`.toLowerCase();
+      if (!terms.every(term => haystack.includes(term))) return false;
     }
     return true;
   });
 
+  const activeUserCount = users.filter(u => u.isActive).length;
+  const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0);
+  const clearUserFilters = () => { setFilterRole('all'); setFilterStatus('all'); };
+
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col">
-        <TopBar title={t('orgUsers.pageTitle')} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
-        </div>
-      </div>
+      <main className="page-container flex items-center justify-center page-enter">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
+      </main>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col">
-      <TopBar title={t('orgUsers.pageTitle')} actions={
-            <button
-              onClick={() => { setError(''); setShowCreateModal(true); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-              style={{ background: brandColor }}
-            >
-              <Plus className="w-4 h-4" />
-              {t('orgUsers.createUser')}
-            </button>
-          } />
-
-      <div className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+    <>
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Success/Error banners */}
         {success && (
-          <div className="mb-4 p-3 rounded-lg text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}>
+          <div className="mb-4 p-3 rounded-lg text-sm font-medium flex-shrink-0" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}>
             {success}
           </div>
         )}
         {error && !showCreateModal && !showResetModal && (
-          <div className="mb-4 p-3 rounded-lg text-sm font-medium" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)', border: '1px solid rgba(229,46,66,0.2)' }}>
+          <div className="mb-4 p-3 rounded-lg text-sm font-medium flex-shrink-0" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)', border: '1px solid rgba(229,46,66,0.2)' }}>
             {error}
           </div>
         )}
 
-        {/* Filters */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative">
-            <select
-              value={filterRole}
-              onChange={e => setFilterRole(e.target.value)}
-              className="appearance-none pl-3 pr-8 py-2 rounded-lg text-sm"
-              style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-light)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <option value="all">{t('orgUsers.allRoles')}</option>
-              {availableRoles.map(r => (
-                <option key={r} value={r}>{roleLabel(r)}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-          </div>
-          <div className="relative">
-            <select
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-              className="appearance-none pl-3 pr-8 py-2 rounded-lg text-sm"
-              style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-light)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <option value="all">{t('orgUsers.allStatus')}</option>
-              <option value="active">{t('orgUsers.statusActive')}</option>
-              <option value="inactive">{t('orgUsers.statusInactive')}</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-          </div>
-          <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
-            {t('orgUsers.showingCount', { shown: filteredUsers.length, total: users.length })}
-          </span>
-        </div>
-
-        {/* Users Table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgUsers.heading')}</h3>
-          </div>
-          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          <table className="w-full" style={{ minWidth: 720 }}>
-            <thead>
-              <tr>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colName')}</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colUsername')}</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colRole')}</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colHospital')}</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colStatus')}</th>
-                <th className="text-right px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                    {t('orgUsers.noUsersFound')}
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map(user => (
-                  <tr key={user._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                          style={{ background: roleColor(user.role) }}
-                        >
-                          {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+          <EhrListHeader
+            title={t('orgUsers.pageTitle')}
+            stats={[
+              { label: 'Total', value: users.length, color: LIST_STAT_COLORS.muted },
+              { label: t('orgUsers.statusActive'), value: activeUserCount, color: LIST_STAT_COLORS.blue },
+              { label: t('orgUsers.statusInactive'), value: users.length - activeUserCount, color: LIST_STAT_COLORS.amber },
+            ]}
+            search={{ value: search, onChange: setSearch, placeholder: 'Search by name or username…' }}
+            actions={
+              <>
+                <div className="relative" ref={filtersRef}>
+                  <EhrListHeaderButton onClick={() => setShowFilters(s => !s)} active={activeFilterCount > 0} ariaExpanded={showFilters} ariaLabel="Filters">
+                    <Filter className="w-4 h-4" />
+                    {activeFilterCount > 0 && (
+                      <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold" style={{ top: -4, right: -4, background: 'var(--accent-primary)', color: '#fff' }}>
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </EhrListHeaderButton>
+                  {showFilters && (
+                    <div
+                      className="absolute right-0 mt-2 rounded-2xl overflow-hidden z-50"
+                      style={{ width: 'min(92vw, 320px)', background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
+                    >
+                      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Filters</span>
+                        <div className="flex items-center gap-2">
+                          {activeFilterCount > 0 && (
+                            <button onClick={clearUserFilters} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
+                          )}
+                          <button type="button" onClick={() => setShowFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                            <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                          </button>
                         </div>
-                        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{user.name}</span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{user.username}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-full"
-                        style={{
-                          background: `${roleColor(user.role)}15`,
-                          color: roleColor(user.role),
-                        }}
-                      >
-                        {roleLabel(user.role)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {user.hospitalName || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-full"
-                        style={{
-                          background: user.isActive ? 'rgba(59, 130, 246,0.1)' : 'rgba(229,46,66,0.1)',
-                          color: user.isActive ? 'var(--accent-primary)' : 'var(--color-danger)',
-                        }}
-                      >
-                        {user.isActive ? t('orgUsers.statusActive') : t('orgUsers.statusInactive')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                      <div className="p-4 flex flex-col gap-3">
+                        <FilterSelect
+                          label={t('orgUsers.fieldRole')}
+                          value={filterRole}
+                          onChange={setFilterRole}
+                          neutralValue="all"
+                          size="sm"
+                          options={[{ value: 'all', label: t('orgUsers.allRoles') }, ...availableRoles.map(r => ({ value: r, label: roleLabel(r) }))]}
+                        />
+                        <FilterSelect
+                          label={t('orgUsers.colStatus')}
+                          value={filterStatus}
+                          onChange={setFilterStatus}
+                          neutralValue="all"
+                          size="sm"
+                          options={[
+                            { value: 'all', label: t('orgUsers.allStatus') },
+                            { value: 'active', label: t('orgUsers.statusActive') },
+                            { value: 'inactive', label: t('orgUsers.statusInactive') },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setError(''); setShowCreateModal(true); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 999, background: brandColor, color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  <Plus className="w-4 h-4" /> {t('orgUsers.createUser')}
+                </button>
+              </>
+            }
+          />
+
+          <div className="px-4 pt-3 pb-1 flex items-center justify-end flex-shrink-0">
+            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              {t('orgUsers.showingCount', { shown: filteredUsers.length, total: users.length })}
+            </span>
+          </div>
+
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            {filteredUsers.length === 0 ? (
+              <EmptyState icon={Users} title={t('orgUsers.heading')} message={t('orgUsers.noUsersFound')} />
+            ) : (
+              <div style={{ minWidth: 640, padding: '0 12px 12px' }}>
+                {/* Column header — aligned to the card grid below */}
+                <div
+                  className="grid items-center px-3 py-2.5 sticky top-0 z-10"
+                  style={{ gridTemplateColumns: USER_GRID, gap: 8, background: 'var(--bg-card-solid)' }}
+                >
+                  {[t('orgUsers.colName'), t('orgUsers.colRole'), t('orgUsers.colHospital'), t('orgUsers.colStatus'), ''].map((h, i) => (
+                    <div key={i} className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</div>
+                  ))}
+                </div>
+
+                {/* Card rows — same anatomy as the appointments list: square
+                    avatar · 14/800 name · pill columns · status pill. */}
+                <div className="flex flex-col" style={{ gap: 8 }}>
+                  {filteredUsers.map(user => (
+                    <div
+                      key={user._id}
+                      className="ehr-appointment-row"
+                      style={{ gridTemplateColumns: USER_GRID, cursor: 'default' }}
+                    >
+                      {/* User: square avatar + name/username */}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="ehr-patient-icon">
+                          {user.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="block text-[14px] truncate" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{user.name}</span>
+                          <span className="block text-[13px] truncate" style={{ color: 'var(--ehr-muted, var(--text-muted))' }}>{user.username}</span>
+                        </div>
+                      </div>
+
+                      {/* Role — department-style pill, uniform for every role */}
+                      <div className="min-w-0">
+                        <span className="ehr-department-pill" style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {roleLabel(user.role)}
+                        </span>
+                      </div>
+
+                      {/* Facility — value + label, like the Care team column */}
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-bold truncate" style={{ color: 'var(--ehr-text, var(--text-primary))' }}>{user.hospitalName || '—'}</div>
+                        <div className="text-[11px]" style={{ color: 'var(--ehr-muted, var(--text-muted))' }}>{t('orgUsers.colHospital')}</div>
+                      </div>
+
+                      {/* Status pill — shared appointment pill metrics */}
+                      <div>
+                        <span
+                          className="appointment-status-pill"
+                          style={user.isActive
+                            ? { borderColor: 'rgba(25,158,112,0.45)', background: 'rgba(25,158,112,0.10)', color: '#167755' }
+                            : { borderColor: 'rgba(227,73,72,0.45)', background: 'rgba(227,73,72,0.10)', color: '#C24135' }}
+                        >
+                          {user.isActive ? t('orgUsers.statusActive') : t('orgUsers.statusInactive')}
+                        </span>
+                      </div>
+
+                      {/* Edit / row actions */}
                       <div className="flex justify-end">
                         <RowActionsMenu
                           ariaLabel="Actions"
                           actions={[
                             { key: 'reset', label: t('orgUsers.resetPassword'), tone: 'default', icon: <KeyRound className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />, onClick: () => { setError(''); setShowResetModal(user._id); setResetPassword(''); } },
                             ...(user.isActive && user._id !== currentUser?._id ? [{ key: 'deactivate', label: t('orgUsers.deactivate'), tone: 'danger' as const, icon: <UserX className="w-4 h-4" />, onClick: () => handleDeactivate(user._id) }] : []),
+                            ...(!user.isActive ? [{ key: 'reactivate', label: t('orgUsers.reactivate'), tone: 'success' as const, icon: <UserCheck className="w-4 h-4" />, onClick: () => handleReactivate(user._id) }] : []),
                           ]}
                         />
                       </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Create User Modal */}
       {showCreateModal && (
@@ -718,7 +749,6 @@ export default function OrgUsersPage() {
           </div>
         </div>
       )}
-
-    </div>
+    </>
   );
 }

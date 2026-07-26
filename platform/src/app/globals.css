@@ -20973,6 +20973,12 @@ textarea.ehr-handoff-input {
   gap: 14px;
 }
 
+/* The page column scrolls; its children must never flex-shrink or a card/
+   strip collapses to its border (the stat strip shrank to 2px). */
+.sa-page > * {
+  flex: 0 0 auto;
+}
+
 .sa-page-head {
   display: flex;
   align-items: flex-end;

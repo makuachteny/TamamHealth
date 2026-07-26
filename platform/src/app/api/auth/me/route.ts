@@ -23,16 +23,58 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ user: null }, { status: 401 });
   }
 
+  // Hydrate from the live user record, not the 8h-stale JWT, so a
+  // deactivation or an admin-forced password reset takes effect on the next
+  // app load instead of lingering until the token expires. Falls back to the
+  // JWT claims when the DB is unavailable or the account is the synthetic
+  // "admin" bootstrap (whose JWT predates any users DB). Mirrors the live
+  // re-check in getAuthPayload (lib/api-auth.ts).
+  const isProduction = process.env.NODE_ENV === 'production';
+  let fresh: {
+    name?: string; role?: string; hospitalId?: string; hospitalName?: string;
+    orgId?: string; mustChangePassword?: boolean;
+  } = {
+    name: payload.name,
+    role: payload.role,
+    hospitalId: payload.hospitalId,
+    hospitalName: payload.hospitalName,
+    orgId: payload.orgId,
+    mustChangePassword: payload.mustChangePassword,
+  };
+  try {
+    const { getUserById } = await import('@/lib/services/user-service');
+    const user = await getUserById(payload.sub);
+    if (user) {
+      // Deactivated mid-session → drop the session on next load.
+      if (user.isActive === false) {
+        return NextResponse.json({ user: null }, { status: 401 });
+      }
+      fresh = {
+        name: user.name,
+        role: user.role,
+        hospitalId: user.hospitalId,
+        hospitalName: user.hospitalName,
+        orgId: user.orgId,
+        mustChangePassword: user.mustChangePassword,
+      };
+    } else if (isProduction && payload.sub !== 'admin') {
+      // Account no longer exists in production → deny.
+      return NextResponse.json({ user: null }, { status: 401 });
+    }
+  } catch {
+    // DB unavailable — fall back to JWT claims (already seeded in `fresh`).
+  }
+
   const response = NextResponse.json({
     user: {
       _id: payload.sub,
       username: payload.username,
-      name: payload.name,
-      role: payload.role,
-      hospitalId: payload.hospitalId,
-      hospitalName: payload.hospitalName,
-      orgId: payload.orgId,
-      mustChangePassword: payload.mustChangePassword,
+      name: fresh.name,
+      role: fresh.role,
+      hospitalId: fresh.hospitalId,
+      hospitalName: fresh.hospitalName,
+      orgId: fresh.orgId,
+      mustChangePassword: fresh.mustChangePassword,
     },
   });
 

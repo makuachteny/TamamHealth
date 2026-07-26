@@ -16,6 +16,7 @@ import { formatDate } from '@/lib/format-utils';
 // module is fine. The disease aggregates that used to come from the same
 // module have been replaced with values derived from the live alert feed.
 import { states } from '@/data/mock';
+import { SOUTH_SUDAN_STATES, SOUTH_SUDAN_BBOX, WHITE_NILE, type GeoState } from '@/data/south-sudan-geo';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
@@ -57,15 +58,55 @@ const alertLevelConfig: Record<string, { bg: string; color: string; iconColor: s
 
 // Hospital map positions - rough placement on SVG to represent South Sudan geography
 // Mapped from lat/lng to SVG coordinates within a 600x400 viewBox
+/* Real-geography projection: uniform (aspect-preserving) equirectangular
+   scale over the actual South Sudan bounding box, centred in the viewBox.
+   Facility dots and the boundary polygons share this one transform, so the
+   markers sit on the true map. */
+const MAP_W = 600;
+const MAP_H = 460;
+const MAP_PAD = 14;
+
 function latLngToSvg(lat: number, lng: number): { x: number; y: number } {
-  // South Sudan approximate bounds: lat 3.5-12, lng 24-36
-  const minLat = 3.5, maxLat = 12, minLng = 24, maxLng = 36;
-  const padding = 40;
-  const width = 600 - 2 * padding;
-  const height = 400 - 2 * padding;
-  const x = padding + ((lng - minLng) / (maxLng - minLng)) * width;
-  const y = padding + ((maxLat - lat) / (maxLat - minLat)) * height;
-  return { x, y };
+  const { minLng, maxLng, minLat, maxLat } = SOUTH_SUDAN_BBOX;
+  const scale = Math.min(
+    (MAP_W - 2 * MAP_PAD) / (maxLng - minLng),
+    (MAP_H - 2 * MAP_PAD) / (maxLat - minLat),
+  );
+  const originX = (MAP_W - (maxLng - minLng) * scale) / 2;
+  const originY = (MAP_H - (maxLat - minLat) * scale) / 2;
+  return {
+    x: originX + (lng - minLng) * scale,
+    y: originY + (maxLat - lat) * scale,
+  };
+}
+
+function geoRingPath(ring: Array<[number, number]>, close = true): string {
+  const d = ring
+    .map(([lng, lat], i) => {
+      const p = latLngToSvg(lat, lng);
+      return `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+    })
+    .join(' ');
+  return close ? `${d} Z` : d;
+}
+
+/* Sequential fill for the cases-by-state choropleth: zero-case states keep a
+   neutral wash; reported burden ramps warm sand → deep red. */
+function choroplethFill(total: number, max: number): string {
+  if (total <= 0 || max <= 0) return 'rgba(33, 145, 208, 0.06)';
+  const t = Math.sqrt(total / max); // sqrt so mid-range states stay readable
+  const from = [249, 231, 205];
+  const to = [194, 65, 53];
+  const c = from.map((f, i) => Math.round(f + (to[i] - f) * t));
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
+
+function geoCentroid(state: GeoState): { x: number; y: number } {
+  // Label anchor: mean of the largest ring's vertices — good enough at this scale.
+  const ring = state.rings.reduce((a, b) => (b.length > a.length ? b : a), state.rings[0]);
+  const lng = ring.reduce((s, p) => s + p[0], 0) / ring.length;
+  const lat = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+  return latLngToSvg(lat, lng);
 }
 
 
@@ -304,6 +345,18 @@ export default function SurveillancePage() {
     return Array.from(byState.values()).sort((a, b) => (b.malaria as number) - (a.malaria as number));
   }, [diseaseAlerts]);
 
+  // Choropleth input: total reported cases per state (all diseases summed),
+  // keyed by the geoBoundaries state name so polygons and data join directly.
+  const caseTotalsByState = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const row of casesByState) {
+      const total = STATE_DISEASE_KEYS.reduce((s, k) => s + ((row[k] as number) || 0), 0);
+      totals.set(String(row.state), total);
+    }
+    const max = Math.max(0, ...totals.values());
+    return { totals, max };
+  }, [casesByState]);
+
   // Cholera CFR: deaths / cases × 100, taken from the live alert set.
   const choleraCFR = useMemo(() => {
     const cholera = (diseaseAlerts || []).filter(a => /cholera/i.test(a.disease || ''));
@@ -437,32 +490,70 @@ export default function SurveillancePage() {
                   </div>
                 </div>
                 <div className="p-4">
-                  <svg viewBox="0 0 600 400" className="w-full" style={{ maxHeight: '340px' }}>
-                    {/* Background - South Sudan shape approximation */}
-                    <rect x="30" y="20" width="540" height="360" rx="24" ry="24"
-                      fill="rgba(33, 145, 208, 0.08)" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                  <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="w-full" style={{ maxHeight: '400px' }}>
+                    <defs>
+                      {/* Heat blobs blur into a continuous intensity surface. */}
+                      <filter id="ssd-heat-blur" x="-60%" y="-60%" width="220%" height="220%">
+                        <feGaussianBlur stdDeviation="13" />
+                      </filter>
+                      {/* Keep the heat inside the national boundary. */}
+                      <clipPath id="ssd-country-clip">
+                        {SOUTH_SUDAN_STATES.map(s => s.rings.map((ring, i) => (
+                          <path key={`${s.name}-${i}`} d={geoRingPath(ring)} />
+                        )))}
+                      </clipPath>
+                    </defs>
 
-                    {/* Country label */}
-                    <text x="300" y="55" textAnchor="middle" fontSize="16" fontWeight="600"
-                      fill="rgba(255,255,255,0.35)" fontFamily="'DM Sans', sans-serif" opacity="0.35">
-                      South Sudan
-                    </text>
+                    {/* Real geography: geoBoundaries SSD ADM1, one polygon per state. */}
+                    <g>
+                      {SOUTH_SUDAN_STATES.map(s => s.rings.map((ring, i) => (
+                        <path
+                          key={`${s.name}-${i}`}
+                          d={geoRingPath(ring)}
+                          fill="rgba(33, 145, 208, 0.09)"
+                          stroke="rgba(1, 86, 151, 0.22)"
+                          strokeWidth="1"
+                          strokeLinejoin="round"
+                        />
+                      )))}
+                    </g>
 
-                    {/* Approximate state boundaries - simplified lines */}
-                    <line x1="300" y1="80" x2="300" y2="350" stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" strokeDasharray="4 3" />
-                    <line x1="100" y1="200" x2="540" y2="200" stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" strokeDasharray="4 3" />
-                    <line x1="180" y1="100" x2="180" y2="350" stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" strokeDasharray="4 3" />
-                    <line x1="420" y1="100" x2="420" y2="350" stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" strokeDasharray="4 3" />
+                    {/* State labels at polygon centroids. */}
+                    {SOUTH_SUDAN_STATES.map(s => {
+                      const c = geoCentroid(s);
+                      return (
+                        <text key={s.name} x={c.x} y={c.y} textAnchor="middle" fontSize="8"
+                          fill="var(--text-muted)" opacity="0.65" fontFamily="'DM Sans', sans-serif">
+                          {s.name}
+                        </text>
+                      );
+                    })}
 
-                    {/* White Nile approximation */}
-                    <path d="M 410 60 Q 380 120 360 180 Q 340 240 300 280 Q 270 310 240 340"
-                      fill="none" stroke="rgba(59, 130, 246,0.15)" strokeWidth="2" opacity="1" strokeLinecap="round" />
-                    <text x="370" y="150" fontSize="9" fill="rgba(59, 130, 246,0.15)" opacity="1" fontStyle="italic">
+                    {/* White Nile / Bahr el Jebel along its real course. */}
+                    <path d={geoRingPath(WHITE_NILE, false)}
+                      fill="none" stroke="rgba(33, 145, 208, 0.38)" strokeWidth="2" strokeLinecap="round" />
+                    <text x={latLngToSvg(7.5, 31.1).x + 8} y={latLngToSvg(7.5, 31.1).y} fontSize="9"
+                      fill="rgba(1, 86, 151, 0.45)" fontStyle="italic">
                       White Nile
                     </text>
 
+                    {/* Heat layer: blurred alert-coloured intensity under the dots,
+                        clipped to the border so it reads as a heat map of the country. */}
+                    <g filter="url(#ssd-heat-blur)" clipPath="url(#ssd-country-clip)" opacity="0.4">
+                      {hospitals.map(h => {
+                        // Facilities without coordinates (possible on
+                        // hand-created records) can't be placed on the map.
+                        if (!Number.isFinite(h.lat) || !Number.isFinite(h.lng)) return null;
+                        const pos = latLngToSvg(h.lat, h.lng);
+                        const level = getHospitalAlertLevel(h.state);
+                        const r = level === 'emergency' ? 40 : level === 'warning' ? 30 : level === 'watch' ? 22 : 16;
+                        return <circle key={`heat-${h._id}`} cx={pos.x} cy={pos.y} r={r} fill={alertDotColors[level]} />;
+                      })}
+                    </g>
+
                     {/* Hospital dots */}
                     {hospitals.map(h => {
+                      if (!Number.isFinite(h.lat) || !Number.isFinite(h.lng)) return null;
                       const pos = latLngToSvg(h.lat, h.lng);
                       const alertLevel = getHospitalAlertLevel(h.state);
                       const dotColor = alertDotColors[alertLevel];
@@ -596,74 +687,72 @@ export default function SurveillancePage() {
                 }}
               </ChartCard>
 
-              {/* Cases by State */}
-              <ChartCard
-                title={t('surveillance.casesByStateTitle')}
-                subtitle={t('surveillance.top5Diseases')}
-                defaultType="bar"
-                defaultPeriod="month"
-              >
-                {({ chartType }) => {
-                  if (casesByState.length === 0) {
-                    return (
-                      <div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <EmptyState icon={BarChart3} title="No data yet" message="No cases reported by state." />
-                      </div>
-                    );
-                  }
-                  const stateBars = [
-                    { key: 'malaria', name: t('surveillance.diseaseMalaria'), color: COLORS.malaria },
-                    { key: 'cholera', name: t('surveillance.diseaseCholera'), color: COLORS.cholera },
-                    { key: 'measles', name: t('surveillance.diseaseMeasles'), color: COLORS.measles },
-                    { key: 'tb', name: t('surveillance.diseaseTb'), color: COLORS.tb },
-                    { key: 'hiv', name: t('surveillance.diseaseHiv'), color: COLORS.hiv },
-                  ];
-                  const commonProps = { data: casesByState, margin: { top: 10, right: 20, left: 0, bottom: 5 } };
-                  const xProps = { dataKey: 'state', tick: { ...axisTick, fontSize: 10 }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false, angle: -25, textAnchor: 'end' as const, height: 60 };
-                  const legendProps = { iconType: 'square' as const, iconSize: 10, wrapperStyle: { fontSize: '0.75rem', paddingTop: '4px' } };
-                  if (chartType === 'area') {
-                    return (
-                      <ResponsiveContainer width="100%" height={360}>
-                        <AreaChart {...commonProps}>
-                          <AreaGradients />
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                          <XAxis {...xProps} />
-                          <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-                          <Tooltip {...chartTooltipStyle} />
-                          <Legend {...legendProps} />
-                          {stateBars.map(d => <Area key={d.key} type="monotone" dataKey={d.key} name={d.name} stroke={d.color} fill={d.color} fillOpacity={0.12} strokeWidth={2} />)}
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    );
-                  }
-                  if (chartType === 'line') {
-                    return (
-                      <ResponsiveContainer width="100%" height={360}>
-                        <LineChart {...commonProps}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                          <XAxis {...xProps} />
-                          <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Legend {...legendProps} />
-                          {stateBars.map(d => <Line key={d.key} type="monotone" dataKey={d.key} name={d.name} stroke={d.color} strokeWidth={2} dot={{ r: 3 }} />)}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    );
-                  }
-                  return (
-                    <ResponsiveContainer width="100%" height={360}>
-                      <BarChart {...commonProps}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                        <XAxis {...xProps} />
-                        <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend {...legendProps} />
-                        {stateBars.map(d => <Bar key={d.key} dataKey={d.key} name={d.name} fill={d.color} radius={[2, 2, 0, 0]} />)}
-                      </BarChart>
-                    </ResponsiveContainer>
-                  );
-                }}
-              </ChartCard>
+              {/* Cases by State — choropleth on the real South Sudan map.
+                  Each state polygon is shaded by its total reported cases
+                  (same alert data that fed the old bar chart). */}
+              <div className="card-elevated">
+                <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                  <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                    <MapPin className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
+                    {t('surveillance.casesByStateTitle')}
+                  </h3>
+                  {caseTotalsByState.max > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>0</span>
+                      <span aria-hidden="true" style={{
+                        width: 96, height: 8, borderRadius: 999,
+                        background: 'linear-gradient(90deg, #EEF4F6, #F3C489, #C24135)',
+                        border: '1px solid var(--border-light)',
+                      }} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        {caseTotalsByState.max.toLocaleString()} cases
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4">
+                  {caseTotalsByState.max === 0 ? (
+                    <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <EmptyState icon={BarChart3} title="No data yet" message="No cases reported by state." />
+                    </div>
+                  ) : (
+                    <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="w-full" style={{ maxHeight: '400px' }}>
+                      {SOUTH_SUDAN_STATES.map(s => {
+                        const total = caseTotalsByState.totals.get(s.name) || 0;
+                        return s.rings.map((ring, i) => (
+                          <path
+                            key={`${s.name}-${i}`}
+                            d={geoRingPath(ring)}
+                            fill={choroplethFill(total, caseTotalsByState.max)}
+                            stroke="rgba(1, 86, 151, 0.25)"
+                            strokeWidth="1"
+                            strokeLinejoin="round"
+                          >
+                            <title>{`${s.name}: ${total.toLocaleString()} reported cases`}</title>
+                          </path>
+                        ));
+                      })}
+                      {SOUTH_SUDAN_STATES.map(s => {
+                        const c = geoCentroid(s);
+                        const total = caseTotalsByState.totals.get(s.name) || 0;
+                        const heavy = caseTotalsByState.max > 0 && total / caseTotalsByState.max > 0.55;
+                        return (
+                          <g key={s.name} pointerEvents="none">
+                            <text x={c.x} y={c.y - 3} textAnchor="middle" fontSize="8.5" fontWeight="700"
+                              fill={heavy ? '#fff' : 'var(--text-secondary)'} fontFamily="'DM Sans', sans-serif">
+                              {s.name}
+                            </text>
+                            <text x={c.x} y={c.y + 8} textAnchor="middle" fontSize="9" fontWeight="800"
+                              fill={heavy ? '#fff' : '#B04A3B'} fontFamily="var(--font-platform-mono)">
+                              {total > 0 ? total.toLocaleString() : ''}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Right Column - 1/3 width */}

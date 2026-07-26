@@ -57,7 +57,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/org-admin',
       '/facility-management',
       '/org-admin/users', '/org-admin/hospitals',
-      '/org-admin/branding', '/org-admin/settings', '/org-admin/analytics', '/org-admin/pricing',
+      '/org-admin/branding', '/org-admin/settings', '/org-admin/pricing',
       '/facility-settings',
       '/it', '/system-admin',
       '/hospitals', '/reports', '/settings',
@@ -67,9 +67,9 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
-    // Org admins land on the org-level command center, not the facility-heavy
-    // facility-management dashboard (still reachable under Facilities & Operations).
-    defaultDashboard: '/org-admin',
+    // Org admins land on the Facility Operations dashboard; the org-level
+    // command center stays reachable as "Org Overview" (/org-admin).
+    defaultDashboard: '/facility-management',
   },
 
   doctor: {

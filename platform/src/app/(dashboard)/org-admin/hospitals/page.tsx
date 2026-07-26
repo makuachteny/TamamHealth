@@ -142,7 +142,7 @@ export default function OrgHospitalsPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         <TopBar title={t('orgHospitals.topBarTitle')} />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
@@ -152,7 +152,7 @@ export default function OrgHospitalsPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0">
       <TopBar title={t('orgHospitals.topBarTitle')} actions={
         <button
           onClick={() => { setError(''); setShowCreateModal(true); }}

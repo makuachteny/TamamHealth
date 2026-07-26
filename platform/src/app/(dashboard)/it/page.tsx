@@ -133,92 +133,217 @@ export default function ItOperationsPage() {
           <HealthCard icon={ShieldCheck} title="Audit" status="healthy" value={`${settings.itOperations.auditRetentionDays} days`} detail="Retention policy" />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
-          <section className="dash-card overflow-hidden">
-            <div className="flex items-center justify-between gap-3 p-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-4 items-stretch">
+          <section className="dash-card overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <Server className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Operations Console</h2>
               </div>
               <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{currentUser?.hospitalName || currentUser?.organization?.name || 'Platform'}</span>
             </div>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-              <ActionButton icon={RefreshCw} label="Start Local Sync" busy={syncing} onClick={runLocalSync} />
-              <ActionButton icon={Upload} label="Push Sync Events" busy={pushing === 'sync'} disabled={!canRunPlatformPush} onClick={() => runServerPush('sync')} />
-              <ActionButton icon={Upload} label="Push DHIS2" busy={pushing === 'dhis2'} disabled={!canRunPlatformPush} onClick={() => runServerPush('dhis2')} />
+
+            {/* Jobs: one full-width row per runnable job, action on the right. */}
+            <div className="px-4 pt-3 pb-1">
+              <p className="it-group-label">Jobs</p>
+            </div>
+            <div className="px-4 flex flex-col">
+              <JobRow
+                icon={RefreshCw}
+                label="Start local sync"
+                desc="Replicate this device's records with the facility server now."
+                busy={syncing}
+                onClick={runLocalSync}
+              />
+              <JobRow
+                icon={Upload}
+                label="Push sync events"
+                desc="Send pending replication events to the country node."
+                busy={pushing === 'sync'}
+                disabled={!canRunPlatformPush}
+                onClick={() => runServerPush('sync')}
+              />
+              <JobRow
+                icon={Upload}
+                label="Push DHIS2 export"
+                desc="Generate the aggregate dataset and push it to DHIS2."
+                busy={pushing === 'dhis2'}
+                disabled={!canRunPlatformPush}
+                onClick={() => runServerPush('dhis2')}
+              />
             </div>
             {message && (
-              <div className="mx-4 mb-4 p-3 rounded-lg text-sm font-semibold" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)' }}>
+              <div className="mx-4 mt-3 p-3 rounded-lg text-sm font-semibold" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)' }}>
                 {message}
               </div>
             )}
-            <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Link className="it-link" href="/data-quality">Data quality monitor</Link>
-              <Link className="it-link" href="/admin/conflicts">Conflict queue</Link>
-              <Link className="it-link" href="/facility-settings">Workflow settings</Link>
-              <Link className="it-link" href="/system-admin">System administration</Link>
+
+            {/* Consoles: descriptive tiles instead of bare chips. */}
+            <div className="px-4 pt-4 pb-1">
+              <p className="it-group-label">Consoles</p>
+            </div>
+            <div className="p-4 pt-1 grid grid-cols-1 md:grid-cols-2 gap-3 mt-auto">
+              <Link className="it-tile" href="/data-quality">
+                <strong>Data quality monitor</strong>
+                <span>Completeness and validation issues by facility.</span>
+              </Link>
+              <Link className="it-tile" href="/admin/conflicts">
+                <strong>Conflict queue</strong>
+                <span>Reconcile document conflicts from offline edits.</span>
+              </Link>
+              <Link className="it-tile" href="/facility-settings">
+                <strong>Workflow settings</strong>
+                <span>Facility workflow and reporting configuration.</span>
+              </Link>
+              <Link className="it-tile" href="/system-admin">
+                <strong>System administration</strong>
+                <span>Data controls, backup policy, and device rules.</span>
+              </Link>
             </div>
           </section>
 
-          <section className="dash-card overflow-hidden">
-            <div className="flex items-center gap-2 p-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <Database className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Data Stores</h2>
-            </div>
-            <div className="p-4">
-              <div className="text-2xl font-bold mb-3" style={{ color: 'var(--text-primary)' }}>{loadingStats ? '...' : totalDocs.toLocaleString()}</div>
-              <div className="grid gap-2">
-                {dbStats.map(stat => (
-                  <div key={stat.key} className="flex items-center justify-between text-sm">
-                    <span style={{ color: 'var(--text-secondary)' }}>{stat.label}</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{stat.count.toLocaleString()}</strong>
-                  </div>
-                ))}
+          <section className="dash-card overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Data Stores</h2>
               </div>
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{loadingStats ? '…' : `${totalDocs.toLocaleString()} documents`}</span>
+            </div>
+            <div className="px-4 py-2 flex-1 flex flex-col justify-center">
+              {dbStats.map(stat => {
+                const maxCount = Math.max(1, ...dbStats.map(s => s.count));
+                return (
+                  <div key={stat.key} className="it-store-row">
+                    <span className="it-store-label">{stat.label}</span>
+                    <span className="it-store-bar" aria-hidden="true">
+                      <i style={{ width: `${Math.max(2, Math.round((stat.count / maxCount) * 100))}%` }} />
+                    </span>
+                    <strong className="it-store-count">{stat.count.toLocaleString()}</strong>
+                  </div>
+                );
+              })}
             </div>
           </section>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-          <section className="dash-card p-4">
-            <h2 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Configured Integrations</h2>
-            <div className="flex flex-wrap gap-2">
+          <section className="dash-card overflow-hidden">
+            <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Configured Integrations</h2>
+            </div>
+            <div className="px-4 py-2">
               {settings.itOperations.integrations.map(integration => (
-                <span key={integration} className="it-pill">{integration.replace(/_/g, ' ').toUpperCase()}</span>
+                <div key={integration} className="it-kv-row">
+                  <span className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                    <i className="it-dot" style={{ background: 'var(--color-success)' }} />
+                    {integration.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                  </span>
+                  <span className="it-pill">Configured</span>
+                </div>
               ))}
             </div>
           </section>
-          <section className="dash-card p-4">
-            <h2 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Workflow Controls</h2>
-            <div className="grid gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-              <span>Offline mode: <strong>{settings.itOperations.allowOfflineMode ? 'Allowed' : 'Disabled'}</strong></span>
-              <span>Device registration: <strong>{settings.itOperations.requireDeviceRegistration ? 'Required' : 'Optional'}</strong></span>
-              <span>Completeness signoff: <strong>{settings.reporting.requireCompletenessSignoff ? 'Required' : 'Optional'}</strong></span>
-              <span>Reporting deadline: <strong>Day {settings.reporting.monthlyDeadlineDay}</strong></span>
+          <section className="dash-card overflow-hidden">
+            <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Workflow Controls</h2>
+            </div>
+            <div className="px-4 py-2">
+              {[
+                { label: 'Offline mode', value: settings.itOperations.allowOfflineMode ? 'Allowed' : 'Disabled', ok: settings.itOperations.allowOfflineMode },
+                { label: 'Device registration', value: settings.itOperations.requireDeviceRegistration ? 'Required' : 'Optional', ok: settings.itOperations.requireDeviceRegistration },
+                { label: 'Completeness signoff', value: settings.reporting.requireCompletenessSignoff ? 'Required' : 'Optional', ok: settings.reporting.requireCompletenessSignoff },
+                { label: 'Reporting deadline', value: `Day ${settings.reporting.monthlyDeadlineDay}`, ok: true },
+              ].map(row => (
+                <div key={row.label} className="it-kv-row">
+                  <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
+                  <strong className="flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                    <i className="it-dot" style={{ background: row.ok ? 'var(--color-success)' : 'var(--color-warning)' }} />
+                    {row.value}
+                  </strong>
+                </div>
+              ))}
             </div>
           </section>
         </div>
 
         <style>{`
-          .it-link {
-            display: inline-flex;
+          .it-group-label {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+          }
+          .it-job-row {
+            display: flex;
             align-items: center;
-            justify-content: center;
-            min-height: 38px;
-            padding: 8px 12px;
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            background: var(--overlay-subtle);
+            gap: 12px;
+            padding: 11px 2px;
+            border-bottom: 1px solid var(--border-light);
+          }
+          .it-job-row:last-child { border-bottom: 0; }
+          .it-job-text { min-width: 0; flex: 1; }
+          .it-job-text strong {
+            display: block;
             color: var(--text-primary);
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 700;
+          }
+          .it-job-text span {
+            display: block;
+            margin-top: 1px;
+            color: var(--text-muted);
+            font-size: 11.5px;
+          }
+          .it-tile {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 11px 13px;
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            background: #fff;
             text-decoration: none;
           }
+          .it-tile:hover { border-color: var(--accent-primary); }
+          .it-tile strong { color: #015697; font-size: 12.5px; font-weight: 800; }
+          .it-tile span { color: var(--text-muted); font-size: 11px; }
+          .it-store-row {
+            display: grid;
+            grid-template-columns: minmax(110px, auto) 1fr auto;
+            align-items: center;
+            gap: 12px;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border-light);
+          }
+          .it-store-row:last-child { border-bottom: 0; }
+          .it-store-label { color: var(--text-secondary); font-size: 13px; font-weight: 600; }
+          .it-store-bar {
+            height: 6px;
+            border-radius: 999px;
+            background: var(--overlay-subtle);
+            overflow: hidden;
+          }
+          .it-store-bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent-primary); opacity: 0.75; }
+          .it-store-count { color: var(--text-primary); font-size: 13px; font-variant-numeric: tabular-nums; }
+          .it-kv-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 42px;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 13px;
+          }
+          .it-kv-row:last-child { border-bottom: 0; }
+          .it-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
           .it-pill {
             display: inline-flex;
             align-items: center;
-            min-height: 28px;
-            padding: 5px 10px;
+            min-height: 26px;
+            padding: 4px 10px;
             border-radius: 999px;
             background: var(--accent-light);
             color: var(--accent-primary);
@@ -259,23 +384,30 @@ function HealthCard({ icon: Icon, title, status, value, detail }: {
   );
 }
 
-function ActionButton({ icon: Icon, label, busy, disabled, onClick }: {
+function JobRow({ icon: Icon, label, desc, busy, disabled, onClick }: {
   icon: typeof RefreshCw;
   label: string;
+  desc: string;
   busy?: boolean;
   disabled?: boolean;
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy || disabled}
-      className="btn btn-secondary inline-flex items-center justify-center gap-2"
-      title={disabled ? 'Requires platform administrator access' : undefined}
-    >
-      <Icon className="w-4 h-4" />
-      {busy ? 'Working...' : label}
-    </button>
+    <div className="it-job-row">
+      <Icon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+      <span className="it-job-text">
+        <strong>{label}</strong>
+        <span>{disabled ? 'Requires platform administrator access' : desc}</span>
+      </span>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy || disabled}
+        className="btn btn-secondary btn-sm flex-shrink-0"
+        title={disabled ? 'Requires platform administrator access' : undefined}
+      >
+        {busy ? 'Working…' : 'Run'}
+      </button>
+    </div>
   );
 }

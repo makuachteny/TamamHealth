@@ -210,7 +210,10 @@ export default function SettingsPage() {
   const handleChangeOwnPassword = async () => {
     if (!currentUser?._id) return;
     if (!pwForm.current) { showToast('Enter your current password', 'error'); return; }
-    if (pwForm.next.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
+    // Match the server (/api/auth/change-password) and every other surface —
+    // an 8-char minimum, so a 6–7 char password no longer passes here only to
+    // be rejected by the API.
+    if (pwForm.next.length < 8) { showToast('Password must be at least 8 characters', 'error'); return; }
     if (pwForm.next !== pwForm.confirm) { showToast('Passwords do not match', 'error'); return; }
     setPwSaving(true);
     try {

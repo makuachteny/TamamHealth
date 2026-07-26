@@ -295,6 +295,36 @@ export async function deactivateUser(
 }
 
 /**
+ * Restore a previously deactivated account so the user can sign in again.
+ * The inverse of deactivateUser. Tenant/role guards live in POST /api/users
+ * (action: 'reactivate'), same as deactivate.
+ */
+export async function reactivateUser(
+  id: string,
+  actorId?: string,
+  actorUsername?: string
+): Promise<void> {
+  if (isBrowserRuntime()) {
+    await postUsersApi({ action: 'reactivate', userId: id });
+    return;
+  }
+
+  const db = usersDB();
+  const existing = await db.get(id) as UserDoc;
+
+  const updated: UserDoc = {
+    ...existing,
+    isActive: true,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const resp = await db.put(updated);
+  updated._rev = resp.rev;
+  const { logAudit } = await import('./audit-service');
+  await logAudit('user_reactivated', actorId, actorUsername, `Reactivated user "${existing.username}"`, true);
+}
+
+/**
  * Permanently remove a user account. Prefer deactivateUser for routine
  * offboarding — deletion is for accounts created in error. Tenant/role guards
  * live in POST /api/users (action: 'delete').

@@ -23,8 +23,19 @@ export const DEFAULT_BRANDING: OrgBranding = {
    CSS tokens moved to navy. Treat the previous default as "unset" so those
    installations pick up the current brand color. */
 const LEGACY_DEFAULT_BLUE = '#2191d0';
+
+/* Only a literal hex color may override the accent system. Some stored org
+   docs carried junk like 'var(--accent-primary)' — a self-referential CSS
+   var that invalidates the whole accent cascade and repaints buttons with
+   whatever leaks through (e.g. the hover indigo). Anything non-hex falls
+   back to the default brand color. */
+function isHexColor(color: string): boolean {
+  return /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color.trim());
+}
+
 function modernizeColor(color?: string): string | undefined {
-  return color && color.toLowerCase() !== LEGACY_DEFAULT_BLUE ? color : undefined;
+  if (!color || !isHexColor(color)) return undefined;
+  return color.toLowerCase() !== LEGACY_DEFAULT_BLUE ? color : undefined;
 }
 
 export function getOrgBranding(org?: OrganizationDoc | null): OrgBranding {
@@ -33,7 +44,7 @@ export function getOrgBranding(org?: OrganizationDoc | null): OrgBranding {
     name: org.name,
     logoUrl: org.logoUrl,
     primaryColor: modernizeColor(org.primaryColor) || DEFAULT_BRANDING.primaryColor,
-    secondaryColor: org.secondaryColor || DEFAULT_BRANDING.secondaryColor,
+    secondaryColor: modernizeColor(org.secondaryColor) || DEFAULT_BRANDING.secondaryColor,
     accentColor: modernizeColor(org.accentColor) || DEFAULT_BRANDING.accentColor,
   };
 }

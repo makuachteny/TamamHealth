@@ -2,9 +2,8 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import {
-  X, Wallet, Activity, AlertCircle, ChevronRight, ExternalLink, Receipt, Shield, Clock, Banknote,
+  X, Wallet, Activity, AlertCircle, ChevronRight, ChevronDown, ExternalLink, Receipt, Shield, Clock, Banknote,
   RotateCcw, Ban, AlertTriangle,
 } from '@/components/icons/lucide';
 import {
@@ -105,6 +104,10 @@ export default function PaymentsPage() {
   // and choosing a patient drops straight into the record-payment panel.
   const [collectPickerOpen, setCollectPickerOpen] = useState(false);
   const [collectSearch, setCollectSearch] = useState('');
+  // Deeper financial analytics (service-line Pareto, plans, A/R aging) live
+  // behind a toggle so the bill queue — the page's actual work — keeps the
+  // viewport. Collapsed by default.
+  const [showAnalytics, setShowAnalytics] = useState(false);
   // Installment recording for a payment plan (folded in from the old Plans page).
   const [recordPlanFor, setRecordPlanFor] = useState<PaymentPlanDoc | null>(null);
   const [planAmount, setPlanAmount] = useState('');
@@ -461,7 +464,6 @@ export default function PaymentsPage() {
   if (loading) {
     return (
       <>
-        <TopBar title={t('payments.title')} hideSearchInput />
         <main className="page-container page-enter">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, color: 'var(--text-muted)' }}>
             <Activity size={44} style={{ marginRight: 8, animation: 'spin 1s linear infinite' }} />
@@ -474,7 +476,6 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <TopBar title={t('payments.title')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {error && (
           <div style={{
@@ -529,7 +530,7 @@ export default function PaymentsPage() {
             {({ chartType }) => {
               if (dailyCollections.every(d => d.amount === 0)) {
                 return (
-                  <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                  <div style={{ padding: '10px 4px', color: 'var(--text-muted)', fontSize: 13 }}>
                     No collections in the last 14 days
                   </div>
                 );
@@ -563,9 +564,26 @@ export default function PaymentsPage() {
           </ChartCard>
         </div>
 
+        {/* Deeper analytics, collapsed by default so the bill queue below gets
+            the viewport. */}
+        <button
+          type="button"
+          onClick={() => setShowAnalytics(s => !s)}
+          aria-expanded={showAnalytics}
+          className="flex items-center gap-1.5 mb-3 self-start"
+          style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        >
+          {showAnalytics ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          Financial analytics
+          <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>
+            Revenue by service line · payment plans · A/R aging
+          </span>
+        </button>
+
         {/* Revenue by Service Line (Pareto) — sum of billed line items grouped
-            by charge category, sorted descending, with a cumulative-% line so
-            finance can see which service lines drive most of the revenue. */}
+            by charge category, sorted descending. Single value axis; the
+            cumulative share rides in the tooltip instead of a second y-scale. */}
+        {showAnalytics && (
         <ChartCard
           title="Revenue by Service Line"
           subtitle="All bills · sorted by total billed"
@@ -577,7 +595,7 @@ export default function PaymentsPage() {
           {() => {
             if (revenueByCategory.length === 0) {
               return (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                <div style={{ padding: '10px 4px', color: 'var(--text-muted)', fontSize: 13 }}>
                   No billed service lines yet
                 </div>
               );
@@ -587,20 +605,23 @@ export default function PaymentsPage() {
                 <ComposedChart data={revenueByCategory} margin={{ top: 8, right: 24, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
                   <XAxis dataKey="category" tick={axisTick} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="amount" tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={48} />
-                  <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={(v: number) => `${v}%`} width={40} />
-                  <Tooltip {...tooltipStyle} formatter={(value: number | undefined, name: string | undefined) => (name === 'Cumulative %' ? [`${value ?? 0}%`, name] : [formatMoney(value ?? 0), name ?? ''])} />
-                  <Bar yAxisId="amount" dataKey="amount" name="Revenue" fill="#2a78d6" radius={[4, 4, 0, 0]} />
-                  <Line yAxisId="pct" type="monotone" dataKey="cumulativePct" name="Cumulative %" stroke="#eda100" strokeWidth={2} dot={{ r: 3 }} />
+                  <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={48} />
+                  <Tooltip
+                    {...tooltipStyle}
+                    formatter={(value: number | undefined, _name: string | undefined, entry: { payload?: { cumulativePct?: number } }) =>
+                      [`${formatMoney(value ?? 0)} · ${entry?.payload?.cumulativePct ?? 0}% cumulative`, 'Revenue']}
+                  />
+                  <Bar dataKey="amount" name="Revenue" fill="#2a78d6" radius={[4, 4, 0, 0]} />
                 </ComposedChart>
               </ResponsiveContainer>
             );
           }}
         </ChartCard>
+        )}
 
         {/* Payment Plans + A/R Aging — side by side, styled like the front-desk
             Quick Actions / Appointments cards (dash-card + uppercase header). */}
-        {(() => {
+        {showAnalytics && (() => {
           const k = computePlanKpis(data.plans);
           // Compact, neutral tiles (no colour tints) so the two cards stay short.
           const tile = { minHeight: 56, padding: '7px 12px' } as const;

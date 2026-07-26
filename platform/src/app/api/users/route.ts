@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getAuthPayload, unauthorized, forbidden, hasRole, serverError, logApiError,
+  type AuthPayload,
 } from '@/lib/api-auth';
 import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
@@ -33,6 +34,43 @@ function assignableRoleError(actorRole: UserRole, targetRole: UserRole | undefin
   if (actorRole === 'super_admin') return null;
   if (PRIVILEGED_ASSIGNABLE_ROLES.includes(targetRole)) {
     return forbidden('You are not permitted to assign platform or national roles.');
+  }
+  return null;
+}
+
+/**
+ * Authorize a mutation that targets an EXISTING user (reset_password,
+ * deactivate, reactivate, update, delete). Two independent rules, both
+ * enforced for every non-super_admin actor:
+ *
+ *  1. Privileged-target guard — only a super_admin may act on a platform or
+ *     national account (super_admin / government / county_health_director).
+ *     The seeded super_admin carries NO orgId, so a tenant's org_admin must
+ *     never be able to reset, disable, demote, or delete it. Without this an
+ *     org_admin could reset the operator's password and take over the whole
+ *     platform (privilege-escalation → cross-tenant breakout).
+ *
+ *  2. Same-tenant guard — an org_admin may act only within their own
+ *     organization. A target with a falsy `orgId` is treated as OUTSIDE the
+ *     tenant (deny), because platform/national accounts carry no orgId; a
+ *     missing orgId must never make the check pass.
+ *
+ * super_admin bypasses both. `null` target → allowed here (callers issue their
+ * own 404). Returns a 403 response, or `null` when the action may proceed.
+ */
+function targetMutationError(
+  actor: AuthPayload,
+  target: { role: UserRole; orgId?: string } | null | undefined,
+): NextResponse | null {
+  if (!target) return null;
+  if (actor.role === 'super_admin') return null;
+  if (PRIVILEGED_ASSIGNABLE_ROLES.includes(target.role)) {
+    return forbidden('You are not permitted to modify platform or national accounts.');
+  }
+  if (actor.role === 'org_admin') {
+    if (!target.orgId || !actor.orgId || target.orgId !== actor.orgId) {
+      return forbidden('Cannot modify users outside your own organization');
+    }
   }
   return null;
 }
@@ -96,12 +134,10 @@ async function postHandler(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (auth.role === 'org_admin') {
-        const target = await getUserById(body.userId as string);
-        if (target && target.orgId && auth.orgId && target.orgId !== auth.orgId) {
-          return forbidden('Cannot modify users outside your own organization');
-        }
-      }
+      const target = await getUserById(body.userId as string);
+      if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      const authzError = targetMutationError(auth, target);
+      if (authzError) return authzError;
       const { resetPassword } = await import('@/lib/services/user-service');
       await resetPassword(
         body.userId as string,
@@ -111,22 +147,26 @@ async function postHandler(request: NextRequest) {
       );
       return NextResponse.json({ success: true });
     }
-    // Deactivate user
-    if (action === 'deactivate') {
+    // Deactivate / reactivate user (toggle via `activate` boolean; default off)
+    if (action === 'deactivate' || action === 'reactivate') {
       if (!body.userId) {
         return NextResponse.json(
           { error: 'userId is required' },
           { status: 400 }
         );
       }
-      if (auth.role === 'org_admin') {
-        const target = await getUserById(body.userId as string);
-        if (target && target.orgId && auth.orgId && target.orgId !== auth.orgId) {
-          return forbidden('Cannot modify users outside your own organization');
-        }
+      const target = await getUserById(body.userId as string);
+      if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      const authzError = targetMutationError(auth, target);
+      if (authzError) return authzError;
+      const activate = action === 'reactivate';
+      if (activate) {
+        const { reactivateUser } = await import('@/lib/services/user-service');
+        await reactivateUser(body.userId as string, auth.sub, auth.username);
+      } else {
+        const { deactivateUser } = await import('@/lib/services/user-service');
+        await deactivateUser(body.userId as string, auth.sub, auth.username);
       }
-      const { deactivateUser } = await import('@/lib/services/user-service');
-      await deactivateUser(body.userId as string, auth.sub, auth.username);
       return NextResponse.json({ success: true });
     }
     // Delete user (permanent). Confined like other mutations: org_admin only
@@ -148,12 +188,8 @@ async function postHandler(request: NextRequest) {
       if (!target) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
-      if (auth.role !== 'super_admin' && PRIVILEGED_ASSIGNABLE_ROLES.includes(target.role)) {
-        return forbidden('You are not permitted to delete platform or national accounts.');
-      }
-      if (auth.role === 'org_admin' && target.orgId && auth.orgId && target.orgId !== auth.orgId) {
-        return forbidden('Cannot modify users outside your own organization');
-      }
+      const deleteAuthzError = targetMutationError(auth, target);
+      if (deleteAuthzError) return deleteAuthzError;
       const { deleteUser } = await import('@/lib/services/user-service');
       await deleteUser(body.userId as string, auth.sub, auth.username);
       return NextResponse.json({ success: true });
@@ -163,10 +199,12 @@ async function postHandler(request: NextRequest) {
       const roleError = assignableRoleError(auth.role, body.role as UserRole | undefined);
       if (roleError) return roleError;
       const existingUser = await getUserById(body.userId as string);
+      // Same privileged-target + same-tenant guard as every other mutation:
+      // blocks an org_admin from editing a platform/national account or a
+      // user in another (or no) organization.
+      const updateAuthzError = targetMutationError(auth, existingUser);
+      if (updateAuthzError) return updateAuthzError;
       if (auth.role === 'org_admin') {
-        if (existingUser && existingUser.orgId && auth.orgId && existingUser.orgId !== auth.orgId) {
-          return forbidden('Cannot modify users outside your own organization');
-        }
         const targetOrgId = (body.orgId as string | undefined) || existingUser?.orgId;
         if (targetOrgId && auth.orgId && targetOrgId !== auth.orgId) {
           return forbidden('Cannot modify users outside your own organization');
