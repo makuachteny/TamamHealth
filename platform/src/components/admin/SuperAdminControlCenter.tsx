@@ -416,7 +416,7 @@ export default function SuperAdminControlCenter() {
                 {([
                   ['Organizations', 'Tenant creation, plans, limits, branding, feature flags.', '/admin/organizations', Building2],
                   ['Users and access', 'Accounts, roles, activation, privileged users.', '/admin/users', Users],
-                  ['System', 'Maintenance mode, sync push, DHIS2 push, database stats.', '/admin/system', Server],
+                  ['System', 'Database stores and build facts.', '/admin/system', Server],
                   ['Billing', 'Subscription status, plan changes, seat/facility limits.', '/admin/billing', Receipt],
                   ['Analytics', 'Usage, adoption, org metrics, growth and distribution.', '/admin/analytics', BarChart3],
                   ['Security policy', 'MFA, sessions, SSO, API keys, emergency access.', '/admin', Lock],

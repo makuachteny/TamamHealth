@@ -727,6 +727,7 @@ export default function FrontDeskDashboardPage() {
         : '';
       return {
         id: `pending-appt-${appointment._id}`,
+        photoUrl: (patient as { photoUrl?: string } | undefined)?.photoUrl,
         title: appointment.patientName,
         subtitle: [appointment.reason || 'Scheduled visit', patientMeta].filter(Boolean).join(' · '),
         meta: `${formatClockTime(appointment.appointmentTime) || 'No time'} · ${appointment.providerName || patient?.assignedDoctorName || 'Unassigned'} · ${appointment.facilityName || currentUser?.hospitalName || 'Facility'}`,
@@ -809,6 +810,7 @@ export default function FrontDeskDashboardPage() {
       const waitTime = entry.time || entry.date || undefined;
       return {
         id: entry.id,
+        photoUrl: (patient as { photoUrl?: string } | undefined)?.photoUrl,
         title: entry.patientName,
         subtitle: `${entry.complaint} · ${entry.department}`,
         meta: `${entry.gender} · ${entry.age}${entry.assignedDoctorName ? ` · ${entry.assignedDoctorName}` : ''}`,
@@ -878,6 +880,7 @@ export default function FrontDeskDashboardPage() {
       const registered = splitDateTime(patientRegisteredAt(patient));
       return {
         id: `registered-${patient._id}`,
+        photoUrl: (patient as { photoUrl?: string }).photoUrl,
         title: patientFullName(patient),
         subtitle: patient.hospitalNumber || patientGenderAge(patient),
         meta: `${patientGenderAge(patient)} · ${registered.date}${registered.time ? ` · ${registered.time}` : ''}`,

@@ -118,12 +118,34 @@ export default function NurseDashboard() {
     { label: 'Start handoff', icon: ArrowRightLeft, onClick: () => setHandoffOpen(true), tone: 'primary' },
   ]), []);
 
+  // Patient portraits by id, so triage and ward rows show the same face as the
+  // patient register instead of falling back to initials.
+  const photoByPatientId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const patient of patients) {
+      const photo = (patient as { photoUrl?: string }).photoUrl;
+      if (photo) map.set(patient._id, photo);
+    }
+    return map;
+  }, [patients]);
+
   const rows = useMemo<EhrCareDashboardRow[]>(() => {
+    // The rail search filters the centre work list on every tab. Filtering
+    // happens BEFORE the 10-row cap, so a match further down the queue is
+    // still reachable instead of being sliced away first.
+    const q = railSearch.trim().toLowerCase();
+    const hit = (...values: Array<unknown>) =>
+      !q || values.some(value => String(value ?? '').toLowerCase().includes(q));
+
     if (activeTab === 'triage') {
-      return triageToday.slice(0, 10).map(triage => {
+      return triageToday.filter(triage => hit(
+        triage.patientName, triage.chiefComplaint, triage.modeOfArrival,
+        triage.status, triage.priority, triage.triagedByName, triage.assignedRoom,
+      )).slice(0, 10).map(triage => {
         const time = rowTime(triage.triagedAt);
         return {
           id: triage._id,
+          photoUrl: photoByPatientId.get(triage.patientId),
           title: triage.patientName,
           subtitle: triage.chiefComplaint || 'ETAT assessment',
           meta: `${triage.modeOfArrival || 'walk-in'} · ${time || 'No time'}`,
@@ -152,10 +174,14 @@ export default function NurseDashboard() {
     }
 
     if (activeTab === 'mar') {
-      return activeAdmissions.slice(0, 10).map(admission => {
+      return activeAdmissions.filter(admission => hit(
+        admission.patientName, admission.wardName, admission.bedNumber, admission.hospitalNumber,
+        admission.admittingDiagnosis, admission.attendingPhysicianName, admission.nurseAssignedName,
+      )).slice(0, 10).map(admission => {
         const time = rowTime(admission.admissionDate);
         return {
           id: admission._id,
+          photoUrl: photoByPatientId.get(admission.patientId),
           title: admission.patientName,
           subtitle: `${admission.wardName}${admission.bedNumber ? ` · Bed ${admission.bedNumber}` : ''}`,
           meta: `${admission.hospitalNumber || 'No MRN'} · ${admission.admittingDiagnosis || 'No diagnosis'} · ${admission.attendingPhysicianName || 'No physician'}`,
@@ -182,10 +208,14 @@ export default function NurseDashboard() {
       });
     }
 
-    return patients.slice(0, 10).map(patient => {
+    return patients.filter(patient => hit(
+      patientFullName(patient), patient.hospitalNumber, patient.phone,
+      patient.county, patient.state, patient.assignedDoctorName,
+    )).slice(0, 10).map(patient => {
       const time = rowTime(patientRegisteredAt(patient));
       return {
         id: patient._id,
+        photoUrl: (patient as { photoUrl?: string }).photoUrl,
         title: patientFullName(patient),
         subtitle: patientGenderAge(patient),
         meta: `${patient.hospitalNumber || 'No MRN'} · ${patient.phone || 'No phone'} · ${patient.county || 'No location'}`,
@@ -210,7 +240,7 @@ export default function NurseDashboard() {
         onAction: () => router.push(`/patients/${patient._id}`),
       };
     });
-  }, [activeAdmissions, activeTab, patients, router, today, triageToday]);
+  }, [activeAdmissions, activeTab, patients, photoByPatientId, railSearch, router, today, triageToday]);
 
   const dateLabel = useMemo(() => (
     new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date())

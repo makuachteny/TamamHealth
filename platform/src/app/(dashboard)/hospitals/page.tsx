@@ -249,16 +249,6 @@ function HospitalsPageInner() {
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        {/* ── KPIs ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5" style={{ marginBottom: 12 }}>
-          <KpiCard label={t('hospitals.kpiFacilities')} value={kpis.total} icon={Building2} color="#2191D0" />
-          <KpiCard label={t('hospitals.kpiFunctional')} value={`${kpis.pctFunctional}%`} icon={ShieldCheck} color={getPerformanceColor(kpis.pctFunctional)} />
-          <KpiCard label={t('hospitals.kpiReporting')} value={`${kpis.avgReporting}%`} icon={Activity} color={getPerformanceColor(kpis.avgReporting)} />
-          <KpiCard label={t('hospitals.kpiReadiness')} value={`${kpis.avgReadiness}%`} icon={Stethoscope} color={getPerformanceColor(kpis.avgReadiness)} />
-          <KpiCard label={t('hospitals.kpiGaps')} value={kpis.coverageGaps} icon={Syringe} color={kpis.coverageGaps > 5 ? 'var(--color-danger)' : 'var(--color-warning)'} />
-          <KpiCard label={t('hospitals.kpiStaffPerBed')} value={kpis.staffPerBed} icon={Users} color="#7C3AED" />
-        </div>
-
         {/* ── Facility Table / Profile ── */}
         <div className="card-elevated flex flex-col" style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
           {selectedHospital ? (
@@ -269,6 +259,11 @@ function HospitalsPageInner() {
                 title={t('hospitals.topBarTitle')}
                 stats={[
                   { label: t('hospitals.kpiFacilities'), value: kpis.total, color: LIST_STAT_COLORS.muted },
+                  { label: t('hospitals.kpiFunctional'), value: `${kpis.pctFunctional}%`, color: getPerformanceColor(kpis.pctFunctional) },
+                  { label: t('hospitals.kpiReporting'), value: `${kpis.avgReporting}%`, color: getPerformanceColor(kpis.avgReporting) },
+                  { label: t('hospitals.kpiReadiness'), value: `${kpis.avgReadiness}%`, color: getPerformanceColor(kpis.avgReadiness) },
+                  { label: t('hospitals.kpiGaps'), value: kpis.coverageGaps, color: kpis.coverageGaps > 5 ? 'var(--color-danger)' : 'var(--color-warning)' },
+                  { label: t('hospitals.kpiStaffPerBed'), value: kpis.staffPerBed, color: LIST_STAT_COLORS.muted },
                   { label: 'Online', value: syncCounts.online, color: LIST_STAT_COLORS.blue },
                   { label: 'Offline', value: syncCounts.offline, color: LIST_STAT_COLORS.amber },
                 ]}
@@ -340,31 +335,6 @@ function FilterDropdown({ label, value, onChange, options }: {
 }) {
   return (
     <FilterSelect label={label} value={value} onChange={onChange} options={options} size="sm" />
-  );
-}
-
-// ═══════════════════════════════════════════
-//  KPI Card
-// ═══════════════════════════════════════════
-function KpiCard({ label, value, icon: Icon, color }: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  color: string;
-}) {
-  return (
-    <div
-      className="flex items-center gap-2.5 p-3 rounded-xl"
-      style={{ background: `color-mix(in srgb, ${color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 22%, transparent)` }}
-    >
-      <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
-        <Icon className="w-[18px] h-[18px]" style={{ color }} />
-      </span>
-      <span className="flex flex-col justify-center min-w-0 leading-tight">
-        <span className="text-lg font-extrabold" style={{ color, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
-        <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-      </span>
-    </div>
   );
 }
 

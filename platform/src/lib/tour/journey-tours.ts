@@ -654,7 +654,7 @@ const SUPER_ADMIN_STEPS: TourStep[] = [
     route: '/admin/system',
     target: '',
     title: 'System',
-    body: 'Platform and DHIS2 configuration, plus manual sync pushes.',
+    body: 'Local data stores and build facts — platform settings live under Configuration.',
   },
   {
     id: 'billing',

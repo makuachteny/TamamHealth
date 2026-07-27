@@ -77,7 +77,7 @@ export const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: num
   '/admin/users': { verb: 'Manage all users', desc: 'Create accounts and assign roles across the platform.', est: 2 },
   '/admin/billing': { verb: 'Review platform billing', desc: 'See subscriptions, usage, and invoices across tenants.', est: 2 },
   '/admin/analytics': { verb: 'Explore platform analytics', desc: 'Track adoption and usage across all organizations.', est: 2 },
-  '/admin/system': { verb: 'Configure the system', desc: 'Adjust platform-wide settings and integrations.', est: 2 },
+  '/admin/system': { verb: 'Check system health', desc: 'Review the local data stores and the running build.', est: 2 },
   '/org-admin/users': { verb: 'Invite your team', desc: 'Create accounts for your staff and assign their roles.', est: 2 },
   '/org-admin/hospitals': { verb: 'Add your facilities', desc: 'Register the facilities your organization operates.', est: 2 },
   '/org-admin/branding': { verb: 'Brand your workspace', desc: 'Add your logo and colours so the app feels like yours.', est: 2 },

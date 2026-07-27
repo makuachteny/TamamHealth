@@ -295,6 +295,16 @@ export default function EhrClinicalDashboard({
     ? outstanding.find(item => item.label === outstandingView) ?? null
     : null;
 
+  // The rail search stays mounted over the outstanding drill-down, so it has
+  // to filter this list too — otherwise typing there silently does nothing.
+  const visibleOutstandingEntries = useMemo(() => {
+    const entries = activeOutstanding?.entries ?? [];
+    const q = appointmentSearch.trim().toLowerCase();
+    if (!q) return entries;
+    return entries.filter(entry =>
+      [entry.title, entry.subtitle, entry.meta].some(value => value?.toLowerCase().includes(q)));
+  }, [activeOutstanding, appointmentSearch]);
+
   const openOutstanding = (item: OutstandingItem) => {
     setView('dashboard');
     setOutstandingView(current => (current === item.label ? null : item.label));
@@ -978,7 +988,9 @@ export default function EhrClinicalDashboard({
                 </h2>
                 <div className="ehr-day-tabs">
                   <button type="button" className="active">
-                    {activeOutstanding.count} {activeOutstanding.count === 1 ? 'item' : 'items'}
+                    {appointmentQuery
+                      ? `${visibleOutstandingEntries.length} of ${activeOutstanding.count}`
+                      : `${activeOutstanding.count} ${activeOutstanding.count === 1 ? 'item' : 'items'}`}
                   </button>
                   {activeOutstanding.href && (
                     <button type="button" onClick={() => router.push(activeOutstanding.href!)}>
@@ -989,19 +1001,25 @@ export default function EhrClinicalDashboard({
               </div>
 
               <div className="ehr-appointment-list">
-                {(activeOutstanding.entries?.length ?? 0) === 0 && (
+                {visibleOutstandingEntries.length === 0 && (
                   <div className="ehr-empty-state">
                     <ClipboardList className="w-8 h-8" />
-                    <strong>Nothing outstanding</strong>
-                    <span>{activeOutstanding.label} is clear — no items need your attention.</span>
-                    <button type="button" onClick={() => setOutstandingView(null)}>Back to schedule</button>
+                    <strong>{appointmentQuery ? 'Nothing matches your search' : 'Nothing outstanding'}</strong>
+                    <span>
+                      {appointmentQuery
+                        ? `No ${activeOutstanding.label.toLowerCase()} items match “${appointmentSearch.trim()}”.`
+                        : `${activeOutstanding.label} is clear — no items need your attention.`}
+                    </span>
+                    {appointmentQuery
+                      ? <button type="button" onClick={() => setAppointmentSearch('')}>Clear search</button>
+                      : <button type="button" onClick={() => setOutstandingView(null)}>Back to schedule</button>}
                   </div>
                 )}
 
-                {(activeOutstanding.entries?.length ?? 0) > 0 && (
+                {visibleOutstandingEntries.length > 0 && (
                   <div className="ehr-queue-scroll">
                     <div className="ehr-queue-cards ehr-queue-cards--compact">
-                      {(activeOutstanding.entries ?? []).map(entry => {
+                      {visibleOutstandingEntries.map(entry => {
                         // Telehealth visits render as full appointment cards (same
                         // columns as the schedule) with a Status column in place of
                         // Language. Clicking opens the appointment popover; Join lives

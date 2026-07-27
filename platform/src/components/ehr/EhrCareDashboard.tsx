@@ -50,6 +50,10 @@ export type EhrCareDashboardRow = {
   id: string;
   title: string;
   subtitle: string;
+  /** The patient's photo. When set the avatar shows the portrait; without one
+   *  it falls back to initials — never a stand-in face, since the avatar is an
+   *  identification cue. */
+  photoUrl?: string;
   /** First line in the Wait column, usually the slot time or the time the
    *  patient entered the queue. Omit for rows with no time and the column reads
    *  "—". */
@@ -480,7 +484,12 @@ export default function EhrCareDashboard({
                           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); } }}
                         >
                           <div className="ehr-appointment-identity">
-                            <div className="ehr-patient-icon" style={stateTint(avatarAcuity)}>{initials(row.title)}</div>
+                            <div className="ehr-patient-icon" style={stateTint(avatarAcuity)}>
+                              {row.photoUrl
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img src={row.photoUrl} alt="" className="ehr-patient-icon-photo" />
+                                : initials(row.title)}
+                            </div>
                             <div className="ehr-appointment-main appointment-card-patient">
                               <button type="button" className="print-visible" onClick={(event) => { event.stopPropagation(); activate(); }}>
                                 {row.title}

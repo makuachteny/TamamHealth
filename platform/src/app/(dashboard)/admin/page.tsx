@@ -287,7 +287,7 @@ export default function AdminDashboardPage() {
         severity: 'high',
         title: 'Backup overdue',
         detail: backupIso ? `Last backup ${formatWhen(backupIso)} · RPO ${rpoHours}h` : `No backup recorded · RPO ${rpoHours}h`,
-        href: '/admin/system',
+        href: '/admin/security',
       });
     }
     if (config?.maintenanceMode) {
@@ -658,7 +658,7 @@ export default function AdminDashboardPage() {
                 { href: '/admin/audit', title: 'Audit Logs', desc: 'Evidence & export' },
                 { href: '/admin/organizations', title: 'Organizations', desc: 'Tenant registry' },
                 { href: '/admin/users', title: 'Users & Access', desc: 'Roles & accounts' },
-                { href: '/admin/system', title: 'System Health', desc: 'Stores & backups' },
+                { href: '/admin/system', title: 'System Health', desc: 'Database stores' },
                 { href: '/admin/security', title: 'Security', desc: 'Policies & posture' },
               ].map(cmd => (
                 <Link

@@ -401,6 +401,9 @@ export default function SecurityCompliancePage() {
             flex: 0 0 auto;
             overflow-x: auto;
           }
+          .saside-nav-title {
+            display: none;
+          }
           .saside-nav-item {
             flex: 0 0 auto;
             white-space: nowrap;

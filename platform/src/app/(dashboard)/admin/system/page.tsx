@@ -72,13 +72,13 @@ export default function AdminSystemPage() {
   const totalDocs = dbStats.reduce((sum, s) => sum + s.docCount, 0);
 
   return (
-    <SaPage title="System Health">
+    <SaPage>
       <SaCard>
         <EhrListHeader
           title="System Health"
           stats={[
             { label: t('system.totalDocuments'), value: dbStatsLoading ? '…' : totalDocs, color: LIST_STAT_COLORS.blue },
-            { label: t('system.databaseStatistics'), value: dbStatsLoading ? '…' : dbStats.length, color: LIST_STAT_COLORS.muted },
+            { label: 'Databases', value: dbStatsLoading ? '…' : dbStats.length, color: LIST_STAT_COLORS.muted },
           ]}
         />
         <SaTable

@@ -102,7 +102,7 @@ export default function AdminConfigPage() {
   const [section, setSection] = useState<typeof CONFIG_SECTIONS[number]['id']>('identity');
 
   return (
-    <SaPage title="Configuration" subtitle="Platform identity, tenant defaults, and maintenance controls.">
+    <SaPage>
       <div className="ehr-set-grid">
         <aside className="ehr-set-rail">
           <nav className="ehr-set-nav" aria-label="Configuration sections">
