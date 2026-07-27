@@ -1995,6 +1995,49 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 .data-table tbody td { border-bottom: 1px solid var(--border-light); }
 .data-table thead th { border-bottom: 1px solid var(--border-light); }
 
+/* Dashboard/card tables that predate `.data-table`.
+   Scoped to operational card containers so print documents and clinical
+   micro-tables keep their specialized layouts, while page-level tables get
+   the same sticky header and row rhythm as the shared data table. */
+.dash-card table.w-full,
+.card-elevated table.w-full,
+.ehr-set-section table.w-full,
+.org-set-card table.w-full {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.dash-card table.w-full thead th,
+.card-elevated table.w-full thead th,
+.ehr-set-section table.w-full thead th,
+.org-set-card table.w-full thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-card-solid);
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dash-card table.w-full tbody tr,
+.card-elevated table.w-full tbody tr,
+.ehr-set-section table.w-full tbody tr,
+.org-set-card table.w-full tbody tr {
+  transition: background 0.15s ease;
+}
+
+.dash-card table.w-full tbody tr:hover,
+.card-elevated table.w-full tbody tr:hover,
+.ehr-set-section table.w-full tbody tr:hover,
+.org-set-card table.w-full tbody tr:hover {
+  background: var(--table-row-hover);
+}
+
 /* ============ Referrals Table — polished list styling ============ */
 /* Header sticks to the top of its scroll container so columns stay labelled
    while the list scrolls; rows get a roomier rhythm and a clearer hover/active

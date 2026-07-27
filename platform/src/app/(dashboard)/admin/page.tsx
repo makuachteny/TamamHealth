@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useApp } from '@/lib/context';
+import { apiFetch } from '@/lib/api-fetch';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
@@ -195,7 +196,7 @@ export default function AdminDashboardPage() {
 
     (async () => {
       try {
-        const res = await fetch('/api/admin/conflicts?status=pending');
+        const res = await apiFetch('/api/admin/conflicts?status=pending');
         if (res.ok) {
           const data = await res.json();
           if (!cancelled) setConflictCount(Array.isArray(data.conflicts) ? data.conflicts.length : Array.isArray(data) ? data.length : 0);

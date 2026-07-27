@@ -75,7 +75,7 @@ export default function AdminSyncPage() {
 
   const loadConflicts = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/conflicts?status=pending');
+      const res = await apiFetch('/api/admin/conflicts?status=pending');
       if (!res.ok) { setConflictsError(true); return; }
       const body = await res.json();
       setPendingConflicts(Array.isArray(body.conflicts) ? body.conflicts.length : 0);

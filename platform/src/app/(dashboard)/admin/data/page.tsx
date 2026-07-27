@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { SaPage, SaCard, SaTable, SaPill } from '@/components/admin/sa-ui';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
+import { apiFetch } from '@/lib/api-fetch';
 import { getAllPatients } from '@/lib/services/patient-service';
 import type { PatientDoc } from '@/lib/db-types';
 import { ArrowRight, Copy, BarChart3, AlertTriangle, GitCompareArrows } from '@/components/icons/lucide';
@@ -63,7 +64,7 @@ export default function AdminDataGovernancePage() {
 
   const loadConflicts = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/conflicts?status=pending');
+      const res = await apiFetch('/api/admin/conflicts?status=pending');
       if (!res.ok) { setConflictsError(true); return; }
       const body = await res.json();
       setPendingConflicts(Array.isArray(body.conflicts) ? body.conflicts.length : 0);
