@@ -3,6 +3,7 @@ import { getClientIp } from '@/lib/request-utils';
 import { createPatientToken } from '@/lib/patient-portal-auth';
 import { demoFallbackEnabled, logDemoFallback, findDemoPatientByUsername } from '@/lib/patient-portal-demo';
 import { verifyPassword } from '@/lib/auth';
+import { otpEnabled, issueOtp } from '@/lib/patient-portal-otp';
 
 // Rate limit: 10 attempts / 15 min / IP + 10 attempts / 15 min / account.
 // Operational note: this API is process-local and best-effort. Multi-replica
@@ -110,6 +111,40 @@ export async function POST(req: NextRequest) {
     const passwordOk = !!found?.portalPasswordHash && await verifyPassword(password, found.portalPasswordHash);
     if (!found || !passwordOk) {
       return NextResponse.json({ error: 'Invalid username or password.' }, { status: 401 });
+    }
+
+    // Second factor (KAN-76). When OTP is enabled we stop here and prove
+    // possession of the registered phone before issuing any session token —
+    // the portal is otherwise protected by a single shared secret, on shared
+    // devices, for users who often cannot reset it themselves.
+    //
+    // Fails CLOSED: if the SMS cannot be delivered no token is issued. A
+    // second factor nobody receives is not a factor. The one exception is a
+    // patient with no number on file, who would otherwise be permanently
+    // locked out of their own records by a config change — they fall through
+    // to password-only, and the response says so.
+    if (otpEnabled()) {
+      const phone = typeof found.phone === 'string' ? found.phone : '';
+      const issued = await issueOtp(found._id, phone);
+
+      if (issued.ok) {
+        return NextResponse.json({
+          otpRequired: true,
+          // Identifies the pending challenge on the verify call. Not a
+          // session token and carries no privilege — the patient id alone is
+          // useless without the code, which only reaches the registered phone.
+          challengeId: found._id,
+          maskedPhone: issued.maskedPhone,
+        });
+      }
+
+      if (issued.error !== 'no-phone') {
+        return NextResponse.json(
+          { error: 'Could not send your verification code. Please try again.' },
+          { status: 503 },
+        );
+      }
+      console.warn('[patient-portal/login] OTP enabled but patient has no phone on file — allowing password-only login.');
     }
 
     // Issue a patient-scoped JWT (8 hour expiry)

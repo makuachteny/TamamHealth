@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Shield, Plus, Edit3, RefreshCw } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import EligibilityBadge from './EligibilityBadge';
 
@@ -30,7 +30,7 @@ interface Policy {
 
 export default function InsuranceSnapshot({ patientId, editable, onAddInsurance, onEditInsurance }: InsuranceSnapshotProps) {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [eligStatus, setEligStatus] = useState<'verified' | 'unverified' | 'expired' | 'denied' | 'cached' | 'none'>('none');

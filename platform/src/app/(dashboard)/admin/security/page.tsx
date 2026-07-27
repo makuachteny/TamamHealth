@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import type { PlatformConfigDoc } from '@/lib/db-types';
 import { ToggleLeft, ToggleRight, Lock, FileText, AlertTriangle, Clock, ShieldCheck } from '@/components/icons/lucide';
@@ -102,7 +102,7 @@ function KvRow({ label, tone, value }: { label: string; tone: 'ok' | 'warn'; val
 }
 
 export default function SecurityCompliancePage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { config, update } = usePlatformConfig();
   const [backupAgeHours, setBackupAgeHours] = useState<number | null>(null);
 

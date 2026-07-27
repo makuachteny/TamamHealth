@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Modal from '@/components/Modal';
 import { X, CheckCircle2, ArrowRight, Loader2 } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { formatMoney } from '@/lib/format-utils';
 
@@ -20,7 +20,7 @@ interface PaymentPlanWizardProps {
 export default function PaymentPlanWizard({
   patientId, patientName, balance: balanceProp, encounterIds, currency = 'SSP', onComplete, onCancel
 }: PaymentPlanWizardProps) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [termMonths, setTermMonths] = useState(3);

@@ -16,7 +16,7 @@ import {
   Users,
   X,
 } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTourContext } from '@/lib/tour/tour-context';
 import { getRoleConfig } from '@/lib/permissions';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -40,7 +40,7 @@ export default function EhrTopRail() {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useTranslation();
-  const { currentUser, logout } = useApp();
+  const { currentUser, logout } = useAuth();
   // Facility name for the header chip. Sessions restored via /api/auth/me
   // before hospitalName was added to the token won't carry it — fall back to
   // resolving the name from the local hospitals store by id.

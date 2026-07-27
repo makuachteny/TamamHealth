@@ -41,6 +41,14 @@ export type PatientTokenPayload = {
   name: string;
   hospitalNumber: string;
   role: 'patient';
+  /**
+   * Session start, unix seconds. Preserved across renewals so a sliding
+   * session still has an absolute ceiling (KAN-68). Optional because tokens
+   * issued before renewal existed do not carry it — those are treated as
+   * starting now, which is the safe direction (it cannot shorten a session
+   * retroactively, only refuse to extend one indefinitely).
+   */
+  sst?: number;
 };
 
 /**
@@ -61,6 +69,12 @@ export async function createPatientToken(payload: {
   name: string;
   hospitalNumber: string;
   role: 'patient';
+  /**
+   * Unix seconds when this SESSION began — preserved across renewals so a
+   * sliding session still has an absolute ceiling (KAN-68). Omit on a fresh
+   * login; the current time is used.
+   */
+  sessionStart?: number;
 }): Promise<string> {
   if (!hasCryptoSubtle()) {
     // Patient portal is web-only and always served over HTTPS in production;
@@ -72,6 +86,7 @@ export async function createPatientToken(payload: {
     name: payload.name,
     hospitalNumber: payload.hospitalNumber,
     role: payload.role,
+    sst: payload.sessionStart ?? Math.floor(Date.now() / 1000),
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -80,6 +95,17 @@ export async function createPatientToken(payload: {
     .setExpirationTime('8h')
     .sign(JWT_SECRET);
 }
+
+/**
+ * Hard ceiling on a renewed session (KAN-68).
+ *
+ * Renewal is a sliding window: a still-valid token buys a fresh 8 hours. That
+ * alone would let a STOLEN token be renewed forever, so `sst` (session start)
+ * is carried through every renewal and refused past this cap. 24h covers the
+ * longest realistic clinic visit — the case the ticket is about — while still
+ * forcing a real re-authentication once a day.
+ */
+export const PATIENT_SESSION_MAX_SECONDS = 24 * 60 * 60;
 
 /**
  * Verify the patient JWT from the Authorization header.

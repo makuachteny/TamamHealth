@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -64,7 +64,7 @@ export default function AdminUsersPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const roleLabel = (role: string) => t(`adminUsers.role_${role}`);
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { organizations } = useOrganizations();
   const [users, setUsers] = useState<UserDoc[]>([]);
   const [loading, setLoading] = useState(true);

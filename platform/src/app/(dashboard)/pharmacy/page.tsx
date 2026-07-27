@@ -20,6 +20,7 @@ import PageInstructionCard from '@/components/PageInstructionCard';
 import { formatMoney } from '@/lib/format-utils';
 import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
+import { prescription as rxLifecycle } from '@/lib/clinical-flow/order-lifecycles';
 import { markCapability } from '@/lib/capability-storage';
 
 const UNITS = ['tablets', 'vials', 'bottles', 'sachets', 'tubes', 'ampoules', 'sachet', 'ml'];
@@ -275,7 +276,46 @@ export default function PharmacyPage() {
     if (ok) setDispenseTarget(null);
   };
 
-  const workflowActionFor = (rx: typeof rxQueue[number]): { label?: string; onClick?: () => void } => {
+  /**
+   * Explicit branch actions (KAN-39). `stockout_partial_referred` was only ever
+   * reachable as a side effect of "Clear" finding the shelf empty, and
+   * `held_awaiting_clarification` / `dispensing_error_recalled` were not
+   * reachable from the UI at all — so three states the lifecycle defines could
+   * never be entered by a pharmacist who needed them.
+   */
+  const handleHold = (rx: typeof rxQueue[number]) =>
+    advanceRx(rx, 'held_awaiting_clarification', `${rx.medication} held pending clarification from the prescriber.`);
+
+  const handleStockout = (rx: typeof rxQueue[number]) => {
+    const inv = findInventoryFor(rx.medication);
+    advanceRx(rx, 'stockout_partial_referred', `Stockout recorded for ${rx.medication}: ${inv?.stockLevel ?? 0} ${inv?.unit || 'unit(s)'} on hand. Patient referred.`);
+  };
+
+  const handleRecall = (rx: typeof rxQueue[number]) =>
+    advanceRx(rx, 'dispensing_error_recalled', `${rx.medication} recalled — dispensing error logged. Re-check before re-issuing.`);
+
+  /**
+   * Secondary actions available alongside the main step action, gated on the
+   * lifecycle so a pharmacist is never offered a transition the service layer
+   * would reject.
+   */
+  const secondaryActionsFor = (rx: typeof rxQueue[number]): Array<{ label: string; onClick: () => void; tone?: 'danger' }> => {
+    if (!canDispense) return [];
+    const stage = pharmacyStage(rx);
+    const out: Array<{ label: string; onClick: () => void; tone?: 'danger' }> = [];
+    if (rxLifecycle.can(stage, 'held_awaiting_clarification')) {
+      out.push({ label: 'Hold — query prescriber', onClick: () => handleHold(rx) });
+    }
+    if (rxLifecycle.can(stage, 'stockout_partial_referred')) {
+      out.push({ label: 'Record stockout', onClick: () => handleStockout(rx) });
+    }
+    if (rxLifecycle.can(stage, 'dispensing_error_recalled')) {
+      out.push({ label: 'Recall — dispensing error', onClick: () => handleRecall(rx), tone: 'danger' });
+    }
+    return out;
+  };
+
+  const workflowActionFor = (rx: typeof rxQueue[number]): { label?: string; onClick?: () => void; disabled?: boolean; disabledReason?: string } => {
     if (!canDispense) return {};
     const stage = pharmacyStage(rx);
     const balance = patientBalanceFor(rx);
@@ -292,6 +332,21 @@ export default function PharmacyPage() {
       return { label: canAccess('/payments') ? 'Collect payment' : 'Send to cashier', onClick: () => handlePaymentStep(rx) };
     }
     if (stage === 'cleared_for_dispensing') {
+      // Stock gate (KAN-39). handleDispense already refuses and explains, but
+      // an enabled button that always fails is a trap: the pharmacist reaches
+      // for it, gets an error, and has no route forward. Disabling it states
+      // the constraint up front and leaves "Record stockout" as the real next
+      // step. `quantityToDispense` is the FULL course — a partial shelf is not
+      // enough to dispense against.
+      const dispenseQty = rx.quantityToDispense || 1;
+      const dispenseInv = findInventoryFor(rx.medication);
+      if (!dispenseInv || dispenseInv.stockLevel < dispenseQty) {
+        return {
+          label: t('pharmacy.dispense'),
+          disabled: true,
+          disabledReason: `Insufficient stock — ${dispenseInv?.stockLevel ?? 0} ${dispenseInv?.unit || 'unit(s)'} on hand, ${dispenseQty} needed for the full course.`,
+        };
+      }
       return { label: t('pharmacy.dispense'), onClick: () => handleDispense(rx._id) };
     }
     if (stage === 'dispensed') {
@@ -373,6 +428,31 @@ export default function PharmacyPage() {
             );
           })}
         </div>
+        {action.label && action.disabled && (
+          <div className="space-y-1">
+            <button type="button" className="btn btn-primary w-full" disabled title={action.disabledReason}>
+              {action.label}
+            </button>
+            {action.disabledReason && (
+              <p className="text-xs" style={{ color: 'var(--color-warning)' }}>{action.disabledReason}</p>
+            )}
+          </div>
+        )}
+        {secondaryActionsFor(rx).length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {secondaryActionsFor(rx).map(secondary => (
+              <button
+                key={secondary.label}
+                type="button"
+                className="btn btn-secondary"
+                style={secondary.tone === 'danger' ? { color: 'var(--color-danger)' } : undefined}
+                onClick={secondary.onClick}
+              >
+                {secondary.label}
+              </button>
+            ))}
+          </div>
+        )}
         {action.label && action.onClick && (
           <button type="button" className="btn btn-primary w-full" onClick={action.onClick}>
             {action.label}

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useAppointments } from '@/lib/hooks/useAppointments';
@@ -121,7 +121,7 @@ function patientFacilityName(patient: PatientDoc | undefined, fallback = 'Facili
 
 export default function FrontDeskDashboardPage() {
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { canConsult } = usePermissions();
   const { patients } = usePatients();
   const { appointments, updateStatus: updateAppointmentStatus, reschedule: rescheduleAppointment } = useAppointments();

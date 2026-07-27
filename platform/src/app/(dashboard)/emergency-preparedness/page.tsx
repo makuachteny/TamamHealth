@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import { AlertTriangle, ShieldAlert, Phone, Users, BedDouble, Activity, Plus, X } from '@/components/icons/lucide';
 import EhrListHeader from '@/components/ehr/EhrListHeader';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import {
   getAllPlans,
@@ -78,7 +78,7 @@ const EMPTY_FORM = {
 };
 
 export default function EmergencyPreparednessPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
 
   const [plans, setPlans] = useState<EmergencyPlanDoc[]>([]);

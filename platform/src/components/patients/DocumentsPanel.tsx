@@ -6,7 +6,7 @@
  * paperless-journey surface (scan the old yellow file, attach radiology, etc.).
  */
 import { useState, useMemo } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import FileUpload from '@/components/FileUpload';
 import { usePatientDocuments } from '@/lib/hooks/usePatientDocuments';
 import type { Attachment } from '@/data/mock';
@@ -38,7 +38,7 @@ function formatSize(bytes: number): string {
 }
 
 export default function DocumentsPanel({ patient }: { patient: PatientDoc }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { documents, add, remove } = usePatientDocuments(patient._id);
   const [category, setCategory] = useState<PatientDocumentCategory>('radiology');
   const [note, setNote] = useState('');

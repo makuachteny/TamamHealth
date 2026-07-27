@@ -10,7 +10,7 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 
 /* Full-page scaffold with the super-admin role guard (defense-in-depth on
    top of the Edge proxy check — matches the existing /admin pages).
@@ -25,7 +25,7 @@ export function SaPage({
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const router = useRouter();
 
   useEffect(() => {

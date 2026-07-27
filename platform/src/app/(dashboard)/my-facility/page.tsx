@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -12,7 +12,7 @@ import {
 
 export default function MyFacilityPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { hospitals, loading: hospitalsLoading, update } = useHospitals();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

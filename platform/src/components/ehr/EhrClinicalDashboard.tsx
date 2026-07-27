@@ -7,6 +7,7 @@ import type { AppointmentDoc, AppointmentStatus, EncounterDoc, LabResultDoc } fr
 import {
   Calendar,
   Check,
+  AlertTriangle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -42,7 +43,7 @@ import {
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import EhrVisitPopup, { EhrQueueMoveDialog, PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
 import { useTriage } from '@/lib/hooks/useTriage';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import type { TriageDoc } from '@/lib/db-types';
 import { encountersDB, labResultsDB } from '@/lib/db';
@@ -497,7 +498,7 @@ export default function EhrClinicalDashboard({
   // record via the acuity-weighted, time-aged queue builder. Scoped to the
   // last 24 hours (older docs are unclosed visits, not waiting patients) and
   // deduped to the newest record per patient.
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { triages, update: updateTriageDoc } = useTriage();
 
   // ── Clinical activity charts (consultations trend + lab-review aging) ──
@@ -1373,6 +1374,49 @@ export default function EhrClinicalDashboard({
           <button type="button" className="ehr-rail-close" aria-label="Close panel" onClick={() => setRailOpen(false)}>
             <X className="w-4 h-4" />
           </button>
+          {/* Unreviewed results past their review SLA (KAN-75). Deliberately
+              ABOVE "Outstanding items": RESULT_REVIEW_SLA existed with nothing
+              reading it, so a critical result could sit at `resulted`
+              indefinitely with no escalation path. A breached critical result
+              outranks routine outstanding work, so it goes first and only
+              renders when there is something to act on. */}
+          {overdueLabRows.length > 0 && (
+            <section className="ehr-side-card ehr-overdue-labs-card">
+              <div className="ehr-side-card-head">
+                <FlaskConical className="w-5 h-5" />
+                <h2>Results awaiting your review</h2>
+              </div>
+              <ul className="ehr-overdue-labs-list">
+                {overdueLabRows.slice(0, 6).map(row => (
+                  <li key={row._id}>
+                    <button
+                      type="button"
+                      className={row.critical ? 'is-critical' : undefined}
+                      onClick={() => router.push(`/patients/${row.patientId}?tab=labs&focus=${encodeURIComponent(row._id)}`)}
+                    >
+                      <span className="ehr-overdue-labs-test">
+                        {row.critical && <AlertTriangle className="w-3.5 h-3.5" aria-label="Critical" />}
+                        {row.testName}
+                      </span>
+                      <span className="ehr-overdue-labs-meta">
+                        {row.patientName}
+                        {' · '}
+                        {/* Hours until it reads oddly, then days. */}
+                        {row.hoursOverdue >= 48
+                          ? `${Math.floor(row.hoursOverdue / 24)}d overdue`
+                          : `${row.hoursOverdue}h overdue`}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {overdueLabRows.length > 6 && (
+                <button type="button" className="ehr-overdue-labs-more" onClick={() => router.push('/lab?tab=review')}>
+                  {`View all ${overdueLabRows.length}`}
+                </button>
+              )}
+            </section>
+          )}
 	          <section className="ehr-side-card ehr-outstanding-card">
 	            <div className="ehr-side-card-head">
 	              <ClipboardList className="w-5 h-5" />

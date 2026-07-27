@@ -22,9 +22,16 @@
  */
 
 import { useMemo } from 'react';
-import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea,
-} from 'recharts';
+import dynamic from 'next/dynamic';
+
+// recharts is ~80–100 KB and only ~half of patient charts show a trend line
+// (a metric needs >= 2 readings). Deferring it keeps that weight off the
+// initial payload on 2G/3G connections (KAN-66). ssr:false because recharts
+// measures the DOM to size itself and cannot render on the server.
+const VitalsSparkline = dynamic(() => import('./_VitalsSparkline'), {
+  ssr: false,
+  loading: () => <div style={{ width: '100%', height: 80 }} />,
+});
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Activity } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { MedicalRecordDoc } from '@/lib/db-types';
@@ -373,64 +380,15 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
 
       {chartPoints.length >= 2 ? (
       <div style={{ width: '100%', height: 80 }}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-          <LineChart data={chartPoints} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 9, fill: 'var(--text-muted)' }}
-              axisLine={false}
-              tickLine={false}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              domain={['auto', 'auto']}
-              tick={{ fontSize: 9, fill: 'var(--text-muted)' }}
-              axisLine={false}
-              tickLine={false}
-              width={28}
-            />
-            <Tooltip
-              contentStyle={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-light)',
-                borderRadius: 6,
-                fontSize: 11,
-                padding: '6px 8px',
-              }}
-              labelStyle={{ color: 'var(--text-muted)' }}
-              formatter={(v, name) => [`${v ?? '—'} ${unit}`, name === 'value' ? title : String(name ?? '')]}
-            />
-            {metric.normalRange && (
-              <ReferenceArea
-                y1={metric.normalRange[0]}
-                y2={metric.normalRange[1]}
-                fill={statusColor}
-                fillOpacity={0.06}
-                stroke="none"
-              />
-            )}
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke={color}
-              strokeWidth={2}
-              dot={chartPoints.length > 1 ? { r: 2.5, fill: color } : false}
-              activeDot={chartPoints.length > 1 ? { r: 4 } : false}
-              isAnimationActive={false}
-            />
-            {key === 'bp' && (
-              <Line
-                type="monotone"
-                dataKey="secondary"
-                stroke={color}
-                strokeWidth={1.5}
-                strokeDasharray="3 3"
-                dot={chartPoints.length > 1 ? { r: 2, fill: color } : false}
-                isAnimationActive={false}
-              />
-            )}
-          </LineChart>
-        </ResponsiveContainer>
+        <VitalsSparkline
+          points={chartPoints}
+          color={color}
+          statusColor={statusColor}
+          unit={unit}
+          title={title}
+          normalRange={metric.normalRange}
+          showSecondary={key === 'bp'}
+        />
       </div>
       ) : (
         <div className="flex items-center justify-center" style={{ width: '100%', height: 80, color: 'var(--text-muted)', fontSize: 11 }}>

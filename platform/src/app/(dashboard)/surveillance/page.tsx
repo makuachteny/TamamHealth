@@ -19,7 +19,7 @@ import { states } from '@/data/mock';
 import { SOUTH_SUDAN_STATES, SOUTH_SUDAN_BBOX, WHITE_NILE, type GeoState } from '@/data/south-sudan-geo';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useHospitals } from '@/lib/hooks/useHospitals';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -241,7 +241,7 @@ export default function SurveillancePage() {
   });
   const [alertSubmitting, setAlertSubmitting] = useState(false);
 
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { canRecordVitalEvents, isGovernment, isSuperAdmin } = usePermissions();
   const canReportAlert = canRecordVitalEvents || isGovernment || isSuperAdmin;
   const { showToast } = useToast();

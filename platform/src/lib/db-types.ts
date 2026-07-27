@@ -299,6 +299,15 @@ export interface LabResultDoc extends BaseDoc {
    *  reviewed_by_clinician → … . The coarse `status` field above is derived
    *  from this. Optional for backward-compatibility with older orders. */
   orderStatus?: LabOrderStatus;
+  /**
+   * Visit this test belongs to (KAN-72). Previously the link ran only the other
+   * way — `MedicalRecordDoc.labOrderIds` / `EncounterDoc` pointed AT the lab
+   * result — so a test ordered straight from the lab desk, with no consultation
+   * behind it, had no anchor at all: unbillable and not attributable to a
+   * facility encounter. Optional because orders created before this, and the
+   * consultation path's own orders, are still reached through the record.
+   */
+  encounterId?: string;
 }
 
 export interface DiseaseAlertDoc extends BaseDoc, Omit<DiseaseAlert, 'id'> {
@@ -1735,6 +1744,28 @@ export interface TelehealthSessionDoc extends BaseDoc {
   connectionDrops: number;
   patientConsentGiven: boolean;
   consentTimestamp?: string;
+  /**
+   * HOW consent was obtained. Required whenever `patientConsentGiven` is true —
+   * a bare boolean says a patient consented but not who recorded it or on what
+   * basis, which is not a defensible record.
+   *
+   *  - `patient_portal`          the patient themselves ticked consent before
+   *                              joining. The only form that is truly
+   *                              first-party.
+   *  - `provider_attested_verbal` the clinician asked the patient (in the room,
+   *                              by phone) and is attesting to it. Carries
+   *                              `consentAttestedBy` so the attestation is
+   *                              attributable to a named user.
+   *  - `written`                 a signed paper/scanned form exists on file.
+   *
+   * Historical documents may lack this field; treat absent as "unknown
+   * provenance", NOT as patient-given.
+   */
+  consentMethod?: 'patient_portal' | 'provider_attested_verbal' | 'written';
+  /** User id of the clinician attesting, when consentMethod is provider-attested. */
+  consentAttestedBy?: string;
+  /** Display name of that clinician, denormalised for audit readability. */
+  consentAttestedByName?: string;
   // Recording & documentation
   sessionRecorded: boolean;
   recordingUrl?: string;

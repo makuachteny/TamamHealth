@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Modal from '@/components/Modal';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useIntakeForms } from '@/lib/hooks/useIntakeForms';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -99,7 +99,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default function PatientIntakePage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { forms, loading, merge, reject, sendRequest } = useIntakeForms();
   const { patients } = usePatients();

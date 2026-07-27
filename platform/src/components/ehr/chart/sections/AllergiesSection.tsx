@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import AddAllergyModal from '@/components/patients/AddAllergyModal';
 import { isNoAllergySentinel } from '@/lib/clinical-roles';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import type { AllergyEntry } from '@/data/mock';
 
@@ -31,7 +31,7 @@ interface AllergiesSectionProps {
 }
 
 export default function AllergiesSection({ patient, autoOpenAdd, onAutoOpenHandled }: AllergiesSectionProps) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {

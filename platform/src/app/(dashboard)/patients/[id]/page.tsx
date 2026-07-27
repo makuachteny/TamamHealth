@@ -64,7 +64,7 @@ import type {
   ProblemDoc,
 } from '@/lib/db-types';
 import { isValidPhone, normalizePhone, formatPhoneDisplay } from '@/lib/field-formats';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { OrderLabModal, PrescribeModal, ReferModal } from '@/components/patients/PatientActionModals';
 import { useWards } from '@/lib/hooks/useWards';
 import OpenmrsChartShell from '@/components/ehr/chart/OpenmrsChartShell';
@@ -197,7 +197,7 @@ export default function PatientDetailPage() {
   };
 
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { patients, loading, update: updatePatient } = usePatients();
   const { hospitals } = useHospitals();
 

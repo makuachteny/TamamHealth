@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { getRoleConfig } from '@/lib/permissions';
 import { uniqueAllowedNavItems, getPrimaryShortcutItems } from '@/components/ehr/ehr-navigation';
 import MobileBottomSheet from '../MobileBottomSheet';
@@ -13,7 +13,7 @@ interface MobileQuickCreateSheetProps {
 }
 
 export default function MobileQuickCreateSheet({ open, onClose }: MobileQuickCreateSheetProps) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const router = useRouter();
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : undefined;
   const allowedRoutes = useMemo(() => roleConfig?.allowedRoutes || [], [roleConfig]);

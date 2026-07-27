@@ -9,13 +9,13 @@
  * Renders nothing; mounted once inside the dashboard shell.
  */
 import { useEffect } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { getUserPrefs, applyDensity, subscribeUserPrefs } from '@/lib/user-prefs';
 import { messagesDB } from '@/lib/db';
 import type { MessageDoc } from '@/lib/db-types';
 
 export default function PreferenceEffects() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const userId = currentUser?._id;
 
   // Density: apply on mount and whenever it changes.

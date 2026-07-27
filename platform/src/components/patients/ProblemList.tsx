@@ -14,7 +14,7 @@ import { useMemo, useState } from 'react';
 import {
   Plus, X, CheckCircle2, Activity, Edit3, Trash2,
 } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useProblems } from '@/lib/hooks/useProblems';
 import { useToast } from '@/components/Toast';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
@@ -218,7 +218,7 @@ function ProblemRow({
 
 export default function ProblemList({ patientId, patientName }: ProblemListProps) {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { active, resolved, problems, create, setStatus, update, remove, loading } = useProblems(patientId);
   const { showToast } = useToast();
 

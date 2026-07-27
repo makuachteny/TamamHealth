@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { Pill, Plus, X, UserCheck } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import {
   getAllMovements,
@@ -55,7 +55,7 @@ const blankForm = {
 };
 
 export default function ControlledSubstancesPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
 
   const [movements, setMovements] = useState<ControlledSubstanceLogDoc[]>([]);

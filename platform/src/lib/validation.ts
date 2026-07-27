@@ -100,7 +100,7 @@ export function validatePatientData(data: Record<string, unknown>): Record<strin
     errors.maidenName = 'Maiden name is too long';
   }
 
-  if (!data.gender || !['male', 'female', 'unknown'].includes((data.gender as string).toLowerCase())) {
+  if (!normalizeGender(data.gender)) {
     errors.gender = 'Gender is required';
   }
 
@@ -109,12 +109,8 @@ export function validatePatientData(data: Record<string, unknown>): Record<strin
   }
 
   if (data.dateOfBirth) {
-    const dob = new Date(data.dateOfBirth as string);
-    if (isNaN(dob.getTime())) {
-      errors.dateOfBirth = 'Invalid date of birth';
-    } else if (dob > new Date()) {
-      errors.dateOfBirth = 'Date of birth cannot be in the future';
-    }
+    const dobError = validateDateOfBirth(data.dateOfBirth as string);
+    if (dobError) errors.dateOfBirth = dobError;
   }
 
   // Validate estimated age range
@@ -340,6 +336,91 @@ export function validateVitalSigns(
   }
 
   return errors;
+}
+
+/**
+ * Canonical gender values (KAN-17).
+ *
+ * Three layers disagreed: the TypeScript type says `'Male' | 'Female'`, the
+ * validator accepted `['male','female','unknown']` after `.toLowerCase()`, and
+ * the SQL column was a bare `TEXT` with no CHECK. It passed only by coincidence
+ * — `'Male'.toLowerCase()` happens to match — while `'unknown'` was accepted by
+ * the API and then **unrepresentable in the type**, so anything that stored it
+ * produced a document violating its own contract.
+ *
+ * Canonical form is the capitalised pair, because that is what the type
+ * declares, what every stored document holds, and what 228 call sites compare
+ * against. Re-casing to lowercase would have meant a 228-site refactor plus a
+ * backfill of every patient record for no behavioural gain.
+ *
+ * `'unknown'` is deliberately NOT accepted here. Nothing in the codebase stores
+ * it (only `fhir.ts` emits lowercase `unknown` outbound, which is correct per
+ * the FHIR spec and is a projection, not storage). Adding an Unknown option is
+ * a real product gap for unidentified patients and neonates — it is tracked
+ * separately in docs/EMR-FIELD-AUDIT-2026-07.md §2 and needs a UI, not just an
+ * enum value.
+ */
+export const CANONICAL_GENDERS = ['Male', 'Female'] as const;
+export type CanonicalGender = (typeof CANONICAL_GENDERS)[number];
+
+/**
+ * Normalise a supplied gender to its canonical casing, or null when it is not
+ * a recognised value. Case-insensitive so a form or import posting `"male"`
+ * still lands as `"Male"` in storage rather than creating a second spelling.
+ */
+export function normalizeGender(value: unknown): CanonicalGender | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim().toLowerCase();
+  if (v === 'male') return 'Male';
+  if (v === 'female') return 'Female';
+  return null;
+}
+
+/**
+ * Validate a date of birth as a CALENDAR date (KAN-16).
+ *
+ * The old check was `new Date(dob) > new Date()`. On a `YYYY-MM-DD` string —
+ * which is what an HTML `type="date"` input produces — `new Date()` parses to
+ * **UTC midnight**, while the right-hand side is local now. In Juba (UTC+2) a
+ * birth registered today read as 2 hours in the future for the first two hours
+ * of every day, so a newborn's registration was rejected as "cannot be in the
+ * future". West of UTC the error runs the other way and a genuinely future date
+ * passes. Comparing Y/M/D directly removes the timezone from the question.
+ *
+ * Returns an error message, or null when the value is acceptable.
+ */
+export function validateDateOfBirth(raw: string, today: Date = new Date()): string | null {
+  const value = (raw || '').trim();
+  if (!value) return null;
+
+  // Accept only the ISO calendar form the date input emits. `new Date()` would
+  // happily accept "not a date"-adjacent strings and silently coerce them.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return 'Invalid date of birth';
+
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return 'Invalid date of birth';
+
+  // Reject impossible days (31 April, 29 Feb in a common year) — Date rolls
+  // these forward silently, so "2026-02-30" would otherwise become 2 March.
+  const probe = new Date(Date.UTC(y, mo - 1, d));
+  if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== mo - 1 || probe.getUTCDate() !== d) {
+    return 'Invalid date of birth';
+  }
+
+  const ty = today.getFullYear();
+  const tm = today.getMonth() + 1;
+  const td = today.getDate();
+  if (y > ty || (y === ty && (mo > tm || (mo === tm && d > td)))) {
+    return 'Date of birth cannot be in the future';
+  }
+
+  // A DOB older than the oldest verified human is a typo, not a centenarian.
+  if (ty - y > 150) return 'Invalid date of birth';
+
+  return null;
 }
 
 /**

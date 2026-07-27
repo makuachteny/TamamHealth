@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useToast } from '@/components/Toast';
@@ -107,7 +107,7 @@ const emptyCensus = (date: string): CensusData => ({
 
 export default function DataEntryDashboard() {
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { hospitals } = useHospitals();
   const { showToast } = useToast();
   const { t } = useTranslation();

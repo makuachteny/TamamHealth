@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { MedicalRecordDoc } from '@/lib/db-types';
 import { Lock, Edit3, Plus, CheckCircle2, Clock, X } from '@/components/icons/lucide';
 import { formatDateTime } from '@/lib/format-utils';
@@ -18,7 +18,7 @@ function statusOf(rec: MedicalRecordDoc): 'draft' | 'awaiting_cosign' | 'signed'
  * signed note can only be corrected via an append-only addendum.
  */
 export default function RecordSignatureBar({ record }: { record: MedicalRecordDoc }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<null | 'sign' | 'cosign'>(null);

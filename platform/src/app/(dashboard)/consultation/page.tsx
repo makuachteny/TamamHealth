@@ -37,7 +37,7 @@ import { useOrderSets } from '@/lib/hooks/useOrderSets';
 import { checkInteractions, checkAllergies, checkAllergiesStructured, findDuplicateMedications } from '@/lib/services/drug-interaction-service';
 import Modal from '@/components/Modal';
 import PopupSelect from '@/components/PopupSelect';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
 import type { SuperbillPreview } from '@/lib/services/superbill-service';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -258,7 +258,7 @@ export default function ConsultationPage() {
   // PouchDB hooks
   const { patients } = usePatients();
   const { hospitals } = useHospitals();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { canConsult } = usePermissions();
   const { triages } = useTriage();
 

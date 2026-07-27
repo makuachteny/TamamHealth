@@ -3,7 +3,7 @@ import type { PatientDoc, HospitalDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
-import { validatePatientData, ValidationError } from '../validation';
+import { validatePatientData, ValidationError, normalizeGender } from '../validation';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
@@ -33,6 +33,13 @@ function normalizePatientContact<T extends Record<string, unknown>>(data: T): T 
   }
   if (out.email) out.email = normalizeEmail(out.email);
   if (out.nationalId) out.nationalId = normalizeNationalId(out.nationalId);
+  // Canonical casing so storage never accumulates a second spelling of the
+  // same value (KAN-17). Left untouched when unrecognised so validation can
+  // report it rather than this silently dropping the field.
+  if (out.gender !== undefined) {
+    const g = normalizeGender(out.gender);
+    if (g) out.gender = g;
+  }
   return out as T;
 }
 
@@ -335,8 +342,11 @@ async function checkDuplicates(data: Record<string, unknown>, scope?: DataScope)
         p.dateOfBirth === dob) {
       return `A patient named "${p.firstName} ${p.surname}" with the same date of birth already exists (${p.hospitalNumber})`;
     }
-    // Match by phone
-    if (phone && phone.length >= 7 && p.phone === phone) {
+    // Match by phone. Compared on digits only so "0912 345 678" and
+    // "+211912345678" are recognised as the same number rather than as two
+    // patients — sharing a household phone is normal here, but the same string
+    // typed two ways is not a different person.
+    if (phone && digitsOf(phone).length >= MIN_PHONE_DIGITS && digitsOf(p.phone) === digitsOf(phone)) {
       return `A patient with phone number ${phone} already exists (${p.firstName} ${p.surname}, ${p.hospitalNumber})`;
     }
     // Match by geocode ID
@@ -344,11 +354,101 @@ async function checkDuplicates(data: Record<string, unknown>, scope?: DataScope)
       return `A patient with Geocode ID ${geocodeId} already exists (${p.firstName} ${p.surname})`;
     }
     // Match by national ID
-    if (nationalId && nationalId.length >= 3 && p.nationalId === nationalId) {
+    if (nationalId && nationalId.trim().length >= MIN_NATIONAL_ID_LENGTH && p.nationalId === nationalId) {
       return `A patient with National ID ${nationalId} already exists (${p.firstName} ${p.surname})`;
     }
   }
   return null;
+}
+
+/**
+ * Minimum length before a national ID is treated as identifying (KAN-15).
+ *
+ * The old threshold was 3 characters, which is not an identifier — it is a
+ * fragment. Two unrelated patients whose partially-recorded IDs both read "123"
+ * would block each other's registration, and a clerk faced with "this patient
+ * already exists" for someone standing in front of them will work around the
+ * system. A wrong duplicate-block is worse than a missed one here, because the
+ * missed one is recoverable by a later MPI merge and the wrong one loses the
+ * registration entirely.
+ */
+const MIN_NATIONAL_ID_LENGTH = 6;
+
+/** Minimum digits before a phone number is treated as identifying. */
+const MIN_PHONE_DIGITS = 9;
+
+/** Digits only, so formatting differences don't read as different numbers. */
+function digitsOf(value: string | undefined): string {
+  return (value || '').replace(/\D/g, '');
+}
+
+/**
+ * Atomically claim a strong identifier before writing the patient (KAN-15).
+ *
+ * `checkDuplicates` reads, then `createPatient` writes. Between those two steps
+ * nothing holds the identifier, so two concurrent registrations of the same
+ * person both pass the check and both insert — the classic TOCTOU race. A
+ * duplicated patient record is not a cosmetic problem in an EMR: the two charts
+ * accumulate different allergies, medications and results, and a clinician
+ * reads whichever one they opened.
+ *
+ * PouchDB has no unique secondary index, so the claim is expressed the way
+ * CouchDB does it — as a document whose `_id` IS the identifier. A second
+ * concurrent writer gets a 409 conflict from the database itself rather than
+ * from a check it can race.
+ *
+ * `_local/` deliberately, for the same reason as the hospital-number counter:
+ * these documents do not replicate. That means:
+ *   - The race THIS ticket describes (concurrent writes against one node) is
+ *     genuinely closed.
+ *   - Two *different facilities* registering the same person offline still
+ *     produce two records. That is cross-facility de-duplication, which is
+ *     `mpi-service`'s job and needs a human merge decision — not something to
+ *     silently resolve at write time.
+ *   - Nothing leaks into the analytics projection: a replicating claim doc in
+ *     the patients database would reach `/api/sync` and be mapped as if it
+ *     were a patient.
+ *
+ * Returns true when the claim is ours, false when someone already holds it.
+ */
+async function claimIdentifier(kind: 'geocode' | 'national', value: string): Promise<boolean> {
+  const db = patientsDB();
+  const claimId = `_local/patient_uid_${kind}_${value.trim().toLowerCase()}`;
+  try {
+    await db.get(claimId);
+    return false; // Already claimed.
+  } catch (err) {
+    const e = err as { name?: string; status?: number } | undefined;
+    if (e && (e.name === 'not_found' || e.status === 404)) {
+      try {
+        await db.put({ _id: claimId, claimedAt: new Date().toISOString() } as never);
+        return true;
+      } catch (putErr) {
+        const pe = putErr as { name?: string; status?: number } | undefined;
+        // Lost the race to a concurrent writer — exactly the case this exists for.
+        if (pe && (pe.name === 'conflict' || pe.status === 409)) return false;
+        throw putErr;
+      }
+    }
+    throw err;
+  }
+}
+
+/**
+ * Hand an identifier claim back, so a failed registration doesn't permanently
+ * lock a patient out of their own geocode/national ID. Best-effort: a leaked
+ * claim blocks one identifier, which a later merge can clear, whereas throwing
+ * here would mask the real registration error.
+ */
+async function releaseIdentifier(kind: 'geocode' | 'national', value: string): Promise<void> {
+  const db = patientsDB();
+  const claimId = `_local/patient_uid_${kind}_${value.trim().toLowerCase()}`;
+  try {
+    const existing = await db.get(claimId) as { _id: string; _rev: string };
+    await db.remove(existing);
+  } catch {
+    /* already gone, or unreachable — nothing useful to do */
+  }
 }
 
 export async function createPatient(rawData: Omit<PatientDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>): Promise<PatientDoc> {
@@ -372,6 +472,30 @@ export async function createPatient(rawData: Omit<PatientDoc, '_id' | '_rev' | '
   const countryId = data.countryId || await inferCountryIdFromHospital(data.registrationHospital);
   const geocodeId = data.geocodeId
     || await assignGeocodeId(data as unknown as Record<string, unknown>);
+
+  // Close the TOCTOU window between checkDuplicates() above and db.put() below
+  // (KAN-15). Claims are taken here, immediately before the write, so a
+  // concurrent registration of the same person loses at the database rather
+  // than passing a check it raced.
+  const heldClaims: Array<{ kind: 'geocode' | 'national'; value: string }> = [];
+  const releaseClaims = async () => {
+    for (const c of heldClaims) await releaseIdentifier(c.kind, c.value);
+  };
+  if (geocodeId) {
+    if (!(await claimIdentifier('geocode', geocodeId))) {
+      throw new ValidationError({ duplicate: `A patient with Geocode ID ${geocodeId} is already registered.` });
+    }
+    heldClaims.push({ kind: 'geocode', value: geocodeId });
+  }
+  const nationalIdValue = (data.nationalId || '').trim();
+  if (nationalIdValue.length >= MIN_NATIONAL_ID_LENGTH) {
+    if (!(await claimIdentifier('national', nationalIdValue))) {
+      await releaseClaims();
+      throw new ValidationError({ duplicate: `A patient with National ID ${nationalIdValue} is already registered.` });
+    }
+    heldClaims.push({ kind: 'national', value: nationalIdValue });
+  }
+
   const doc: PatientDoc = withPendingOfflineSync({
     _id: id,
     type: 'patient',
@@ -384,7 +508,16 @@ export async function createPatient(rawData: Omit<PatientDoc, '_id' | '_rev' | '
     createdAt: now,
     updatedAt: now,
   } as PatientDoc, now);
-  const resp = await db.put(doc);
+  let resp;
+  try {
+    resp = await db.put(doc);
+  } catch (err) {
+    // The claims exist to protect this write. If it fails, hand them back —
+    // otherwise a transient error would permanently block the patient from
+    // ever being registered with their own identifiers.
+    await releaseClaims();
+    throw err;
+  }
   doc._rev = resp.rev;
   await logAuditSafe('CREATE_PATIENT', undefined, undefined, `Created patient ${doc._id}: ${data.firstName} ${data.surname} (${hospitalNumber})`);
   emitSyncEvent({

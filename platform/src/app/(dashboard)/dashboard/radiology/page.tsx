@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import DemoModeBanner from '@/components/DemoModeBanner';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
@@ -54,7 +54,7 @@ const SAMPLE_STUDIES = [
 
 export default function RadiologyDashboard() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { results: labResults, update: updateLabResult } = useLabResults();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   // Which stat panel (header toggles) currently occupies the center instead

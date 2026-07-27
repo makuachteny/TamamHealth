@@ -7,10 +7,13 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
 import DataTile from '@/components/DataTile';
-import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import EhrListHeader, { EhrListFilters, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import {
-  CreditCard, Edit3, Check, X,
+  Edit3, Check, X,
 } from '@/components/icons/lucide';
+
+// Shared control styling inside the header's Filters popover.
+const filterFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
 
 export default function AdminBillingPage() {
   const router = useRouter();
@@ -21,6 +24,12 @@ export default function AdminBillingPage() {
   // Text search comes from the shared global search state, surfaced via this
   // page's own list header search box (the TopBar strip is gone).
   const search = globalSearch;
+  // Plan / status filters live in the list header's Filters popover. These
+  // replace the old "Active Subscriptions by Plan" card — a static breakdown
+  // you could read but not act on. As filters the same numbers are still
+  // visible (see the option counts below) and clicking one narrows the table.
+  const [planFilter, setPlanFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPlan, setEditPlan] = useState<'basic' | 'professional' | 'enterprise'>('basic');
   const [editStatus, setEditStatus] = useState<'trial' | 'active' | 'suspended' | 'cancelled'>('trial');
@@ -37,8 +46,21 @@ export default function AdminBillingPage() {
 
   const filteredOrgs = useMemo(() => {
     const q = search.toLowerCase();
-    return organizations.filter(o => !q || o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q));
-  }, [organizations, search]);
+    return organizations.filter(o => {
+      if (q && !o.name.toLowerCase().includes(q) && !o.slug.toLowerCase().includes(q)) return false;
+      if (planFilter && o.subscriptionPlan !== planFilter) return false;
+      if (statusFilter && o.subscriptionStatus !== statusFilter) return false;
+      return true;
+    });
+  }, [organizations, search, planFilter, statusFilter]);
+
+  /** Per-plan counts for the filter option labels — the numbers the deleted
+   *  breakdown card used to show, kept visible at the point of use. */
+  const planCounts = useMemo(() => ({
+    basic: organizations.filter(o => o.subscriptionPlan === 'basic').length,
+    professional: organizations.filter(o => o.subscriptionPlan === 'professional').length,
+    enterprise: organizations.filter(o => o.subscriptionPlan === 'enterprise').length,
+  }), [organizations]);
 
   if (!currentUser || currentUser.role !== 'super_admin') return null;
 
@@ -71,13 +93,6 @@ export default function AdminBillingPage() {
     }
   };
 
-  // Summary stats
-  const planRevenue: Record<string, { count: number; color: string }> = {
-    enterprise: { count: organizations.filter(o => o.subscriptionPlan === 'enterprise' && o.subscriptionStatus === 'active').length, color: 'var(--accent-primary)' },
-    professional: { count: organizations.filter(o => o.subscriptionPlan === 'professional' && o.subscriptionStatus === 'active').length, color: '#2191D0' },
-    basic: { count: organizations.filter(o => o.subscriptionPlan === 'basic' && o.subscriptionStatus === 'active').length, color: '#6B7280' },
-  };
-
   const totalActive = organizations.filter(o => o.subscriptionStatus === 'active').length;
   const totalTrial = organizations.filter(o => o.subscriptionStatus === 'trial').length;
   const totalSuspended = organizations.filter(o => o.subscriptionStatus === 'suspended').length;
@@ -106,25 +121,6 @@ export default function AdminBillingPage() {
           <DataTile label={t('adminBilling.kpiTotalLicensedUsers')} value={totalMaxUsers} />
         </div>
 
-        {/* Plan Breakdown */}
-        <div className="dash-card overflow-hidden mb-4">
-          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <CreditCard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('adminBilling.activeSubscriptionsByPlan')}</h3>
-          </div>
-          <div className="p-4 flex flex-col sm:flex-row gap-3">
-            {Object.entries(planRevenue).map(([plan, info]) => (
-              <div key={plan} className="flex items-center gap-3 px-4 py-3 rounded-xl flex-1" style={{ background: `${info.color}08`, border: `1px solid ${info.color}20` }}>
-                <div className="w-3 h-3 rounded-full" style={{ background: info.color }} />
-                <div>
-                  <p className="text-xs font-medium capitalize" style={{ color: 'var(--text-secondary)' }}>{plan}</p>
-                  <p className="text-xl font-bold" style={{ color: info.color }}>{info.count}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <EhrListHeader
@@ -135,6 +131,32 @@ export default function AdminBillingPage() {
               { label: t('adminBilling.statusSuspended'), value: totalSuspended, color: LIST_STAT_COLORS.muted },
             ]}
             search={{ value: search, onChange: setGlobalSearch, placeholder: t('adminBilling.searchPlaceholder') }}
+            actions={
+              <EhrListFilters
+                activeCount={(planFilter ? 1 : 0) + (statusFilter ? 1 : 0)}
+                onClear={() => { setPlanFilter(''); setStatusFilter(''); }}
+                panelWidth={260}
+              >
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('adminBilling.colPlan')}</span>
+                  <select value={planFilter} onChange={e => setPlanFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
+                    <option value="">{t('adminBilling.planAll')}</option>
+                    <option value="enterprise">{t('adminBilling.planEnterprise')} ({planCounts.enterprise})</option>
+                    <option value="professional">{t('adminBilling.planProfessional')} ({planCounts.professional})</option>
+                    <option value="basic">{t('adminBilling.planBasic')} ({planCounts.basic})</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('adminBilling.colStatus')}</span>
+                  <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
+                    <option value="">{t('adminBilling.statusAll')}</option>
+                    <option value="active">{t('adminBilling.statusActive')} ({totalActive})</option>
+                    <option value="trial">{t('adminBilling.statusTrial')} ({totalTrial})</option>
+                    <option value="suspended">{t('adminBilling.statusSuspended')} ({totalSuspended})</option>
+                  </select>
+                </label>
+              </EhrListFilters>
+            }
           />
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <table className="w-full" style={{ minWidth: 720 }}>

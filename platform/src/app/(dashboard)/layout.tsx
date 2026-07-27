@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import EhrTopRail from '@/components/ehr/EhrTopRail';
 import RoleGuard from '@/components/RoleGuard';
 import { SettingsProvider } from '@/lib/settings/SettingsProvider';
@@ -23,7 +23,7 @@ import MobileAppShell from '@/components/mobile/MobileAppShell';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, currentUser, dbReady, logout } = useApp();
+  const { isAuthenticated, currentUser, dbReady, logout } = useAuth();
   const orgTimeout = currentUser?.organization?.lockTimeoutMinutes;
   const { isLocked, hasPin, unlock, verifyPin, setPin } = useAutoLock(isAuthenticated, orgTimeout);
   const isMobile = useIsMobileViewport();

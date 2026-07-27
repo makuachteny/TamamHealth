@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import type { CareAlertCategory } from '@/data/mock';
 import { AlertTriangle, Plus, X } from '@/components/icons/lucide';
@@ -14,7 +14,7 @@ import CareAlertFields, { CARE_ALERT_CATEGORY_LABELS } from '@/components/patien
  * (alerts are retained, never hard-deleted).
  */
 export default function CareAlertsBanner({ patient, hideAddButton = false }: { patient: PatientDoc; hideAddButton?: boolean }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);

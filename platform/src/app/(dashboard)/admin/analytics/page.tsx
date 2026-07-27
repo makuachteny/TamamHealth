@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import {
@@ -25,7 +25,7 @@ interface OrgDataPoint {
 export default function AdminAnalyticsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { organizations, loading: orgsLoading, getStats } = useOrganizations();
 
   const [orgData, setOrgData] = useState<OrgDataPoint[]>([]);

@@ -15,7 +15,7 @@ import CodedSearchField from '@/components/CodedSearchField';
 import Modal from '@/components/Modal';
 import { X } from '@/components/icons/lucide';
 import { useToast } from '@/components/Toast';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useProblems } from '@/lib/hooks/useProblems';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
 import { formatDate } from '@/lib/format-utils';
@@ -40,7 +40,7 @@ interface ConditionsSectionProps {
 }
 
 export default function ConditionsSection({ patientId, patientName, autoOpenAdd, onAutoOpenHandled }: ConditionsSectionProps) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { problems, create } = useProblems(patientId);
   const [show, setShow] = useState<ShowFilter>('active');

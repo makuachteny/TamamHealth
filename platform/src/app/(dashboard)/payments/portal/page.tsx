@@ -7,7 +7,7 @@ import {
   Shield, Receipt,
   ArrowRight, Wallet, Copy, Check, Loader2, AlertCircle
 } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { BillingDoc } from '@/lib/db-types-billing';
 import type { PaymentMethodType, PaymentStatus } from '@/lib/db-types-payments';
@@ -122,7 +122,7 @@ const buildPaymentMethods = (bankDetails?: string): PaymentMethodDef[] => [
 
 export default function PatientPortalPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [selectedBill, setSelectedBill] = useState<PortalBill | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');

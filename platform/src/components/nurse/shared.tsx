@@ -2,7 +2,7 @@
 // Not a component itself — consumers ('use client') import from here.
 
 import { useEffect, useMemo, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth, useUi } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -195,7 +195,7 @@ function scheduledForISO(day: string, time: string): string {
 // ============================================================
 export function useMarEntries() {
   const { prescriptions, administer, voidAdministration } = usePrescriptions();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { t } = useTranslation();
   const [marEntries, setMarEntries] = useState<MAREntry[]>([]);
@@ -364,7 +364,7 @@ export function useWardRoster(opts?: { search?: string; sortByUrgency?: boolean 
 
   const { patients, reload } = usePatients();
   const { triages: triageHistory } = useTriage();
-  const { globalSearch } = useApp();
+  const { globalSearch } = useUi();
 
   // Map patient IDs to their most recent triage for sorting and display
   const patientTriageMap = useMemo(() => {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   BedDouble, ArrowRightLeft, Plus, Printer,
@@ -41,7 +41,7 @@ function rowTime(iso?: string): string | undefined {
 
 export default function NurseDashboard() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const router = useRouter();
   const { patients } = usePatients();
   const { triages } = useTriage();

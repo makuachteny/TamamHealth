@@ -154,9 +154,69 @@ export async function updateLabResult(id: string, data: Partial<LabResultDoc>): 
       orgId: plaintextUpdated.orgId,
       hospitalId: plaintextUpdated.hospitalId,
     });
+    // A critical value that has just come back must reach the ordering
+    // clinician actively, not wait to be noticed (KAN-75). Fires only on the
+    // transition INTO a critical resulted state, so re-saving the same result
+    // does not raise a second task.
+    // `status` is the coarse field ('pending' | 'in_progress' | 'completed');
+    // `effectiveOrderStatus` resolves the granular lifecycle stage where
+    // 'resulted' actually lives.
+    const wasCriticalResult =
+      existing.critical === true && effectiveOrderStatus(existing) === 'resulted';
+    const becameCriticalResult =
+      plaintextUpdated.critical === true &&
+      effectiveOrderStatus(plaintextUpdated) === 'resulted' &&
+      !wasCriticalResult;
+    if (becameCriticalResult) {
+      await raiseCriticalResultTask(plaintextUpdated);
+    }
     return plaintextUpdated;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Put a high-priority task in the ordering clinician's queue for a critical
+ * result (KAN-75 / LOW-03).
+ *
+ * `RESULT_REVIEW_SLA.criticalHours` (24h) previously had no enforcement path at
+ * all — nothing read it, so a critical result could sit at `resulted`
+ * indefinitely. The dashboard panel covers results that have ALREADY breached;
+ * this is the push at the moment the value arrives, which is the point at which
+ * acting on it still matters.
+ *
+ * Due-dated at the critical SLA so it sorts to the top of the task list and the
+ * clinician can see the deadline they are working against.
+ *
+ * Best-effort: the result is already durably written, and failing the save
+ * because a notification could not be created would be a worse outcome than a
+ * missing task.
+ */
+async function raiseCriticalResultTask(result: LabResultDoc): Promise<void> {
+  try {
+    if (!result.orderedBy) return; // No one to notify — the panel still catches it.
+    const { createTask } = await import('./clinician-task-service');
+    const sla = getResultReviewSLA();
+    await createTask({
+      // LabResultDoc.orderedBy is a free-text clinician NAME, not an id — the
+      // same join the dashboard uses. Passing it as userId keeps this
+      // consistent with how tasks are already matched to a clinician here.
+      userId: result.orderedBy,
+      userName: result.orderedBy,
+      title: `Critical result: ${result.testName}`,
+      description:
+        `${result.patientName} — ${result.testName}: ${result.result || 'see result'}${result.unit ? ' ' + result.unit : ''}. ` +
+        `Review within ${sla.criticalHours}h.`,
+      dueDate: new Date(Date.now() + sla.criticalHours * 3_600_000).toISOString(),
+      priority: 'high',
+      patientId: result.patientId,
+      patientName: result.patientName,
+      hospitalId: result.hospitalId,
+      orgId: result.orgId,
+    });
+  } catch (err) {
+    console.warn('[lab] could not raise critical-result task (result was saved):', err);
   }
 }
 

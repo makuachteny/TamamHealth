@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useToast } from '@/components/Toast';
 import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
@@ -90,7 +90,7 @@ export default function PatientCheckInForm({
   onRegisterPatient?: () => void;
 }) {
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { patients } = usePatients();
   const { showToast } = useToast();
 

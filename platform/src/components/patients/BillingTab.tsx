@@ -14,7 +14,7 @@ import Modal from '@/components/Modal';
 import { getMethodConfig } from '@/lib/payment-method-config';
 import { apiFetch } from '@/lib/api-fetch';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { formatMoney } from '@/lib/format-utils';
 import type { PatientDoc } from '@/lib/db-types';
@@ -196,7 +196,7 @@ export default function BillingTab({
   setShowPaymentPanel, setShowPlanWizard, reloadPayments,
 }: BillingTabProps) {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const [data, setData] = useState<FinancialOverview | null>(null);
   const [loading, setLoading] = useState(true);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { SaPage, SaCard, SaStatusDot } from '@/components/admin/sa-ui';
@@ -19,7 +19,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export default function AdminConfigPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { config, loading, update } = usePlatformConfig();
 

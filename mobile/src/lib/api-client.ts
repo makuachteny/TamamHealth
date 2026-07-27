@@ -98,6 +98,79 @@ export async function clearSession(): Promise<void> {
   }
 }
 
+/**
+ * Renew the session when the token is within this many seconds of expiring
+ * (KAN-68). 30 minutes is wide enough that a patient on an intermittent 2G
+ * window still gets a live token on the next request they manage to make,
+ * rather than waiting for a 401 that only arrives once they are already
+ * locked out mid-read.
+ */
+const REFRESH_THRESHOLD_SECONDS = 30 * 60;
+
+/** Read a JWT's `exp` without verifying it — the server is the authority. */
+function readTokenExpirySeconds(token: string): number | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const payload = JSON.parse(
+      decodeURIComponent(
+        atob(padded)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(''),
+      ),
+    ) as { exp?: number };
+    return typeof payload.exp === 'number' ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * In-flight renewal, shared across concurrent callers. Without this, a screen
+ * firing five requests at once on wake would start five refreshes and four of
+ * them would race to overwrite the token.
+ */
+let refreshInFlight: Promise<void> | null = null;
+
+/**
+ * Renew the token if it is close to expiring. Silent and best-effort: on any
+ * failure the original token is left in place and the request proceeds. If it
+ * really has expired the normal 401 path still handles it, so a failed refresh
+ * degrades to exactly the old behaviour rather than logging the user out early.
+ */
+async function maybeRefreshToken(): Promise<void> {
+  if (!cachedToken) return;
+  const exp = readTokenExpirySeconds(cachedToken);
+  if (exp === null) return;
+  const secondsLeft = exp - Math.floor(Date.now() / 1000);
+  if (secondsLeft > REFRESH_THRESHOLD_SECONDS) return;
+  // Already expired — renewal is rejected server-side; let the 401 path run.
+  if (secondsLeft <= 0) return;
+
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/patient-portal/refresh`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cachedToken}` },
+      });
+      if (!response.ok) return; // includes session-max-age; 401 path handles it
+      const data = (await response.json()) as { token?: string };
+      if (data.token) await setAuthToken(data.token);
+    } catch {
+      // Offline or unreachable — keep the existing token.
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
 export type ApiFetchOptions = RequestInit & {
   /** Skip attaching the Authorization header even if a token is present. */
   skipAuth?: boolean;
@@ -118,6 +191,13 @@ export async function apiFetch(
   init: ApiFetchOptions = {}
 ): Promise<Response> {
   const { skipAuth, skipUnauthorizedHandler, headers, ...rest } = init;
+
+  // Renew BEFORE attaching the header, so this request carries the fresh
+  // token rather than the one that was about to expire (KAN-68). Skipped for
+  // unauthenticated calls (login) and for the refresh call itself.
+  if (!skipAuth) {
+    await maybeRefreshToken();
+  }
 
   const finalHeaders = new Headers(headers);
   if (!skipAuth && cachedToken) {

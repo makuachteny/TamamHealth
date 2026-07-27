@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -25,7 +25,7 @@ const planTone = (plan: OrganizationDoc['subscriptionPlan']) =>
   plan === 'enterprise' ? 'info' as const : plan === 'professional' ? 'ok' as const : 'muted' as const;
 
 export default function AdminFlagsPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { config, loading: configLoading, update: updateConfig } = usePlatformConfig();
   const { organizations, loading: orgsLoading, update: updateOrg } = useOrganizations();

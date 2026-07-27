@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import type { DirectiveType } from '@/data/mock';
 import { ShieldCheck, Plus, Edit3, Trash2, X } from '@/components/icons/lucide';
@@ -21,7 +21,7 @@ const TYPE_OPTIONS = Object.keys(TYPE_LABELS) as DirectiveType[];
 const EMPTY_FORM = { type: 'informed_consent' as DirectiveType, description: '', startDate: '' };
 
 export default function DirectiveList({ patient, hideAddButton = false }: { patient: PatientDoc; hideAddButton?: boolean }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);

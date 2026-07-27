@@ -6,7 +6,7 @@
  * into. Opened from the TopBar quick-actions menu.
  */
 import { useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { AvailabilityModality } from '@/lib/db-types';
 import { Calendar, Clock, X, Loader2, Check, AlertCircle } from '@/components/icons/lucide';
 
@@ -25,7 +25,7 @@ function nowTimePlus(hours: number): string {
 }
 
 export default function AvailabilityModal({ onClose, onCreated }: { onClose: () => void; onCreated?: () => void }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
 
   const [date, setDate] = useState(today);

@@ -20,7 +20,7 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Pill, CheckCircle2, X, AlertTriangle, ShieldAlert, Printer, BedDouble,
 } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useWards } from '@/lib/hooks/useWards';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
@@ -154,7 +154,7 @@ export default function MARPage() {
   const params = useParams();
   const admissionId = params?.admissionId as string;
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { activeAdmissions } = useWards();
   const { patients } = usePatients();
   const { prescriptions, administer } = usePrescriptions();

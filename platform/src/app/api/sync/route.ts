@@ -103,6 +103,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { query, upsertDocument, deleteDocument } from '@/lib/db/postgres';
+import { patientAgeInYears } from '@/lib/validation';
+
+/**
+ * Age for the national projection: derived from date of birth when present,
+ * otherwise the registration-time estimate. Whole years — the analytics tier
+ * bands by year, and sub-year precision would imply an accuracy the source
+ * data does not have. See KAN-16.
+ */
+function derivePatientAge(doc: Record<string, unknown>): number | undefined {
+  const age = patientAgeInYears(doc);
+  return age === undefined ? undefined : Math.floor(age);
+}
 
 /**
  * Constant-time comparison of two strings. Prevents timing side-channels
@@ -229,10 +241,27 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     name: [doc.firstName, doc.middleName, doc.surname].filter(Boolean).join(' ') || undefined,
     gender: doc.gender,
     date_of_birth: doc.dateOfBirth,
-    // Doc field is `estimatedAge`; there is no top-level `age`.
-    age: doc.estimatedAge,
+    // Age is DERIVED from date of birth when one exists, and only falls back to
+    // the stored `estimatedAge` when it doesn't (KAN-16). `estimatedAge` is
+    // captured once at registration and never re-computed, so projecting it
+    // straight through meant a patient registered at 4 was still reported as 4
+    // years old three years later — and under-5 mortality and immunisation
+    // coverage are both age-banded, so the drift lands directly in national
+    // indicators.
+    age: derivePatientAge(doc),
     state: doc.state,
     county: doc.county,
+    // Full geographic hierarchy (KAN-14). state → county alone stops two levels
+    // short of where an outbreak actually is; surveillance aggregates to payam
+    // and boma.
+    payam: doc.payam,
+    boma: doc.boma,
+    // South Sudan's primary patient identifier — without it national
+    // de-duplication has nothing stable to match on, and household linkage
+    // (how contact tracing works here) is lost.
+    geocode_id: doc.geocodeId,
+    national_id: doc.nationalId,
+    household_number: doc.householdNumber,
     // Doc field is `registrationHospital`; there is no `hospitalId`.
     hospital_id: doc.registrationHospital,
     org_id: doc.orgId,

@@ -8,7 +8,7 @@
  * via screening-service; the chart's live patient subscription refreshes it.
  */
 import { useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import { ClipboardList, Plus, Check, X, Clock } from '@/components/icons/lucide';
 import CodedSearchField from '@/components/CodedSearchField';
@@ -21,7 +21,7 @@ const COMMON_SCREENINGS = ['Blood pressure', 'HIV test', 'Cervical cancer (VIA)'
 const screeningOptions = COMMON_SCREENINGS.map(s => ({ code: '', name: s }));
 
 export default function ScreeningsPanel({ patient }: { patient: PatientDoc }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);

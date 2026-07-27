@@ -6,7 +6,7 @@ import { useDeaths } from '@/lib/hooks/useDeaths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { patientAge } from '@/lib/patient-utils';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -22,7 +22,7 @@ export default function DeathsPage() {
   const { deaths, register } = useDeaths();
   const { hospitals } = useHospitals();
   const { patients } = usePatients();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
   // Per-column filters (replace the old search + gender top bar).

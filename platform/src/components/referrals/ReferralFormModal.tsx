@@ -7,7 +7,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { useToast } from '@/components/Toast';
 import FileUpload from '@/components/FileUpload';
@@ -38,7 +38,7 @@ export default function ReferralFormModal({ onClose, onSent }: { onClose: () => 
   const { showToast } = useToast();
   const { hospitals } = useHospitals();
   const { patients } = usePatients();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { departments: facilityDepartments } = useSettings();
   const departments = facilityDepartments.length ? facilityDepartments : FALLBACK_DEPARTMENTS;
   const OUR_HOSPITAL_ID = currentUser?.hospitalId || '';

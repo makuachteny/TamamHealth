@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
 import { patientFullName } from '@/lib/patient-utils';
@@ -41,7 +41,7 @@ export default function HandoffWorkflow({
 }: { variant?: 'page' | 'modal'; onClose?: () => void; onSigned?: () => void }) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { wardPatients, patientTriageMap } = useWardRoster();
   const { marEntries } = useMarEntries();

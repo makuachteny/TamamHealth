@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
@@ -94,7 +94,7 @@ function formatDate(iso?: string) {
 
 export default function SuperAdminControlCenter() {
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { organizations, loading: orgsLoading, update: updateOrg } = useOrganizations();
   const { hospitals } = useHospitals();
   const { config, update: updateConfig } = usePlatformConfig();

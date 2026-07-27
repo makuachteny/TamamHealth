@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTelehealth } from '@/lib/hooks/useTelehealth';
 import { useToast } from '@/components/Toast';
 import {
@@ -41,11 +41,20 @@ export default function TelehealthVisitRoom({
   chiefComplaint?: string;
   onLeave: () => void;
 }) {
-  const { currentUser } = useApp();
-  const { create, updateStatus } = useTelehealth();
+  const { currentUser } = useAuth();
+  const { create, updateStatus, recordConsent } = useTelehealth();
   const { showToast } = useToast();
 
   const [phase, setPhase] = useState<Phase>('entering');
+  // Consent is NOT assumed. The session record previously hardcoded
+  // `patientConsentGiven: true` with a timestamp, which fabricated an
+  // affirmative consent record for a patient who was never asked — worse than
+  // recording nothing, because it looks like evidence of compliance.
+  //
+  // Until a patient-side capture exists (patient portal / mobile join), the
+  // clinician attests to verbal consent explicitly and that attestation is
+  // stored against their user id.
+  const [consentAttested, setConsentAttested] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -83,8 +92,10 @@ export default function TelehealthVisitRoom({
           chiefComplaint: chiefComplaint || 'Telehealth visit',
           followUpRequired: false,
           referralRequired: false,
-          patientConsentGiven: true,
-          consentTimestamp: now.toISOString(),
+          // Recorded as NOT consented at creation. It becomes true only when
+          // the clinician explicitly attests (see recordConsentAttestation),
+          // which also stamps the method and who attested.
+          patientConsentGiven: false,
           sessionRecorded: false,
           connectionDrops: 0,
         } as never);
@@ -174,14 +185,30 @@ export default function TelehealthVisitRoom({
   }, [sharing]);
 
   // ── Admit the patient from the waiting room ────────────────────────────────
+  // Gated on consent. The clinician must attest they have asked the patient
+  // before the visit starts; that attestation is written against their user id
+  // rather than assumed at session creation.
   const admitPatient = useCallback(async () => {
+    if (!consentAttested) {
+      showToast('Confirm the patient has consented to a telehealth visit before admitting them.', 'error');
+      return;
+    }
     setPhase('in_call');
     setMessages(prev => [...prev, { id: `sys-${Date.now()}`, from: 'patient', text: `${patientName.split(' ')[0]} joined the visit.`, at: Date.now() }]);
     if (sessionIdRef.current) {
+      try {
+        // Record the attestation before the status change, so a session can
+        // never be `in_session` without a consent record behind it.
+        await recordConsent(sessionIdRef.current, {
+          method: 'provider_attested_verbal',
+          attestedBy: currentUser?._id,
+          attestedByName: currentUser?.name || currentUser?.username,
+        });
+      } catch { /* non-fatal: surfaced by the audit trail, visit still proceeds */ }
       try { await updateStatus(sessionIdRef.current, 'in_session', { actualStartTime: new Date().toISOString() }); } catch { /* non-fatal */ }
     }
     if (!camOn) void enableCamera();
-  }, [camOn, enableCamera, patientName, updateStatus]);
+  }, [camOn, consentAttested, currentUser, enableCamera, patientName, recordConsent, showToast, updateStatus]);
 
   // ── Picture-in-Picture charting: float the call, open the note ─────────────
   const chartInPiP = useCallback(async () => {
@@ -264,9 +291,35 @@ export default function TelehealthVisitRoom({
                 {phase === 'entering' ? 'Connecting you to the visit…' : `${patientName} is waiting to be admitted.`}
               </p>
               {phase === 'waiting' && (
-                <button type="button" className="th-admit-btn" onClick={admitPatient}>
-                  <LogIn className="w-4 h-4" color="currentColor" /> Admit {patientName.split(' ')[0]}
-                </button>
+                <>
+                  {/* Consent gate. Until the patient can affirm consent themselves
+                      from the portal / mobile app, the clinician attests to it and
+                      that attestation is recorded against their user id. */}
+                  <label className="th-consent">
+                    <input
+                      type="checkbox"
+                      checked={consentAttested}
+                      onChange={e => setConsentAttested(e.target.checked)}
+                      aria-describedby="th-consent-help"
+                    />
+                    <span>
+                      I have explained this is a telehealth visit and{' '}
+                      <strong>{patientName.split(' ')[0]} has given verbal consent</strong>.
+                    </span>
+                  </label>
+                  <p id="th-consent-help" className="th-consent-help">
+                    Recorded as verbal consent attested by {currentUser?.name || currentUser?.username || 'you'}.
+                  </p>
+                  <button
+                    type="button"
+                    className="th-admit-btn"
+                    onClick={admitPatient}
+                    disabled={!consentAttested}
+                    aria-disabled={!consentAttested}
+                  >
+                    <LogIn className="w-4 h-4" color="currentColor" /> Admit {patientName.split(' ')[0]}
+                  </button>
+                </>
               )}
             </div>
           )}

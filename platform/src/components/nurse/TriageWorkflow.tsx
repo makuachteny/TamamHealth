@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useToast } from '@/components/Toast';
@@ -43,7 +43,7 @@ function triageStatusLabel(status: string): string {
 export default function TriageWorkflow({ initialPatientId }: { initialPatientId?: string }) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { patients } = usePatients();
   // Portrait per patient id — the triage card shows the same face as the
   // register, falling back to initials when a patient has no photo on file.

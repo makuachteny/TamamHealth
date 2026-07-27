@@ -7,7 +7,7 @@
 // "assigned to you" worklist on the clinician dashboard.
 
 import { useMemo, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
 import { Stethoscope, X, Check, Search } from '@/components/icons/lucide';
@@ -41,7 +41,7 @@ export default function AssignDoctorModal({
   onClose: () => void;
   onAssigned?: (doctor: { id: string; name: string }) => void;
 }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { users, loading } = useUsers();
   const { showToast } = useToast();
 

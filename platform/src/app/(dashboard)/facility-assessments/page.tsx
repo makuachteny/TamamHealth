@@ -5,7 +5,7 @@ import Modal from '@/components/Modal';
 import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { useFacilityAssessments } from '@/lib/hooks/useFacilityAssessments';
 import { useHospitals } from '@/lib/hooks/useHospitals';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -45,7 +45,7 @@ const EMPTY_FORM = {
 export default function FacilityAssessmentsPage() {
   const { assessments, summary, loading, create } = useFacilityAssessments();
   const { hospitals } = useHospitals();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { canAssessFacility } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();

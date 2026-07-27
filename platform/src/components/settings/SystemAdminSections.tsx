@@ -22,7 +22,7 @@
  */
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import PortalModal from '@/components/Modal';
 import { isPathAllowed } from '@/lib/role-routes';
@@ -119,7 +119,7 @@ function matches(query: string, ...fields: string[]): boolean {
  * that hasn't confirmed the current role even has system-admin access yet).
  */
 export function useSystemAdminConfig(enabled: boolean = true): SystemAdminConfigData {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const orgId = currentUser?.orgId || '';
 

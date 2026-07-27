@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { usePhoneNotes } from '@/lib/hooks/usePhoneNotes';
 import type { PatientDoc } from '@/lib/db-types';
@@ -22,7 +22,7 @@ const STATUS_STYLE: Record<string, { bg: string; fg: string; label: string }> = 
  * the Centricity phone note workflow.
  */
 export default function PhoneNotes({ patient }: { patient: PatientDoc }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { users } = useUsers();
   const { notes } = usePhoneNotes(patient._id);
   const [busy, setBusy] = useState(false);

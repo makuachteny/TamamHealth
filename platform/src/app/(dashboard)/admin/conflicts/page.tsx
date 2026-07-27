@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { ConflictQueueDoc } from '@/lib/db-types';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { apiFetch } from '@/lib/api-fetch';
 import { useToast } from '@/components/Toast';
 import { CONFLICT_RESOLUTION_ROLES } from '@/lib/permissions';
@@ -20,7 +20,7 @@ const RISK_STYLES: Record<ConflictQueueDoc['risk'], { bg: string; fg: string; bo
 };
 
 export default function ConflictsPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { t } = useTranslation();
   const [conflicts, setConflicts] = useState<ConflictQueueDoc[]>([]);

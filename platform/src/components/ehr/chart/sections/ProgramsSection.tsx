@@ -13,7 +13,7 @@ import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import Modal from '@/components/Modal';
 import { X } from '@/components/icons/lucide';
 import { useToast } from '@/components/Toast';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePrograms } from '@/lib/hooks/usePrograms';
 import { formatDate } from '@/lib/format-utils';
 import type { ProgramKey, ProgramEnrollmentStatus } from '@/lib/db-types';
@@ -54,7 +54,7 @@ interface ProgramsSectionProps {
 }
 
 export default function ProgramsSection({ patientId, patientName, canConsult }: ProgramsSectionProps) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { enrollments, create, setStatus } = usePrograms(patientId);
 

@@ -197,13 +197,48 @@ export default function LabPage() {
     }
     try {
       setOrderSubmitting(true);
+      const hospitalId = currentUser?.hospitalId || patient.registrationHospital;
+      const patientName = `${patient.firstName} ${patient.surname}`;
+
+      // A walk-in lab order has no consultation behind it, so nothing used to
+      // anchor it: the LabResultDoc carried no encounterId and no charge was
+      // raised. Those tests were financially and clinically invisible — no
+      // bill, no invoice line, and not attributable to a facility encounter
+      // (KAN-72). Open a minimal encounter first so both have something to
+      // hang off.
+      let deskEncounterId: string | undefined;
+      try {
+        const { createEncounter } = await import('@/lib/services/encounter-service');
+        const encounter = await createEncounter({
+          patientId: patient._id,
+          patientName,
+          hospitalNumber: patient.hospitalNumber,
+          // The patient is physically at the lab and nowhere else in the
+          // journey — `awaiting_labs` is the honest stage for that.
+          status: 'awaiting_labs',
+          startedAt: new Date().toISOString(),
+          hospitalId,
+          hospitalName: currentUser?.hospitalName,
+          orgId: currentUser?.orgId,
+          clinicianId: currentUser?._id,
+          clinicianName: currentUser?.name,
+        } as never);
+        deskEncounterId = encounter._id;
+      } catch (err) {
+        // Never block the order on this. An unbilled test still beats a
+        // clinician unable to order one.
+        console.warn('[lab] could not open a desk encounter for this order:', err);
+      }
+
       const { createLabResult } = await import('@/lib/services/lab-service');
+      const createdIds: string[] = [];
       for (const testName of orderTests) {
         const catalog = LAB_TESTS_CATALOG.find(t => t.name === testName);
-        await createLabResult({
+        const created = await createLabResult({
           patientId: patient._id,
-          patientName: `${patient.firstName} ${patient.surname}`,
+          patientName,
           hospitalNumber: patient.hospitalNumber,
+          encounterId: deskEncounterId,
           testName,
           specimen: catalog?.specimen || 'Blood',
           status: orderPriority === 'stat' ? 'in_progress' : 'pending',
@@ -211,15 +246,58 @@ export default function LabPage() {
           unit: '',
           referenceRange: '',
           abnormal: false,
-          critical: orderPriority === 'stat',
+          // `critical` describes the RESULT VALUE, not the order priority —
+          // nothing has come back yet, so it cannot be critical. It was
+          // previously set from `orderPriority === 'stat'`, which made every
+          // STAT order announce itself as a critical result once filed
+          // (and now would raise a spurious critical-result task, KAN-75).
+          // Urgency is carried by the in_progress status above.
+          critical: false,
           orderedBy: currentUser?.name || 'Lab',
           orderedAt: new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
           completedAt: '',
-          hospitalId: currentUser?.hospitalId || patient.registrationHospital,
+          hospitalId,
           hospitalName: currentUser?.hospitalName,
           orgId: currentUser?.orgId,
           clinicalNotes: orderNotes || undefined,
         });
+        createdIds.push(created._id);
+      }
+
+      // Bill the tests against that encounter. Best-effort and price-driven:
+      // lines with no catalogued price are skipped and no bill is created when
+      // the org hasn't priced anything, so this is safe before pricing is set
+      // up — same contract the consultation path uses.
+      if (deskEncounterId) {
+        try {
+          const { chargeForServices } = await import('@/lib/services/fee-schedule-service');
+          await chargeForServices(
+            {
+              patientId: patient._id,
+              patientName,
+              hospitalNumber: patient.hospitalNumber,
+              facilityId: hospitalId,
+              facilityName: currentUser?.hospitalName || '',
+              facilityLevel: 'clinic',
+              state: patient.state || '',
+              county: patient.county,
+              orgId: currentUser?.orgId,
+              encounterId: deskEncounterId,
+              generatedBy: currentUser?._id || 'system',
+              generatedByName: currentUser?.name || 'Lab desk',
+              scope: { orgId: currentUser?.orgId, hospitalId, role: currentUser?.role || 'lab_tech' },
+            },
+            orderTests.map((testName, i) => ({
+              category: 'laboratory' as const,
+              serviceCode: testName,
+              description: testName,
+              referenceId: createdIds[i],
+              referenceType: 'lab_result',
+            })),
+          );
+        } catch (err) {
+          console.warn('[lab] could not bill desk lab order (tests were ordered):', err);
+        }
       }
       const { logAudit } = await import('@/lib/services/audit-service');
       await logAudit('LAB_ORDER_CREATED', currentUser?._id, currentUser?.username,

@@ -17,7 +17,7 @@ import {
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { usePatients } from '@/lib/hooks/usePatients';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
@@ -43,7 +43,7 @@ export default function ReferralsPage() {
   const { referrals, accept, updateStatus, updateNotes, completeWithOutcome } = useReferrals();
   const { showToast } = useToast();
   const { patients } = usePatients();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [localSearch, setLocalSearch] = useState('');
   const { canManageReferrals } = usePermissions();
   const OUR_HOSPITAL_ID = currentUser?.hospitalId || '';

@@ -1,5 +1,5 @@
 import { telehealthDB } from '../db';
-import type { TelehealthSessionDoc, TelehealthStatus } from '../db-types';
+import type { AppointmentStatus, TelehealthSessionDoc, TelehealthStatus } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { findByType } from './db-query';
@@ -119,9 +119,55 @@ export async function updateSessionStatus(
       orgId: updated.orgId,
       hospitalId: updated.facilityId,
     });
+
+    // Keep the originating appointment in step. Without this a telehealth
+    // visit could run to completion while its appointment still read
+    // "scheduled" — the front desk would show the patient as never seen, and
+    // the appointment would eventually age into a false no-show.
+    await syncAppointmentToSessionStatus(updated, status);
+
     return updated;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Mirror a telehealth session's lifecycle onto its linked appointment.
+ *
+ * Only the transitions that have an unambiguous appointment meaning are
+ * mapped. `waiting_room` deliberately maps to `checked_in`: the patient has
+ * presented for their appointment but the clinician has not started, which is
+ * exactly what checked-in means at a physical front desk.
+ *
+ * Best-effort and non-fatal — the session record is the source of truth for
+ * the visit itself, and failing to update the appointment must not roll back a
+ * completed consultation.
+ */
+async function syncAppointmentToSessionStatus(
+  session: TelehealthSessionDoc,
+  status: TelehealthStatus,
+): Promise<void> {
+  if (!session.appointmentId) return;
+
+  const mapped: Partial<Record<TelehealthStatus, AppointmentStatus>> = {
+    waiting_room: 'checked_in',
+    in_session: 'in_progress',
+    completed: 'completed',
+    cancelled: 'cancelled',
+    no_show: 'no_show',
+  };
+  const next = mapped[status];
+  if (!next) return;
+
+  try {
+    const { updateAppointmentStatus } = await import('./appointment-service');
+    await updateAppointmentStatus(session.appointmentId, next);
+  } catch (err) {
+    console.warn(
+      `[telehealth] could not sync appointment ${session.appointmentId} to ${next}`,
+      err,
+    );
   }
 }
 
@@ -148,6 +194,57 @@ export async function updateSession(
   } catch {
     return null;
   }
+}
+
+/**
+ * Record that consent to the telehealth encounter was obtained, and on what basis.
+ *
+ * Consent is deliberately NOT a plain boolean setter. `patientConsentGiven`
+ * alone says a patient agreed but not who recorded it or how, which is not a
+ * defensible record — and the provider room previously set it to `true`
+ * automatically at session creation, fabricating an affirmative consent
+ * record, complete with timestamp, for a patient nobody had asked.
+ *
+ * Every consent write therefore carries its provenance:
+ *   - `patient_portal`           the patient themselves affirmed it
+ *   - `provider_attested_verbal` a named clinician is attesting they asked
+ *   - `written`                  a signed form exists on file
+ *
+ * The audit line names the attesting user, because the point of an attestation
+ * is that it is attributable to a person.
+ */
+export async function recordConsent(
+  id: string,
+  consent: {
+    method: NonNullable<TelehealthSessionDoc['consentMethod']>;
+    attestedBy?: string;
+    attestedByName?: string;
+  },
+): Promise<TelehealthSessionDoc | null> {
+  if (consent.method === 'provider_attested_verbal' && !consent.attestedBy) {
+    // Refuse rather than silently store an unattributable attestation — an
+    // attestation with no attester is exactly the record we are removing.
+    throw new Error('provider_attested_verbal consent requires attestedBy (the clinician\'s user id)');
+  }
+
+  const updated = await updateSession(id, {
+    patientConsentGiven: true,
+    consentTimestamp: new Date().toISOString(),
+    consentMethod: consent.method,
+    consentAttestedBy: consent.attestedBy,
+    consentAttestedByName: consent.attestedByName,
+  });
+
+  if (updated) {
+    await logAuditSafe(
+      'TELEHEALTH_CONSENT_RECORDED',
+      undefined,
+      consent.attestedByName,
+      `Telehealth consent recorded for session ${id} — method: ${consent.method}` +
+      (consent.attestedByName ? `, attested by ${consent.attestedByName}` : ''),
+    );
+  }
+  return updated;
 }
 
 export async function addClinicalNotes(

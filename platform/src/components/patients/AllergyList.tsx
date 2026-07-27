@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import type { AllergyEntry } from '@/data/mock';
 import { AlertTriangle, Plus, Edit3, Trash2, X } from '@/components/icons/lucide';
@@ -22,7 +22,7 @@ const CRITICALITIES: NonNullable<AllergyEntry['criticality']>[] = ['mild', 'mode
 const EMPTY_FORM = { substance: '', classification: 'drug' as AllergyEntry['classification'], criticality: 'unknown' as NonNullable<AllergyEntry['criticality']>, reaction: '', onsetDate: '' };
 
 export default function AllergyList({ patient, hideAddButton = false }: { patient: PatientDoc; hideAddButton?: boolean }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);

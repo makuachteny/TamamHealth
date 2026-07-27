@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import DemoModeBanner from '@/components/DemoModeBanner';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useNutritionScreenings } from '@/lib/hooks/useNutritionScreenings';
@@ -87,7 +87,7 @@ const matchesTab = (status: string, tab: string): boolean => {
 };
 
 export default function NutritionDashboard() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { t } = useTranslation();
   usePatients();
 

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import EhrListHeader from '@/components/ehr/EhrListHeader';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import {
   FileText, Download, Users, Activity, Pill, BedDouble, TrendingUp,
-  ChevronUp, Loader2, BarChart3, AlertTriangle
+  ChevronUp, Loader2, BarChart3, AlertTriangle, Filter
 } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EmptyState from '@/components/EmptyState';
@@ -96,6 +96,61 @@ const reports = [
   },
 ];
 
+/* ── Display-text translation lookups (keyed by stable identifiers) ──
+ * Module-scope so the search/filter memo below keeps stable deps. */
+const categoryKey: Record<string, string> = {
+  'Patient Statistics': 'reports.categoryPatientStatistics',
+  'Disease Surveillance': 'reports.categoryDiseaseSurveillance',
+  'Pharmacy & Supply Chain': 'reports.categoryPharmacySupplyChain',
+  'Hospital Operations': 'reports.categoryHospitalOperations',
+  'Financial': 'reports.categoryFinancial',
+};
+const reportNameKey: Record<string, string> = {
+  'Daily Patient Census': 'reports.nameDailyPatientCensus',
+  'Monthly OPD Summary': 'reports.nameMonthlyOpdSummary',
+  'Patient Demographics Report': 'reports.namePatientDemographics',
+  'IDSR Weekly Report': 'reports.nameIdsrWeekly',
+  'Notifiable Diseases Report': 'reports.nameNotifiableDiseases',
+  'Malaria Indicators Report': 'reports.nameMalariaIndicators',
+  'TB Treatment Outcomes': 'reports.nameTbTreatmentOutcomes',
+  'HIV/AIDS Program Report': 'reports.nameHivAidsProgram',
+  'Drug Consumption Report': 'reports.nameDrugConsumption',
+  'Stock Status Report': 'reports.nameStockStatus',
+  'Essential Medicines Availability': 'reports.nameEssentialMedicines',
+  'Bed Occupancy Report': 'reports.nameBedOccupancy',
+  'Referral Summary': 'reports.nameReferralSummary',
+  'Staff Productivity Report': 'reports.nameStaffProductivity',
+  'Revenue Report': 'reports.nameRevenue',
+  'Donor Reporting Pack': 'reports.nameDonorReporting',
+};
+const reportDescKey: Record<string, string> = {
+  'Daily Patient Census': 'reports.descDailyPatientCensus',
+  'Monthly OPD Summary': 'reports.descMonthlyOpdSummary',
+  'Patient Demographics Report': 'reports.descPatientDemographics',
+  'IDSR Weekly Report': 'reports.descIdsrWeekly',
+  'Notifiable Diseases Report': 'reports.descNotifiableDiseases',
+  'Malaria Indicators Report': 'reports.descMalariaIndicators',
+  'TB Treatment Outcomes': 'reports.descTbTreatmentOutcomes',
+  'HIV/AIDS Program Report': 'reports.descHivAidsProgram',
+  'Drug Consumption Report': 'reports.descDrugConsumption',
+  'Stock Status Report': 'reports.descStockStatus',
+  'Essential Medicines Availability': 'reports.descEssentialMedicines',
+  'Bed Occupancy Report': 'reports.descBedOccupancy',
+  'Referral Summary': 'reports.descReferralSummary',
+  'Staff Productivity Report': 'reports.descStaffProductivity',
+  'Revenue Report': 'reports.descRevenue',
+  'Donor Reporting Pack': 'reports.descDonorReporting',
+};
+const periodKey: Record<string, string> = {
+  Daily: 'reports.periodDaily',
+  Weekly: 'reports.periodWeekly',
+  Monthly: 'reports.periodMonthly',
+  Quarterly: 'reports.periodQuarterly',
+};
+
+/** Report cadences, in the order their stat dots appear in the header. */
+const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Quarterly'] as const;
+
 /* ── Component ─────────────────────────────────────────────────── */
 export default function ReportsPage() {
   const { t } = useTranslation();
@@ -149,55 +204,47 @@ export default function ReportsPage() {
   ];
   const [reportPeriod, setReportPeriod] = useState('feb2026');
 
-  /* ── Display-text translation lookups (keyed by stable identifiers) ── */
-  const categoryKey: Record<string, string> = {
-    'Patient Statistics': 'reports.categoryPatientStatistics',
-    'Disease Surveillance': 'reports.categoryDiseaseSurveillance',
-    'Pharmacy & Supply Chain': 'reports.categoryPharmacySupplyChain',
-    'Hospital Operations': 'reports.categoryHospitalOperations',
-    'Financial': 'reports.categoryFinancial',
-  };
-  const reportNameKey: Record<string, string> = {
-    'Daily Patient Census': 'reports.nameDailyPatientCensus',
-    'Monthly OPD Summary': 'reports.nameMonthlyOpdSummary',
-    'Patient Demographics Report': 'reports.namePatientDemographics',
-    'IDSR Weekly Report': 'reports.nameIdsrWeekly',
-    'Notifiable Diseases Report': 'reports.nameNotifiableDiseases',
-    'Malaria Indicators Report': 'reports.nameMalariaIndicators',
-    'TB Treatment Outcomes': 'reports.nameTbTreatmentOutcomes',
-    'HIV/AIDS Program Report': 'reports.nameHivAidsProgram',
-    'Drug Consumption Report': 'reports.nameDrugConsumption',
-    'Stock Status Report': 'reports.nameStockStatus',
-    'Essential Medicines Availability': 'reports.nameEssentialMedicines',
-    'Bed Occupancy Report': 'reports.nameBedOccupancy',
-    'Referral Summary': 'reports.nameReferralSummary',
-    'Staff Productivity Report': 'reports.nameStaffProductivity',
-    'Revenue Report': 'reports.nameRevenue',
-    'Donor Reporting Pack': 'reports.nameDonorReporting',
-  };
-  const reportDescKey: Record<string, string> = {
-    'Daily Patient Census': 'reports.descDailyPatientCensus',
-    'Monthly OPD Summary': 'reports.descMonthlyOpdSummary',
-    'Patient Demographics Report': 'reports.descPatientDemographics',
-    'IDSR Weekly Report': 'reports.descIdsrWeekly',
-    'Notifiable Diseases Report': 'reports.descNotifiableDiseases',
-    'Malaria Indicators Report': 'reports.descMalariaIndicators',
-    'TB Treatment Outcomes': 'reports.descTbTreatmentOutcomes',
-    'HIV/AIDS Program Report': 'reports.descHivAidsProgram',
-    'Drug Consumption Report': 'reports.descDrugConsumption',
-    'Stock Status Report': 'reports.descStockStatus',
-    'Essential Medicines Availability': 'reports.descEssentialMedicines',
-    'Bed Occupancy Report': 'reports.descBedOccupancy',
-    'Referral Summary': 'reports.descReferralSummary',
-    'Staff Productivity Report': 'reports.descStaffProductivity',
-    'Revenue Report': 'reports.descRevenue',
-    'Donor Reporting Pack': 'reports.descDonorReporting',
-  };
-  const periodKey: Record<string, string> = {
-    Daily: 'reports.periodDaily',
-    Weekly: 'reports.periodWeekly',
-    Monthly: 'reports.periodMonthly',
-    Quarterly: 'reports.periodQuarterly',
+  // Header search + category filter, matching the appointments list header.
+  const [reportSearch, setReportSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  /* ── Visible catalogue (category filter + search) ─────────────── */
+  const visibleSections = useMemo(() => {
+    const q = reportSearch.trim().toLowerCase();
+    return reports
+      .filter(section => categoryFilter === 'all' || section.category === categoryFilter)
+      .map(section => ({
+        ...section,
+        // Search the translated strings, so it works in the reader's language
+        // rather than only against the English identifiers.
+        items: section.items.filter(report => !q || [
+          t(reportNameKey[report.name] ?? report.name),
+          t(reportDescKey[report.name] ?? report.description),
+          t(categoryKey[section.category] ?? section.category),
+          t(periodKey[report.period] ?? report.period),
+        ].some(value => value.toLowerCase().includes(q))),
+      }))
+      .filter(section => section.items.length > 0);
+  }, [reportSearch, categoryFilter, t]);
+
+  // Stat dots: two lead counts plus the four cadences, which partition the
+  // visible reports exactly — the row always adds up to the "Reports" count.
+  const reportStats = useMemo(() => {
+    const items = visibleSections.flatMap(section => section.items);
+    return {
+      total: items.length,
+      categories: visibleSections.length,
+      byPeriod: Object.fromEntries(
+        PERIODS.map(p => [p, items.filter(i => i.period === p).length]),
+      ) as Record<(typeof PERIODS)[number], number>,
+    };
+  }, [visibleSections]);
+
+  const periodDotColor: Record<(typeof PERIODS)[number], string> = {
+    Daily: LIST_STAT_COLORS.green,
+    Weekly: LIST_STAT_COLORS.amber,
+    Monthly: LIST_STAT_COLORS.bronze,
+    Quarterly: LIST_STAT_COLORS.purple,
   };
 
   /* ── Toggle report ──────────────────────────────────────────── */
@@ -744,21 +791,68 @@ export default function ReportsPage() {
         <div className="card-elevated overflow-hidden mb-6">
           <EhrListHeader
             title={t('nav.reports')}
+            stats={[
+              { label: t('nav.reports'), value: reportStats.total, color: LIST_STAT_COLORS.muted },
+              { label: t('reports.statCategories'), value: reportStats.categories, color: LIST_STAT_COLORS.blue },
+              ...PERIODS.map(p => ({
+                label: t(periodKey[p]),
+                value: reportStats.byPeriod[p],
+                color: periodDotColor[p],
+              })),
+            ]}
+            search={{
+              value: reportSearch,
+              onChange: setReportSearch,
+              placeholder: t('reports.searchPlaceholder'),
+              ariaLabel: t('reports.searchPlaceholder'),
+            }}
             actions={
-              <FilterSelect
-                value={reportPeriod}
-                onChange={setReportPeriod}
-                options={periodOptions}
-                neutralValue="feb2026"
-                aria-label={t('reports.pageTitle')}
-              />
+              <>
+                <div
+                  className={`listpage-icon-select ${categoryFilter !== 'all' ? 'is-active' : ''}`}
+                  title={t('reports.filterByCategory')}
+                >
+                  <Filter size={16} />
+                  <select
+                    value={categoryFilter}
+                    onChange={e => setCategoryFilter(e.target.value)}
+                    aria-label={t('reports.filterByCategory')}
+                  >
+                    <option value="all">{t('reports.allCategories')}</option>
+                    {reports.map(section => (
+                      <option key={section.category} value={section.category}>
+                        {t(categoryKey[section.category] ?? section.category)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <FilterSelect
+                  value={reportPeriod}
+                  onChange={setReportPeriod}
+                  options={periodOptions}
+                  neutralValue="feb2026"
+                  aria-label={t('reports.pageTitle')}
+                />
+              </>
             }
           />
         </div>
 
         {/* ── Report categories ───────────────────────────────── */}
+        {visibleSections.length === 0 && (
+          <div className="card-elevated overflow-hidden">
+            <EmptyState
+              title={t('reports.noMatches')}
+              message={t('reports.noMatchesMessage')}
+              action={{
+                label: t('reports.clearFilters'),
+                onClick: () => { setReportSearch(''); setCategoryFilter('all'); },
+              }}
+            />
+          </div>
+        )}
         <div className="space-y-6">
-          {reports.map(section => (
+          {visibleSections.map(section => (
             <div key={section.category}>
               <div className="flex items-center gap-2 mb-3">
                 <section.icon className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />

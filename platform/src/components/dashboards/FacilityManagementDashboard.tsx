@@ -3,17 +3,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useDataScope } from '@/lib/hooks/useDataScope';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useWards } from '@/lib/hooks/useWards';
 import { useAppointments } from '@/lib/hooks/useAppointments';
-import {
-  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
-} from 'recharts';
-import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
+import dynamic from 'next/dynamic';
+import ChartCard from '@/components/ChartCard';
+
+// recharts (~80–100 KB) is deferred behind a dynamic boundary so it is fetched
+// only when these charts render (KAN-66). ssr:false because recharts measures
+// the DOM to size itself. The surrounding stat cards and totals render without
+// it, so the dashboard is useful before the chart chunk lands.
+const CashFlowDonut = dynamic(() => import('./_FacilityCharts').then(m => m.CashFlowDonut), {
+  ssr: false,
+  loading: () => <div style={{ width: '100%', height: '100%' }} />,
+});
+const WeeklyActivityChart = dynamic(() => import('./_FacilityCharts').then(m => m.WeeklyActivityChart), {
+  ssr: false,
+  loading: () => <div style={{ width: '100%', height: 208 }} />,
+});
 import {
   Stethoscope, Users, HeartPulse, BedDouble, ChevronRight,
   Eye, Pencil, Trash2, Plus,
@@ -51,7 +61,7 @@ interface BillingSummary {
 }
 
 export default function FacilityManagementDashboard() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const router = useRouter();
   const scope = useDataScope();
   const currentUserId = currentUser?._id;
@@ -297,14 +307,7 @@ export default function FacilityManagementDashboard() {
               </div>
               <div className="flex items-center gap-4 p-4">
                 <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={cashData.length ? cashData : [{ name: 'None', value: 1, color: 'var(--border-light)' }]}
-                        dataKey="value" innerRadius={44} outerRadius={60} paddingAngle={cashData.length > 1 ? 3 : 0} stroke="none">
-                        {(cashData.length ? cashData : [{ color: 'var(--border-light)' }]).map((d, i) => <Cell key={i} fill={d.color} />)}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <CashFlowDonut data={cashData} />
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{formatMoney(totalInvoice)}</span>
                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total invoice</span>
@@ -353,55 +356,7 @@ export default function FacilityManagementDashboard() {
                   { key: 'newPatients', name: 'New Patients', color: CHART_GREEN },
                   { key: 'canceled', name: 'Canceled', color: CHART_RED },
                 ];
-                const legendProps = { wrapperStyle: { fontSize: 11 }, iconType: 'circle' as const };
-                if (chartType === 'area') {
-                  return (
-                    <ResponsiveContainer width="100%" height={208}>
-                      <AreaChart data={weekly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                        <AreaGradients />
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                        <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
-                        <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} allowDecimals={false} />
-                        <Tooltip {...chartTooltipStyle} />
-                        <Legend {...legendProps} />
-                        {series.map(s => <Area key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} fill={s.color} fillOpacity={0.12} strokeWidth={2} />)}
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  );
-                }
-                if (chartType === 'line') {
-                  return (
-                    <ResponsiveContainer width="100%" height={208}>
-                      <LineChart data={weekly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                        <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
-                        <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} allowDecimals={false} />
-                        <Tooltip {...chartTooltipStyle} />
-                        <Legend {...legendProps} />
-                        {series.map(s => <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2} dot={{ r: 3 }} />)}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  );
-                }
-                // Default: one stacked column per day — total activity at a
-                // glance, composition by segment. Grouped bars read poorly at
-                // these single-digit counts.
-                return (
-                  <ResponsiveContainer width="100%" height={208}>
-                    <BarChart data={weekly} barCategoryGap="32%">
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                      <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
-                      <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} allowDecimals={false} />
-                      <Tooltip cursor={{ fill: 'var(--overlay-subtle)' }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                      <Legend {...legendProps} />
-                      {series.map((s, i) => (
-                        <Bar key={s.key} dataKey={s.key} name={s.name} stackId="day" fill={s.color}
-                          maxBarSize={28} stroke="var(--bg-card-solid)" strokeWidth={1}
-                          radius={i === series.length - 1 ? [4, 4, 0, 0] : 0} />
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
-                );
+                return <WeeklyActivityChart data={weekly} chartType={chartType} series={series} />;
               }}
             </ChartCard>
           </div>

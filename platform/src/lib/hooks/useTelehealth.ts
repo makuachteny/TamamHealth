@@ -78,7 +78,21 @@ export function useTelehealth() {
     await load();
   }, [load]);
 
-  return { sessions, loading, error, create, updateStatus, addNotes, rate, update, reload: load };
+  /** Record consent with its provenance. See recordConsent in the service. */
+  const recordConsent = useCallback(async (
+    id: string,
+    consent: {
+      method: NonNullable<TelehealthSessionDoc['consentMethod']>;
+      attestedBy?: string;
+      attestedByName?: string;
+    },
+  ) => {
+    const { recordConsent: record } = await import('../services/telehealth-service');
+    await record(id, consent);
+    await load();
+  }, [load]);
+
+  return { sessions, loading, error, create, updateStatus, addNotes, rate, update, recordConsent, reload: load };
 }
 
 export function useTelehealthStats() {

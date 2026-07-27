@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Modal from '@/components/Modal';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { Plus, Save, Search, Trash2 } from '@/components/icons/lucide';
 import EhrListHeader from '@/components/ehr/EhrListHeader';
@@ -30,7 +30,7 @@ const emptyForm = (): FeeInput & { isActive: boolean } => ({
 });
 
 export default function ServicePricingPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const [fees, setFees] = useState<FeeScheduleDoc[]>([]);
   const [loading, setLoading] = useState(true);

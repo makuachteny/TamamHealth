@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Palette, Save, Upload, X, Eye, RotateCcw, Building2, Users,
@@ -11,7 +11,7 @@ import type { OrganizationDoc } from '@/lib/db-types';
 import EhrListHeader from '@/components/ehr/EhrListHeader';
 
 export default function OrgBrandingPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { t } = useTranslation();
   const [org, setOrg] = useState<OrganizationDoc | null>(null);
   const [loading, setLoading] = useState(true);

@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { isRouteAllowed, getDefaultDashboard } from '@/lib/permissions';
 import { ShieldAlert, ArrowLeft, Loader2 } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -9,7 +9,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 export default function RoleGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { t } = useTranslation();
 
   if (!currentUser) {

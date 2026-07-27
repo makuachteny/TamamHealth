@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useCallback } from 'react';
 import { formatClockTime } from '@/lib/format-utils';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import EhrClinicalDashboard from '@/components/ehr/EhrClinicalDashboard';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useResumableEncounters } from '@/lib/hooks/useResumableEncounters';
@@ -26,7 +26,7 @@ const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { patients } = usePatients();
   // Consultations this clinician paused while waiting on lab/imaging results.
   const { encounters: resumableEncounters } = useResumableEncounters();

@@ -7,6 +7,11 @@
 let uuidCounter = 0;
 jest.mock('uuid', () => ({ v4: () => `${String(++uuidCounter).padStart(8, '0')}-tele-uuid` }));
 jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
+// telehealth-service reaches appointment-service through a dynamic import;
+// ES module exports are non-configurable so jest.spyOn cannot redefine them.
+jest.mock('@/lib/services/appointment-service', () => ({
+  updateAppointmentStatus: jest.fn().mockResolvedValue(null),
+}));
 
 import { teardownTestDBs } from '../helpers/test-db';
 import { jubaDate } from '@/lib/time-juba';
@@ -21,6 +26,7 @@ import {
   updateSession,
   addClinicalNotes,
   rateSession,
+  recordConsent,
   getTelehealthStats,
 } from '@/lib/services/telehealth-service';
 
@@ -366,5 +372,76 @@ describe('Telehealth Service', () => {
 
     const stats = await getTelehealthStats();
     expect(stats.failedTotal).toBe(1);
+  });
+
+  // ── Consent provenance ────────────────────────────────────────────────────
+  // The provider room used to write `patientConsentGiven: true` with a
+  // timestamp at session creation, fabricating an affirmative consent record
+  // for a patient nobody had asked. These lock in that consent can only be
+  // recorded deliberately, and always with its provenance.
+  describe('consent', () => {
+    test('records provider-attested consent with method and attester', async () => {
+      const created = await createSession(validSession({ patientConsentGiven: false }));
+
+      const updated = await recordConsent(created._id, {
+        method: 'provider_attested_verbal',
+        attestedBy: 'user-dr-smith',
+        attestedByName: 'Dr. Smith',
+      });
+
+      expect(updated?.patientConsentGiven).toBe(true);
+      expect(updated?.consentMethod).toBe('provider_attested_verbal');
+      expect(updated?.consentAttestedBy).toBe('user-dr-smith');
+      expect(updated?.consentAttestedByName).toBe('Dr. Smith');
+      expect(updated?.consentTimestamp).toBeTruthy();
+    });
+
+    test('refuses a provider attestation with no attester', async () => {
+      const created = await createSession(validSession({ patientConsentGiven: false }));
+
+      // An attestation nobody is accountable for is the exact record we removed.
+      await expect(
+        recordConsent(created._id, { method: 'provider_attested_verbal' }),
+      ).rejects.toThrow(/attestedBy/);
+    });
+
+    test('patient-portal consent needs no attester', async () => {
+      const created = await createSession(validSession({ patientConsentGiven: false }));
+
+      const updated = await recordConsent(created._id, { method: 'patient_portal' });
+
+      expect(updated?.patientConsentGiven).toBe(true);
+      expect(updated?.consentMethod).toBe('patient_portal');
+      expect(updated?.consentAttestedBy).toBeUndefined();
+    });
+  });
+
+  // ── Appointment lifecycle linkage ─────────────────────────────────────────
+  describe('appointment linkage', () => {
+    const { updateAppointmentStatus } = require('@/lib/services/appointment-service');
+
+    beforeEach(() => { (updateAppointmentStatus as jest.Mock).mockClear(); });
+
+    test('maps session status onto the linked appointment', async () => {
+      const created = await createSession(validSession({ appointmentId: 'appt-42' }));
+
+      await updateSessionStatus(created._id, 'in_session');
+      expect(updateAppointmentStatus).toHaveBeenCalledWith('appt-42', 'in_progress');
+
+      await updateSessionStatus(created._id, 'completed');
+      expect(updateAppointmentStatus).toHaveBeenCalledWith('appt-42', 'completed');
+    });
+
+    test('waiting_room maps to checked_in', async () => {
+      const created = await createSession(validSession({ appointmentId: 'appt-43' }));
+      await updateSessionStatus(created._id, 'waiting_room');
+      expect(updateAppointmentStatus).toHaveBeenCalledWith('appt-43', 'checked_in');
+    });
+
+    test('does nothing when the session has no appointment', async () => {
+      const created = await createSession(validSession());
+      await updateSessionStatus(created._id, 'in_session');
+      expect(updateAppointmentStatus).not.toHaveBeenCalled();
+    });
   });
 });

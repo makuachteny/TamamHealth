@@ -101,7 +101,7 @@ describe('patient-service', () => {
   });
 
   test('createPatient throws ValidationError for invalid gender', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const data = { ...validPatient(), gender: 'other' as any };
     await expect(createPatient(data)).rejects.toThrow(ValidationError);
   });
@@ -543,5 +543,51 @@ describe('patient-service', () => {
     const results = await searchPatients('Alice');
     expect(Array.isArray(results)).toBe(true);
     expect(results.some(p => p.firstName === 'Alice')).toBe(true);
+  });
+});
+
+/**
+ * Duplicate-registration hardening (KAN-15).
+ *
+ * `checkDuplicates` read, then `createPatient` wrote, with nothing holding the
+ * identifier in between — so two concurrent registrations of the same person
+ * both passed and both inserted. A duplicated chart is not cosmetic in an EMR:
+ * the two records accumulate different allergies and medications, and the
+ * clinician reads whichever they opened.
+ */
+describe('duplicate registration guards (KAN-15)', () => {
+  const p = (overrides: Record<string, unknown> = {}) => ({
+    firstName: 'Achol', surname: 'Deng', dateOfBirth: '1994-05-05', gender: 'Female',
+    phone: '+211912345678', state: 'Central Equatoria', county: 'Juba', tribe: 'Bari',
+    primaryLanguage: 'Juba Arabic', bloodType: 'O+', allergies: [], chronicConditions: [],
+    nokName: 'Mary', nokRelationship: 'Sister', nokPhone: '+211912000099',
+    registrationHospital: 'hosp-001', registrationDate: '2026-01-01',
+    ...overrides,
+  });
+
+  test('concurrent registrations with the same national ID: exactly one wins', async () => {
+    const results = await Promise.allSettled([
+      createPatient(p({ nationalId: 'SSD12345678', hospitalNumber: 'A1' }) as never),
+      createPatient(p({ nationalId: 'SSD12345678', hospitalNumber: 'A2', firstName: 'Achol2' }) as never),
+    ]);
+    const ok = results.filter(r => r.status === 'fulfilled');
+    expect(ok).toHaveLength(1);
+  });
+
+  test('a national ID fragment no longer blocks an unrelated patient', async () => {
+    // The old threshold was 3 characters — "123" is a fragment, not an
+    // identifier, and blocking on it loses a registration for someone standing
+    // at the desk.
+    await createPatient(p({ nationalId: '123', hospitalNumber: 'B1' }) as never);
+    await expect(
+      createPatient(p({ nationalId: '123', hospitalNumber: 'B2', firstName: 'Nyandeng', dateOfBirth: '1988-02-02', phone: '+211911111111' }) as never),
+    ).resolves.toBeTruthy();
+  });
+
+  test('the same phone written two ways is recognised as one person', async () => {
+    await createPatient(p({ phone: '+211912345678', hospitalNumber: 'C1' }) as never);
+    await expect(
+      createPatient(p({ phone: '0912345678', hospitalNumber: 'C2', firstName: 'Other', dateOfBirth: '1970-01-01' }) as never),
+    ).rejects.toThrow();
   });
 });

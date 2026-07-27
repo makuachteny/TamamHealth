@@ -12,7 +12,7 @@
  * the national dashboard (see the government dashboard's reporting gate).
  */
 import { useState, useCallback } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import RoleGuard from '@/components/RoleGuard';
 import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
@@ -43,7 +43,7 @@ export default function FacilityOverviewPage() {
 
 function FacilityOverview() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { hospitals, loading: hospitalsLoading, update } = useHospitals();
   const { births } = useBirths();
   const { deaths } = useDeaths();

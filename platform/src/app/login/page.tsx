@@ -4,7 +4,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, ChevronRight, X, WifiOff, Users, BarChart3 } from '@/components/icons/lucide';
 import { Icon } from '@/components/icons';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { resolveLandingPage } from '@/lib/user-prefs';
 import type { UserRole } from '@/lib/db-types';
 
@@ -118,7 +118,7 @@ const emailFor = (user: string) => `${user}@tamamhealth.ss`;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, currentUser, dbReady } = useApp();
+  const { login, isAuthenticated, currentUser, dbReady } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

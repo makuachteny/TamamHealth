@@ -6,7 +6,7 @@
  * areas and links to the canonical editor to avoid duplicate management UI.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import {
   ArrowUpRight, Building2, CheckCircle, CreditCard, ExternalLink, Info, Lock,
   Mail, Palette, Shield, Timer, Users, XCircle, Zap,
@@ -46,7 +46,7 @@ const sectionCopy: Record<OrganizationSettingsSection, { title: string; note: st
 
 export default function OrganizationSettingsPanel({ section, users = [], hospitals = [], onNavigate }: Props) {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const [org, setOrg] = useState<OrganizationDoc | null>(null);
   const [loading, setLoading] = useState(true);

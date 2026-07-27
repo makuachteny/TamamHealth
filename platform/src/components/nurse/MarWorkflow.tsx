@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useWards } from '@/lib/hooks/useWards';
 import { usePatients } from '@/lib/hooks/usePatients';
 import Modal from '@/components/Modal';
@@ -19,7 +19,7 @@ type AdminStatus = 'given' | 'held' | 'refused' | 'missed';
 export default function MarWorkflow({ onAdminister }: { onAdminister?: () => void }) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { marEntries, recordEntry, undoAdministration } = useMarEntries();
   const { activeAdmissions } = useWards();
   const { patients } = usePatients();

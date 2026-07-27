@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
 import { getDefaultDashboard } from '@/lib/permissions';
 import type { OnboardingSection, OnboardingStep } from '@/lib/onboarding/steps';
@@ -22,7 +22,7 @@ import {
 export default function GetStartedCard() {
   const router = useRouter();
   const pathname = usePathname();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const {
     ready, plan, completedStepIds, completedCount, totalSteps,
     allDone, finished, collapsed,

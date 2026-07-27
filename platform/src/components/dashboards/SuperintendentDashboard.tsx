@@ -15,7 +15,7 @@ import {
   ClipboardCheck, Activity, AlertTriangle, SendHorizontal,
   ChevronRight, ArrowRight,
 } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useReferrals } from '@/lib/hooks/useReferrals';
@@ -27,7 +27,7 @@ const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 export default function SuperintendentDashboard() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { users } = useUsers();
   const { referrals } = useReferrals();
   const { alerts: diseaseAlerts } = useSurveillance();

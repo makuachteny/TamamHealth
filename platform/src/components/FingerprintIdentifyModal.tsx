@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ScanLine, X, RefreshCw, ChevronRight, UserCheck } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import {
   getBridgeStatus,
   captureFingerprint,
@@ -29,7 +29,7 @@ interface FingerprintIdentifyModalProps {
 
 export default function FingerprintIdentifyModal({ onSelect, onClose }: FingerprintIdentifyModalProps) {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [status, setStatus] = useState<BridgeStatus | null>(null);
   const [phase, setPhase] = useState<'idle' | 'scanning' | 'results'>('idle');
   const [matches, setMatches] = useState<IdentifyMatch[]>([]);

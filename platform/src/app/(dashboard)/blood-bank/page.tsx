@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import { Droplets, Plus, X, Search, UserCheck, FlaskConical, Syringe, Trash2, CheckCircle2, XCircle } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import {
   getAllUnits,
@@ -54,7 +54,7 @@ const daysUntil = (date: string) =>
   Math.ceil((new Date(date).getTime() - new Date(todayStr()).getTime()) / 86400000);
 
 export default function BloodBankPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { patients } = usePatients();
   const scope = useDataScope();

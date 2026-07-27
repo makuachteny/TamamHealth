@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -22,7 +22,7 @@ const SUPPORT_ACTION_RE = /support|impersonat|emergency|break/i;
 type SectionId = 'tenants' | 'users' | 'access' | 'announcements' | 'tickets';
 
 export default function AdminSupportPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { organizations, loading: orgsLoading } = useOrganizations();
   const { hospitals, loading: hospitalsLoading } = useHospitals();

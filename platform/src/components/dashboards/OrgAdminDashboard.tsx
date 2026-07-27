@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useDataScope } from '@/lib/hooks/useDataScope';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useUsers } from '@/lib/hooks/useUsers';
@@ -88,7 +88,7 @@ function SegmentBar({ segments, height = 6 }: { segments: { value: number; color
 }
 
 export default function OrgAdminDashboard() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const router = useRouter();
   const scope = useDataScope();
 

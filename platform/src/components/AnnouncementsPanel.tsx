@@ -6,7 +6,7 @@
  * expired or dismissed) and, for authorised roles, an inline compose form.
  */
 import { useEffect, useState, useCallback } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { AnnouncementDoc, AnnouncementAudience, AnnouncementPriority } from '@/lib/db-types';
 import type { DataScope } from '@/lib/services/data-scope';
 import { Megaphone, X, Loader2, Send, Plus, Check } from '@/components/icons/lucide';
@@ -18,7 +18,7 @@ const PRIORITY_STYLE: Record<AnnouncementPriority, { color: string; bg: string; 
 };
 
 export default function AnnouncementsPanel({ onClose, onUnreadChange }: { onClose: () => void; onUnreadChange?: (n: number) => void }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [items, setItems] = useState<AnnouncementDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [composing, setComposing] = useState(false);

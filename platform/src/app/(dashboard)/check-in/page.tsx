@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useToast } from '@/components/Toast';
 import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
@@ -34,7 +34,7 @@ function patientFacilityName(patient: PatientDoc | undefined, fallback = 'Facili
 export default function CheckInPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { patients } = usePatients();
   const { showToast } = useToast();
 

@@ -7,7 +7,7 @@
  * reminders are marked sent manually (a real gateway can dispatch queued rows).
  */
 import { useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { PatientDoc, ReminderChannel } from '@/lib/db-types';
 import { usePatientReminders } from '@/lib/hooks/usePatientReminders';
 import { patientFullName } from '@/lib/patient-utils';
@@ -25,7 +25,7 @@ function todayISO(): string {
 }
 
 export default function RemindersPanel({ patient }: { patient: PatientDoc }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { reminders, queued, queue, markSent, cancel } = usePatientReminders(patient._id);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);

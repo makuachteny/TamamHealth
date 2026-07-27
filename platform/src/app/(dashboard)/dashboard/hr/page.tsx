@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Plus, Clock, Calendar, Activity, Wallet } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
@@ -33,7 +33,7 @@ function titleCase(value: string): string {
 export default function HRDashboardPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { users } = useUsers();
   const { showToast } = useToast();
   // Same approver role list as the full HR page's leave tab — who can act on

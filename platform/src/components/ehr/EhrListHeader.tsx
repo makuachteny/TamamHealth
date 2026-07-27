@@ -28,6 +28,9 @@ export const LIST_STAT_COLORS = {
   amber: '#D97706',
   green: '#15795C',
   bronze: '#B8741C',
+  // Sixth slot for headers whose stats partition into four buckets plus two
+  // lead counts (reports: total + categories + the four report cadences).
+  purple: 'var(--accent-purple)',
 } as const;
 
 export default function EhrListHeader({

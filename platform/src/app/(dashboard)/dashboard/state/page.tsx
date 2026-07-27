@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import RoleGuard from '@/components/RoleGuard';
 import { useMCHAnalytics } from '@/lib/hooks/useMCHAnalytics';
 import { useBirths } from '@/lib/hooks/useBirths';
@@ -66,7 +66,7 @@ function countByState(
 
 export default function StateDashboardPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const stateName = (currentUser as unknown as { state?: string } | null)?.state || '';
 
   const { data: mch, loading: mchLoading } = useMCHAnalytics();

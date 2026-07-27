@@ -95,6 +95,58 @@ function writeSyncPreference(wantsOnline: boolean): void {
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
+/**
+ * Sliced contexts (KAN-65 / MED-16).
+ *
+ * `AppState` bundles values that change at wildly different rates. `syncStatus`
+ * ticks while replication runs and `globalSearch` changes on every keystroke,
+ * while `currentUser` changes about twice a session. Because they shared one
+ * context, a sync tick re-rendered ALL ~119 `useApp()` consumers — including
+ * every component that only wanted to know who is logged in.
+ *
+ * The fix is subscription granularity, not more memoisation: a consumer of
+ * `AuthContext` is not subscribed to `SyncContext` and simply does not re-render
+ * when sync ticks.
+ *
+ * `useApp()` still returns the whole merged object so all existing consumers
+ * keep working unchanged — it is subscribed to everything by definition, so
+ * migrating a component to a narrow hook is what actually buys the saving.
+ */
+
+/** Identity + session. Changes on login/logout and little else. */
+interface AuthSlice {
+  isAuthenticated: boolean;
+  currentUser: AppUser | null;
+  dbReady: boolean;
+  login: AppState['login'];
+  logout: AppState['logout'];
+}
+
+/** Replication state. The high-frequency slice. */
+interface SyncSlice {
+  isOnline: boolean;
+  isNetworkUp: boolean;
+  syncPaused: boolean;
+  lastSync: string;
+  syncStatus: AggregateStatus | null;
+  syncNow: AppState['syncNow'];
+  toggleOnline: AppState['toggleOnline'];
+}
+
+/** Chrome state — sidebar and the global search box. Keystroke-frequency. */
+interface UiSlice {
+  globalSearch: string;
+  setGlobalSearch: (s: string) => void;
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+}
+
+const AuthContext = createContext<AuthSlice | undefined>(undefined);
+const SyncContext = createContext<SyncSlice | undefined>(undefined);
+const UiContext = createContext<UiSlice | undefined>(undefined);
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
@@ -641,29 +693,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // calls useApp) don't re-render on each provider render — only when one of
   // these values actually changes. setState setters and the useCallback'd
   // actions are stable, so they don't need to be in the dependency list.
-  const value = useMemo<AppState>(() => ({
-    isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
-    lastSync, dbReady,
+  const authValue = useMemo<AuthSlice>(() => ({
+    isAuthenticated, currentUser, dbReady, login, logout,
+  }), [isAuthenticated, currentUser, dbReady, login, logout]);
+
+  const syncValue = useMemo<SyncSlice>(() => ({
+    isOnline, isNetworkUp, syncPaused, lastSync, syncStatus, syncNow, toggleOnline,
+  }), [isOnline, isNetworkUp, syncPaused, lastSync, syncStatus, syncNow, toggleOnline]);
+
+  const uiValue = useMemo<UiSlice>(() => ({
     globalSearch, setGlobalSearch,
     sidebarOpen, setSidebarOpen,
     sidebarCollapsed, setSidebarCollapsed,
-    login, logout, toggleOnline,
-    syncStatus, syncNow,
-  }), [
-    isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
-    lastSync, dbReady, globalSearch, sidebarOpen, sidebarCollapsed,
-    syncStatus, login, logout, toggleOnline, syncNow,
-  ]);
+  }), [globalSearch, sidebarOpen, sidebarCollapsed]);
+
+  // The merged value keeps `useApp()` working for the ~119 existing consumers.
+  // It necessarily changes whenever ANY slice does — that is the cost narrow
+  // hooks exist to avoid, not a defect here.
+  const value = useMemo<AppState>(() => ({
+    ...authValue, ...syncValue, ...uiValue,
+  }), [authValue, syncValue, uiValue]);
 
   return (
-    <AppContext.Provider value={value}>
-      {children}
-    </AppContext.Provider>
+    <AuthContext.Provider value={authValue}>
+      <SyncContext.Provider value={syncValue}>
+        <UiContext.Provider value={uiValue}>
+          <AppContext.Provider value={value}>
+            {children}
+          </AppContext.Provider>
+        </UiContext.Provider>
+      </SyncContext.Provider>
+    </AuthContext.Provider>
   );
 }
 
 export function useApp() {
   const context = useContext(AppContext);
   if (!context) throw new Error('useApp must be used within AppProvider');
+  return context;
+}
+
+/**
+ * Identity only. Prefer this over `useApp()` in any component that just needs
+ * to know who is signed in — it will not re-render when sync ticks or the
+ * user types in the global search box.
+ */
+export function useAuth(): AuthSlice {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AppProvider');
+  return context;
+}
+
+/** Replication state only. For sync badges and offline banners. */
+export function useSync(): SyncSlice {
+  const context = useContext(SyncContext);
+  if (!context) throw new Error('useSync must be used within AppProvider');
+  return context;
+}
+
+/** Sidebar + global search only. */
+export function useUi(): UiSlice {
+  const context = useContext(UiContext);
+  if (!context) throw new Error('useUi must be used within AppProvider');
   return context;
 }

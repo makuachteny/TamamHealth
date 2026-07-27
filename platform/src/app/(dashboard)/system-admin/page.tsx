@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import ItOperationsPanel from '@/components/admin/ItOperationsPanel';
 import {
   SYSTEM_ADMIN_SECTIONS_META,
@@ -23,7 +23,7 @@ import {
 type PageSectionId = 'itops' | SystemAdminSectionId;
 
 export default function SystemAdministrationPage() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const data = useSystemAdminConfig(true);
 
   const [activeSection, setActiveSection] = useState<PageSectionId>('apps');

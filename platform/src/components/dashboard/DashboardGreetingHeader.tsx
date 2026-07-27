@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 
 /**
  * Shared greeting header for dashboards that don't use the full EhrCareDashboard
@@ -14,7 +14,7 @@ export default function DashboardGreetingHeader({
 }: {
   actions?: ReactNode;
 }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
 
   return (
     <div className="dashboard-greeting-header">

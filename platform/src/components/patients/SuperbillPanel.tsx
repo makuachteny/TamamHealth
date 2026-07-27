@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useDataScope } from '@/lib/hooks/useDataScope';
 import type { PatientDoc } from '@/lib/db-types';
 import type { FeeScheduleDoc } from '@/lib/db-types-billing';
@@ -29,7 +29,7 @@ export default function SuperbillPanel({
   encounterId?: string;
   hospitalName?: string;
 }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const scope = useDataScope();
   const [fees, setFees] = useState<FeeScheduleDoc[]>([]);
   const [lines, setLines] = useState<Line[]>([]);

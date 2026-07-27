@@ -36,7 +36,7 @@ import {
   CheckCircle, Save, Clock, MapPin, Stethoscope, Plus,
   FlaskConical, Syringe,
 } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
 import type {
@@ -81,7 +81,7 @@ export default function HospitalManagePage() {
   const { hospitalId } = useParams<{ hospitalId: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { t } = useTranslation();
   // ?tab= deep link (e.g. the facility-settings picker opens ?tab=settings).
   const requestedTab = searchParams.get('tab');

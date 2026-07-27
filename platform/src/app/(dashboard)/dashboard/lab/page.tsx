@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
@@ -205,7 +205,7 @@ interface BatchEntry {
 
 export default function LabDashboardPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { results: allResults, loading, update } = useLabResults();
   // Imaging orders (specimen 'Imaging') belong to the radiology work queue —
   // keep the lab bench focused on specimen-based investigations.

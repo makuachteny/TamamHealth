@@ -12,7 +12,7 @@ import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import Modal from '@/components/Modal';
 import { X } from '@/components/icons/lucide';
 import { useToast } from '@/components/Toast';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useProcedures } from '@/lib/hooks/useProcedures';
 import { formatDate } from '@/lib/format-utils';
 
@@ -23,7 +23,7 @@ interface ProceduresSectionProps {
 }
 
 export default function ProceduresSection({ patientId, patientName, canConsult }: ProceduresSectionProps) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { procedures, create } = useProcedures(patientId);
 

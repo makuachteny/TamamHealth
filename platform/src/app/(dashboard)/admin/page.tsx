@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { apiFetch } from '@/lib/api-fetch';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -142,7 +142,7 @@ function QueueRow({ tone, tag, title, detail, when, onClick }: {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { organizations } = useOrganizations();
   const { hospitals } = useHospitals();
   const { config } = usePlatformConfig();

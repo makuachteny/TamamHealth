@@ -8,7 +8,7 @@ import {
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import EhrListHeader, { EhrListHeaderButton, EhrListFilters } from '@/components/ehr/EhrListHeader';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -75,7 +75,7 @@ function StaffCell({ name, sub, capitalizeSub = false }: { name: string; sub?: s
 
 export default function HRPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { users } = useUsers();
   const { showToast } = useToast();
   const router = useRouter();

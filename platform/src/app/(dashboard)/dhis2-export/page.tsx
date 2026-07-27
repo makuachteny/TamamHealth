@@ -11,7 +11,7 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useANC } from '@/lib/hooks/useANC';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   getDhis2SyncLog, recordDhis2SyncResult, appendDhis2LogEntry,
@@ -50,7 +50,7 @@ export default function DHIS2ExportPage() {
   const { alerts: diseaseAlerts } = useSurveillance();
   const { stats: immStats } = useImmunizations();
   const { stats: ancStats } = useANC();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
 
   const hospitalName = currentUser?.hospital?.name || currentUser?.hospitalName || '';
 

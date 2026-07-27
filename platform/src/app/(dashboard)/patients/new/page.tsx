@@ -7,7 +7,7 @@ import FingerprintCapture, { type CapturedFingerprint } from '@/components/Finge
 import PhotoCaptureModal from '@/components/patients/PhotoCaptureModal';
 import { statesAndCounties, states, tribes, languages } from '@/data/mock';
 import { usePatients } from '@/lib/hooks/usePatients';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { enrollFingerprint } from '@/lib/services/fingerprint-service';
@@ -56,7 +56,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
   ];
   const router = useRouter();
   const { create: createPatient } = usePatients();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({

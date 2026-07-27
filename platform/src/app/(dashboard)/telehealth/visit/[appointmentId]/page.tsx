@@ -2,14 +2,14 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import TelehealthVisitRoom from '@/components/telehealth/TelehealthVisitRoom';
 
 export default function TelehealthVisitPage({ params }: { params: Promise<{ appointmentId: string }> }) {
   const { appointmentId } = use(params);
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { appointments, loading } = useAppointments();
 
   const appointment = appointments.find(a => a._id === decodeURIComponent(appointmentId));

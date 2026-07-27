@@ -3,12 +3,12 @@
 import { useMemo } from 'react';
 import { Loader2 } from '@/components/icons/lucide';
 import EmptyState from '@/components/EmptyState';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useMessages } from '@/lib/hooks/useMessages';
 import { initials, avatarTint } from '@/lib/patient-utils';
 
 export default function MobileInboxView() {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { messages, loading } = useMessages();
 
   const sorted = useMemo(

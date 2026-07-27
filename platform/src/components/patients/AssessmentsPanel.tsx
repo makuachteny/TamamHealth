@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import { useAssessments } from '@/lib/hooks/useAssessments';
 import { ASSESSMENT_INSTRUMENTS, getInstrument, scoreAssessment } from '@/lib/clinical/assessment-instruments';
@@ -23,7 +23,7 @@ const SEVERITY_COLOR: Record<string, string> = {
  * (held); the score auto-totals; the provider reviews with the patient and signs.
  */
 export default function AssessmentsPanel({ patient }: { patient: PatientDoc }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { assessments } = useAssessments(patient._id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

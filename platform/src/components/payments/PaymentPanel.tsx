@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Banknote, Smartphone, CreditCard, Building2, Shield, CheckCircle2, Loader2, Printer, Mail } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { PAYOR_LABELS, type PaymentMethodKey } from '@/lib/settings/facility-settings';
@@ -26,7 +26,7 @@ type TabType = 'cash' | 'mobile' | 'card' | 'bank' | 'insurance';
 export default function PaymentPanel({
   patientId, patientName, encounterId, amountDue, currency = 'SSP', onSuccess, onCancel
 }: PaymentPanelProps) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const { t } = useTranslation();
   const settings = useSettings();
   const [tab, setTab] = useState<TabType>('cash');

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useApp } from '@/lib/context';
+import { useAuth } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import type { DirectiveType, CareAlertCategory } from '@/data/mock';
 import { AlertTriangle, ShieldCheck, Bell, Plus, X } from '@/components/icons/lucide';
@@ -27,7 +27,7 @@ const triggerClass = 'inline-flex items-center gap-2 px-3.5 rounded-lg text-sm f
 const triggerStyle = { height: 40, background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' } as const;
 
 export default function ChartSafetyActions({ patient, iconOnly }: { patient: PatientDoc; iconOnly?: boolean }) {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const [open, setOpen] = useState<Which>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
