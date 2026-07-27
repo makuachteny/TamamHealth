@@ -295,16 +295,30 @@ export default function LoginPage() {
           <section className="tl-hero" style={{ backgroundImage: `url(${hero})` }}>
             <button type="button" onClick={backToList} aria-label="Close" className="tl-hero-close"><X size={18} /></button>
 
-            {/* What the platform actually does — replaces the old decorative
-                schedule/calendar chips, which showed invented appointments,
-                fixed dates, and stock-photo faces. */}
-            <div className="tl-promo">
-              <span className="tl-promo-eyebrow">Tamam Healthcare System</span>
-              <h2 className="tl-promo-title">One patient record, every facility &mdash; online or off.</h2>
-              <ul className="tl-promo-points">
-                <li><WifiOff size={15} /> Keeps working when the network drops, then syncs</li>
-                <li><Users size={15} /> One chart shared across your organization&rsquo;s clinics</li>
-                <li><BarChart3 size={15} /> HMIS-ready reporting, built for national programmes</li>
+            {/* Floating promo cards. Same three card shapes as the original
+                hero, but each one now carries a product claim instead of the
+                invented appointments, fixed calendar dates, and stock-photo
+                faces they used to show. */}
+            <div className="tl-chip tl-chip-task">
+              <div className="tl-chip-title"><WifiOff size={13} /> Works offline</div>
+              <div className="tl-chip-time">Syncs the moment you reconnect</div>
+            </div>
+
+            {/* Replaces the old week strip — advertising copy, not a calendar. */}
+            <div className="tl-tagline">
+              <span className="tl-tagline-eyebrow">Tamam Healthcare System</span>
+              <strong className="tl-tagline-line">One patient record,<br />every facility.</strong>
+            </div>
+
+            <div className="tl-meeting">
+              <div className="tl-meeting-top">
+                <span className="tl-meeting-title">HMIS-ready reporting</span>
+                <span className="tl-meeting-dot" />
+              </div>
+              <div className="tl-meeting-time">Built for national programmes</div>
+              <ul className="tl-meeting-points">
+                <li><Users size={13} /> One chart across every clinic</li>
+                <li><BarChart3 size={13} /> Indicators ready to submit</li>
               </ul>
             </div>
           </section>
@@ -458,12 +472,25 @@ const sharedStyles = (
     .tl-hero-close:hover { background: var(--bg-card-solid); }
     /* Value panel over the hero photo: a readable scrim rather than floating
        cards, so the copy stays legible on any background image. */
-    .tl-promo { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; padding: 92px 34px 34px; background: linear-gradient(180deg, rgba(2, 26, 45, 0) 0%, rgba(2, 26, 45, 0.55) 30%, rgba(2, 26, 45, 0.9) 62%, rgba(2, 26, 45, 0.95) 100%); color: var(--color-white); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
-    .tl-promo-eyebrow { display: block; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; opacity: 0.82; }
-    .tl-promo-title { margin: 9px 0 0; color: #fff; font-family: var(--font-platform); font-size: 25px; line-height: 1.24; font-weight: 800; letter-spacing: -0.02em; max-width: 22ch; }
-    .tl-promo-points { margin: 16px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
-    .tl-promo-points li { display: flex; color: #fff; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; opacity: 0.94; }
-    .tl-promo-points svg { flex: none; opacity: 0.9; }
+    /* Floating hero cards: accent chip (top-left), glass tagline (right),
+       white claim card (bottom-left). A scrim keeps every card legible
+       whatever the hero photograph is doing behind it. */
+    .tl-hero::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(2, 26, 45, 0.45) 0%, rgba(2, 26, 45, 0.20) 42%, rgba(2, 26, 45, 0.72) 100%); }
+    .tl-chip { position: absolute; z-index: 2; backdrop-filter: blur(6px); }
+    .tl-chip-task { top: 64px; left: 34px; background: ${ACCENT}; color: var(--color-white); border-radius: 14px; padding: 11px 15px; }
+    .tl-chip-title { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; }
+    .tl-chip-time { font-size: 11.5px; opacity: 0.92; margin-top: 3px; }
+    .tl-tagline { position: absolute; z-index: 2; right: 30px; bottom: 150px; max-width: 250px; padding: 15px 17px; border-radius: 16px; background: color-mix(in srgb, var(--color-white) 18%, transparent); border: 1px solid color-mix(in srgb, var(--color-white) 42%, transparent); backdrop-filter: blur(10px); color: var(--color-white); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+    .tl-tagline-eyebrow { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.01em; opacity: 0.88; }
+    .tl-tagline-line { display: block; margin-top: 7px; font-family: var(--font-platform); font-size: 19px; line-height: 1.25; font-weight: 800; letter-spacing: -0.01em; }
+    .tl-meeting { position: absolute; z-index: 2; left: 30px; bottom: 36px; width: 244px; padding: 15px 17px; border-radius: 18px; background: var(--bg-card-solid); }
+    .tl-meeting-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .tl-meeting-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+    .tl-meeting-dot { width: 8px; height: 8px; border-radius: 50%; background: ${ACCENT}; flex: none; }
+    .tl-meeting-time { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .tl-meeting-points { margin: 11px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+    .tl-meeting-points li { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+    .tl-meeting-points svg { flex: none; color: ${ACCENT}; }
 
     .tl-spin { width: 13px; height: 13px; border: 2px solid var(--accent-border); border-top-color: ${ACCENT}; border-radius: 50%; display: inline-block; animation: tl-rot .7s linear infinite; }
     .tl-spin-light { border-color: color-mix(in srgb, var(--color-white) 40%, transparent); border-top-color: var(--color-white); }
