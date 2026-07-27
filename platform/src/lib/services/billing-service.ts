@@ -13,6 +13,7 @@ import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { nextSequence } from './doc-counter';
 import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
 
@@ -28,9 +29,28 @@ async function generateInvoiceNumber(): Promise<string> {
   const date = new Date();
   const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
   const db = billingDB();
-  const count = (await db.allDocs()).total_rows;
-  const seq = String(count + 1).padStart(4, '0');
-  return `INV-${dateStr}-${seq}`;
+  // Per-day counter rather than `allDocs().total_rows`. The old count fell when
+  // a bill was deleted, so the next bill reissued a number already in use — two
+  // distinct bills reconciling to one reference. It was also a full scan of the
+  // billing database on every invoice. See doc-counter.ts.
+  const seq = await nextSequence(db, `invoice_${dateStr}`, () => highestInvoiceSeq(dateStr));
+  return `INV-${dateStr}-${String(seq).padStart(4, '0')}`;
+}
+
+/**
+ * Highest sequence already issued for a date, so a fresh counter starts above
+ * any number an existing dataset already used.
+ */
+async function highestInvoiceSeq(dateStr: string): Promise<number> {
+  const prefix = `INV-${dateStr}-`;
+  let highest = 0;
+  for (const bill of await getAllBills()) {
+    const num = (bill as { invoiceNumber?: string }).invoiceNumber;
+    if (typeof num !== 'string' || !num.startsWith(prefix)) continue;
+    const parsed = Number.parseInt(num.slice(prefix.length), 10);
+    if (Number.isFinite(parsed) && parsed > highest) highest = parsed;
+  }
+  return highest;
 }
 
 // ===== Bill Calculations =====

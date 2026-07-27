@@ -9,10 +9,15 @@ export async function assembleTransferPackage(
 ): Promise<TransferPackage> {
   // Get patient demographics
   const pDb = patientsDB();
-  const allPatients = await pDb.allDocs({ include_docs: true });
-  const patientDoc = allPatients.rows
-    .map(r => r.doc as PatientDoc)
-    .find(d => d && d._id === patientId);
+  // Direct fetch by _id. This previously pulled EVERY patient document into
+  // memory and then ran Array.find over them to locate one known id — an O(N)
+  // scan of the whole patient database to answer a primary-key lookup.
+  let patientDoc: PatientDoc | undefined;
+  try {
+    patientDoc = await pDb.get(patientId) as PatientDoc;
+  } catch {
+    patientDoc = undefined;
+  }
 
   if (!patientDoc) {
     throw new Error(`Patient ${patientId} not found`);

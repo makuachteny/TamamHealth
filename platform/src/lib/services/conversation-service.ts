@@ -24,10 +24,11 @@ export async function getConversationsForUser(
   scope?: DataScope,
 ): Promise<ConversationDoc[]> {
   const db = conversationsDB();
-  const result = await db.allDocs({ include_docs: true });
-  let all = result.rows
-    .map(r => r.doc as ConversationDoc)
-    .filter(d => d && d.type === 'conversation' && Array.isArray(d.participantIds) && d.participantIds.includes(userId));
+  // Indexed on type; the participant test stays in JS because Mango's
+  // $elemMatch on an array of scalars cannot use a plain index here, and the
+  // per-user conversation count is small once the type filter has run.
+  let all = (await findByType<ConversationDoc>(db, 'conversation'))
+    .filter(d => Array.isArray(d.participantIds) && d.participantIds.includes(userId));
   if (scope) all = filterByScope(all, scope);
   return all.sort((a, b) => {
     const ap = a.pinnedBy?.includes(userId) ? 1 : 0;
@@ -57,11 +58,9 @@ export async function getOrCreateDM(
   ctx: { hospitalId?: string; hospitalName?: string; orgId?: string } = {},
 ): Promise<ConversationDoc> {
   const db = conversationsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const existing = result.rows
-    .map(r => r.doc as ConversationDoc)
+  const existing = (await findByType<ConversationDoc>(db, 'conversation', { kind: 'dm' }, { indexFields: ['type', 'kind'] }))
     .find(d =>
-      d && d.type === 'conversation' && d.kind === 'dm' &&
+      d &&
       d.participantIds.length === 2 &&
       d.participantIds.includes(me.id) && d.participantIds.includes(other.id),
     );

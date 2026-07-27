@@ -91,10 +91,12 @@ export async function decrementStock(
 
   // Locate the target row once. Subsequent retries refetch *that specific
   // row* by _id so we keep narrowing the window.
-  const result = await db.allDocs({ include_docs: true });
-  const items = result.rows
-    .map(r => r.doc as PharmacyInventoryDoc)
-    .filter(d => d && d.type === 'pharmacy_inventory' && d.medicationName === medicationName);
+  const items = await findByType<PharmacyInventoryDoc>(
+    db,
+    'pharmacy_inventory',
+    { medicationName },
+    { indexFields: ['type', 'medicationName'] },
+  );
   const initial = items.find(i => i.hospitalId === hospitalId) || items[0];
   if (!initial) return;
 

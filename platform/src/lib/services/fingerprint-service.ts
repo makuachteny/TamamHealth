@@ -13,6 +13,7 @@
  */
 
 import { biometricTemplatesDB } from '../db';
+import { findByType } from './db-query';
 import type { BiometricTemplateDoc, BiometricTemplateFormat, FingerPosition } from '../db-types-biometrics';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
@@ -162,10 +163,7 @@ export async function enrollFingerprint(input: EnrollFingerprintInput): Promise<
 
 async function getAllTemplates(): Promise<BiometricTemplateDoc[]> {
   const db = biometricTemplatesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as BiometricTemplateDoc)
-    .filter(d => d && d.type === 'biometric_template');
+  return findByType<BiometricTemplateDoc>(db, 'biometric_template');
 }
 
 export async function getTemplatesForPatient(patientId: string): Promise<BiometricTemplateDoc[]> {

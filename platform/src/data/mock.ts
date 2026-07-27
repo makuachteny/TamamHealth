@@ -2394,6 +2394,14 @@ export interface Referral {
   outcome?: ReferralOutcome;
   transferPackage?: TransferPackage;
   referralAttachments?: Attachment[];
+  /**
+   * When the receiving facility is expected to have acknowledged this referral,
+   * derived from `urgency` at creation (emergency +4h, urgent +24h, routine
+   * +72h). Optional because referrals created before SLA tracking existed do
+   * not carry one — treat a missing value as "no SLA", never as "breached".
+   * See REFERRAL_SLA_HOURS in services/referral-service.ts.
+   */
+  expectedAt?: string;
 }
 
 export const referrals: Referral[] = [

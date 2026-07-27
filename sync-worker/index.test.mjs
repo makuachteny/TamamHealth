@@ -22,6 +22,7 @@ import {
   loadState,
   saveState,
   pollDatabase,
+  recoverStateFromPlatform,
   FALLBACK_DBS,
 } from './index.mjs';
 
@@ -129,4 +130,123 @@ test('pollDatabase advances seq and POSTs an HMAC signed body', async (t) => {
   // verify HMAC matches what /api/sync expects
   const expected = 'sha256=' + createHmac('sha256', env.COUCHDB_WEBHOOK_SECRET).update(postedBody, 'utf8').digest('hex');
   assert.equal(postedHeaders['x-tamamhealth-signature'], expected);
+});
+
+// ---------------------------------------------------------------------------
+// State recovery from the platform (KAN-55 / MED-06)
+//
+// Losing the state file makes all ~46 databases replay from seq=0, re-posting
+// every historical patient record and prescription through /api/sync. These
+// cases cover recovering the checkpoints the platform already holds in the
+// sync_metadata Postgres table.
+// ---------------------------------------------------------------------------
+
+test('recoverStateFromPlatform maps sync_metadata rows to worker state', async (t) => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    databases: [
+      { db_name: 'tamamhealth_patients', last_seq: '412-abc', last_synced_at: '2026-07-27T00:00:00Z' },
+      { db_name: 'tamamhealth_lab_results', last_seq: '77-def', last_synced_at: '2026-07-27T00:00:00Z' },
+    ],
+  }), { status: 200 });
+  t.after(() => { globalThis.fetch = realFetch; });
+
+  const state = await recoverStateFromPlatform('http://platform:3000/api/sync');
+  assert.deepEqual(state, {
+    tamamhealth_patients: { seq: '412-abc' },
+    tamamhealth_lab_results: { seq: '77-def' },
+  });
+});
+
+test('recoverStateFromPlatform keeps CouchDB seqs opaque strings', async (t) => {
+  // CouchDB 3 seqs look like "42-g1AAAABXeJzLYWBg...". Coercing to a number
+  // would silently truncate to 42 and replay everything after it.
+  const realFetch = globalThis.fetch;
+  const opaque = '42-g1AAAABXeJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCjMlMiTJ';
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    databases: [{ db_name: 'tamamhealth_patients', last_seq: opaque }],
+  }), { status: 200 });
+  t.after(() => { globalThis.fetch = realFetch; });
+
+  const state = await recoverStateFromPlatform('http://platform:3000/api/sync');
+  assert.equal(state.tamamhealth_patients.seq, opaque);
+});
+
+test('recoverStateFromPlatform returns null when Postgres is unconfigured (503)', async (t) => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: 'not configured' }), { status: 503 });
+  t.after(() => { globalThis.fetch = realFetch; });
+
+  assert.equal(await recoverStateFromPlatform('http://platform:3000/api/sync'), null);
+});
+
+test('recoverStateFromPlatform returns null when the platform is unreachable', async (t) => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('ECONNREFUSED'); };
+  t.after(() => { globalThis.fetch = realFetch; });
+
+  assert.equal(await recoverStateFromPlatform('http://platform:3000/api/sync'), null);
+});
+
+test('recoverStateFromPlatform ignores rows still at seq 0', async (t) => {
+  // A database registered but never synced carries no useful checkpoint;
+  // returning it would be indistinguishable from a real seq and mask the
+  // full-replay warning.
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    databases: [{ db_name: 'tamamhealth_patients', last_seq: '0' }],
+  }), { status: 200 });
+  t.after(() => { globalThis.fetch = realFetch; });
+
+  assert.equal(await recoverStateFromPlatform('http://platform:3000/api/sync'), null);
+});
+
+test('replaying the identical batch twice posts identical payloads (idempotency contract)', async (t) => {
+  // /api/sync upserts on document id, so a replay must be a no-op. This asserts
+  // the worker's half of that contract: the same changes feed produces a
+  // byte-identical signed body, so a duplicate delivery is genuinely duplicate
+  // and the route's ON CONFLICT DO UPDATE lands on the same rows.
+  const realFetch = globalThis.fetch;
+  const posted = [];
+  const changesResponse = () => new Response(JSON.stringify({
+    last_seq: '9-zzz',
+    pending: 0,
+    results: [
+      { seq: '9-zzz', id: 'pat-1', doc: { _id: 'pat-1', type: 'patient', firstName: 'Achol' }, changes: [{ rev: '2-b' }] },
+    ],
+  }), { status: 200 });
+
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.includes('/_changes')) return changesResponse();
+    if (u.endsWith('/api/sync')) {
+      posted.push(opts.body);
+      return new Response(JSON.stringify({ ok: true, processed: 1, errors: 0, lastSeq: '9-zzz' }), { status: 200 });
+    }
+    return new Response('not mocked', { status: 500 });
+  };
+  t.after(() => { globalThis.fetch = realFetch; });
+
+  const env = {
+    COUCHDB_URL: 'http://couchdb:5984',
+    COUCHDB_WEBHOOK_SECRET: 'x'.repeat(32),
+    PLATFORM_SYNC_URL: 'http://platform:3000/api/sync',
+    BATCH_SIZE: 100,
+  };
+
+  // First delivery, then a state-file loss (state reset to {}) and a replay.
+  const first = {};
+  await pollDatabase({ env, state: first, db: 'tamamhealth_patients' });
+  const afterLoss = {};
+  await pollDatabase({ env, state: afterLoss, db: 'tamamhealth_patients' });
+
+  assert.equal(posted.length, 2);
+  assert.equal(posted[0], posted[1], 'replayed batch must be byte-identical');
+  // Compare the checkpoint only — `lastUpdated` is a wall-clock stamp and will
+  // differ between the two runs by design.
+  assert.equal(
+    first.tamamhealth_patients.seq,
+    afterLoss.tamamhealth_patients.seq,
+    'resulting state must converge to the same seq',
+  );
 });

@@ -1,4 +1,5 @@
 import { messagesDB } from '../db';
+import { findByType } from './db-query';
 import type { MessageDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
@@ -29,10 +30,7 @@ function encryptMessageFields<T extends Partial<MessageDoc>>(data: T): T {
 
 export async function getAllMessages(scope?: DataScope): Promise<MessageDoc[]> {
   const db = messagesDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as MessageDoc)
-    .filter(d => d && d.type === 'message')
+  const all = (await findByType<MessageDoc>(db, 'message'))
     .map(decryptMessage)
     .sort((a, b) => new Date(b.sentAt || '').getTime() - new Date(a.sentAt || '').getTime());
   return scope ? filterByScope(all, scope) : all;

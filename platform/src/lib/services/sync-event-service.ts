@@ -117,10 +117,20 @@ export async function pushPendingToCountryNode(batchSize = 200): Promise<{
  */
 export async function getPendingSyncEvents(limit = 500): Promise<SyncEventDoc[]> {
   const db = syncEventsDB();
-  const res = await db.allDocs({ include_docs: true, limit });
-  return res.rows
-    .map((r) => r.doc as SyncEventDoc)
-    .filter((d) => d && d.type === 'sync_event' && d.syncStatus === 'pending');
+  // Indexed query on (type, syncStatus). The previous implementation applied
+  // `limit` to allDocs BEFORE filtering, so it only ever looked at the first
+  // 500 documents in _id order and returned the pending ones among them. Once
+  // the database held more than 500 events — which it does almost immediately,
+  // since every create/update emits one — a backlog of pending events sitting
+  // past that boundary was invisible and never pushed. Filtering in the
+  // selector means the limit now bounds the RESULT, which is what the caller
+  // asked for.
+  return findByType<SyncEventDoc>(
+    db,
+    'sync_event',
+    { syncStatus: 'pending' },
+    { limit, indexFields: ['type', 'syncStatus'] },
+  );
 }
 
 /**

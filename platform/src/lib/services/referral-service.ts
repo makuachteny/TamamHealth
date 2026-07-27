@@ -51,6 +51,94 @@ export async function getReferralById(id: string): Promise<ReferralDoc | null> {
   }
 }
 
+/**
+ * Acknowledgement deadline per urgency, in hours (KAN-43 / HIGH-11).
+ *
+ * A referral sits at `sent` until the receiving facility marks it `received` or
+ * `seen`. Nothing used to bound that wait: an emergency referral could sit
+ * unacknowledged indefinitely with no timeout, no escalation, and nothing for
+ * the sending clinician to chase. These are the acknowledgement windows, not
+ * treatment windows — the clock stops when someone at the other end picks the
+ * referral up, not when the patient is treated.
+ */
+export const REFERRAL_SLA_HOURS: Record<'emergency' | 'urgent' | 'routine', number> = {
+  emergency: 4,
+  urgent: 24,
+  routine: 72,
+};
+
+/** Acknowledgement deadline for a referral raised at `fromIso`. */
+export function computeExpectedAt(
+  urgency: 'emergency' | 'urgent' | 'routine',
+  fromIso: string,
+): string {
+  const hours = REFERRAL_SLA_HOURS[urgency] ?? REFERRAL_SLA_HOURS.routine;
+  return new Date(new Date(fromIso).getTime() + hours * 60 * 60 * 1000).toISOString();
+}
+
+/** Statuses that mean the receiving facility has acknowledged the referral. */
+const ACKNOWLEDGED_STATUSES = new Set(['received', 'seen', 'completed', 'cancelled']);
+
+/**
+ * True when a referral is past its acknowledgement deadline and still
+ * unacknowledged. A referral with no `expectedAt` (created before SLA tracking
+ * existed) is never reported as breached — absence of a deadline is not
+ * evidence of a missed one.
+ */
+export function isReferralOverdue(referral: ReferralDoc, now: Date = new Date()): boolean {
+  if (!referral.expectedAt) return false;
+  if (ACKNOWLEDGED_STATUSES.has(referral.status)) return false;
+  return new Date(referral.expectedAt).getTime() < now.getTime();
+}
+
+/**
+ * Referrals past their acknowledgement deadline, most overdue first, so the
+ * sending facility can chase them. This is the query a dashboard panel or a
+ * scheduled escalation job runs.
+ */
+export async function getOverdueReferrals(
+  scope?: DataScope,
+  now: Date = new Date(),
+): Promise<ReferralDoc[]> {
+  const all = await getAllReferrals(scope);
+  return all
+    .filter((r) => isReferralOverdue(r, now))
+    .sort((a, b) => (a.expectedAt || '').localeCompare(b.expectedAt || ''));
+}
+
+/**
+ * Tell the sending facility their referral has been picked up (KAN-43).
+ *
+ * Written as a care alert on the patient's own record rather than a message to
+ * a named user: the referring clinician may be off shift, and the next person
+ * to open that patient's chart at the sending facility is the one who needs to
+ * know. It travels with the patient, which a direct message would not.
+ *
+ * Best-effort — a failure here must not roll back the status change. The
+ * receiving facility has done the right thing by acknowledging; losing the
+ * notification is a lesser harm than rejecting their update.
+ */
+async function notifySendingFacility(
+  referral: ReferralDoc,
+  status: 'received' | 'seen',
+): Promise<void> {
+  try {
+    const { addCareAlert } = await import('./care-alert-service');
+    const verb = status === 'received' ? 'received' : 'been seen at';
+    await addCareAlert(referral.patientId, {
+      category: 'administrative',
+      // Emergency and urgent referrals are the ones a sending clinician is
+      // actively waiting on, so they surface at high priority.
+      priority: referral.urgency === 'routine' ? 'normal' : 'high',
+      message:
+        `Referral to ${referral.toHospital} (${referral.department}, ${referral.urgency}) has ${verb} the receiving facility.`,
+      recordedByName: referral.toHospital,
+    });
+  } catch (err) {
+    console.warn('[referral] could not notify the sending facility (status change was saved):', err);
+  }
+}
+
 export async function createReferral(
   data: Omit<ReferralDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>
 ): Promise<ReferralDoc> {
@@ -61,6 +149,8 @@ export async function createReferral(
     _id: `ref-${uuidv4().slice(0, 8)}`,
     type: 'referral',
     ...data,
+    // Stamp the acknowledgement deadline unless the caller supplied one.
+    expectedAt: data.expectedAt || computeExpectedAt(data.urgency, now),
     orgId,
     createdAt: now,
     updatedAt: now,
@@ -105,6 +195,9 @@ export async function createReferralWithTransfer(
     _id: `ref-${uuidv4().slice(0, 8)}`,
     type: 'referral',
     ...data,
+    // Same acknowledgement deadline as the plain createReferral path — a
+    // referral carrying a transfer package is if anything more urgent.
+    expectedAt: data.expectedAt || computeExpectedAt(data.urgency, now),
     orgId,
     transferPackage,
     referralAttachments: referralAttachments.length > 0 ? referralAttachments : undefined,
@@ -145,6 +238,12 @@ export async function updateReferralStatus(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_REFERRAL', undefined, undefined, `Referral ${id} status changed to ${status}`);
+    // Close the loop back to the sending facility (KAN-43). The referring
+    // clinician previously had no way to learn their patient had been picked
+    // up short of opening the referral and looking.
+    if (status === 'received' || status === 'seen') {
+      await notifySendingFacility(existing, status);
+    }
     emitSyncEvent({
       resourceType: 'referral',
       resourceId: updated._id,
