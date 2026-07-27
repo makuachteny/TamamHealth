@@ -76,7 +76,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.ready == 'true'
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 

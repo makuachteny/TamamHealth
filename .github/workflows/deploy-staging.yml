@@ -64,6 +64,17 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.platform_image }}:${{ steps.meta.outputs.sha }}
             ${{ steps.meta.outputs.platform_image }}:staging
+          # NEXT_PUBLIC_* is inlined into the client bundle at BUILD time, so
+          # demo mode has to be decided here — no runtime env can undo it. This
+          # image is also what deploy-production promotes, so whatever is baked
+          # in here is what production ships.
+          #
+          # Defaults to "false" (real mode). Set the repository/environment
+          # variable NEXT_PUBLIC_DEMO_MODE to "true" only while these droplets
+          # are still serving the public demo described in
+          # docs/DEMO-LAUNCH-tamamhealth-org.md.
+          build-args: |
+            NEXT_PUBLIC_DEMO_MODE=${{ vars.NEXT_PUBLIC_DEMO_MODE || 'false' }}
           cache-from: type=gha,scope=platform
           cache-to: type=gha,mode=max,scope=platform
 

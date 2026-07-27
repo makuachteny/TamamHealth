@@ -1,7 +1,30 @@
 #!/bin/sh
 # CouchDB backup script — runs nightly from the couchdb-backup service.
+#
 # Dumps every tamamhealth_* database to gzipped JSON on the shared volume,
-# then prunes anything older than BACKUP_RETAIN_DAYS.
+# VERIFIES each dump against the live database, records the replication
+# checkpoint, then prunes anything older than BACKUP_RETAIN_DAYS.
+#
+# Two things this does that a plain `_all_docs` dump did not:
+#
+#   1. Captures the `update_seq` checkpoint per database. `_all_docs` alone
+#      discards the CouchDB _changes sequence, so a restored server has no
+#      resume point — every PouchDB client reconnecting after a restore
+#      re-replicates its entire database from scratch. Over a 10-50 Kbps
+#      satellite link that is hours per facility, during which the clinic is
+#      effectively offline. The checkpoint is what makes incremental resume
+#      possible.
+#
+#   2. Verifies the dump. Previously a truncated or empty dump was written,
+#      logged as success, and eventually rotated away — the failure surfaced
+#      only at restore time, which is the worst possible moment to find it.
+#
+# NOTE on `couchbackup`: the ticket suggested the official CLI. It is a Node
+# package, and this container is alpine + curl + jq by design (small, no npm at
+# runtime). Adding a Node toolchain to the backup sidecar is a bigger change
+# than the problem warrants, so we capture the checkpoint and verify the dump
+# directly against the same HTTP API couchbackup drives. Swap the dump step for
+# `couchbackup` if a Node base image is ever adopted here.
 set -eu
 
 : "${COUCHDB_USER:?COUCHDB_USER required}"
@@ -9,27 +32,92 @@ set -eu
 : "${COUCHDB_HOST:=couchdb}"
 : "${COUCHDB_PORT:=5984}"
 : "${BACKUP_RETAIN_DAYS:=14}"
+# Tolerated shortfall between live doc_count and dumped rows, as a percentage.
+# Non-zero because a write landing mid-dump is normal, not a failure.
+: "${BACKUP_VERIFY_TOLERANCE_PCT:=1}"
 
 BASE="http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@${COUCHDB_HOST}:${COUCHDB_PORT}"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 OUT="/backups/${STAMP}"
 mkdir -p "$OUT"
 
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] starting CouchDB backup → $OUT"
+log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 
-# Every tamamhealth_* db (clinical + meta + outbox + conflicts)
-curl -sf "${BASE}/_all_dbs" \
-  | jq -r '.[]' \
-  | grep '^tamamhealth_' \
-  | while read db; do
-      echo "  dumping $db"
-      curl -sf "${BASE}/${db}/_all_docs?include_docs=true" \
-        | gzip -c > "${OUT}/${db}.json.gz"
-    done
+log "starting CouchDB backup → $OUT"
 
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] backup complete"
+FAILURES=0
+MANIFEST="${OUT}/manifest.json"
+echo '{"startedAt":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","databases":[' > "$MANIFEST"
+FIRST=1
 
-# Prune older snapshots
-find /backups -maxdepth 1 -type d -name '20*' -mtime +${BACKUP_RETAIN_DAYS} -exec rm -rf {} + 2>/dev/null || true
+# Every tamamhealth_* db (clinical + meta + outbox + conflicts).
+# Iterating a `for` over command substitution rather than piping into `while`:
+# a piped subshell cannot mutate FAILURES in the parent, so failures were
+# invisible to the exit status.
+for db in $(curl -sf "${BASE}/_all_dbs" | jq -r '.[]' | grep '^tamamhealth_'); do
+  log "  dumping $db"
 
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] retention cleanup done (kept ${BACKUP_RETAIN_DAYS}d)"
+  # Read live state BEFORE dumping, so the recorded checkpoint is never ahead
+  # of the data it describes. A checkpoint newer than the dump would silently
+  # skip documents on an incremental restore.
+  if ! INFO=$(curl -sf "${BASE}/${db}"); then
+    log "  ERROR: could not read ${db} info"
+    FAILURES=$((FAILURES + 1))
+    continue
+  fi
+  LIVE_COUNT=$(echo "$INFO" | jq -r '.doc_count')
+  UPDATE_SEQ=$(echo "$INFO" | jq -r '.update_seq')
+
+  if ! curl -sf "${BASE}/${db}/_all_docs?include_docs=true" | gzip -c > "${OUT}/${db}.json.gz"; then
+    log "  ERROR: dump failed for ${db}"
+    FAILURES=$((FAILURES + 1))
+    continue
+  fi
+
+  # --- Verification -------------------------------------------------------
+  # Count rows actually present in the gzipped file, not what we intended to
+  # write. This also proves the gzip stream and JSON are both intact.
+  DUMPED=$(gzip -dc "${OUT}/${db}.json.gz" | jq -r '.rows | length' 2>/dev/null || echo "invalid")
+  if [ "$DUMPED" = "invalid" ] || [ -z "$DUMPED" ]; then
+    log "  ERROR: ${db} dump is not valid JSON — treating as failed"
+    FAILURES=$((FAILURES + 1))
+    continue
+  fi
+
+  # _all_docs includes design documents, which doc_count excludes, so the dump
+  # is normally >= doc_count. Only a SHORTFALL indicates data loss.
+  if [ "$LIVE_COUNT" -gt 0 ]; then
+    ALLOWED_MISSING=$(( LIVE_COUNT * BACKUP_VERIFY_TOLERANCE_PCT / 100 ))
+    MIN_ACCEPTABLE=$(( LIVE_COUNT - ALLOWED_MISSING ))
+    if [ "$DUMPED" -lt "$MIN_ACCEPTABLE" ]; then
+      log "  ERROR: ${db} verification FAILED — dumped ${DUMPED} rows, live doc_count ${LIVE_COUNT} (min acceptable ${MIN_ACCEPTABLE})"
+      FAILURES=$((FAILURES + 1))
+      continue
+    fi
+  fi
+  log "  ok ${db}: ${DUMPED} rows (live ${LIVE_COUNT}), checkpoint ${UPDATE_SEQ}"
+
+  [ $FIRST -eq 0 ] && echo ',' >> "$MANIFEST"
+  FIRST=0
+  printf '{"db":"%s","docCount":%s,"dumpedRows":%s,"updateSeq":%s}' \
+    "$db" "$LIVE_COUNT" "$DUMPED" "$(echo "$UPDATE_SEQ" | jq -R .)" >> "$MANIFEST"
+done
+
+echo '],"failures":'"$FAILURES"'}' >> "$MANIFEST"
+
+if [ "$FAILURES" -gt 0 ]; then
+  log "BACKUP FAILED — ${FAILURES} database(s) did not verify. Snapshot ${STAMP} is NOT trustworthy."
+  # Mark the directory so a restore never silently picks it up, and so
+  # retention below refuses to delete the evidence.
+  touch "${OUT}/.INCOMPLETE"
+  exit 1
+fi
+
+log "backup complete and verified — manifest at ${MANIFEST}"
+
+# Prune older snapshots, but never an incomplete one: leaving it on disk keeps
+# the failure visible to an operator instead of quietly aging out.
+find /backups -maxdepth 1 -type d -name '20*' -mtime +${BACKUP_RETAIN_DAYS} \
+  '!' -exec test -e '{}/.INCOMPLETE' ';' -exec rm -rf {} + 2>/dev/null || true
+
+log "retention cleanup done (kept ${BACKUP_RETAIN_DAYS}d)"

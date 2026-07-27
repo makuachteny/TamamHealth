@@ -6,6 +6,8 @@ import { getAllEncounters } from './encounter-service';
 import { hospitalsDB, patientsDB, referralsDB, diseaseAlertsDB, labResultsDB, prescriptionsDB, immunizationsDB, ancDB } from '../db';
 import type { HospitalDoc, PatientDoc, ReferralDoc, DiseaseAlertDoc, LabResultDoc, PrescriptionDoc, ImmunizationDoc, ANCVisitDoc, EncounterDoc, UserRole } from '../db-types';
 import { findByType } from './db-query';
+import { resolveDataElement, validateDataElements } from './dhis2-element-map';
+import type { DHIS2ElementValidation } from './dhis2-element-map';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { isInRange } from '../time-juba';
@@ -141,6 +143,12 @@ export interface DHIS2DataSet {
   period: string;
   orgUnit: string;
   dataValues: DHIS2DataValue[];
+  /**
+   * Whether every `dataElement` above is a real DHIS2 UID. Absent on datasets
+   * built before the UID map existed. Surface `warning` in the export UI —
+   * an unmapped payload is accepted here and rejected by DHIS2.
+   */
+  elementValidation?: DHIS2ElementValidation;
 }
 
 export interface DHIS2DataValue {
@@ -382,11 +390,21 @@ export async function generateDHIS2Export(
     dataValues.push({ dataElement: 'FACILITY_DEATHS', category: 'default', value: fDeaths.toString(), period, orgUnit: h._id });
   }
 
+  // Translate concept names to the deployment's configured DHIS2 UIDs. With no
+  // map configured this is a no-op and `elementValidation` explains why the
+  // receiving instance will reject the payload — see dhis2-element-map.ts.
+  const resolved = dataValues.map((dv) => ({ ...dv, dataElement: resolveDataElement(dv.dataElement) }));
+  const elementValidation = validateDataElements(resolved.map((dv) => dv.dataElement));
+  if (!elementValidation.valid) {
+    console.warn('[dhis2-export]', elementValidation.warning);
+  }
+
   return {
     exportDate: now,
     period,
     orgUnit,
-    dataValues,
+    dataValues: resolved,
+    elementValidation,
   };
 }
 

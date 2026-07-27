@@ -97,39 +97,72 @@ export function jaroWinkler(a: string, b: string): number {
  */
 export async function matchPatient(query: MpiQuery, limit = 10, scope?: DataScope): Promise<MpiCandidate[]> {
   const db = patientsDB();
-  let patients = await findByType<PatientDoc>(db, 'patient');
-  // Tenant/facility isolation: without this every caller could probe the FULL
-  // multi-tenant patient index (names, national IDs, phones) across orgs.
-  if (scope) patients = filterByScope(patients, scope);
+
+  /** Tenant/facility isolation — without this a caller could probe the FULL
+   *  multi-tenant patient index (names, national IDs, phones) across orgs. */
+  const scoped = (docs: PatientDoc[]) => (scope ? filterByScope(docs, scope) : docs);
 
   const candidates: MpiCandidate[] = [];
 
-  // 1. Deterministic — high-confidence single-hit matches
-  for (const p of patients) {
-    if (query.nationalId && p.nationalId && p.nationalId === query.nationalId) {
+  // 1. Deterministic — high-confidence single-hit matches.
+  //
+  // These run as INDEXED lookups rather than a scan. Previously the whole
+  // patient collection was loaded and iterated even when the query carried an
+  // exact national ID — at a district hospital's ~50k patients that stalled
+  // every registration for seconds. Now an exact identifier hit costs one
+  // indexed read and the full collection is never materialised at all.
+  //
+  // Each selector gets its own compound index ({type, field}) so CouchDB/PouchDB
+  // can serve it directly; `ensureIndex` inside `findByType` is idempotent and
+  // cached per process.
+  const deterministic: Array<{
+    value: string | undefined;
+    field: 'nationalId' | 'geocodeId' | 'hospitalNumber';
+    score: number;
+    method: MpiCandidate['method'];
+    /** Geocode and hospital number were compared case-insensitively before
+     *  this became an indexed lookup; preserve that. National ID was always
+     *  compared exactly, so it stays exact. */
+    caseInsensitive: boolean;
+    reason: (v: string) => string;
+  }> = [
+    { value: query.nationalId, field: 'nationalId', score: 1.0, method: 'national_id',
+      caseInsensitive: false, reason: (v) => `Exact national ID match: ${v}` },
+    { value: query.geocodeId, field: 'geocodeId', score: 0.99, method: 'geocode',
+      caseInsensitive: true, reason: (v) => `Exact geocode match: ${v}` },
+    { value: query.hospitalNumber, field: 'hospitalNumber', score: 0.95, method: 'hospital_number',
+      caseInsensitive: true, reason: (v) => `Exact hospital number match: ${v}` },
+  ];
+
+  /** Selector that still hits the index but tolerates casing differences.
+   *  Both identifiers are generated upper-case, so the realistic mismatch is a
+   *  lower-case value typed into a search box — covered by `$in`. */
+  const selectorFor = (field: string, value: string, caseInsensitive: boolean) =>
+    caseInsensitive
+      ? { [field]: { $in: Array.from(new Set([value, value.toUpperCase(), value.toLowerCase()])) } }
+      : { [field]: value };
+
+  const alreadyMatched = new Set<string>();
+  for (const rule of deterministic) {
+    if (!rule.value) continue;
+    const hits = scoped(
+      await findByType<PatientDoc>(
+        db,
+        'patient',
+        selectorFor(rule.field, rule.value, rule.caseInsensitive),
+        { indexFields: ['type', rule.field] },
+      ),
+    );
+    for (const p of hits) {
+      // Mirrors the original precedence: a patient already matched by a
+      // stronger identifier is not re-scored by a weaker one.
+      if (alreadyMatched.has(p._id)) continue;
+      alreadyMatched.add(p._id);
       candidates.push({
         patient: p,
-        score: 1.0,
-        method: 'national_id',
-        reasons: [`Exact national ID match: ${query.nationalId}`],
-      });
-      continue;
-    }
-    if (query.geocodeId && p.geocodeId && p.geocodeId.toUpperCase() === query.geocodeId.toUpperCase()) {
-      candidates.push({
-        patient: p,
-        score: 0.99,
-        method: 'geocode',
-        reasons: [`Exact geocode match: ${query.geocodeId}`],
-      });
-      continue;
-    }
-    if (query.hospitalNumber && p.hospitalNumber && p.hospitalNumber.toUpperCase() === query.hospitalNumber.toUpperCase()) {
-      candidates.push({
-        patient: p,
-        score: 0.95,
-        method: 'hospital_number',
-        reasons: [`Exact hospital number match: ${query.hospitalNumber}`],
+        score: rule.score,
+        method: rule.method,
+        reasons: [rule.reason(rule.value)],
       });
     }
   }
@@ -137,7 +170,9 @@ export async function matchPatient(query: MpiQuery, limit = 10, scope?: DataScop
   // Skip probabilistic pass if we already have a deterministic 1.0
   const hasExact = candidates.some((c) => c.score === 1.0);
   if (!hasExact) {
-    // 2. Probabilistic — name + DOB + phone
+    // 2. Probabilistic — name + DOB + phone. This one genuinely needs every
+    // candidate document, because Jaro-Winkler similarity is not indexable.
+    const patients = scoped(await findByType<PatientDoc>(db, 'patient'));
     for (const p of patients) {
       const reasons: string[] = [];
       let score = 0;

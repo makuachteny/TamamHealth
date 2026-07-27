@@ -1,0 +1,49 @@
+# Off-site CouchDB backup — encrypts the latest nightly dump and ships it to
+# S3 / Backblaze / any S3-compatible store.
+#
+# WHY THIS EXISTS: the in-container `couchdb-backup` service only writes to a
+# local Docker volume on the same droplet as the database. A disk failure, a
+# destroyed droplet, or ransomware takes the database and every "backup" with
+# it. scripts/backup-couchdb.sh has always been able to encrypt and upload
+# off-site, but nothing invoked it — this unit is what actually runs it.
+#
+# Install with: scripts/install-offsite-backup.sh
+[Unit]
+Description=TamamHealth off-site encrypted CouchDB backup
+Documentation=file:///opt/tamamhealth/docs/operations/backups.md
+# Ordered after the stack so the volume it reads is present and mounted.
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/tamamhealth
+
+# Credentials and destination live in a root-only env file, NOT in this unit —
+# unit files are world-readable under /etc/systemd/system.
+EnvironmentFile=/etc/tamamhealth/backup.env
+
+ExecStart=/opt/tamamhealth/scripts/backup-couchdb.sh
+
+# The script already exits non-zero on any failure; surface that rather than
+# masking it, so `systemctl --failed` and the timer's OnFailure both see it.
+SuccessExitStatus=0
+
+# Retry a couple of times before giving up: the most common cause of failure
+# here is a transient satellite link, not a real problem.
+Restart=on-failure
+RestartSec=15min
+
+# Hardening — this reads a backup volume and talks to S3; it needs nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/docker/volumes /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

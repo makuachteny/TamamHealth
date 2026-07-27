@@ -148,6 +148,31 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
+# ===== 4b. SHRED BOOTSTRAP CREDENTIALS =====================================
+# When ADMIN_INITIAL_PASSWORD is unset the platform generates an admin password
+# and writes it to platform/.seed-credentials.json. On a real deployment the
+# first-boot operator may be a local MoH IT technician, and that file otherwise
+# sits on disk in plaintext indefinitely — a standing privilege-escalation path
+# for anyone who later gets shell or a stale backup.
+#
+# The app also deletes it once the admin clears mustChangePassword (see
+# lib/seed-credentials.ts), but that only fires if someone actually logs in.
+# This is the belt to that braces: by the time the stack is healthy the
+# operator has had their chance to read it.
+SEED_FILE="${APP_DIR}/platform/.seed-credentials.json"
+if [ -f "$SEED_FILE" ]; then
+  say "Removing bootstrap credentials file (${SEED_FILE})"
+  echo "  ⚠ If you have not yet noted the admin password, press Ctrl-C NOW —"
+  echo "    it is about to be destroyed and cannot be recovered."
+  echo "    Contents:"
+  sed 's/^/      /' "$SEED_FILE" || true
+  sleep "${SEED_SHRED_DELAY:-15}"
+  # Overwrite before unlinking: on a journalling filesystem a plain rm leaves
+  # the plaintext recoverable.
+  shred -u "$SEED_FILE" 2>/dev/null || rm -f "$SEED_FILE"
+  say "Bootstrap credentials removed"
+fi
+
 # ===== 5. INIT COUCHDB SYSTEM DBS ==========================================
 say "Initializing CouchDB system databases (idempotent)"
 COUCH_USER="$(grep '^COUCHDB_USER=' .env | cut -d= -f2)"

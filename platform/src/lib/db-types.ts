@@ -998,6 +998,18 @@ export interface EncounterDoc extends BaseDoc {
   stageKey: EncounterStageKey;
   /** Consultation form draft (chiefComplaint, vitals, diagnoses, labOrders, …). */
   snapshot: Record<string, unknown>;
+  /**
+   * Shape version of `snapshot`. Bump whenever the draft's structure changes
+   * incompatibly, and add a migration step in `migrateEncounterSnapshot`.
+   *
+   * Why this exists: `snapshot` is `Record<string, unknown>` and is written by
+   * one app version but resumed by another — a clinician can pause a visit,
+   * the facility updates, and the encounter is resumed against a newer form.
+   * Without a version stamp, structurally incompatible data is applied to the
+   * current form fields silently. Absent/undefined means version 1 (every
+   * document written before this field existed).
+   */
+  snapshotVersion?: number;
   /** Lab order doc ids created when the encounter was sent to the lab. */
   labOrderIds: string[];
   /** Triage record that fed this encounter, when the patient was triaged. */

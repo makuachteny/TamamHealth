@@ -87,6 +87,24 @@ export async function POST(request: NextRequest) {
       mustChangePassword: false,
     });
 
+    // The bootstrap credentials file has now served its only purpose: it
+    // existed so the first operator could learn the generated admin password.
+    // Once that password has been changed the file is a plaintext credential
+    // sitting on disk with no remaining use, so shred it here rather than
+    // relying on an operator remembering to.
+    //
+    // Admin only — a nurse changing their own password must not delete the
+    // file before the admin has read it. Non-fatal: the password change has
+    // already succeeded and must not be rolled back over cleanup.
+    if (auth.role === 'super_admin' || auth.role === 'org_admin' || auth.username === 'admin') {
+      try {
+        const { deleteSeedCredentialsFile } = await import('@/lib/seed-credentials');
+        await deleteSeedCredentialsFile();
+      } catch (cleanupErr) {
+        console.warn('[change-password] could not remove seed credentials file', cleanupErr);
+      }
+    }
+
     const response = NextResponse.json({ success: true });
     response.cookies.set('tamamhealth-token', token, {
       httpOnly: true,

@@ -46,6 +46,19 @@ check grep -q 'docker-compose.ghcr.yml' .github/workflows/deploy-production.yml
 check grep -q 'IMAGE_TAG=production' .github/workflows/deploy-production.yml
 
 echo ""
+echo "=== Demo-mode opt-out is baked into the image ==="
+# NEXT_PUBLIC_DEMO_MODE is read as `!== 'false'` (opt-out) and NEXT_PUBLIC_* is
+# inlined into the client bundle at BUILD time, so a runtime env var cannot
+# switch it off afterwards. These checks exist because the published images
+# were once built with no demo flag at all, which shipped a demo-seeding
+# bundle to every deploy. Regressing any one of them would restore that.
+check grep -q 'ARG NEXT_PUBLIC_DEMO_MODE' platform/Dockerfile
+check grep -q 'NEXT_PUBLIC_DEMO_MODE=\"\$NEXT_PUBLIC_DEMO_MODE\"' platform/Dockerfile
+check grep -q 'org.tamamhealth.demo-mode' platform/Dockerfile
+check grep -q 'NEXT_PUBLIC_DEMO_MODE=' .github/workflows/deploy-staging.yml
+check grep -q 'org.tamamhealth.demo-mode' .github/workflows/deploy-production.yml
+
+echo ""
 echo "=== Compose config render (staging tag) ==="
 if command -v docker >/dev/null 2>&1; then
   export GH_OWNER=makuachteny IMAGE_TAG=staging

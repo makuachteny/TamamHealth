@@ -12,8 +12,34 @@
 # `docker compose build`. Runtime `environment:` entries will not affect
 # already-built bundles.
 
+# Log rotation for every service (KAN-70 / MED-21).
+#
+# Docker's json-file default has NO rotation: on a long-running droplet the
+# container logs grow until they fill the disk, and a full disk takes CouchDB
+# down with it. For a clinical system the audit trail — who opened which patient
+# record — is legally required and is the primary forensic tool after an
+# incident, so it must survive rather than be silently truncated or lost.
+#
+# 100 MB × 5 files = 500 MB ceiling per service.
+#
+# Why json-file and not journald/awslogs: max-size/max-file are json-file
+# options — journald ignores them and delegates retention to the host's
+# journald.conf, and awslogs needs AWS credentials the DO droplet does not
+# have. On the AWS path the CloudFormation stack sets awslogs with real log
+# groups instead (infra/aws/cloudformation/platform.yml).
+#
+# NOTE: rotation bounds disk use, it does not offload. Shipping these logs off
+# the host is still open — see KAN-70's remaining scope in
+# docs/PRODUCTION-PLAN-2026-07.md.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "100m"
+    max-file: "5"
+
 services:
   platform:
+    logging: *default-logging
     build:
       context: ./platform
       dockerfile: Dockerfile
@@ -79,13 +105,19 @@ services:
         echo "[entrypoint] DOPPLER_TOKEN unset; legacy env_file path"
         exec npm run start
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      # Hits the dedicated probe, not the homepage. `/` renders the full app
+      # shell — it can return 200 while the analytics DB is unreachable, and it
+      # is far more expensive to poll every 30s. /api/health reports on
+      # DATABASE_URL and returns 503 when a configured DB is down, so an
+      # unhealthy container actually gets marked unhealthy.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
   website:
+    logging: *default-logging
     build:
       context: ./website
       dockerfile: Dockerfile
@@ -109,6 +141,7 @@ services:
   # volume at 02:15 UTC. Rotate the volume offsite via your cloud snapshotter
   # or an additional rclone/rsync sidecar for full DR.
   couchdb-backup:
+    logging: *default-logging
     image: alpine:3.19
     depends_on:
       couchdb:
@@ -131,6 +164,7 @@ services:
       - app-net
 
   couchdb:
+    logging: *default-logging
     image: couchdb:3
     environment:
       COUCHDB_USER: ${COUCHDB_USER:?COUCHDB_USER must be set in .env}
@@ -156,6 +190,7 @@ services:
   # profile so installs that don't run Postgres skip this:
   #   docker compose --profile analytics up -d
   sync-worker:
+    logging: *default-logging
     image: ghcr.io/${GH_OWNER:-tamamhealth}/tamamhealth-sync-worker:latest
     profiles: ["analytics"]
     build:
@@ -187,6 +222,7 @@ services:
   # Postgres is optional — the platform works fully via PouchDB alone.
   # Start with:  docker compose --profile analytics up -d
   postgres:
+    logging: *default-logging
     image: postgres:16-alpine
     profiles: ["analytics"]
     environment:

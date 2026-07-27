@@ -65,11 +65,31 @@ cd /opt/tamamhealth
 ./scripts/gen-secrets.sh
 sed -i 's/REPLACE-DOMAIN/tamamhealth.org/g' platform/.env.production website/.env.production
 sed -i 's#^NEXT_PUBLIC_COUCHDB_URL=.*#NEXT_PUBLIC_COUCHDB_URL=https://couch.tamamhealth.org#' platform/.env.production
+
+# PHI encryption at rest — REQUIRED. The platform refuses to boot in
+# production without it (lib/config-validation.ts); the only exemption is an
+# explicit demo deployment. Generate the key ONCE and escrow it with the
+# CouchDB credentials — losing it makes every encrypted field permanently
+# unreadable, and there is no recovery path.
+sed -i 's#^PHI_ENCRYPTION_ENABLED=.*#PHI_ENCRYPTION_ENABLED=true#' platform/.env.production
+sed -i "s#^PHI_ENCRYPTION_KEY=.*#PHI_ENCRYPTION_KEY=$(openssl rand -base64 32)#" platform/.env.production
+
+# Public demo only — seeds fictional patients, and exempts the boot guard
+# above. Skip both lines for any deployment that will hold real patient data.
 sed -i 's#^NEXT_PUBLIC_DEMO_MODE=.*#NEXT_PUBLIC_DEMO_MODE=true#' platform/.env.production   # demo
 ./scripts/preflight.sh
 sudo bash deploy.sh
 ```
 Caddy auto-issues TLS for the three domains. Verify at https://app.tamamhealth.org.
+
+> **`NEXT_PUBLIC_DEMO_MODE` is only half a runtime setting.** It is inlined
+> into the client bundle at *build* time, so on the `deploy.sh` path above
+> (which builds on the droplet) the `.env.production` value does take effect —
+> but on the CI/CD path in 5b, which pulls a prebuilt GHCR image, it does
+> **not**. There the mode is fixed by the `NEXT_PUBLIC_DEMO_MODE` build-arg in
+> `deploy-staging.yml` and recorded on the image as the
+> `org.tamamhealth.demo-mode` label. `deploy-production.yml` refuses to promote
+> an image labelled `true`.
 
 ## 5b. CI/CD deploy (after first manual boot)
 

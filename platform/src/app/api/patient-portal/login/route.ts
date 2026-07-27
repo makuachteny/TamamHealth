@@ -120,15 +120,28 @@ export async function POST(req: NextRequest) {
       role: 'patient',
     });
 
-    // Never leak the credential fields to the browser.
-    const { portalPasswordHash: _hash, portalUsername: _user, ...safePatient } = found;
-    void _hash; void _user;
-
+    // Minimal identity only — enough to render "logged in as", nothing more.
+    //
+    // This previously spread the whole patient document (credential fields
+    // aside), so authentication returned date of birth, phone, next-of-kin,
+    // allergies and chronic conditions. The authentication boundary is the
+    // worst place to carry PHI: it is the request most likely to be captured
+    // by request logging, proxied, retried, or persisted client-side next to
+    // the token.
+    //
+    // An explicit allow-list, not a spread-and-delete — a spread silently
+    // re-leaks every field added to PatientDoc in future.
+    //
+    // Everything else now comes from GET /api/patient-portal/profile, which
+    // requires the token this response issues.
     return NextResponse.json({
       token,
       patient: {
-        ...safePatient,
         id: found._id,
+        firstName: found.firstName,
+        surname: found.surname,
+        hospitalNumber: found.hospitalNumber || '',
+        registrationHospital: found.registrationHospital,
       },
     });
   } catch (err) {

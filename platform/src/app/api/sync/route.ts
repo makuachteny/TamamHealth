@@ -333,6 +333,10 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     status: doc.status,
     hospital_id: doc.hospitalId,
     org_id: doc.orgId,
+    // Clinical provenance — lets the analytics tier trace a dispensed drug to
+    // the visit and the note that ordered it (migration 0010).
+    encounter_id: doc.encounterId,
+    medical_record_id: doc.medicalRecordId,
     created_at: doc.createdAt,
     updated_at: doc.updatedAt,
   }),

@@ -3,7 +3,7 @@
 Operator guide for tracing work from Jira tickets through GitHub CI/CD to
 staging and production droplets on DigitalOcean.
 
-**Related:** [Jira backlog (SCRUM-70 epic)](../JIRA-DEPLOY-BACKLOG.md),
+**Related:** [Jira backlog (KAN-90 epic)](../JIRA-DEPLOY-BACKLOG.md),
 [DigitalOcean infra](../../infra/digitalocean/README.md),
 [GitHub for Jira setup](./github-for-jira-setup.md),
 [GitHub Environments secrets](./github-environments-setup.md),
@@ -15,7 +15,7 @@ staging and production droplets on DigitalOcean.
 
 | System | Role in tracking |
 |--------|------------------|
-| **Jira** (`taban.atlassian.net`, project **SCRUM**) | Work items — epic SCRUM-70, phase stories, subtasks |
+| **Jira** (`tamamorg.atlassian.net`, project **KAN**) | Work items — epic KAN-90, phase stories, subtasks |
 | **GitHub** (`makuachteny/TamamHealth`) | Code, PRs, CI, GHCR images, deploy workflows |
 | **DigitalOcean** | Two droplets — **staging** (auto) + **production** (manual promote) |
 
@@ -46,9 +46,9 @@ Append the right file on each droplet:
 
 ```mermaid
 flowchart LR
-  subgraph jira [Jira taban]
-    Epic[SCRUM-70]
-    Issues[SCRUM-N subtasks]
+  subgraph jira [Jira tamamorg]
+    Epic[KAN-90]
+    Issues[KAN-N subtasks]
   end
 
   subgraph github [GitHub]
@@ -67,7 +67,7 @@ flowchart LR
     ProdApp[app]
   end
 
-  Issues -->|"SCRUM-N in commits"| PR
+  Issues -->|"KAN-N in commits"| PR
   PR --> CI
   CI -->|main| StgWF
   StgWF --> GHCR
@@ -82,7 +82,7 @@ flowchart LR
 
 | Layer | What you track | Where |
 |-------|----------------|-------|
-| Work | Epic, stories, subtasks | [SCRUM board](https://taban.atlassian.net/jira/software/projects/SCRUM/boards) |
+| Work | Epic, stories, subtasks | [KAN board](https://tamamorg.atlassian.net/jira/software/projects/KAN/boards) |
 | Code | PR, commit SHA, CI | GitHub → Actions |
 | Artifact | `:staging`, `:production`, `:<sha>` | GitHub → Packages (GHCR) |
 | Runtime | Live image tag + SHA | Droplet: `docker compose … images`; Actions log: `Deployed sha=…` |
@@ -91,10 +91,10 @@ flowchart LR
 
 ## Daily workflow (developers)
 
-1. Pick a Jira subtask (e.g. **SCRUM-98**).
-2. Branch: `feat/SCRUM-98-short-description`.
-3. Commit: `SCRUM-98 Add docker-compose.ghcr.yml override`.
-4. Open PR — title includes `SCRUM-98`; body can include `Closes SCRUM-98`.
+1. Pick a Jira subtask (e.g. **KAN-91**).
+2. Branch: `feat/KAN-91-short-description`.
+3. Commit: `KAN-91 Add docker-compose.ghcr.yml override`.
+4. Open PR — title includes `KAN-91`; body can include `Closes KAN-91`.
 5. CI green → merge to `main`.
 6. **deploy-staging** runs → staging droplet pulls `:staging`.
 7. Smoke-test `https://app.staging.<domain>`.
@@ -136,7 +136,7 @@ docker compose -f docker-compose.yml -f docker-compose.ghcr.yml images
 
 **GHCR:** Package tags under `ghcr.io/makuachteny/tamamhealth-platform` (and website, sync-worker).
 
-**Jira (manual):** Comment on SCRUM-95 / SCRUM-101 with environment URL + SHA after deploy.
+**Jira (manual):** Comment on KAN-91 / KAN-92 with environment URL + SHA after deploy.
 
 ---
 
@@ -148,7 +148,7 @@ docker compose -f docker-compose.yml -f docker-compose.ghcr.yml images
 | Provision two DO droplets | [infra/digitalocean/README.md](../../infra/digitalocean/README.md) |
 | GitHub `staging` + `production` secrets | [github-environments-setup.md](./github-environments-setup.md) |
 | Doppler `stg` + `prd` tokens on droplets | [secrets.md](./secrets.md) |
-| Jira backlog (done) | [SCRUM-70](https://taban.atlassian.net/browse/SCRUM-70) |
+| Jira backlog (done) | [KAN-90](https://tamamorg.atlassian.net/browse/KAN-90) |
 
 ---
 
@@ -161,7 +161,7 @@ docker compose -f docker-compose.yml -f docker-compose.ghcr.yml images
 
 Manual end-to-end:
 
-1. Push a trivial commit to `main` with `SCRUM-N` in the message.
+1. Push a trivial commit to `main` with `KAN-N` in the message.
 2. Confirm **ci** → **deploy-staging** succeed.
 3. Confirm staging droplet shows new image tag.
 4. Run **deploy-production** with `target: vps`; confirm prod droplet updates.
@@ -180,6 +180,6 @@ Manual end-to-end:
 
 ## Residency note
 
-DigitalOcean staging/demo is fine for SCRUM deployment work. Production on DO is
+DigitalOcean staging/demo is fine for KAN deployment work. Production on DO is
 **pre-pilot only** — real PHI belongs in-country or on AWS `af-south-1`
 ([`docs/AFRICA-HOSTING-STRATEGY.md`](../AFRICA-HOSTING-STRATEGY.md)).

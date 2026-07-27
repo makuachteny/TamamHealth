@@ -304,3 +304,47 @@ export async function voidAdministration(
     return null;
   }
 }
+
+/**
+ * Attach the medical record that documents this prescription.
+ *
+ * Called after the consultation's record is written — the prescriptions are
+ * created first, so `medicalRecordId` cannot be set at creation time. Closing
+ * the link here is what lets a dispensed drug be traced back to the diagnosis
+ * that justified it, which is what billing and controlled-substance audits ask
+ * for. `encounterId` is already set at creation.
+ *
+ * Idempotent and non-fatal: re-linking the same record is a no-op, and a
+ * missing prescription returns null rather than throwing, because the caller
+ * treats this as a best-effort step after the visit has already been saved.
+ */
+export async function linkPrescriptionToRecord(
+  prescriptionId: string,
+  medicalRecordId: string,
+): Promise<PrescriptionDoc | null> {
+  const db = prescriptionsDB();
+  try {
+    const existing = await db.get(prescriptionId) as PrescriptionDoc;
+    if (existing.medicalRecordId === medicalRecordId) return existing;
+
+    const now = new Date().toISOString();
+    const next = withPendingOfflineSync({
+      ...existing,
+      medicalRecordId,
+      updatedAt: now,
+    } as PrescriptionDoc, now);
+    const resp = await db.put(next);
+    next._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'prescription',
+      resourceId: next._id,
+      operation: 'update',
+      resourceVersion: next._rev,
+      hospitalId: next.hospitalId,
+      orgId: next.orgId,
+    });
+    return next;
+  } catch {
+    return null;
+  }
+}

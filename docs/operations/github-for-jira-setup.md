@@ -1,4 +1,4 @@
-# GitHub for Jira — setup (taban.atlassian.net)
+# GitHub for Jira — setup (tamamorg.atlassian.net)
 
 One-time install to link Jira issues with GitHub PRs, commits, and (optionally)
 deployments for **makuachteny/TamamHealth**.
@@ -9,10 +9,10 @@ Parent doc: [jira-github-do-tracking.md](./jira-github-do-tracking.md).
 
 ## 1. Install the app
 
-1. Open **https://taban.atlassian.net**
+1. Open **https://tamamorg.atlassian.net**
 2. **Settings** (gear) → **Apps** → **Explore apps** (or Atlassian Marketplace)
 3. Search **GitHub for Jira** (by Atlassian)
-4. Click **Get app** → install for **taban**
+4. Click **Get app** → install for **tamamorg**
 5. Complete OAuth: authorize **GitHub** and select org/user **makuachteny**
 
 ---
@@ -31,9 +31,9 @@ Parent doc: [jira-github-do-tracking.md](./jira-github-do-tracking.md).
 
 ## 3. Verify
 
-1. Open any SCRUM issue (e.g. [SCRUM-98](https://taban.atlassian.net/browse/SCRUM-98))
+1. Open any KAN issue (e.g. [KAN-91](https://tamamorg.atlassian.net/browse/KAN-91))
 2. Check **Development** panel — should show “Connect to GitHub” or linked items after first PR
-3. Open a test PR on GitHub with `SCRUM-98` in the title — issue should link within a few minutes
+3. Open a test PR on GitHub with `KAN-91` in the title — issue should link within a few minutes
 
 ---
 
@@ -42,14 +42,14 @@ Parent doc: [jira-github-do-tracking.md](./jira-github-do-tracking.md).
 In commit messages:
 
 ```text
-SCRUM-98 Add GHCR compose override for staging deploys
+KAN-91 Add GHCR compose override for staging deploys
 ```
 
 In PR description:
 
 ```text
-Closes SCRUM-98
-Fixes SCRUM-97
+Closes KAN-91
+Fixes KAN-92
 ```
 
 Jira moves issues to **Done** when merged if your workflow allows smart-commit transitions.
@@ -60,22 +60,22 @@ Full conventions: [CONTRIBUTING.md](../CONTRIBUTING.md#jira-integration-smart-co
 
 ## 5. Cursor / VS Code (Atlascode)
 
-Cursor is authenticated to **taban.atlassian.net**. Update user settings if the Jira
+Cursor is authenticated to **tamamorg.atlassian.net**. Update user settings if the Jira
 sidebar still shows **inchcapeglobal**:
 
 ```json
 "atlascode.jira.jqlList": [
   {
-    "name": "My SCRUM Issues",
-    "query": "project = SCRUM AND assignee = currentUser() AND resolution = Unresolved ORDER BY lastViewed DESC",
-    "siteId": "03f67228-adf2-4432-b323-f5eb3f788025",
+    "name": "My KAN Issues",
+    "query": "project = KAN AND assignee = currentUser() AND resolution = Unresolved ORDER BY lastViewed DESC",
+    "siteId": "147a321a-6723-462e-8ee2-ba43700629cd",
     "enabled": true,
     "monitor": true
   }
 ]
 ```
 
-Site ID `03f67228-adf2-4432-b323-f5eb3f788025` = **taban**.
+Site ID `147a321a-6723-462e-8ee2-ba43700629cd` = **tamamorg** (`tamamorg.atlassian.net`), confirmed via the Atlassian API on 2026-07-27.
 
 ---
 
@@ -83,6 +83,6 @@ Site ID `03f67228-adf2-4432-b323-f5eb3f788025` = **taban**.
 
 | Problem | Fix |
 |---------|-----|
-| PRs not linking | Confirm repo included in GitHub for Jira settings; key must match `SCRUM-123` |
+| PRs not linking | Confirm repo included in GitHub for Jira settings; key must match `KAN-123` |
 | Wrong GitHub org | Re-authorize app under **makuachteny** |
 | Deployments empty | GitHub Deployments API not used yet — track SHA manually in Jira comments |

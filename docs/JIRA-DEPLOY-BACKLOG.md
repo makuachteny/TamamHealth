@@ -10,10 +10,51 @@ Docs: [`DEPLOY-DIGITALOCEAN.md`](./DEPLOY-DIGITALOCEAN.md),
 [`STEP-BY-STEP-PLAYBOOK.md`](./STEP-BY-STEP-PLAYBOOK.md),
 [`operations/jira-github-do-tracking.md`](./operations/jira-github-do-tracking.md) (Jira ↔ GitHub ↔ DO tracking).
 
-**Live backlog:** [SCRUM-70 epic](https://taban.atlassian.net/browse/SCRUM-70) on taban.atlassian.net.
+**Live backlog:** [KAN-90 epic](https://tamamorg.atlassian.net/browse/KAN-90) on tamamorg.atlassian.net.
 
 **Labels (all issues):** `deployment`, `digitalocean`  
 **Component:** `Infrastructure` (or `DevOps` if your project uses that)
+
+---
+
+## Verified status — 2026-07-27
+
+Audited against the live repo, GitHub Actions, and public DNS, and mirrored into
+Jira on the same date. The two genuinely-open items are tracked as
+[KAN-91](https://tamamorg.atlassian.net/browse/KAN-91) (CI deploy secrets) and
+[KAN-92](https://tamamorg.atlassian.net/browse/KAN-92) (backup restore drill).
+
+| Phase | State | Evidence |
+|-------|-------|----------|
+| 1 — Accounts & prerequisites | **Done** | Droplets exist; CI green on `main` |
+| 2 — DO infrastructure | **Done** (2.5 skipped) | 3 droplets w/ reserved IPs; DNS resolves (below) |
+| 3 — Secrets & environment | **Done on droplets** | `.env` appends applied; 3.5 Doppler optional, not done |
+| 4 — First deploy on droplet | **Done** | Stack serving on both app hostnames |
+| 5 — CI/CD automation | **Blocked at 5.2** | Images publish to GHCR; SSH deploy skips every run |
+| 6 — Post-deploy operations | **Partial** | Off-site upload unwired; restore drill ran 2026-07-01 and **failed** |
+| 7 — Optional enhancements | **7.1 done**, 7.2/7.3 open | `infra/digitalocean/terraform/` exists |
+
+**Live DNS (verified 2026-07-27)**
+
+| Hostname | Resolves to | Droplet |
+|----------|-------------|---------|
+| `tamamhealth.org`, `www` | 138.68.124.30 | production |
+| `app.tamamhealth.org`, `couch.tamamhealth.org` | 138.68.124.30 | production |
+| `app.staging.tamamhealth.org`, `couch.staging.tamamhealth.org` | 146.190.179.153 | staging |
+
+**The one blocker:** the `staging` and `production` GitHub Environments exist but
+contain **no secrets**. `deploy-staging` builds and pushes images to GHCR
+successfully, then its `ssh deploy to staging host` job skips the SSH steps every
+run — so CI has never deployed to a droplet. `deploy-production` has never run at
+all. Unblocking needs a deploy keypair whose public half is in the droplets'
+`authorized_keys`; the existing `tamamhealth-deploy` private key is not on this
+machine. See [Task 5.2](#task-52--add-staging_ssh_-secrets).
+
+Re-run the static half of this audit any time:
+
+```bash
+./scripts/verify-deploy-pipeline.sh   # 17/17 passing as of 2026-07-27
+```
 
 ---
 
@@ -64,9 +105,12 @@ References:
 
 **Acceptance criteria**
 
-- [ ] `https://app.<domain>` loads with valid TLS
-- [ ] Admin can log in and create a facility
-- [ ] (Optional) Push to `main` auto-deploys to staging via GHCR + SSH
+- [x] `https://app.staging.<domain>` loads with valid TLS
+- [x] Admin can log in and create a facility
+- [ ] Push to `main` auto-deploys to staging via GHCR + SSH — **blocked, see Task 5.2**
+
+Note: this epic is the *staging* pipeline. `app.<domain>` (no `staging.`) is the
+production droplet and is promoted manually via the `deploy-production` workflow.
 
 ---
 
@@ -194,17 +238,25 @@ cat ~/.ssh/id_ed25519.pub   # add to DO droplet + GitHub if needed
 | **Summary** | Point @, app, couch DNS to reserved IP |
 | **Parent** | Phase 2 — DigitalOcean infrastructure |
 
-**Description:**
+**Description:** Staging and production use *separate* hostnames on separate droplets.
 
-| Type | Name | Value |
-|------|------|-------|
-| A | `@` | reserved IP |
-| A | `app` | reserved IP |
-| A | `couch` | reserved IP |
+| Type | Name | Value | Droplet |
+|------|------|-------|---------|
+| A | `app.staging` | 146.190.179.153 | staging |
+| A | `couch.staging` | 146.190.179.153 | staging |
+| A | `@` | 138.68.124.30 | production |
+| A | `www` | 138.68.124.30 | production |
+| A | `app` | 138.68.124.30 | production |
+| A | `couch` | 138.68.124.30 | production |
 
-Verify: `dig +short app.<domain>` returns the IP.
+Verify: `dig +short app.staging.<domain>` returns the staging reserved IP.
 
-**Acceptance criteria:** All three hostnames resolve to reserved IP.
+**Acceptance criteria:** All hostnames resolve to their droplet's reserved IP.
+
+**Status: Done** — all six verified resolving 2026-07-27. Note the apex now points
+at the *production* droplet, not the `tamamhealth-website` droplet
+(129.212.252.214); website changes deployed to .214 no longer reach the public
+site.
 
 ---
 
@@ -446,6 +498,27 @@ See `.github/workflows/deploy-staging.yml`.
 
 **Acceptance criteria:** All three required secrets set; deploy job no longer skips SSH step.
 
+**Status: BLOCKED — this is the critical path for the whole epic.** Verified
+2026-07-27: the `staging` environment exists but holds zero secrets, so the gate
+step writes `ready=false` and both SSH steps skip on every run. Same for
+`production` (`PROD_SSH_*`), which is why `deploy-production` has never run.
+
+To unblock, someone with droplet console/SSH access must:
+
+```bash
+ssh-keygen -t ed25519 -C "tamamhealth-staging-deploy" -f ~/.ssh/tamamhealth_staging -N ""
+# add the .pub to /root/.ssh/authorized_keys on the staging droplet (146.190.179.153)
+gh secret set STAGING_SSH_HOST --env staging --body "146.190.179.153"
+gh secret set STAGING_SSH_USER --env staging --body "root"
+gh secret set STAGING_SSH_KEY  --env staging < ~/.ssh/tamamhealth_staging
+```
+
+Blocker detail: the droplets' firewall restricts port 22 to specific source IPs,
+and the private half of the existing `tamamhealth-deploy` key is not on the
+developer machine — so the keypair has to be re-issued from the DO console
+(Droplet → Access → Recovery Console) rather than over SSH. Full procedure:
+[`operations/github-environments-setup.md`](./operations/github-environments-setup.md).
+
 ---
 
 ### Task 5.3 — Add docker-compose.ghcr.yml override
@@ -458,6 +531,13 @@ See `.github/workflows/deploy-staging.yml`.
 **Description:** Root `docker-compose.yml` builds locally; CI runs `docker compose pull`. Add `docker-compose.ghcr.yml` with `image: ghcr.io/<owner>/tamamhealth-platform:staging` (and website, sync-worker). Document `COMPOSE_FILE` or `-f` usage on server.
 
 **Acceptance criteria:** `docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull` succeeds on server.
+
+**Status: Done.** [`docker-compose.ghcr.yml`](../docker-compose.ghcr.yml) exists at
+the repo root covering all three services, and both deploy workflows layer it with
+`-f`. `COMPOSE_FILE` is persisted via
+[`infra/digitalocean/staging.env.append`](../infra/digitalocean/staging.env.append).
+The server-side `pull` half is still unproven because no CI deploy has reached a
+droplet (Task 5.2).
 
 ---
 
@@ -557,6 +637,21 @@ See `.github/workflows/deploy-staging.yml`.
 
 **Acceptance criteria:** Successful restore drill documented.
 
+**Status: Automated but failing.** The quarterly drill
+(`.github/workflows/backups-cron.yml`) fired on 2026-07-01 and **failed after 22s**
+— `apt-get install awscli` returned *"Package 'awscli' has no installation
+candidate"*, because `awscli` was dropped from the Ubuntu 24.04 (noble) archive
+that `ubuntu-latest` now resolves to. Fixed 2026-07-27: the workflow now relies on
+the runner's preinstalled AWS CLI v2 and falls back to the official installer.
+
+**Still required to actually pass:** the `production` environment has no secrets,
+so the drill will now fail one step later on `BACKUP_PRIVKEY_GPG is not set`. Set
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `BACKUP_BUCKET`,
+`BACKUP_PRIVKEY_GPG`, `BACKUP_PRIVKEY_PASSPHRASE` per
+[`operations/backups.md`](./operations/backups.md), then re-run via
+**Actions → backups-restore-drill → Run workflow** rather than waiting for
+2026-10-01. No drill has ever passed, so the backups are **unverified**.
+
 ---
 
 ### Task 6.5 — Enable DO weekly droplet backups
@@ -603,6 +698,11 @@ See `.github/workflows/deploy-staging.yml`.
 
 **Acceptance criteria:** `terraform apply` provisions staging infra reproducibly.
 
+**Status: Done.** [`infra/digitalocean/terraform/`](../infra/digitalocean/terraform/)
+provisions both droplets, reserved IPs, and 22/80/443 firewalls
+(`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, `terraform.tfvars.example`).
+The website droplet has its own module at `infra/digitalocean-website/`.
+
 ---
 
 ### Task 7.2 — Document fingerprint-bridge desk setup
@@ -636,7 +736,16 @@ See `.github/workflows/deploy-staging.yml`.
 **Columns:** Backlog → Ready → In Progress → Blocked → Done
 
 **Week 1 focus (minimum slice):** Stories 1–4 + Task 5.1–5.2. Defer Story 7.
+*(Stories 1–4 and Tasks 5.1/5.3/7.1 are now Done — see Verified status above.)*
 
-**Blocked examples:**
-- Phase 4 blocked until DNS propagates (Task 2.4)
-- Phase 5 Task 5.3 blocked until dev implements `docker-compose.ghcr.yml`
+**Currently blocked (2026-07-27):**
+
+| Item | Blocked on | Who can unblock |
+|------|-----------|-----------------|
+| **Task 5.2** — `STAGING_SSH_*` secrets | Deploy keypair must be re-issued from the DO recovery console; port 22 is IP-firewalled and the existing private key is lost | Someone with DO console access |
+| Task 5.4/5.5/5.6 | Cascade from 5.2 — no CI deploy can land until SSH works | — |
+| Production promote path | `PROD_SSH_*` secrets also unset; `deploy-production` has never run | Same as 5.2 |
+| **Task 6.4** — restore drill | `production` environment backup secrets unset | Whoever holds the backup GPG key + S3 creds |
+
+*Resolved since first draft:* Phase 4 DNS propagation (Task 2.4) and the
+`docker-compose.ghcr.yml` dependency (Task 5.3) are both done.

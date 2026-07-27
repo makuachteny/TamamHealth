@@ -53,8 +53,20 @@ jobs:
 
       - name: Install drill prerequisites
         run: |
+          # NOTE: do not `apt-get install awscli` — the package was dropped from
+          # the Ubuntu 24.04 (noble) archive, which is what ubuntu-latest now
+          # resolves to, and the drill failed on 2026-07-01 with
+          # "Package 'awscli' has no installation candidate". The runner image
+          # ships AWS CLI v2 already; fall back to the official installer only
+          # if a future image drops it.
           sudo apt-get update -qq
-          sudo apt-get install -y -qq awscli gnupg postgresql-client
+          sudo apt-get install -y -qq gnupg postgresql-client
+          if ! command -v aws >/dev/null 2>&1; then
+            echo "AWS CLI not preinstalled on the runner — installing v2"
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$RUNNER_TEMP/awscliv2.zip"
+            unzip -q "$RUNNER_TEMP/awscliv2.zip" -d "$RUNNER_TEMP"
+            sudo "$RUNNER_TEMP/aws/install"
+          fi
           aws --version
           gpg --version | head -1
           pg_restore --version

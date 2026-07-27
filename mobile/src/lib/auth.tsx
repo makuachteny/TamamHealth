@@ -25,12 +25,14 @@ import * as SecureStore from 'expo-secure-store';
 import type { Patient } from './types';
 import {
   apiFetch,
+  getApiBaseUrl,
   loadStoredToken,
   setAuthToken,
   clearSession,
   setUnauthorizedHandler,
 } from './api-client';
 import { clearAllCachedPhi } from './offline-cache';
+import { configureSyncEngine, pauseSyncEngine } from './sync-engine';
 
 /**
  * The authenticated user as far as the patient mobile app is concerned.
@@ -101,6 +103,29 @@ function friendlyLoginError(status: number, raw: string | undefined): string {
   return 'Login failed. Please try again.';
 }
 
+/**
+ * Enrich the minimal patient from login with the fields the profile screen
+ * needs (DOB, phone, address, …).
+ *
+ * The login response deliberately carries no PHI, so those fields arrive from
+ * `GET /api/patient-portal/profile` under the token we just obtained.
+ *
+ * Best-effort by design: the caller is already authenticated, so a failure
+ * here must degrade to "profile fields missing", never to "login failed".
+ * Offline first sign-in is a real case in the field.
+ */
+async function fetchProfileInto(base: PatientUser): Promise<PatientUser> {
+  try {
+    const res = await apiFetch('/api/patient-portal/profile');
+    if (!res.ok) return base;
+    const body = (await res.json()) as { profile?: Partial<PatientUser> };
+    return body.profile ? { ...base, ...body.profile } : base;
+  } catch (err) {
+    console.warn('[auth] profile fetch failed; continuing with identity only', err);
+    return base;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -141,7 +166,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         try {
           const user = JSON.parse(cached) as PatientUser;
+          // Arm the sync engine for a restored session. Without this, a user
+          // who never signs in again this launch (the normal case) has a
+          // permanently disabled engine: every syncNow() hits the guard and
+          // exits, and queued writes accumulate forever.
+          configureSyncEngine({ apiBaseUrl: getApiBaseUrl(), authToken: token });
           if (!cancelled) setSession({ token, user });
+
+          // Backfill the PHI fields if this cache predates the profile
+          // endpoint, or the login-time fetch failed (e.g. offline sign-in).
+          // Runs after the session is set so it never delays first paint.
+          if (!user.dateOfBirth) {
+            const enriched = await fetchProfileInto(user);
+            if (enriched !== user && !cancelled) {
+              await SecureStore.setItemAsync(PATIENT_CACHE_KEY, JSON.stringify(enriched));
+              setSession({ token, user: enriched });
+            }
+          }
         } catch {
           await clearSession();
         }
@@ -184,11 +225,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       await setAuthToken(data.token);
+      // Point the sync engine at the API with this session's credential.
+      // `configureSyncEngine` had zero call sites before this, so `_apiBaseUrl`
+      // stayed '' and every syncNow() exited at the disabled guard — queued
+      // patient writes never reached the platform.
+      configureSyncEngine({ apiBaseUrl: getApiBaseUrl(), authToken: data.token });
+
+      // The login response carries identity only, no PHI. Pull the rest from
+      // the authenticated profile endpoint so the profile screen has a DOB,
+      // phone and address to render. Best-effort: a failure here must not
+      // block a successful sign-in — the user is authenticated either way and
+      // the screens treat these fields as optional.
+      const patient = await fetchProfileInto(data.patient);
+
       await SecureStore.setItemAsync(
         PATIENT_CACHE_KEY,
-        JSON.stringify(data.patient)
+        JSON.stringify(patient)
       );
-      setSession({ token: data.token, user: data.patient });
+      setSession({ token: data.token, user: patient });
     } finally {
       setIsLoading(false);
     }
@@ -198,6 +252,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Capture the id BEFORE we null out session — otherwise we can't target
     // the right cache namespace for this patient's PHI.
     const departingPatientId = session?.user.id;
+    // Stop the engine FIRST, before the credential is torn down, so a
+    // background sync trigger firing mid-logout cannot push this patient's
+    // data with a token we are in the middle of discarding.
+    pauseSyncEngine();
     setSession(null);
     await SecureStore.deleteItemAsync(PATIENT_CACHE_KEY).catch(() => {});
     if (departingPatientId) {

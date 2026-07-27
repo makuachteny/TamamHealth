@@ -10,6 +10,12 @@ import { findByType } from './db-query';
 import { getSettings } from '../settings/settings-store';
 import { normalizePhone, normalizeEmail, normalizeNationalId } from '../field-formats';
 import { withPendingOfflineSync } from '../sync/offline-metadata';
+import {
+  buildGeocodeId,
+  buildUnknownId,
+  householdPrefix,
+  nextPatientSuffix,
+} from '../clinical-flow/patient-identity';
 
 /**
  * Canonicalize contact/identity fields before validation + storage so every
@@ -140,15 +146,172 @@ async function inferOrgIdFromHospital(hospitalId?: string): Promise<string | und
 }
 
 /**
+ * ISO 3166-1 alpha-2 code for the jurisdiction that owns new records.
+ *
+ * `BaseDoc.countryId` is documented as being populated at create time so the
+ * country-node aggregator can partition for DHIS2 reporting and cross-border
+ * referral routing — but nothing was ever setting it, so every patient doc
+ * carried `undefined`.
+ *
+ * Source of truth is deployment config, because a facility node serves exactly
+ * one jurisdiction. `HospitalDoc` has no country field today; if one is added
+ * later it should win over the env var, so that lookup goes first.
+ */
+const COUNTRY_NAME_TO_ISO: Readonly<Record<string, string>> = {
+  'south sudan': 'SS',
+  'republic of south sudan': 'SS',
+  sudan: 'SD',
+  kenya: 'KE',
+  uganda: 'UG',
+  ethiopia: 'ET',
+  somalia: 'SO',
+};
+
+export function resolveConfiguredCountryId(): string | undefined {
+  // Explicit ISO code wins — unambiguous and what operators should set.
+  const explicit = process.env.NEXT_PUBLIC_ORG_COUNTRY_CODE?.trim();
+  if (explicit) return explicit.toUpperCase();
+
+  // Fall back to deriving it from the display name already in .env.example.
+  const name = process.env.NEXT_PUBLIC_ORG_COUNTRY?.trim().toLowerCase();
+  if (name && COUNTRY_NAME_TO_ISO[name]) return COUNTRY_NAME_TO_ISO[name];
+
+  // Unknown/unset: leave undefined rather than guessing. A wrong country code
+  // misroutes cross-border referrals, which is worse than an absent one.
+  return undefined;
+}
+
+async function inferCountryIdFromHospital(hospitalId?: string): Promise<string | undefined> {
+  if (hospitalId) {
+    try {
+      const hdb = hospitalsDB();
+      const hosp = await hdb.get(hospitalId) as HospitalDoc & { countryId?: string };
+      if (hosp.countryId) return hosp.countryId.toUpperCase();
+    } catch {
+      // Fall through to deployment config.
+    }
+  }
+  return resolveConfiguredCountryId();
+}
+
+/**
+ * Assign the per-patient geocode identifier (Principle 2.7).
+ *
+ * Previously `geocodeId` was only ever read — for search and duplicate
+ * detection — and never written, so the field stayed empty for every patient
+ * registered through the app. Where it *was* constructed elsewhere it omitted
+ * the patient suffix, so an entire household collided on one ID.
+ *
+ * Returns undefined when the boma code or household number is unknown; those
+ * patients are legitimately "transient" per the identity model and can be
+ * upgraded later without changing their UUID.
+ */
+async function assignGeocodeId(data: Record<string, unknown>, scope?: DataScope): Promise<string | undefined> {
+  const bomaCode = (data.bomaCode as string | undefined)?.trim();
+  const householdNumber = data.householdNumber as string | number | undefined;
+  const all = await getAllPatients(scope);
+
+  // No boma/household yet — displaced, transient, or an emergency admission.
+  // Issue a temporary UNKNOWN- identifier rather than leaving the field empty:
+  // an empty geocodeId is indistinguishable from "not yet looked up", whereas
+  // UNKNOWN- is explicitly upgradeable and `isTemporaryId()` can find them for
+  // follow-up. The patient's UUID never changes when it is upgraded.
+  if (!bomaCode || householdNumber === undefined || householdNumber === null || householdNumber === '') {
+    const facility = (data.registrationHospital as string | undefined) || 'UNSPEC';
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const todaysPrefix = `UNKNOWN-${facility}-${date}-`;
+    // Sequence within this facility/day, again taking highest + 1 so a deleted
+    // record cannot collide with a live one.
+    let highest = 0;
+    for (const p of all) {
+      if (typeof p.geocodeId === 'string' && p.geocodeId.startsWith(todaysPrefix)) {
+        const seq = Number(p.geocodeId.slice(todaysPrefix.length));
+        if (!isNaN(seq)) highest = Math.max(highest, seq);
+      }
+    }
+    return buildUnknownId({ facility, date, seq: highest + 1 });
+  }
+
+  const prefix = householdPrefix({ bomaCode, householdNumber });
+  const siblings = all
+    .map((p) => p.geocodeId)
+    .filter((id): id is string => typeof id === 'string' && id.startsWith(`${prefix}-`));
+
+  return buildGeocodeId({
+    bomaCode,
+    householdNumber,
+    patientSuffix: nextPatientSuffix(siblings),
+  });
+}
+
+/**
  * Generate a unique hospital number using UUID suffix to avoid race conditions.
  * Format: PREFIX-XXXXXX (e.g., JTH-A3F2B1)
  */
+/**
+ * Monotonic counter for hospital numbers, stored per facility prefix.
+ *
+ * `_local/` documents are deliberate: they are NOT replicated, so each facility
+ * node keeps its own sequence and two facilities can never fight over the same
+ * counter revision. The number is already namespaced by facility prefix, so
+ * per-node counters are the correct model.
+ *
+ * Replaces a `db.allDocs().total_rows` count, which was wrong in two ways:
+ * it was O(N) on every registration, and — worse — deleting a patient lowered
+ * the count so the NEXT registration reissued a number that already belonged
+ * to someone. In an EMR a reused patient identifier is a safety problem, not
+ * just an integrity one.
+ */
+async function nextHospitalSequence(prefix: string): Promise<number> {
+  const db = patientsDB();
+  const counterId = `_local/hospital_number_counter_${prefix}`;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let current: { _id: string; _rev?: string; seq: number };
+    try {
+      current = await db.get(counterId) as unknown as { _id: string; _rev?: string; seq: number };
+    } catch (err) {
+      const e = err as { name?: string; status?: number } | undefined;
+      if (!e || (e.name !== 'not_found' && e.status !== 404)) throw err;
+      // First registration for this prefix. Seed above any number already in
+      // use so an existing dataset (seeded or migrated) can't collide.
+      current = { _id: counterId, seq: await highestExistingSequence(prefix) };
+    }
+
+    const next = { ...current, seq: current.seq + 1 };
+    try {
+      await db.put(next as unknown as Record<string, unknown>);
+      return next.seq;
+    } catch (err) {
+      const e = err as { name?: string; status?: number } | undefined;
+      // Another tab/worker incremented first — re-read and try again.
+      if (e && (e.name === 'conflict' || e.status === 409)) continue;
+      throw err;
+    }
+  }
+  throw new Error('Could not allocate a hospital number after 5 attempts');
+}
+
+/** Highest sequence already present for a prefix, so a fresh counter starts above it. */
+async function highestExistingSequence(prefix: string): Promise<number> {
+  const all = await getAllPatients();
+  let highest = 0;
+  for (const p of all) {
+    if (typeof p.hospitalNumber === 'string' && p.hospitalNumber.startsWith(`${prefix}-`)) {
+      // Format is PREFIX-NNNNXX; take the leading digits of the suffix.
+      const m = /^(\d+)/.exec(p.hospitalNumber.slice(prefix.length + 1));
+      if (m) highest = Math.max(highest, Number(m[1]));
+    }
+  }
+  return highest;
+}
+
 async function generateHospitalNumber(hospitalId?: string): Promise<string> {
   const prefix = await getHospitalPrefix(hospitalId);
-  const db = patientsDB();
-  const count = (await db.allDocs()).total_rows;
-  // Use count + random suffix for uniqueness without race conditions
-  const suffix = `${String(count + 1).padStart(4, '0')}${uuidv4().slice(0, 2).toUpperCase()}`;
+  const seq = await nextHospitalSequence(prefix);
+  // The 2-char random tail is retained as belt-and-braces against a counter
+  // that gets rolled back by a restore; the sequence carries the ordering.
+  const suffix = `${String(seq).padStart(4, '0')}${uuidv4().slice(0, 2).toUpperCase()}`;
   return `${prefix}-${suffix}`;
 }
 
@@ -206,11 +369,16 @@ export async function createPatient(rawData: Omit<PatientDoc, '_id' | '_rev' | '
   const id = `pat-${uuidv4().slice(0, 8)}`;
   const hospitalNumber = data.hospitalNumber || await generateHospitalNumber(data.registrationHospital);
   const orgId = data.orgId || await inferOrgIdFromHospital(data.registrationHospital);
+  const countryId = data.countryId || await inferCountryIdFromHospital(data.registrationHospital);
+  const geocodeId = data.geocodeId
+    || await assignGeocodeId(data as unknown as Record<string, unknown>);
   const doc: PatientDoc = withPendingOfflineSync({
     _id: id,
     type: 'patient',
     ...data,
     orgId,
+    countryId,
+    ...(geocodeId ? { geocodeId } : {}),
     hospitalNumber,
     registeredAt: data.registeredAt || now,
     createdAt: now,
@@ -334,6 +502,19 @@ export async function mutatePatient(
     try {
       const resp = await db.put(updated);
       updated._rev = resp.rev;
+      // Audit every mutation that lands, not just those routed through
+      // updatePatient(). This path was previously silent, leaving a hole in
+      // the PHI trail for anything that mutates a patient in a retry loop.
+      // Field NAMES only — never values.
+      const changedFields = Object.keys(patch).filter(
+        (k) => !['_id', '_rev', 'type', 'createdAt', 'updatedAt', 'offlineSync'].includes(k),
+      );
+      await logAuditSafe(
+        'UPDATE_PATIENT',
+        undefined,
+        undefined,
+        `Updated patient ${updated._id}${changedFields.length ? ` — fields: ${changedFields.join(', ')}` : ''}`,
+      );
       emitSyncEvent({
         resourceType: 'patient',
         resourceId: updated._id,

@@ -27,6 +27,64 @@ export const RESUMABLE_STATUSES: EncounterStatus[] = [
   'consultation_paused_draft',
 ];
 
+/**
+ * Current shape of `EncounterDoc.snapshot`.
+ *
+ * Bump this whenever the consultation draft changes shape in a way that older
+ * drafts cannot satisfy, and add the corresponding step to
+ * `migrateEncounterSnapshot` below.
+ */
+export const CURRENT_SNAPSHOT_VERSION = 1;
+
+/**
+ * Bring a stored consultation draft up to `CURRENT_SNAPSHOT_VERSION`.
+ *
+ * An encounter can be paused on one app version and resumed on another — the
+ * clinician sends the patient to the lab, the facility updates overnight, and
+ * the draft is reopened against a newer consultation form. Before this existed,
+ * a structurally incompatible snapshot was spread onto the current form fields
+ * with no signal that anything was wrong.
+ *
+ * Documents written before `snapshotVersion` existed are treated as version 1,
+ * which is correct: version 1 *is* the shape they were written in.
+ *
+ * Migrations must be pure and defensive — they run against real clinical drafts
+ * that may be partially filled or hand-edited by a sync conflict resolution.
+ */
+export function migrateEncounterSnapshot(
+  snapshot: Record<string, unknown> | undefined,
+  fromVersion: number | undefined,
+): { snapshot: Record<string, unknown>; version: number; migrated: boolean } {
+  const current = snapshot ?? {};
+  const version = fromVersion ?? 1;
+
+  if (version === CURRENT_SNAPSHOT_VERSION) {
+    return { snapshot: current, version, migrated: false };
+  }
+
+  if (version > CURRENT_SNAPSHOT_VERSION) {
+    // Written by a NEWER app version than this one. Do not attempt to
+    // down-convert — dropping fields we don't understand would silently
+    // discard clinical data. Hand it back untouched and let the form ignore
+    // what it doesn't recognise.
+    console.warn(
+      `[encounter] snapshot version ${version} is newer than supported ${CURRENT_SNAPSHOT_VERSION}; leaving as-is`,
+    );
+    return { snapshot: current, version, migrated: false };
+  }
+
+  // ---------------------------------------------------------------------
+  // Upgrade chain. Each step takes vN → vN+1. No steps yet: version 1 is the
+  // first defined shape. When the draft shape next changes, add:
+  //
+  //   let working = current;
+  //   if (working.__version < 2) { working = upgradeV1toV2(working); }
+  //
+  // and bump CURRENT_SNAPSHOT_VERSION.
+  // ---------------------------------------------------------------------
+  return { snapshot: current, version: CURRENT_SNAPSHOT_VERSION, migrated: true };
+}
+
 export async function getEncounter(id: string): Promise<EncounterDoc | null> {
   try {
     return await encountersDB().get(id) as EncounterDoc;
@@ -63,6 +121,7 @@ export async function createEncounter(
     ...data,
     status,
     stageKey: stageOf(status),
+    snapshotVersion: CURRENT_SNAPSHOT_VERSION,
     createdAt: now,
     updatedAt: now,
   };
@@ -78,7 +137,17 @@ export async function updateEncounter(id: string, patch: Partial<EncounterDoc>):
   const db = encountersDB();
   try {
     const existing = await db.get(id) as EncounterDoc;
-    const updated: EncounterDoc = { ...existing, ...patch, _id: existing._id, _rev: existing._rev, type: 'clinical_encounter', updatedAt: new Date().toISOString() };
+    // Any write re-stamps the version: the snapshot being persisted is
+    // produced by *this* app version, whatever shape it was read in.
+    const updated: EncounterDoc = {
+      ...existing,
+      ...patch,
+      _id: existing._id,
+      _rev: existing._rev,
+      type: 'clinical_encounter',
+      ...(patch.snapshot ? { snapshotVersion: CURRENT_SNAPSHOT_VERSION } : {}),
+      updatedAt: new Date().toISOString(),
+    };
     const resp = await db.put(updated as unknown as Record<string, unknown>);
     updated._rev = resp.rev;
     emitSyncEvent({ resourceType: 'clinical_encounter', resourceId: id, operation: 'update', resourceVersion: updated._rev, orgId: updated.orgId, hospitalId: updated.hospitalId });

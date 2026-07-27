@@ -117,6 +117,102 @@ Conditions:
 # -----------------------------------------------------------------------------
 Resources:
 
+  # ---- CloudWatch Logs (KAN-70 / MED-21) ------------------------------------
+
+  # Container logs shipped off the instance. Without these the logs live only
+  # on the EC2 instance's local disk and die with it — and the audit trail
+  # (who accessed which patient record) is legally required and is the primary
+  # forensic tool after a security incident, so losing it with the host is not
+  # acceptable.
+  #
+  # 90-day retention matches the ticket. Raise it if the governing data-retention
+  # policy for South Sudan health records requires longer — that is a compliance
+  # decision, not a technical one.
+  #
+  # The instance role already carries CloudWatchAgentServerPolicy, which grants
+  # logs:CreateLogStream and logs:PutLogEvents, so the awslogs driver on each
+  # container can write to these groups without extra IAM.
+  PlatformLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub '/tamamhealth/${EnvironmentName}/platform'
+      RetentionInDays: 90
+
+  WebsiteLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub '/tamamhealth/${EnvironmentName}/website'
+      RetentionInDays: 90
+
+  CouchDBLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub '/tamamhealth/${EnvironmentName}/couchdb'
+      RetentionInDays: 90
+
+  SyncWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub '/tamamhealth/${EnvironmentName}/sync-worker'
+      RetentionInDays: 90
+
+  # ---- KMS ------------------------------------------------------------------
+
+  # Customer-managed key for TamamHealth's SSM SecureString parameters.
+  #
+  # Exists so the instance role can be granted kms:Decrypt on THIS key alone.
+  # Previously it held kms:Decrypt on Resource '*' with only a kms:ViaService
+  # condition — that constrains how a key may be used, not which keys, so a
+  # compromised instance could decrypt every other service's SecureString
+  # parameters in the same AWS account.
+  SsmParameterKey:
+    Type: AWS::KMS::Key
+    # Retain on stack delete: parameters encrypted with this key become
+    # permanently unreadable without it, and CloudFormation would otherwise
+    # schedule deletion while those parameters still exist.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: !Sub 'TamamHealth ${EnvironmentName} — SSM SecureString parameter encryption'
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          # Without this the key is unmanageable — AWS requires the account
+          # root to retain administrative access or the key can be orphaned.
+          - Sid: EnableAccountAdministration
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: AllowUseViaSsmOnly
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:DescribeKey
+            Resource: '*'
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
+
+  SsmParameterKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/tamamhealth-ssm-${EnvironmentName}'
+      TargetKeyId: !Ref SsmParameterKey
+
   # ---- VPC ------------------------------------------------------------------
 
   VPC:
@@ -392,12 +488,19 @@ Resources:
                   - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/tamamhealth/${EnvironmentName}/COUCHDB_USER'
                   - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/tamamhealth/${EnvironmentName}/COUCHDB_WEBHOOK_SECRET'
                   - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/tamamhealth/${EnvironmentName}/*'
-              # SecureString parameters are KMS-encrypted with the AWS-managed
-              # ssm key by default; reading them requires kms:Decrypt against
-              # that key. Constrained to the SSM service via the condition.
+              # SecureString parameters are KMS-encrypted; reading them requires
+              # kms:Decrypt against the encrypting key.
+              #
+              # Scoped to the TamamHealth-owned key ONLY. This was previously
+              # Resource: '*' with just a kms:ViaService condition, which let
+              # this instance role decrypt ANY SecureString parameter in the
+              # account — every other service's secrets included. The ViaService
+              # condition restricts how the key is used, not which keys, so it
+              # was no defence against lateral movement after an instance
+              # compromise.
               - Effect: Allow
                 Action: kms:Decrypt
-                Resource: '*'
+                Resource: !GetAtt SsmParameterKey.Arn
                 Condition:
                   StringEquals:
                     kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
@@ -449,13 +552,19 @@ Resources:
       Port: 3000
       TargetType: instance
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /
+      # Dedicated probe, not `/`. The root path renders the app shell and
+      # returns 200 even when the analytics DB is unreachable, so the ALB would
+      # keep routing traffic to an instance that cannot serve API requests.
+      # /api/health returns 503 when a configured DB is down.
+      HealthCheckPath: /api/health
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
       Matcher:
-        HttpCode: 200-399
+        # Narrowed from 200-399: /api/health returns 503 when unhealthy, and a
+        # 3xx here would mean a redirect away from the probe — not healthy.
+        HttpCode: '200'
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: '30'
@@ -677,6 +786,12 @@ Resources:
             services:
               platform:
                 image: ${!PLATFORM_IMAGE}
+                logging:
+                  driver: awslogs
+                  options:
+                    awslogs-region: "${AWS::Region}"
+                    awslogs-group: "/tamamhealth/${EnvironmentName}/platform"
+                    awslogs-create-group: "false"
                 restart: unless-stopped
                 ports:
                   - "3000:3000"
@@ -699,6 +814,12 @@ Resources:
 
               website:
                 image: ${!WEBSITE_IMAGE}
+                logging:
+                  driver: awslogs
+                  options:
+                    awslogs-region: "${AWS::Region}"
+                    awslogs-group: "/tamamhealth/${EnvironmentName}/website"
+                    awslogs-create-group: "false"
                 restart: unless-stopped
                 ports:
                   - "3001:3001"
@@ -714,6 +835,12 @@ Resources:
 
               couchdb:
                 image: couchdb:3
+                logging:
+                  driver: awslogs
+                  options:
+                    awslogs-region: "${AWS::Region}"
+                    awslogs-group: "/tamamhealth/${EnvironmentName}/couchdb"
+                    awslogs-create-group: "false"
                 restart: unless-stopped
                 # Bound to all interfaces on :5984 so the ALB target-group
                 # health check (which hits the EC2 ENI on port 5984) can
@@ -735,6 +862,12 @@ Resources:
 
               sync-worker:
                 image: ${!SYNC_WORKER_IMAGE}
+                logging:
+                  driver: awslogs
+                  options:
+                    awslogs-region: "${AWS::Region}"
+                    awslogs-group: "/tamamhealth/${EnvironmentName}/sync-worker"
+                    awslogs-create-group: "false"
                 restart: unless-stopped
                 environment:
                   COUCHDB_URL: http://${!COUCHDB_USER}:${!COUCHDB_PASSWORD}@couchdb:5984
@@ -908,6 +1041,22 @@ Resources:
 # Outputs
 # -----------------------------------------------------------------------------
 Outputs:
+  SsmParameterKeyAlias:
+    Description: >-
+      KMS key alias for TamamHealth SSM SecureString parameters. Every
+      SecureString under /tamamhealth/<env>/ MUST be created with
+      --key-id this alias — the instance role can only decrypt this key, so a
+      parameter encrypted with the default aws/ssm key will fail to read at boot.
+    Value: !Ref SsmParameterKeyAlias
+    Export:
+      Name: !Sub '${AWS::StackName}-SsmParameterKeyAlias'
+
+  SsmParameterKeyArn:
+    Description: ARN of the TamamHealth SSM parameter encryption key.
+    Value: !GetAtt SsmParameterKey.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-SsmParameterKeyArn'
+
   ALBDnsName:
     Description: Public DNS name of the Application Load Balancer.
     Value: !GetAtt ALB.DNSName

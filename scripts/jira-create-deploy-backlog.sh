@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # Create DigitalOcean deployment Epic + Stories + Tasks in Jira via REST API.
 #
+# NOTE (2026-07-27): this epic already exists as KAN-90 on tamamorg.atlassian.net,
+# created during the deploy audit. Running this script again would duplicate it.
+# Keep it only for bootstrapping a fresh Jira site. See docs/JIRA-DEPLOY-BACKLOG.md
+# for the current verified status.
+#
 # Prerequisites:
 #   - Jira Cloud site with a Software/Team-managed project
 #   - API token: https://id.atlassian.com/manage-profile/security/api-tokens
 #
 # Usage:
-#   export JIRA_SITE="taban.atlassian.net"
+#   export JIRA_SITE="tamamorg.atlassian.net"
 #   export JIRA_EMAIL="you@example.com"
 #   export JIRA_API_TOKEN="..."
-#   export JIRA_PROJECT="TH"          # project key
+#   export JIRA_PROJECT="KAN"         # project key
 #   ./scripts/jira-create-deploy-backlog.sh
 #
 # Dry run (prints payloads only):

@@ -66,6 +66,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Production promotes an image that was BUILT by deploy-staging, and
+      # NEXT_PUBLIC_DEMO_MODE is inlined into the client bundle at build time.
+      # So production inherits whatever demo setting staging was built with,
+      # and nothing downstream can override it. If the staging build was still
+      # in demo mode (the droplets currently serve the public demo), promoting
+      # it would seed fictional patients into a real facility's browsers.
+      #
+      # Refuse the promotion instead. To ship a real production image, unset
+      # the NEXT_PUBLIC_DEMO_MODE repo/environment variable (or set it to
+      # "false"), let deploy-staging rebuild, then re-run this workflow.
+      - name: Refuse to promote a demo-mode image
+        run: |
+          SRC="${{ steps.resolve.outputs.platform_image }}:${{ steps.resolve.outputs.sha }}"
+          # Recursive search rather than a fixed path: `imagetools inspect`
+          # nests the config differently for single- vs multi-platform images.
+          MODE="$(docker buildx imagetools inspect "$SRC" --format '{{ json . }}' \
+                  | jq -r '.. | objects | .Labels? // empty | ."org.tamamhealth.demo-mode" // empty' \
+                  | head -1)"
+          echo "Image demo-mode label: '${MODE:-<absent>}'"
+          if [ "$MODE" = "true" ]; then
+            echo "::error title=Demo image blocked::$SRC was built with NEXT_PUBLIC_DEMO_MODE=true and would seed fictional patient data. Refusing to promote it to production."
+            exit 1
+          fi
+          if [ -z "$MODE" ]; then
+            echo "::error title=Unlabelled image::$SRC carries no org.tamamhealth.demo-mode label, so its demo setting cannot be verified. Rebuild it with the current platform/Dockerfile before promoting."
+            exit 1
+          fi
+
       - name: Re-tag platform ${{ steps.resolve.outputs.sha }} as production
         run: |
           SRC="${{ steps.resolve.outputs.platform_image }}:${{ steps.resolve.outputs.sha }}"

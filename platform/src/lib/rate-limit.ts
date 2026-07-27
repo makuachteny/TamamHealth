@@ -249,12 +249,15 @@ export async function rateLimit(opts: RateLimitOptions): Promise<RateLimitVerdic
     try {
       return await upstashIncrement(cfg, hashed, windowMs, limit);
     } catch (err) {
-      console.error('[rate-limit] Upstash failed, failing open:', err);
-      return {
-        allowed: true,
-        resetAt: Date.now() + windowMs,
-        remaining: limit,
-      };
+      // Degrade to the in-process counter rather than failing fully open
+      // (KAN-34). The old behaviour returned `allowed: true`, which suspended
+      // rate limiting entirely for the duration of an Upstash outage — an
+      // attacker who could induce or wait out a blip got unlimited login
+      // attempts. The in-process bucket is per-replica and therefore weaker
+      // than the shared one, but it is bounded: brute force is still capped at
+      // `limit` per replica per window instead of infinity.
+      console.error('[rate-limit] Upstash failed — degrading to in-process counter:', err);
+      return memIncrement(hashed, windowMs, limit);
     }
   }
 

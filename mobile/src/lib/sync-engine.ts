@@ -48,6 +48,25 @@ export function updateAuthToken(token: string) {
   _authToken = token;
 }
 
+/**
+ * Stop the engine from talking to the server.
+ *
+ * Called on sign-out. Clearing the token (rather than only the base URL) means
+ * `syncNow()` short-circuits to `disabled` AND no queued write can be pushed
+ * with a stale credential if a background trigger fires mid-logout. The queue
+ * itself is left intact — PHI cache clearing is `clearAllCachedPhi`'s job, and
+ * conflating the two here would silently drop unsynced patient data.
+ */
+export function pauseSyncEngine() {
+  _authToken = '';
+  _apiBaseUrl = '';
+}
+
+/** Whether the engine currently has everything it needs to reach the server. */
+export function isSyncEngineConfigured(): boolean {
+  return Boolean(_apiBaseUrl && _authToken);
+}
+
 function headers(): Record<string, string> {
   return {
     'Content-Type': 'application/json',

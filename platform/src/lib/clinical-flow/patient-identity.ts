@@ -59,11 +59,58 @@ export const PATIENT_ID_ASSUMPTIONS = {
 } as const;
 
 /**
- * Build the geocode-based identifier. The `patientSuffix` scheme is left for
- * engineers to finalise (Principle 2.7); pass the chosen suffix in.
+ * Build the geocode-based identifier.
+ *
+ * The `patientSuffix` scheme is finalised as `P{n}` — see `buildPatientSuffix`.
+ * Callers that already hold a suffix (imports, migrations, tests) may pass any
+ * string; callers registering a new person should use `buildPatientSuffix`.
  */
 export function buildGeocodeId(params: { bomaCode: string; householdNumber: number | string; patientSuffix: string }): string {
   return `BOMA-${params.bomaCode}-HH${params.householdNumber}-${params.patientSuffix}`;
+}
+
+/**
+ * The finalised patient-suffix scheme: `P{n}`, 1-based, in registration order
+ * within a household.
+ *
+ * Chosen over the alternatives because:
+ *   - It keeps the household prefix intact, so `householdPrefix()` still
+ *     groups co-residents for BHW household operations (assumption 2.7.1).
+ *   - It is stable: a member's suffix is assigned once and never renumbers
+ *     when a sibling is added or a record is deactivated. Renumbering would
+ *     break `idStableAcrossMoves`.
+ *   - It is human-sayable over a radio or phone ("BOMA KJ, household 1001,
+ *     person 2"), which matters for BHWs working without connectivity.
+ *
+ * NOTE: this is intentionally NOT derived from name, age or sex — those change
+ * or are unknown at registration, and encoding them would leak PHI into an
+ * identifier that gets written on paper referral slips.
+ */
+export function buildPatientSuffix(memberIndex: number): string {
+  if (!Number.isInteger(memberIndex) || memberIndex < 1) {
+    throw new RangeError(`patient suffix index must be a positive integer, got ${memberIndex}`);
+  }
+  return `P${memberIndex}`;
+}
+
+/** Parse `P{n}` back to its index. Returns 0 for anything that isn't our scheme. */
+export function parsePatientSuffix(suffix: string): number {
+  const m = /^P(\d+)$/.exec(suffix.trim());
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * Next free member index for a household, given the geocode IDs already issued
+ * in it. Takes the highest existing index + 1 rather than `count + 1`, so a
+ * deleted or merged record never causes a collision with a live one.
+ */
+export function nextPatientSuffix(existingGeocodeIds: readonly string[]): string {
+  let highest = 0;
+  for (const id of existingGeocodeIds) {
+    const suffix = id.slice(id.lastIndexOf('-') + 1);
+    highest = Math.max(highest, parsePatientSuffix(suffix));
+  }
+  return buildPatientSuffix(highest + 1);
 }
 
 /** Household-level prefix shared by co-residing family members (BHW/household ops). */

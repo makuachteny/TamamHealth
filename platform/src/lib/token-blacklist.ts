@@ -23,11 +23,22 @@
  *     swapping to Redis (per the rate-limiting ticket) means replacing
  *     this one file, not touching every caller.
  *
+ * OPERATIONAL CONSTRAINT — the store is per-instance. The file lives on one
+ * container's filesystem, so with more than one platform replica a logout
+ * recorded on replica A is invisible to replica B, and the revoked token keeps
+ * working there until its `exp` passes. Rate limiting already moved to shared
+ * Upstash Redis for exactly this reason; this store has not. Until it does,
+ * the platform must run as a SINGLE replica in production — or every replica
+ * must share the TOKEN_BLACKLIST_FILE path on a shared volume. We warn once at
+ * first use in production rather than failing closed, because refusing to boot
+ * would take down a correctly-configured single-replica deploy too.
+ *
  * NOT a replacement for short JWT lifetimes — it complements them.
  */
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { getUpstashConfig, upstashPipeline, withRetry, hashKey } from './upstash';
 
 interface RevocationEntry {
   /** Unix epoch *seconds* when the JWT itself expires. */
@@ -46,6 +57,26 @@ function filePath(): string {
   const override = process.env.TOKEN_BLACKLIST_FILE;
   if (override) return path.resolve(override);
   return path.resolve(process.cwd(), '.token-blacklist.json');
+}
+
+let singleInstanceWarned = false;
+
+/**
+ * Warn once, in production only, that revocation state is per-instance.
+ * Mirrors the in-process warning `rate-limit.ts` emits when it falls back off
+ * shared Redis — a silent per-instance security store is the failure mode we
+ * are trying not to repeat.
+ */
+function maybeWarnSingleInstance(): void {
+  if (singleInstanceWarned) return;
+  singleInstanceWarned = true;
+  if (process.env.NODE_ENV !== 'production') return;
+  console.warn(
+    '[token-blacklist] Revocation state is stored per-instance at ' +
+      `${filePath()}. This deploy MUST run a single platform replica, or all ` +
+      'replicas must share TOKEN_BLACKLIST_FILE on a shared volume — ' +
+      'otherwise a logged-out token stays valid on the other replicas until it expires.',
+  );
 }
 
 async function loadFromDisk(): Promise<Map<string, RevocationEntry>> {
@@ -72,6 +103,7 @@ async function ensureLoaded(): Promise<void> {
   if (store) return;
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
+    maybeWarnSingleInstance();
     store = await loadFromDisk();
     if (!sweepTimer) {
       sweepTimer = setInterval(sweep, SWEEP_INTERVAL_MS);
@@ -139,14 +171,61 @@ function readExpFromJwt(token: string): number {
   return fallback;
 }
 
+// ---------------------------------------------------------------------------
+// Shared (Upstash) backend — KAN-34
+// ---------------------------------------------------------------------------
+//
+// The token is HASHED before it becomes a Redis key. Storing raw JWTs in Redis
+// would turn the revocation list into a credential store: anyone who could read
+// it would hold a set of still-valid session tokens, since a revoked JWT stays
+// cryptographically valid until its `exp`. The hash is enough to answer "is
+// this exact token revoked?" without ever holding the token itself.
+//
+// Redis TTL does the eviction: the key expires exactly when the JWT does, so
+// there is no sweep to run and no unbounded growth.
+
+const REVOKED_PREFIX = 'revoked:';
+
+async function upstashRevoke(token: string, expSec: number): Promise<void> {
+  const cfg = getUpstashConfig();
+  if (!cfg) throw new Error('upstash not configured');
+  const ttlSec = Math.max(1, expSec - Math.floor(Date.now() / 1000));
+  const key = REVOKED_PREFIX + (await hashKey(token, 'tamam-revoked'));
+  await withRetry(() => upstashPipeline(cfg, [['SET', key, '1', 'EX', ttlSec]]), 'token-blacklist');
+}
+
+async function upstashIsRevoked(token: string): Promise<boolean> {
+  const cfg = getUpstashConfig();
+  if (!cfg) throw new Error('upstash not configured');
+  const key = REVOKED_PREFIX + (await hashKey(token, 'tamam-revoked'));
+  const res = await withRetry(() => upstashPipeline(cfg, [['GET', key]]), 'token-blacklist');
+  return res[0]?.result != null;
+}
+
 /**
  * Mark a token as revoked. The store is durable across server restarts —
  * once added, the token cannot be replayed until its `exp` passes.
+ *
+ * Writes to BOTH backends when Upstash is configured. The local file is kept as
+ * a warm fallback so a later Upstash outage degrades to "revocations this
+ * replica recorded" rather than to "nothing is revoked".
  */
 export async function revokeToken(token: string): Promise<void> {
   if (!token) return;
-  await ensureLoaded();
   const expSec = readExpFromJwt(token);
+
+  if (getUpstashConfig()) {
+    try {
+      await upstashRevoke(token, expSec);
+    } catch (err) {
+      // Do not swallow: a failed revocation means logout did not actually
+      // invalidate the session. The local write below still happens, so this
+      // replica is protected, but the operator needs to see it.
+      console.error('[token-blacklist] shared revocation failed — token is revoked on THIS replica only:', err);
+    }
+  }
+
+  await ensureLoaded();
   store!.set(token, { expSec });
   schedulePersist();
 }
@@ -154,9 +233,23 @@ export async function revokeToken(token: string): Promise<void> {
 /**
  * True if the token has been revoked AND has not yet expired. Lazy-evicts
  * an entry that has aged past its `exp`.
+ *
+ * Checks the shared store first so a logout on any replica is honoured here.
+ * On an Upstash failure it falls through to the local file rather than
+ * returning false — answering "not revoked" because the network hiccuped would
+ * hand a valid session back to a logged-out token.
  */
 export async function isTokenRevoked(token: string): Promise<boolean> {
   if (!token) return false;
+
+  if (getUpstashConfig()) {
+    try {
+      if (await upstashIsRevoked(token)) return true;
+    } catch (err) {
+      console.error('[token-blacklist] shared lookup failed — falling back to local store:', err);
+    }
+  }
+
   await ensureLoaded();
   const entry = store!.get(token);
   if (!entry) return false;

@@ -24,6 +24,7 @@ import type { CodedOption } from '@/components/CodedSearchField';
 import { medications } from '@/data/mock';
 import type { Attachment } from '@/data/mock';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
+import { validateDiagnosisCodes } from '@/lib/clinical/diagnosis-validation';
 import FileUpload from '@/components/FileUpload';
 import ClinicalScribe from '@/components/ClinicalScribe';
 import type { ScribeExtraction } from '@/lib/services/clinical-scribe-service';
@@ -331,10 +332,17 @@ export default function ConsultationPage() {
     resumeLoadedRef.current = true;
     (async () => {
       try {
-        const { getEncounter } = await import('@/lib/services/encounter-service');
+        const { getEncounter, migrateEncounterSnapshot } = await import('@/lib/services/encounter-service');
         const enc = await getEncounter(encId);
         if (!enc) return;
-        const s = enc.snapshot as Partial<{
+        // A paused encounter may have been written by an older app version.
+        // Upgrade the draft before spreading it onto the current form fields,
+        // rather than letting an incompatible shape apply silently.
+        const { snapshot: migratedSnapshot } = migrateEncounterSnapshot(
+          enc.snapshot,
+          enc.snapshotVersion,
+        );
+        const s = migratedSnapshot as Partial<{
           consultationStartedAt: string;
           chiefComplaint: string; complaints: string[];
           vitals: typeof vitals; physExam: typeof physExam;
@@ -1196,6 +1204,25 @@ export default function ConsultationPage() {
       return;
     }
 
+    // Check the coded diagnoses against the ICD-11 catalogue (KAN-49). Errors
+    // block (malformed code, coded row with no name); level and catalogue
+    // findings are advisory — a boma clinician who suspects TB must still be
+    // able to record it, so we warn and let the save proceed.
+    const dxCheck = validateDiagnosisCodes(
+      diagnoses.map(d => ({ name: d.name, icd11Code: d.code, certainty: d.certainty })),
+      { facilityLevel: currentUser?.hospital?.facilityLevel, requireDiagnosis: true },
+    );
+    if (dxCheck.errors.length > 0) {
+      showToast(dxCheck.errors[0], 'error');
+      return;
+    }
+    // Advisory. Shown with the attention variant (the toast API has only
+    // success/error) because it asks the clinician to downgrade to 'suspected'
+    // and refer — but the save is NOT blocked and continues below.
+    if (dxCheck.warnings.length > 0) {
+      showToast(dxCheck.warnings[0], 'error');
+    }
+
     if (!hasPlanInput()) {
       showToast('Add a treatment plan, follow-up, referral, or attachment before saving the note.', 'error');
       return;
@@ -1431,6 +1458,24 @@ export default function ConsultationPage() {
       // second one.
       if (activeEncounterId && savedRecord?._id && !existingRecordId) {
         try { await updateEncounter(activeEncounterId, { medicalRecordId: savedRecord._id }); } catch { /* non-fatal */ }
+      }
+
+      // Back-fill medicalRecordId onto the prescriptions written above.
+      // It cannot be set at creation time — the prescriptions are written
+      // before the record exists — so the link is closed here. Without it a
+      // dispensed drug can be traced to the encounter but not to the diagnosis
+      // that justified it, which is what a billing or controlled-substance
+      // audit actually asks for. Non-fatal: the prescriptions are already
+      // valid and carry encounterId.
+      if (savedRecord?._id && prescriptionIds.length > 0) {
+        try {
+          const { linkPrescriptionToRecord } = await import('@/lib/services/prescription-service');
+          await Promise.all(
+            prescriptionIds.map((rxId) => linkPrescriptionToRecord(rxId, savedRecord._id)),
+          );
+        } catch {
+          postWarnings.push('Visit saved, but prescriptions could not be linked to the visit note.');
+        }
       }
 
       // Sign (attest + lock) the note on completion if the clinician opted in.

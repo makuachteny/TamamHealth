@@ -1,0 +1,24 @@
+# Nightly trigger for the off-site backup.
+#
+# Timing: the in-container dump runs at 02:15 UTC (see docker-compose.yml
+# couchdb-backup). This fires at 03:30 UTC — deliberately well after, so the
+# dump has finished and been verified before we try to ship it. Uploading a
+# half-written dump is worse than not uploading, because it looks like a backup.
+[Unit]
+Description=Nightly off-site encrypted CouchDB backup
+Documentation=file:///opt/tamamhealth/docs/operations/backups.md
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+
+# Jitter so a fleet of facility nodes doesn't hit the bucket in lockstep.
+RandomizedDelaySec=15min
+
+# If the droplet was powered off at 03:30 (grid failure is routine here), run
+# as soon as it comes back rather than skipping the night entirely.
+Persistent=true
+
+Unit=tamamhealth-offsite-backup.service
+
+[Install]
+WantedBy=timers.target

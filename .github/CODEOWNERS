@@ -1,0 +1,68 @@
+# CODEOWNERS — automatic review routing.
+#
+# GitHub requests a review from the matching owner when a PR touches these
+# paths. The LAST matching pattern wins, so the catch-all is first and the
+# specific paths override it.
+#
+# Pairs with branch protection's "Require review from Code Owners" (KAN-2).
+# That box is NOT ticked yet — until it is, these are suggestions, not gates.
+#
+# ---------------------------------------------------------------------------
+# ACTION REQUIRED: per-area owners still route to one person.
+#
+# Repo collaborators are @makuachteny, @senyomd and @ikyalo01. Every path below
+# is mapped so review routing actually works, but they all point at
+# @makuachteny because who owns which subsystem was never recorded — and
+# naming someone a required reviewer is a commitment on their behalf, not a
+# formatting detail.
+#
+# To spread the load, change the handle on the right of any line. The two
+# reassignments that were previously pencilled in here were:
+#     /mobile/     -> @ikyalo01
+#     /website/    -> @senyomd
+# ---------------------------------------------------------------------------
+
+# Default owner for anything not matched below.
+*                           @makuachteny
+
+# --- Application code ------------------------------------------------------
+/platform/                  @makuachteny
+/mobile/                    @makuachteny
+/website/                   @makuachteny
+
+# --- Data & sync -----------------------------------------------------------
+# Patient data, CouchDB→Postgres projection and the offline sync engine.
+# Changes here can silently corrupt or drop PHI — keep a second pair of eyes.
+/sync-worker/                    @makuachteny
+/platform/src/app/api/sync/      @makuachteny
+/platform/src/lib/db/            @makuachteny
+
+# --- Security-sensitive paths ----------------------------------------------
+# Auth, proxy (Next 16's middleware), CSRF and token handling. Listed AFTER the
+# application-code block on purpose: last match wins, so these override
+# /platform/ and keep auth changes routed to security review.
+/platform/src/proxy.ts           @makuachteny
+/platform/src/lib/auth.ts        @makuachteny
+/platform/src/lib/auth-token.ts  @makuachteny
+/platform/src/lib/csrf.ts        @makuachteny
+/platform/src/lib/api-auth.ts    @makuachteny
+/platform/src/lib/token-blacklist.ts  @makuachteny
+/platform/src/lib/field-encryption.ts @makuachteny
+/platform/src/lib/config-validation.ts @makuachteny
+/fingerprint-bridge/             @makuachteny
+
+# --- Infrastructure, CI/CD and deploy --------------------------------------
+# A bad change here can take down staging/production or leak secrets.
+/.github/                   @makuachteny
+/infra/                     @makuachteny
+/scripts/                   @makuachteny
+/docker-compose.yml         @makuachteny
+/docker-compose.ghcr.yml    @makuachteny
+/deploy.sh                  @makuachteny
+
+# --- Repo-root tooling -----------------------------------------------------
+/package.json               @makuachteny
+/.lintstagedrc.mjs          @makuachteny
+/.husky/                    @makuachteny
+/.nvmrc                     @makuachteny
+/CODEOWNERS                 @makuachteny

@@ -305,6 +305,31 @@ else
 fi
 echo
 
+# ── bootstrap credentials must not be lying around ───────────────────────────
+# platform/.seed-credentials.json holds the auto-generated admin password in
+# plaintext. It is written on first boot when ADMIN_INITIAL_PASSWORD is unset,
+# and is supposed to be gone once the admin has logged in and changed it. If it
+# still exists, either nobody has completed first login or the cleanup failed —
+# both mean a usable admin credential is sitting on disk.
+echo "Bootstrap credentials"
+SEED_CRED_FILE="platform/.seed-credentials.json"
+if [ -f "$SEED_CRED_FILE" ]; then
+  fail "$SEED_CRED_FILE exists — plaintext admin password on disk. Complete first login and change the password, then: shred -u $SEED_CRED_FILE"
+else
+  ok "no plaintext bootstrap credentials on disk"
+fi
+
+# The off-site backup destination is not optional for anything holding PHI: a
+# droplet failure with only local snapshots is unrecoverable data loss.
+if [ -f .env ] && grep -q '^BACKUP_BUCKET=.\+' .env 2>/dev/null; then
+  ok "BACKUP_BUCKET configured (off-site backups can run)"
+elif [ -f .env ]; then
+  fail "BACKUP_BUCKET is unset in .env — nightly dumps stay on the droplet only. A disk failure loses every record. See docs/operations/backups.md"
+else
+  warn "no .env found — cannot check BACKUP_BUCKET"
+fi
+echo
+
 # ── summary ──────────────────────────────────────────────────────────────────
 echo "──────────────────────────────────────────────────────────────────────────"
 if [ "$failed" -eq 0 ]; then

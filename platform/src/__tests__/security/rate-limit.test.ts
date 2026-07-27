@@ -192,16 +192,39 @@ describe('rate-limit (Upstash backend)', () => {
     expect(verdict.remaining).toBe(0);
   });
 
-  it('fails open on Upstash 5xx (after one retry)', async () => {
+  it('degrades to the in-process counter on Upstash 5xx (after one retry)', async () => {
+    // KAN-34: this used to fail fully open (allowed:true, remaining:limit),
+    // which suspended rate limiting entirely for the duration of an outage.
+    // Now it falls back to the local bucket — weaker than the shared one
+    // because it is per-replica, but still bounded.
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     fetchMock.mockResolvedValue(upstashFail(503));
 
     const verdict = await rateLimit({ key: 'flaky', limit: 5, windowMs: 60_000 });
     expect(verdict.allowed).toBe(true);
-    expect(verdict.remaining).toBe(5);
+    // The local bucket counted this attempt, so one fewer remains.
+    expect(verdict.remaining).toBe(4);
     // INCR → fail; retry → fail → 2 calls.
     expect(fetchMock).toHaveBeenCalledTimes(2);
     errSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('the degraded fallback still locks out a brute-force run', async () => {
+    // The security property that matters: an attacker who induces or waits out
+    // an Upstash outage must not get unlimited attempts.
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    fetchMock.mockResolvedValue(upstashFail(503));
+
+    let last = await rateLimit({ key: 'bruteforce', limit: 3, windowMs: 60_000 });
+    for (let i = 0; i < 3; i++) {
+      last = await rateLimit({ key: 'bruteforce', limit: 3, windowMs: 60_000 });
+    }
+    expect(last.allowed).toBe(false);
+    errSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it('resetRateLimit issues a DEL pipeline', async () => {

@@ -142,7 +142,10 @@ function log(level, msg, extra) {
   const line = extra
     ? `${ts} [${level}] ${msg} ${JSON.stringify(extra)}`
     : `${ts} [${level}] ${msg}`;
-  if (level === 'error') console.error(line);
+  // 'critical' goes to stderr alongside 'error': log shippers and alerting
+  // rules key off the stream, so a CRITICAL line on stdout would be filed as
+  // routine output and never page anyone.
+  if (level === 'error' || level === 'critical') console.error(line);
   else console.log(line);
 }
 
@@ -188,6 +191,59 @@ async function loadState(path) {
     if (err.code === 'ENOENT') return {};
     log('error', `state file read failed (${path}): ${err.message} — starting from zero`);
     return {};
+  }
+}
+
+/**
+ * Recover per-database sequence numbers from the platform when the local
+ * state file is gone (KAN-55 / MED-06).
+ *
+ * The state file lives on a container volume. Lose it — an ephemeral restart,
+ * a recreated volume — and `loadState()` returns `{}`, which makes every one of
+ * the ~46 databases replay from seq=0. That re-posts the entire history of
+ * every patient record and prescription through /api/sync. The route's upserts
+ * are keyed on document id so a correct replay is idempotent, but it is a large
+ * unnecessary load and any gap in that idempotency corrupts analytics.
+ *
+ * `GET /api/sync` already reports `last_seq` per database from the
+ * `sync_metadata` Postgres table, which the POST handler writes on every batch.
+ * That is the same checkpoint, held somewhere the container cannot lose.
+ *
+ * Best-effort: if the platform or Postgres is unreachable we return null and
+ * the caller falls back to a full replay with a CRITICAL log line. Refusing to
+ * start would be worse — the worker would never catch up at all.
+ *
+ * Derives the status URL from PLATFORM_SYNC_URL so there is nothing new to
+ * configure (the POST target and the GET source are the same endpoint).
+ */
+async function recoverStateFromPlatform(syncUrl) {
+  try {
+    const res = await fetch(syncUrl, {
+      method: 'GET',
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) {
+      log('warn', `state recovery: /api/sync returned HTTP ${res.status}`);
+      return null;
+    }
+    const body = await res.json();
+    const rows = Array.isArray(body?.databases) ? body.databases : [];
+    if (rows.length === 0) return null;
+
+    const state = {};
+    for (const row of rows) {
+      // last_seq comes back as a string (CouchDB seqs are opaque strings, and
+      // Postgres returns the column as text). Keep it opaque — never coerce to
+      // a number, CouchDB 3 seqs look like "42-g1AAAA...".
+      if (row?.db_name && row?.last_seq != null && String(row.last_seq) !== '0') {
+        state[row.db_name] = { seq: String(row.last_seq) };
+      }
+    }
+    return Object.keys(state).length > 0 ? state : null;
+  } catch (err) {
+    log('warn', `state recovery failed: ${err.message}`);
+    return null;
   }
 }
 
@@ -361,7 +417,33 @@ export async function runOnce({ env, state, dbs }) {
 }
 
 async function mainLoop({ env, dbs }) {
-  const state = await loadState(env.STATE_FILE);
+  let state = await loadState(env.STATE_FILE);
+
+  // Empty state means either a genuine first run or a lost state file. We
+  // cannot tell them apart locally, so ask the platform for the checkpoints it
+  // holds in Postgres before deciding to replay everything (KAN-55).
+  if (Object.keys(state).length === 0) {
+    log('warn', `no local state at ${env.STATE_FILE} — attempting recovery from the platform's sync_metadata`);
+    const recovered = await recoverStateFromPlatform(env.PLATFORM_SYNC_URL);
+    if (recovered) {
+      state = recovered;
+      log('info', `state recovered for ${Object.keys(recovered).length} database(s); resuming from stored checkpoints`);
+      // Write it back immediately so a crash before the first successful poll
+      // doesn't send us round the same recovery loop.
+      await saveState(env.STATE_FILE, state).catch((err) =>
+        log('warn', `could not persist recovered state: ${err.message}`),
+      );
+    } else {
+      log(
+        'critical',
+        `RECOVERING FROM SEQ=0 — no local state file and no usable checkpoints from the platform. ` +
+        `All ${dbs.length} databases will replay their FULL history through /api/sync. ` +
+        `This is expected on a genuine first run; on a restart it means the state volume was lost ` +
+        `and analytics rows will be re-upserted. Verify STATE_FILE is on a persistent volume.`,
+      );
+    }
+  }
+
   log('info', `worker starting; dbs=${dbs.length}, batch=${env.BATCH_SIZE}, interval=${env.POLL_INTERVAL_MS}ms, state=${env.STATE_FILE}`);
 
   let consecutiveFailures = 0;
@@ -445,6 +527,7 @@ export {
   loadState,
   saveState,
   pollDatabase,
+  recoverStateFromPlatform,
   splitCouchAuth,
   FALLBACK_DBS,
 };

@@ -4,6 +4,7 @@
 import {
   validatePatientData,
   validateVitalSigns,
+  patientAgeInYears,
   validateMedicalRecord,
   validateAttachment,
   validatePrescription,
@@ -273,6 +274,101 @@ describe('validation', () => {
     test('accepts valid systolic BP using systolic alias', () => {
       const errors = validateVitalSigns({ systolic: 120 });
       expect(errors.systolicBP).toBeUndefined();
+    });
+
+    describe('age-banded bounds (paediatric)', () => {
+      // The bug these cover: adult bounds were applied to every patient, so
+      // ordinary infant physiology was REJECTED as invalid data entry.
+
+      test('accepts a neonate respiratory rate that adult bounds would reject', () => {
+        // A distressed newborn at 70 breaths/min is a real, recordable
+        // observation; the adult ceiling is 60.
+        expect(validateVitalSigns({ respiratoryRate: 70 }).respiratoryRate).toBeDefined();
+        expect(validateVitalSigns({ respiratoryRate: 70 }, 0.1).respiratoryRate).toBeUndefined();
+      });
+
+      test('accepts an infant heart rate at the top of normal', () => {
+        expect(validateVitalSigns({ pulse: 160 }, 0.5).pulse).toBeUndefined();
+      });
+
+      test('accepts an infant systolic BP below the adult floor', () => {
+        expect(validateVitalSigns({ systolicBP: 35 }).systolicBP).toBeDefined();
+        expect(validateVitalSigns({ systolicBP: 35 }, 0.2).systolicBP).toBeUndefined();
+      });
+
+      test('accepts a newborn weight below the adult floor', () => {
+        expect(validateVitalSigns({ weight: 0.4 }).weight).toBeDefined();
+        expect(validateVitalSigns({ weight: 0.4 }, 0.02).weight).toBeUndefined();
+      });
+
+      test('still rejects genuine data-entry errors for infants', () => {
+        // 90 kg for a 6-month-old is a typo, not a patient.
+        expect(validateVitalSigns({ weight: 90 }, 0.5).weight).toBeDefined();
+        // A pulse of 5 is not survivable at any age.
+        expect(validateVitalSigns({ pulse: 5 }, 0.5).pulse).toBeDefined();
+      });
+
+      test('an adolescent gets wider bounds than an adult but narrower than an infant', () => {
+        // 190cm is plausible for a 16-year-old, rejected only above 220.
+        expect(validateVitalSigns({ height: 190 }, 16).height).toBeUndefined();
+        // An infant height of 40cm is implausible for an adolescent.
+        expect(validateVitalSigns({ height: 40 }, 16).height).toBeDefined();
+        expect(validateVitalSigns({ height: 40 }, 0.1).height).toBeUndefined();
+      });
+
+      test('omitting the age preserves the previous adult behaviour', () => {
+        const withoutAge = validateVitalSigns({ pulse: 72, respiratoryRate: 16, weight: 70, height: 170 });
+        const asAdult = validateVitalSigns({ pulse: 72, respiratoryRate: 16, weight: 70, height: 170 }, 35);
+        expect(withoutAge).toEqual(asAdult);
+        expect(Object.keys(withoutAge)).toHaveLength(0);
+      });
+
+      test('temperature and SpO2 are not age-banded', () => {
+        expect(validateVitalSigns({ temperature: 50 }, 0.1).temperature).toBeDefined();
+        expect(validateVitalSigns({ oxygenSaturation: 105 }, 0.1).oxygenSaturation).toBeDefined();
+      });
+    });
+
+    describe('patientAgeInYears', () => {
+      const isoDaysAgo = (days: number) =>
+        new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+
+      test('returns undefined with no usable source', () => {
+        expect(patientAgeInYears(undefined)).toBeUndefined();
+        expect(patientAgeInYears({})).toBeUndefined();
+      });
+
+      test('computes whole years from a date of birth', () => {
+        const age = patientAgeInYears({ dateOfBirth: isoDaysAgo(365 * 30 + 8) });
+        expect(age).toBeGreaterThanOrEqual(29);
+        expect(age).toBeLessThanOrEqual(30);
+      });
+
+      test('gives sub-year precision for infants — the whole point of the <1 band', () => {
+        const threeMonths = patientAgeInYears({ dateOfBirth: isoDaysAgo(91) });
+        expect(threeMonths).toBeDefined();
+        expect(threeMonths!).toBeGreaterThan(0.2);
+        expect(threeMonths!).toBeLessThan(0.3);
+        // and it must land in the infant band, not the adult one
+        expect(validateVitalSigns({ respiratoryRate: 70 }, threeMonths).respiratoryRate)
+          .toBeUndefined();
+      });
+
+      test('falls back to estimatedAge when DOB is absent', () => {
+        expect(patientAgeInYears({ estimatedAge: 7 })).toBe(7);
+        expect(patientAgeInYears({ estimatedAge: '7' })).toBe(7);
+      });
+
+      test('prefers a real DOB over estimatedAge', () => {
+        const age = patientAgeInYears({ dateOfBirth: isoDaysAgo(365 * 40), estimatedAge: 7 });
+        expect(age).toBeGreaterThan(30);
+      });
+
+      test('ignores nonsense values rather than producing a bogus band', () => {
+        expect(patientAgeInYears({ dateOfBirth: 'not-a-date' })).toBeUndefined();
+        expect(patientAgeInYears({ estimatedAge: 999 })).toBeUndefined();
+        expect(patientAgeInYears({ estimatedAge: -5 })).toBeUndefined();
+      });
     });
 
     test('accepts valid diastolic BP using diastolic alias', () => {

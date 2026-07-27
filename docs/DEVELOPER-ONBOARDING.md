@@ -145,7 +145,7 @@ every PR. The build step catches server/client boundary mistakes — run
 
 ## 6. Jira, GitHub, and deploy tracking
 
-- **Jira:** taban.atlassian.net, project **SCRUM** — include `SCRUM-N` in branches, commits, and PRs ([CONTRIBUTING.md](../CONTRIBUTING.md)).
+- **Jira:** tamamorg.atlassian.net, project **KAN** — include `KAN-N` in branches, commits, and PRs ([CONTRIBUTING.md](../CONTRIBUTING.md)).
 - **Staging:** merges to `main` auto-deploy to the staging DigitalOcean droplet via GitHub Actions.
 - **Production:** manual **deploy-production** workflow after staging smoke test.
 

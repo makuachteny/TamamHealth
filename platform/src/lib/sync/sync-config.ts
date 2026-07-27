@@ -103,6 +103,29 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   // and a payment taken at another (the cashier) have to converge so every
   // device computes the same patient balance. Unlike the audit/controlled logs
   // (write-only trails), the ledger is read at the point of care.
+  //
+  // CONFLICT POLICY (KAN-40) — no resolution strategy is needed, by design:
+  //
+  //   1. Entries are never updated or deleted, only appended. A document-level
+  //      conflict requires two writers to touch the SAME _id, and
+  //      `createLedgerEntry` mints `ledger-<uuidv4 fragment>` per entry, so two
+  //      stations posting simultaneously produce two distinct documents. Both
+  //      survive replication; neither wins, because they never collide.
+  //      LAST_WRITE_WINS and MERGE are therefore equally acceptable here — the
+  //      branch is unreachable in normal operation.
+  //
+  //   2. The convergent balance is derived, not stored. `getPatientBalance()`
+  //      SUMS every entry's `amount`. Two concurrent posts converge to the
+  //      correct total once both replicate, in either arrival order.
+  //
+  //   3. `runningBalance` on each doc is a point-in-time snapshot taken on the
+  //      writing device and is NOT authoritative after sync. Two stations
+  //      posting concurrently each compute it from the balance they can see, so
+  //      both may record the same figure. Never sum or compare `runningBalance`
+  //      across entries — read `getPatientBalance()` instead. It is retained
+  //      only as a forensic record of what the clerk saw at the till.
+  //
+  // Asserted by src/__tests__/services/ledger-conflict-policy.test.ts.
   { localName: 'tamamhealth_ledger',                direction: 'both', orgScoped: true },
   // A form submitted at the patient portal (or by front desk on the
   // patient's behalf) needs to reach whichever facility device reviews it,

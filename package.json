@@ -1,0 +1,18 @@
+{
+  "name": "tamamhealth-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Repo-root tooling only (git hooks + lint-staged). Application code lives in platform/, mobile/, website/, sync-worker/, fingerprint-bridge/, country-node/ and regional-exchange/, each with its own package.json and lockfile. Nothing here is published or deployed.",
+  "engines": {
+    "node": ">=20.0.0 <21.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "setup": "bash scripts/setup.sh"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10"
+  }
+}

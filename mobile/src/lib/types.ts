@@ -1,22 +1,38 @@
 /** Shared types for the TamamHealth Patient mobile app. */
 
+/**
+ * The signed-in patient.
+ *
+ * Only `id`, `firstName`, `surname`, `hospitalNumber` and `registrationHospital`
+ * arrive from `POST /api/patient-portal/login` — the login response deliberately
+ * carries no PHI, because the authentication request is the one most likely to
+ * be logged, proxied or retried.
+ *
+ * Everything below that is optional and is populated by a follow-up call to
+ * `GET /api/patient-portal/profile` once a token exists. Screens must therefore
+ * tolerate these being absent on the very first render after sign-in.
+ */
 export type Patient = {
   id: string;
   firstName: string;
   surname: string;
   hospitalNumber: string;
-  phone: string;
-  dateOfBirth: string;
-  gender: 'Male' | 'Female';
   registrationHospital: string;
-  /**
-   * Patient-portal login does not currently return this field; declared as
-   * optional so the profile screen can render it once the endpoint exposes it.
-   */
+  /** From /profile. */
+  middleName?: string;
+  /** From /profile. */
+  phone?: string;
+  /** From /profile. */
+  dateOfBirth?: string;
+  /** From /profile. */
+  gender?: 'Male' | 'Female';
+  /** From /profile. */
+  registrationHospitalName?: string;
+  /** From /profile. */
   registrationDate?: string;
-  /** Optional contact address — surfaced on the profile screen if present. */
+  /** From /profile — optional contact address. */
   address?: string;
-  /** Optional email — surfaced on the profile screen if present. */
+  /** From /profile — optional email. */
   email?: string;
 };
 

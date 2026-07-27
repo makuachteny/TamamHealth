@@ -40,14 +40,51 @@ export function validateProductionConfig(env: ConfigEnv): string[] {
   }
 
   // --- Field encryption key (encryption at rest) ---------------------------
-  // Optional, but if encryption-at-rest is enabled the key must be valid.
-  if (env.PHI_ENCRYPTION_ENABLED === 'true') {
+  // REQUIRED in production. The previous rule only fired when encryption was
+  // already switched ON, so the dangerous case — an operator who never set the
+  // flag at all and is silently writing plaintext PHI — passed validation
+  // cleanly. That is exactly backwards for a fail-closed check.
+  // Exempt only an explicit demo deployment, which by definition holds seeded
+  // fake data rather than real patients. Any other production boot must encrypt.
+  const isDemo = env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  if (!isDemo && env.PHI_ENCRYPTION_ENABLED !== 'true') {
+    errors.push(
+      'PHI_ENCRYPTION_ENABLED must be "true" in production — patient data would otherwise be stored unencrypted. ' +
+      'Set it and supply PHI_ENCRYPTION_KEY (`openssl rand -base64 32`). ' +
+      'Only an explicit demo deployment (NEXT_PUBLIC_DEMO_MODE=true, seeded fake data) may run without it.',
+    );
+  } else if (env.PHI_ENCRYPTION_ENABLED === 'true') {
     const key = env.PHI_ENCRYPTION_KEY || '';
     if (!key) {
       errors.push('PHI_ENCRYPTION_ENABLED=true but PHI_ENCRYPTION_KEY is unset — generate one with `openssl rand -base64 32`.');
+    } else if (PLACEHOLDER.test(key)) {
+      errors.push('PHI_ENCRYPTION_KEY still contains a placeholder — generate a real one with `openssl rand -base64 32`.');
     } else if (Buffer.from(key, 'base64').length !== 32) {
       errors.push('PHI_ENCRYPTION_KEY must decode to exactly 32 bytes (AES-256) — generate with `openssl rand -base64 32`.');
     }
+  }
+
+  // --- Shared security state (Upstash Redis) -------------------------------
+  // Rate-limit counters and the JWT revocation list are per-instance unless a
+  // shared store is configured. With more than one replica that means an
+  // attacker gets `limit` login attempts PER REPLICA, and a token revoked at
+  // logout on replica A keeps working on replica B until its `exp` passes.
+  //
+  // A process cannot tell how many replicas it is one of, so this is required
+  // in production and the single-replica case must say so explicitly. Same
+  // fail-closed shape as the PHI rule above: the dangerous configuration is
+  // reachable, but only as a deliberate, recorded choice.
+  if (!isDemo && !env.UPSTASH_REDIS_REST_URL) {
+    if (env.SINGLE_REPLICA_ACK !== 'true') {
+      errors.push(
+        'UPSTASH_REDIS_REST_URL/TOKEN are unset, so rate-limit counters and the JWT ' +
+        'revocation list are per-instance — a logged-out token stays valid on other ' +
+        'replicas. Configure Upstash, or set SINGLE_REPLICA_ACK=true to confirm this ' +
+        'deploy runs exactly ONE platform replica.',
+      );
+    }
+  } else if (!isDemo && env.UPSTASH_REDIS_REST_URL && !env.UPSTASH_REDIS_REST_TOKEN) {
+    errors.push('UPSTASH_REDIS_REST_URL is set but UPSTASH_REDIS_REST_TOKEN is unset — the shared store would be unreachable.');
   }
 
   // --- Sync (CouchDB) ------------------------------------------------------

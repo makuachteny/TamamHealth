@@ -246,3 +246,47 @@ export async function getSeedPasswordFor(username: string): Promise<string | und
   const file = await getOrCreateSeedCredentials();
   return file.passwords[username];
 }
+
+/**
+ * Remove the bootstrap credentials file.
+ *
+ * Called once the admin has changed the generated password — at that point the
+ * file is a plaintext admin credential on disk with no remaining purpose. In a
+ * field deployment the first-boot operator may be a local MoH IT technician,
+ * and without this the file persists indefinitely as a standing
+ * privilege-escalation path (including into any backup taken since).
+ *
+ * Overwrites before unlinking: on a journalling filesystem a plain unlink
+ * leaves the plaintext recoverable from free blocks.
+ *
+ * Safe to call when the file is absent, when running in deterministic
+ * (SEED_CREDENTIALS_SECRET) mode where no file is ever written, or on a
+ * read-only filesystem — it never throws.
+ */
+export async function deleteSeedCredentialsFile(): Promise<boolean> {
+  const filePath = credentialsFilePath();
+  try {
+    const { writeFile, unlink, stat } = await import('node:fs/promises');
+    const info = await stat(filePath);
+    // Best-effort overwrite; ignore failure and still unlink.
+    try {
+      const { randomBytes } = await import('node:crypto');
+      // Write as a plain string; Buffer's generic ArrayBufferLike doesn't
+      // satisfy writeFile's stricter Uint8Array<ArrayBuffer> parameter here.
+      await writeFile(filePath, randomBytes(Math.max(info.size, 1)).toString('hex'), { mode: 0o600 });
+    } catch {
+      /* overwrite unavailable — proceed to unlink anyway */
+    }
+    await unlink(filePath);
+    // Drop the in-memory cache too; keeping plaintext passwords resident after
+    // the file is gone would defeat the point.
+    cache = null;
+    console.log('[seed-credentials] bootstrap credentials file removed after password change');
+    return true;
+  } catch (err) {
+    const e = err as { code?: string } | undefined;
+    if (e?.code === 'ENOENT') return false; // already gone — the normal case
+    console.warn('[seed-credentials] could not remove credentials file', err);
+    return false;
+  }
+}

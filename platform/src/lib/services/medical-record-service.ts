@@ -10,6 +10,8 @@ import { findByType } from './db-query';
 import { isProviderRole, isClinicalAuthorRole } from '../clinical-roles';
 import { maybeDecrypt, maybeEncrypt } from '../field-encryption';
 import { withPendingOfflineSync } from '../sync/offline-metadata';
+import { validateDiagnosisCodes, lookupIcd11 } from '../clinical/diagnosis-validation';
+import type { DiagnosisLike } from '../clinical/diagnosis-validation';
 
 const ENCRYPTED_RECORD_FIELDS = [
   'chiefComplaint',
@@ -160,7 +162,59 @@ export async function createMedicalRecord(
     orgId: plaintextDoc.orgId,
     hospitalId: plaintextDoc.hospitalId,
   });
+  await raiseNotifiableDiseaseAlerts(plaintextDoc);
   return plaintextDoc;
+}
+
+/**
+ * Raise a `disease_alert` for every notifiable diagnosis on a saved record
+ * (KAN-31 / CRIT-10).
+ *
+ * Before this, a clinician could save a confirmed cholera or measles
+ * consultation and nothing downstream ever learned about it — the ICD-11
+ * catalogue carried a `notifiable` flag that nothing read, so surveillance and
+ * the DHIS2 export both under-counted outbreaks at source.
+ *
+ * Best-effort by design: this runs AFTER the record is durably written, and a
+ * failure here must never fail the consultation save. A lost alert is
+ * recoverable from the record; a lost record is not.
+ */
+async function raiseNotifiableDiseaseAlerts(record: MedicalRecordDoc): Promise<void> {
+  try {
+    const diagnoses = (record.diagnoses ?? []) as DiagnosisLike[];
+    if (diagnoses.length === 0) return;
+
+    const { notifiableCodes } = validateDiagnosisCodes(diagnoses);
+    if (notifiableCodes.length === 0) return;
+
+    const { createAlert } = await import('./surveillance-service');
+
+    for (const code of [...new Set(notifiableCodes)]) {
+      const entry = lookupIcd11(code);
+      if (!entry) continue;
+      // One case per record. Aggregation into outbreak counts is the
+      // surveillance layer's job — this only guarantees the case is visible.
+      await createAlert({
+        disease: entry.title,
+        state: (record as { state?: string }).state || '',
+        county: (record as { county?: string }).county || '',
+        cases: 1,
+        deaths: 0,
+        // A single case is a signal to watch, not an outbreak declaration.
+        // Escalation belongs to whoever reviews the surveillance queue.
+        alertLevel: 'watch',
+        reportDate: new Date().toISOString(),
+        trend: 'stable',
+        orgId: record.orgId,
+        hospitalId: record.hospitalId,
+        patientId: record.patientId,
+        icd11Code: entry.code,
+        sourceRecordId: record._id,
+      } as unknown as Parameters<typeof createAlert>[0]);
+    }
+  } catch (err) {
+    console.warn('[medical-record] notifiable disease alert failed (record was saved):', err);
+  }
 }
 
 export async function updateMedicalRecord(id: string, data: Partial<MedicalRecordDoc>): Promise<MedicalRecordDoc | null> {

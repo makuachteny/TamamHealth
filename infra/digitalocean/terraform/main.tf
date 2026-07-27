@@ -56,13 +56,24 @@ resource "digitalocean_firewall" "staging" {
   }
 }
 
+# NOTE: "production" here means pre-pilot load testing and cutover rehearsal,
+# NOT live patient data. This droplet is outside South Sudan (DO has no Africa
+# region) — see the data-residency block at the top of variables.tf. Real PHI
+# belongs on AWS af-south-1 (infra/aws/) or an in-country host.
 resource "digitalocean_droplet" "production" {
   name     = "${var.project_name}-production"
   region   = var.region
   size     = var.production_size
   image    = "ubuntu-22-04-x64"
   ssh_keys = [digitalocean_ssh_key.deploy.fingerprint]
-  tags     = ["tamamhealth", "production"]
+  tags     = ["tamamhealth", "production", "no-phi", "non-residency"]
+
+  lifecycle {
+    precondition {
+      condition     = var.data_residency_acknowledged
+      error_message = "Refusing to create a production-sized droplet outside South Sudan without data_residency_acknowledged = true. See variables.tf."
+    }
+  }
 }
 
 resource "digitalocean_reserved_ip" "production" {
