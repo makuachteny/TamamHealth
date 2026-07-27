@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useWards } from '@/lib/hooks/useWards';
+import { usePatients } from '@/lib/hooks/usePatients';
 import Modal from '@/components/Modal';
 import { Pill, X, CheckCircle2, RotateCcw, Filter } from '@/components/icons/lucide';
 import type { MedicationAdministration } from '@/lib/db-types';
@@ -21,6 +22,17 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
   const { currentUser } = useApp();
   const { marEntries, recordEntry, undoAdministration } = useMarEntries();
   const { activeAdmissions } = useWards();
+  const { patients } = usePatients();
+  // Portrait per patient id — same face as the register; initials when a
+  // patient has no photo on file.
+  const marPhotoById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const patient of patients) {
+      const photo = (patient as { photoUrl?: string }).photoUrl;
+      if (photo) map.set(patient._id, photo);
+    }
+    return map;
+  }, [patients]);
   // "Now" for the Time column's relative subline — captured once on mount
   // (live-ish, matching the Recent Triages list), not re-read during render.
   const [now] = useState(() => new Date());
@@ -288,7 +300,12 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
                   }}
                 >
                   <div className="ehr-appointment-identity">
-                    <div className="ehr-patient-icon" style={avatarPlate}>{initials(entry.patientName)}</div>
+                    <div className="ehr-patient-icon" style={avatarPlate}>
+                      {marPhotoById.get(entry.patientId)
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={marPhotoById.get(entry.patientId)} alt="" className="ehr-patient-icon-photo" />
+                        : initials(entry.patientName)}
+                    </div>
                     <div className="ehr-appointment-main appointment-card-patient">
                       <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`/patients/${entry.patientId}`); }}>
                         {entry.patientName}

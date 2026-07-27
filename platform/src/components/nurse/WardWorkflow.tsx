@@ -258,7 +258,12 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                       style={{ cursor: patient._demo ? 'default' : 'pointer' }}
                     >
                       <div className="ehr-appointment-identity">
-                        <div className="ehr-patient-icon" style={stateTint(priority)}>{initials(patientFullName(patient))}</div>
+                        <div className="ehr-patient-icon" style={stateTint(priority)}>
+                          {(patient as { photoUrl?: string }).photoUrl
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={(patient as { photoUrl?: string }).photoUrl} alt="" className="ehr-patient-icon-photo" />
+                            : initials(patientFullName(patient))}
+                        </div>
                         <div className="ehr-appointment-main appointment-card-patient">
                           <strong className="ehr-queue-name">{patientFullName(patient)}</strong>
                           <p>{subtitle}</p>

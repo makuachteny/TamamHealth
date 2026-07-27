@@ -45,6 +45,16 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
   const router = useRouter();
   const { currentUser } = useApp();
   const { patients } = usePatients();
+  // Portrait per patient id — the triage card shows the same face as the
+  // register, falling back to initials when a patient has no photo on file.
+  const triagePhotoById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const patient of patients) {
+      const photo = (patient as { photoUrl?: string }).photoUrl;
+      if (photo) map.set(patient._id, photo);
+    }
+    return map;
+  }, [patients]);
   const { triages: triageHistory, create: createTriageRecord, update: updateTriageRecord } = useTriage();
   const { showToast } = useToast();
 
@@ -692,7 +702,12 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
                 return (
                   <div key={ti._id} className="ehr-queue-card ehr-queue-card--triage" data-triage={ti.priority}>
                     <div className="ehr-queue-patient">
-                      <span className="ehr-patient-icon" data-acuity={ti.priority}>{initials(ti.patientName)}</span>
+                      <span className="ehr-patient-icon" data-acuity={ti.priority}>
+                        {triagePhotoById.get(ti.patientId)
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={triagePhotoById.get(ti.patientId)} alt="" className="ehr-patient-icon-photo" />
+                          : initials(ti.patientName)}
+                      </span>
                       <div className="ehr-queue-patient-text">
                         <button type="button" className="ehr-queue-name" onClick={() => router.push(`/patients/${ti.patientId}`)} title={t('nurse.viewPatientRecord')}>
                           {ti.patientName}

@@ -57,6 +57,8 @@ function appointmentTriage(priority: AppointmentDoc['priority']) {
 
 type WorklistPatient = {
   _id: string;
+  /** Patient portrait; the avatar falls back to initials when absent. */
+  photoUrl?: string;
   name: string;
   age: number | null;
   gender: string;
@@ -70,6 +72,7 @@ type WorklistPatient = {
 
 type UnifiedPatientRow = {
   id: string;
+  photoUrl?: string;
   patient: WorklistPatient | null;
   appointment: AppointmentDoc | null;
   name: string;
@@ -217,6 +220,16 @@ export default function EhrClinicalDashboard({
     const map = new Map<string, string>();
     for (const patient of patientDocs) {
       if (patient.primaryLanguage) map.set(patient._id, patient.primaryLanguage);
+    }
+    return map;
+  }, [patientDocs]);
+  // Portraits for rows that come from an appointment rather than the assigned
+  // worklist, so the same patient shows the same face on every surface.
+  const photoByPatientId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const patient of patientDocs) {
+      const photo = (patient as { photoUrl?: string }).photoUrl;
+      if (photo) map.set(patient._id, photo);
     }
     return map;
   }, [patientDocs]);
@@ -430,6 +443,7 @@ export default function EhrClinicalDashboard({
       const department = patient.division || patient.ward?.split('-')[0] || appointment?.department || 'OPD';
       return {
         id: patient._id,
+        photoUrl: patient.photoUrl,
         patient,
         appointment,
         name: patient.name,
@@ -450,6 +464,7 @@ export default function EhrClinicalDashboard({
       if ((appointment.patientId && assignedIds.has(appointment.patientId)) || assignedNames.has(appointment.patientName.toLowerCase())) continue;
       rows.push({
         id: appointment._id,
+        photoUrl: appointment.patientId ? photoByPatientId.get(appointment.patientId) : undefined,
         patient: null,
         appointment,
         name: appointment.patientName,
@@ -470,7 +485,7 @@ export default function EhrClinicalDashboard({
       const bTime = b.appointment?.appointmentTime || '99:99';
       return aTime.localeCompare(bTime) || a.name.localeCompare(b.name);
     });
-  }, [clinicianName, patients, selectedAppointmentsForDay]);
+  }, [clinicianName, patients, photoByPatientId, selectedAppointmentsForDay]);
   const visiblePatientRows = unifiedPatientRows.filter(row => (
     !appointmentQuery ||
     [row.name, row.reason, row.timeLabel, row.department, row.provider, row.status]
@@ -1214,7 +1229,10 @@ export default function EhrClinicalDashboard({
                       >
                         <div className="ehr-appointment-identity">
                           <div className="ehr-patient-icon" style={stateTint(row.triagePriority)}>
-                            {initials(row.name)}
+                            {row.photoUrl
+                              // eslint-disable-next-line @next/next/no-img-element
+                              ? <img src={row.photoUrl} alt="" className="ehr-patient-icon-photo" />
+                              : initials(row.name)}
                           </div>
                           <div className="ehr-appointment-main appointment-card-patient">
                             <button type="button" className="print-visible" onClick={event => { event.stopPropagation(); openRow(); }}>
