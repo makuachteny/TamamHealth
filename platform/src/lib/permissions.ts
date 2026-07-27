@@ -654,7 +654,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'CLINICAL' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
-      { href: '/consultation', label: 'Consultation', icon: ClipboardPen, section: 'CLINICAL' },
+      { href: '/consultation', label: 'Consultation', icon: Stethoscope, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
