@@ -72,8 +72,10 @@ describe('encounter journey invariants', () => {
 });
 
 describe('roles & capabilities', () => {
-  test('there are exactly 10 documented roles', () => {
-    expect(Object.keys(CLINICAL_FLOW_ROLES)).toHaveLength(10);
+  // 9 since facility_administrator was retired (273d869f); the count is
+  // asserted so adding/removing a role is a deliberate, reviewed change.
+  test('there are exactly 9 documented roles', () => {
+    expect(Object.keys(CLINICAL_FLOW_ROLES)).toHaveLength(9);
   });
 
   test('every role has at least one capability and a primary function', () => {

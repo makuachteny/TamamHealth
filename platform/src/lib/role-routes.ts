@@ -359,8 +359,12 @@ export function hasRoleRouteConfig(role: UserRole | string): boolean {
 export function isPathAllowed(role: UserRole | string, pathname: string): boolean {
   const config = getConfig(role);
   if (!config) return false;
+  // Compare the path only: callers also pass nav hrefs, which may carry a
+  // query string or hash (e.g. "/data-quality?view=completeness"). Those
+  // target the same route, and a real pathname never contains ? or #.
+  const path = pathname.split(/[?#]/)[0];
   return config.allowed.some(
-    route => pathname === route || pathname.startsWith(route + '/'),
+    route => path === route || path.startsWith(route + '/'),
   );
 }
 

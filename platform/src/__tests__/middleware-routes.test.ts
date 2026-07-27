@@ -8,15 +8,16 @@
  * so navigation links can never point at a route the middleware would block.
  */
 import { ROLE_PERMISSIONS } from '../lib/permissions';
-import { ROLE_ROUTE_TABLE } from '../lib/role-routes';
+import { ROLE_ROUTE_TABLE, isPathAllowed } from '../lib/role-routes';
 import type { UserRole } from '../lib/db-types';
 
 const ALL_ROLES = Object.keys(ROLE_ROUTE_TABLE) as UserRole[];
 
+// Delegates to the real matcher the proxy uses, so this test can't drift
+// from production behaviour (it previously duplicated the logic and missed
+// query-string handling).
 function allowedByTable(role: UserRole, path: string): boolean {
-  return ROLE_ROUTE_TABLE[role].allowed.some(
-    r => path === r || path.startsWith(r + '/'),
-  );
+  return isPathAllowed(role, path);
 }
 
 describe('proxy routes sync with permissions', () => {
