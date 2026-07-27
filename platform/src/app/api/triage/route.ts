@@ -10,11 +10,11 @@ import {
 import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole, TriageDoc, TriagePriority } from '@/lib/db-types';
 const READ_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'clinician', 'nurse',
   'front_desk', 'medical_superintendent',
 ];
 const CREATE_ROLES: UserRole[] = [
-  'super_admin', 'doctor', 'clinical_officer', 'nurse', 'front_desk',
+  'super_admin', 'doctor', 'clinical_officer', 'clinician', 'nurse', 'front_desk',
   'medical_superintendent',
 ];
 /**

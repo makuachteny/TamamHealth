@@ -11,7 +11,7 @@ import {
 import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
 const WRITE_ROLES: UserRole[] = [
-  'super_admin', 'doctor', 'clinical_officer', 'medical_superintendent',
+  'super_admin', 'doctor', 'clinical_officer', 'clinician', 'medical_superintendent',
 ];
 async function patchHandler(
   request: NextRequest,

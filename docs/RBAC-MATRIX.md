@@ -9,16 +9,30 @@ each role gets only the features its real job justifies. Clinicians don't handle
 non-clinicians don't author clinical/vital records, and oversight roles see aggregates rather
 than individual patient records.
 
-## Roles at a glance (22 total)
+## Roles at a glance (25 total)
 
-**Clinical:** doctor, clinical_officer, nurse, **midwife** (new), medical_superintendent,
+Every role below exists in the `UserRole` union in `platform/src/lib/db-types.ts`.
+Verified against code 2026-07-27 (KAN-120, KAN-121).
+
+**Clinical:** doctor, clinical_officer, clinician, nurse, midwife, medical_superintendent,
 nutritionist, radiologist
 **Diagnostics & pharmacy:** lab_tech, pharmacist
-**Front office & finance:** front_desk, **cashier** (new), medical_biller
-**Community:** boma_health_worker (BHW), community_health_volunteer (CHV)
+**Front office & finance:** front_desk, cashier, medical_biller
+**Clinical-flow workstations:** central_registration_clerk, clinic_clerk, triage_nurse,
+rooming_nurse, records_hmis_officer
 **Records & data:** hrio, data_entry_clerk
-**Oversight / government:** payam_supervisor, **county_health_director** (new), government, hospital_manager
+**Oversight / government:** county_health_director, government, hospital_manager
 **Administration:** super_admin, org_admin
+
+> **Removed from this document, not from the product backlog.** `boma_health_worker`,
+> `community_health_volunteer` and `payam_supervisor` were listed here but have never
+> existed in `UserRole`, so nothing could hold them and no guard could grant them
+> anything. The community-health tier they belonged to was deleted from the platform on
+> 2026-06-15 (commit `9c6f26e5`, plus migration `0007_drop_boma_visits.sql`). Documenting
+> permissions for roles that cannot be assigned is worse than omitting them: it reads as
+> an access-control statement while granting nothing, and an auditor reviewing this matrix
+> would believe community workers had scoped access they do not have. If the BHW/CHV tier
+> returns, add the roles to `UserRole` first and re-derive this table from the code.
 
 ## Capability matrix (key permissions)
 
@@ -36,19 +50,22 @@ nutritionist, radiologist
 | front_desk | — | — | — | — | — | — | — | ✅ RW (register) |
 | **cashier** | — | — | — | — | ✅ | — | — | ✅ R (lookup) |
 | medical_biller | — | — | — | — | ✅ | ✅ | — | ✅ R |
-| boma_health_worker | — | — | — | ✅ (community) | — | — | — | ✅ RW |
-| community_health_volunteer | — | — | — | ✅ (community) | — | — | — | ✅ RW |
 | hrio | — | — | — | ✅ (register) | — | — | ✅ | ✅ R |
 | data_entry_clerk | — | — | — | ✅ (data entry) | — | — | — | — |
-| payam_supervisor | — | — | — | — | — | — | — | ✅ R |
 | **county_health_director** | — | — | — | — | — | — | ✅ | — (aggregate only) |
 | government | — | — | — | — | — | — | ✅ | — (aggregate only) |
 | hospital_manager | — | — | — | — | — | ✅ | ✅ | ✅ R |
 | org_admin | — | — | — | — | ✅ | ✅ | — | — |
 | super_admin | — (read QA) | — | — | — | ✅ | — | ✅ | ✅ R |
 
-RW = read/write, R = read-only. "Vital events" = authoring births/deaths; community workers
-notify, clinicians/midwives certify, HRIO/data-entry register.
+RW = read/write, R = read-only. "Vital events" = authoring births/deaths; clinicians and
+midwives certify, HRIO/data-entry register.
+
+The clinical-flow workstation roles (`central_registration_clerk`, `clinic_clerk`,
+`triage_nurse`, `rooming_nurse`, `clinician`, `records_hmis_officer`) are capability-gated
+stations rather than cadres, so they are not broken out in the matrix above — see
+`clinical-flow/roles.ts` for their capability sets. `clinician` carries full
+consult/prescribe authority and signs independently (KAN-19, KAN-20).
 
 ## What changed in this revision
 
@@ -72,7 +89,6 @@ notify, clinicians/midwives certify, HRIO/data-entry register.
 
 **Additions (features a role SHOULD have)**
 
-- boma_health_worker — added disease surveillance/reporting (core Boma Health Initiative package).
 - hrio — added DHIS2 export (HRIOs own HMIS reporting).
 - midwife & cashier wired through every relevant API guard so they actually function.
 
@@ -95,9 +111,11 @@ nav/route entries so the UI matches what the role can do.
 - **hospital_manager** — removed Laboratory and Pharmacy work queues. A manager sees
   service utilisation through reports, not the live operational queues run by lab
   techs and pharmacists.
-- **facility_administrator** — removed Consultation, Telehealth, Laboratory, and
-  Pharmacy. This is a non-clinical facility manager (administration, finance, HR,
-  assets, records, reporting), not a consulting clinician.
+
+> `facility_administrator` previously appeared in this list. The role was **retired**
+> in commit `273d869f` and is not in `UserRole`; its non-clinical facility-management
+> responsibilities are covered by `hospital_manager` and `org_admin`. Kept as a note
+> rather than a bullet so the history is legible without implying the role is grantable.
 
 CHW/BHW scope was verified against the South Sudan Boma Health Initiative package
 (iCCM for child illness, malnutrition screening, immunisation promotion, birth/death
