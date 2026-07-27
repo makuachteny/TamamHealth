@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import EmptyState from '@/components/EmptyState';
 import Badge, { type BadgeTone } from '@/components/Badge';
 import {
@@ -255,46 +255,35 @@ export default function AlertsPage() {
   };
 
   return (
-    <>
-      <TopBar />
-      <main className="page-container page-enter">
-        {/* Severity summary — inline stats (patient-list style, no cards) */}
-        <div className="flex items-end justify-between gap-3 mb-4 flex-wrap">
-          <span style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 20, lineHeight: 1, color: 'var(--text-primary)' }}>
-            All alerts
-          </span>
-          <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
-            {[
-              { label: 'Total',    value: counts.all,      color: 'var(--text-muted)' },
-              { label: 'Critical', value: counts.critical, color: 'var(--color-danger)' },
-              { label: 'Warning',  value: counts.warning,  color: '#B8741C' },
-              { label: 'Info',     value: counts.info,     color: 'var(--accent-primary)' },
-            ].map(s => (
-              <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                {s.label} ({s.value.toLocaleString()})
-              </span>
-            ))}
-          </div>
-        </div>
+    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+      <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+        <EhrListHeader
+          title="All alerts"
+          stats={[
+            { label: 'Total',    value: counts.all,      color: 'var(--text-muted)' },
+            { label: 'Critical', value: counts.critical, color: 'var(--color-danger)' },
+            { label: 'Warning',  value: counts.warning,  color: '#B8741C' },
+            { label: 'Info',     value: counts.info,     color: 'var(--accent-primary)' },
+          ]}
+        />
 
         {/* Alerts feed */}
-        {visibleAlerts.length === 0 ? (
-          <div className="card-elevated">
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: 16 }}>
+          {visibleAlerts.length === 0 ? (
             <EmptyState
               icon={CheckCircle2}
               title="All clear"
               message="No active clinical alerts. We will notify you the moment something needs attention."
             />
-          </div>
-        ) : (
-          <>
-            {renderSection('Recent · last 24 hours', buckets.recent)}
-            {renderSection('Earlier this week', buckets.thisWeek)}
-            {renderSection('Older', buckets.earlier)}
-          </>
-        )}
-      </main>
-    </>
+          ) : (
+            <>
+              {renderSection('Recent · last 24 hours', buckets.recent)}
+              {renderSection('Earlier this week', buckets.thisWeek)}
+              {renderSection('Older', buckets.earlier)}
+            </>
+          )}
+        </div>
+      </div>
+    </main>
   );
 }

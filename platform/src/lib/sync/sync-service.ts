@@ -12,6 +12,7 @@ import PouchDB from 'pouchdb-browser';
 import type { SyncDirection } from './sync-config';
 import { enqueueConflict, HIGH_RISK_RESOURCES } from '../services/conflict-service';
 import { addBreadcrumb, captureException } from '../observability';
+import { markDocsConflicted, markDocsSynced } from './offline-metadata';
 
 export type SyncState = 'idle' | 'connecting' | 'active' | 'paused' | 'error' | 'denied';
 
@@ -278,12 +279,19 @@ export class SyncService {
       };
       const docsWritten = changeInfo.docs_written || changeInfo.change?.docs_written || 0;
       const docsRead = changeInfo.docs_read || changeInfo.change?.docs_read || 0;
+      const changedDocs = changeInfo.change?.docs ?? changeInfo.docs ?? [];
       this.updateStatus({
         state: 'active',
         lastSync: new Date().toISOString(),
         docsWritten: this._status.docsWritten + docsWritten,
         docsRead: this._status.docsRead + docsRead,
       });
+
+      if ((changeInfo.direction === 'push' || this.direction === 'push') && changedDocs.length > 0) {
+        void markDocsSynced(this.localDB, changedDocs).catch(err =>
+          captureException(err, { tag: 'sync.markDocsSynced' })
+        );
+      }
 
       // Conflict-queue wiring: when sync replication writes a doc into the
       // local DB, PouchDB may have created sibling revisions (a `_conflicts`
@@ -303,6 +311,9 @@ export class SyncService {
         // outer catch handles any failure of the call as a whole.
         void surfaceHighRiskConflicts(this.localDB, docsLanded).catch(err =>
           captureException(err, { tag: 'sync.surfaceHighRiskConflicts.outer' })
+        );
+        void markDocsConflicted(this.localDB, docsLanded).catch(err =>
+          captureException(err, { tag: 'sync.markDocsConflicted' })
         );
       }
     });

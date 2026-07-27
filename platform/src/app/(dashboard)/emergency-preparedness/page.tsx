@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Modal from '@/components/Modal';
-import TopBar from '@/components/TopBar';
 import { AlertTriangle, ShieldAlert, Phone, Users, BedDouble, Activity, Plus, X } from '@/components/icons/lucide';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import {
@@ -183,12 +183,17 @@ export default function EmergencyPreparednessPage() {
 
   return (
     <>
-      <TopBar title="Emergency Preparedness" actions={
-        <button onClick={openForm} className="btn btn-primary">
-          <Plus className="w-4 h-4" /> New plan
-        </button>
-      } />
       <main className="page-container page-enter">
+        <div className="dash-card overflow-hidden mb-4">
+          <EhrListHeader
+            title="Emergency Preparedness"
+            actions={
+              <button onClick={openForm} className="btn btn-primary" style={{ marginLeft: 'auto', height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <Plus className="w-4 h-4" /> New plan
+              </button>
+            }
+          />
+        </div>
         {loading ? (
           <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</div>
         ) : plans.length === 0 ? (

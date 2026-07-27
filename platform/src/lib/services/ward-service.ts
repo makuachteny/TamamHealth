@@ -12,6 +12,7 @@ import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 const wardDB = () => getDB('tamamhealth_wards');
 
@@ -36,7 +37,7 @@ export async function getWardById(id: string): Promise<WardDoc | null> {
 export async function createWard(data: Omit<WardDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'occupiedBeds' | 'availableBeds'>): Promise<WardDoc> {
   const db = wardDB();
   const now = new Date().toISOString();
-  const doc: WardDoc = {
+  const doc: WardDoc = withPendingOfflineSync({
     _id: `ward-${uuidv4().slice(0, 8)}`,
     type: 'ward',
     ...data,
@@ -44,7 +45,7 @@ export async function createWard(data: Omit<WardDoc, '_id' | '_rev' | 'type' | '
     availableBeds: data.totalBeds,
     createdAt: now,
     updatedAt: now,
-  };
+  }, now);
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('WARD_CREATED', undefined, undefined, `Ward ${doc.name} created at ${doc.facilityName}`);
@@ -88,8 +89,10 @@ export async function updateBedStatus(bedId: string, status: BedStatus, patientI
       bed.lastCleanedAt = new Date().toISOString();
     }
     bed.updatedAt = new Date().toISOString();
-    const resp = await db.put(bed);
+    const pendingBed = withPendingOfflineSync(bed);
+    const resp = await db.put(pendingBed);
     bed._rev = resp.rev;
+    bed.offlineSync = pendingBed.offlineSync;
     emitSyncEvent({
       resourceType: 'bed',
       resourceId: bed._id,
@@ -156,7 +159,7 @@ export async function admitPatient(data: AdmitPatientInput): Promise<AdmissionDo
   const db = wardDB();
   const now = new Date().toISOString();
 
-  const doc: AdmissionDoc = {
+  const doc: AdmissionDoc = withPendingOfflineSync({
     _id: `adm-${uuidv4().slice(0, 8)}`,
     type: 'admission',
     ...data,
@@ -166,7 +169,7 @@ export async function admitPatient(data: AdmitPatientInput): Promise<AdmissionDo
     followUpRequired: false,
     createdAt: now,
     updatedAt: now,
-  };
+  }, now);
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
@@ -233,8 +236,10 @@ export async function dischargePatient(
     admission.lengthOfStay = Math.max(1, Math.ceil((discDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24)));
 
     admission.updatedAt = now;
-    const resp = await db.put(admission);
+    const pendingAdmission = withPendingOfflineSync(admission, now);
+    const resp = await db.put(pendingAdmission);
     admission._rev = resp.rev;
+    admission.offlineSync = pendingAdmission.offlineSync;
 
     // Free the bed
     if (admission.bedId) {
@@ -275,8 +280,10 @@ async function updateWardOccupancy(wardId: string): Promise<void> {
     ward.occupiedBeds = beds.filter(b => b.status === 'occupied').length;
     ward.availableBeds = ward.totalBeds - ward.occupiedBeds;
     ward.updatedAt = new Date().toISOString();
-    const resp = await db.put(ward);
+    const pendingWard = withPendingOfflineSync(ward);
+    const resp = await db.put(pendingWard);
     ward._rev = resp.rev;
+    ward.offlineSync = pendingWard.offlineSync;
     emitSyncEvent({
       resourceType: 'ward',
       resourceId: ward._id,

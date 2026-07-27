@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import TopBar from '@/components/TopBar';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import {
   FileText, Download, Users, Activity, Pill, BedDouble, TrendingUp,
   ChevronUp, Loader2, BarChart3, AlertTriangle
@@ -740,17 +740,21 @@ export default function ReportsPage() {
   };
 
   return (
-    <>
-      <TopBar title={t('nav.reports')} actions={
-            <FilterSelect
-              value={reportPeriod}
-              onChange={setReportPeriod}
-              options={periodOptions}
-              neutralValue="feb2026"
-              aria-label={t('reports.pageTitle')}
-            />
-          } />
-      <main className="page-container page-enter">
+    <main className="page-container page-enter">
+        <div className="card-elevated overflow-hidden mb-6">
+          <EhrListHeader
+            title={t('nav.reports')}
+            actions={
+              <FilterSelect
+                value={reportPeriod}
+                onChange={setReportPeriod}
+                options={periodOptions}
+                neutralValue="feb2026"
+                aria-label={t('reports.pageTitle')}
+              />
+            }
+          />
+        </div>
 
         {/* ── Report categories ───────────────────────────────── */}
         <div className="space-y-6">
@@ -849,7 +853,6 @@ export default function ReportsPage() {
             </div>
           ))}
         </div>
-      </main>
-    </>
+    </main>
   );
 }

@@ -17,7 +17,7 @@ import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader'
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
-import { initials, patientAgeLabel, patientFullName, stateColor } from '@/lib/patient-utils';
+import { initials, patientAgeLabel, patientFullName, stateTint } from '@/lib/patient-utils';
 import { useApp } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -611,7 +611,7 @@ export default function AppointmentsPage() {
                       }}
                     >
                       <div className="ehr-appointment-identity">
-                        <div className="ehr-patient-icon" style={{ background: stateColor(apt.priority), color: '#fff' }}>
+                        <div className="ehr-patient-icon" style={stateTint(apt.priority)}>
                           {initials(apt.patientName)}
                         </div>
                         <div className="ehr-appointment-main appointment-card-patient">
@@ -626,15 +626,15 @@ export default function AppointmentsPage() {
 
                       <div className="ehr-appointment-time">
                         <strong>{formatClockTime(apt.appointmentTime)}</strong>
-                        <span>{apt.appointmentType === 'walk_in' ? 'Walk-in' : 'Appointment'}</span>
+                        <span>{apt.appointmentDate}</span>
                       </div>
 
                       <div className="appointment-card-provider">
-                        <strong>{apt.providerName || 'Unassigned'}</strong>
-                        <span>Care team</span>
+                        <strong>{apt.providerName || patient?.assignedDoctorName || 'Doctor unassigned'}</strong>
+                        <span>{patient?.assignedByName || 'Nurse unassigned'}</span>
                       </div>
 
-                      <div className="ehr-appointment-department">
+                      <div className="ehr-appointment-department appointment-card-department">
                         <span className={`ehr-department-pill appointment-service-pill type-${apt.appointmentType}`}>
                           {apt.department || svc?.label || 'Service'}
                         </span>

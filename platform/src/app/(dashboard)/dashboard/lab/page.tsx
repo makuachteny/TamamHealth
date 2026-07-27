@@ -687,9 +687,13 @@ export default function LabDashboardPage() {
               careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
+              timeSecondary: lab.completedAt ? lab.completedAt.slice(0, 10) : 'Resulted',
               status: 'completed',
               statusLabel: 'Complete',
+              statusSecondary: row.severity === 'critical' ? 'Critical' : row.severity === 'abnormal' ? 'Abnormal' : 'Normal',
               statusTone: row.severity === 'critical' ? 'danger' : row.severity === 'abnormal' ? 'warning' : 'done',
+              location: lab.specimen || lab.testName || row.disease,
+              locationSecondary: 'Specimen',
               chartSeries: 1,
               // A critical result is a true acuity — same RED pill the rest
               // of the app uses for "needs attention now", not free text.
@@ -709,9 +713,15 @@ export default function LabDashboardPage() {
               careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
+              timeSecondary: order.status === 'completed'
+                ? (order.completedAt ? order.completedAt.slice(0, 10) : 'Completed')
+                : (order.orderedAt ? order.orderedAt.slice(0, 10) : 'Ordered'),
               status: order.status,
               statusLabel: labStatusLabel(order.status),
+              statusSecondary: order.critical ? 'Critical' : order.abnormal ? 'Abnormal' : order.specimen,
               statusTone: order.critical ? 'danger' : order.abnormal ? 'warning' : order.status === 'completed' ? 'done' : order.status === 'in_progress' ? 'active' : 'scheduled',
+              location: order.specimen,
+              locationSecondary: order.testName,
               chartSeries: order.status === 'completed' ? 1 : 0,
               // A critical result is a true acuity — same RED pill the rest
               // of the app uses for "needs attention now", not free text.

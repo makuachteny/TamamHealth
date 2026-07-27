@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { useRouter } from 'next/navigation';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useANC } from '@/lib/hooks/useANC';
@@ -87,10 +88,7 @@ export default function DiseaseProgramsPage() {
   return (
     <main className="page-container page-enter">
       <div className="dash-card mb-3">
-        <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-          <span style={SECTION_TITLE_STYLE}>Disease programs</span>
-          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Programme monitoring · National</p>
-        </div>
+        <EhrListHeader title="Disease programs" stats={[{ label: 'Scope', value: 'Programme monitoring · National' }]} />
       </div>
 
       {loading ? (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Modal from '@/components/Modal';
-import TopBar from '@/components/TopBar';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { Pill, Plus, X, UserCheck } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -147,23 +147,19 @@ export default function ControlledSubstancesPage() {
   };
 
   return (
-    <>
-      <TopBar title="Controlled Substances" actions={
-            <button onClick={openModal} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> Record movement
-            </button>
-          } />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <div className="dash-card flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div className="px-5 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--border-light)' }}>
-            <span className="icon-box-sm">
-              <Pill className="w-4 h-4" style={{ color: '#C44536' }} />
-            </span>
-            <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Movement log</h3>
-            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-              {movements.length} {movements.length === 1 ? 'entry' : 'entries'}
-            </span>
-          </div>
+          <EhrListHeader
+            title="Controlled Substances"
+            stats={[
+              { label: movements.length === 1 ? 'entry' : 'entries', value: movements.length, color: LIST_STAT_COLORS.muted },
+            ]}
+            actions={
+              <button onClick={openModal} className="btn btn-primary">
+                <Plus className="w-4 h-4" /> Record movement
+              </button>
+            }
+          />
 
           <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
@@ -313,7 +309,6 @@ export default function ControlledSubstancesPage() {
             </div>
           </Modal>
         )}
-      </main>
-    </>
+    </main>
   );
 }

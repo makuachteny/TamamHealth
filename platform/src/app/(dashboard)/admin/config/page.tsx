@@ -6,6 +6,7 @@ import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { SaPage, SaCard, SaStatusDot } from '@/components/admin/sa-ui';
+import { Building2, Server, ShieldAlert, Shield, MessageSquare } from '@/components/icons/lucide';
 import { Save, ToggleLeft, ToggleRight } from '@/components/icons/lucide';
 
 const inputStyle: React.CSSProperties = {
@@ -88,10 +89,45 @@ export default function AdminConfigPage() {
     }
   };
 
+  // Five distinct topics rather than one list — rendered one at a time from an
+  // in-page rail (same shell as the System Administration console). Switching
+  // is local state only: the URL never changes.
+  const CONFIG_SECTIONS = [
+    { id: 'identity', label: 'Platform identity', icon: Building2 },
+    { id: 'defaults', label: 'Tenant defaults', icon: Server },
+    { id: 'maintenance', label: 'Maintenance', icon: ShieldAlert },
+    { id: 'security', label: 'Security policy defaults', icon: Shield },
+    { id: 'templates', label: 'Notification templates', icon: MessageSquare },
+  ] as const;
+  const [section, setSection] = useState<typeof CONFIG_SECTIONS[number]['id']>('identity');
+
   return (
     <SaPage title="Configuration" subtitle="Platform identity, tenant defaults, and maintenance controls.">
-      <div className="sa-split">
+      <div className="ehr-set-grid">
+        <aside className="ehr-set-rail">
+          <nav className="ehr-set-nav" aria-label="Configuration sections">
+            <div className="ehr-set-nav-group">
+              <span className="ehr-set-nav-group-title">Configuration</span>
+              {CONFIG_SECTIONS.map(item => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={section === item.id ? 'active' : undefined}
+                    onClick={() => setSection(item.id)}
+                  >
+                    <Icon />
+                    <em>{item.label}</em>
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+        </aside>
+        <main className="ehr-set-main">
 
+        {section === 'identity' && (
         <SaCard title="Platform identity">
           {loading ? (
             <p className="sa-empty">Loading…</p>
@@ -127,7 +163,9 @@ export default function AdminConfigPage() {
             </div>
           )}
         </SaCard>
+        )}
 
+        {section === 'defaults' && (
         <SaCard title="Tenant defaults">
           {loading ? (
             <p className="sa-empty">Loading…</p>
@@ -164,7 +202,9 @@ export default function AdminConfigPage() {
             </div>
           )}
         </SaCard>
+        )}
 
+        {section === 'maintenance' && (
         <SaCard title="Maintenance">
           {loading ? (
             <p className="sa-empty">Loading…</p>
@@ -196,7 +236,9 @@ export default function AdminConfigPage() {
             </div>
           )}
         </SaCard>
+        )}
 
+        {section === 'security' && (
         <SaCard title="Security policy defaults" meta="Read-only" actions={
           <Link href="/admin/security" className="sa-btn">Edit in Security &amp; Compliance</Link>
         }>
@@ -213,11 +255,15 @@ export default function AdminConfigPage() {
             </div>
           )}
         </SaCard>
+        )}
 
+        {section === 'templates' && (
         <SaCard title="Notification templates">
           <p className="sa-empty">No template store configured — email/SMS notifications use built-in copy.</p>
         </SaCard>
+        )}
 
+        </main>
       </div>
     </SaPage>
   );

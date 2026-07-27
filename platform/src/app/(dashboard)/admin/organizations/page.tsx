@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -12,6 +11,7 @@ import {
   ToggleLeft, ToggleRight
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 
 type OrgFormData = {
   name: string;
@@ -46,10 +46,11 @@ const emptyForm: OrgFormData = {
 export default function AdminOrganizationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser, globalSearch } = useApp();
+  const { currentUser, globalSearch, setGlobalSearch } = useApp();
   const { organizations, loading, create, update, deactivate, getStats } = useOrganizations();
 
-  // Text search comes from the shared global search bar (TopBar).
+  // Text search comes from the shared global search state, surfaced via this
+  // page's own list header search box (the TopBar strip is gone).
   const search = globalSearch;
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -193,15 +194,19 @@ export default function AdminOrganizationsPage() {
 
   return (
     <>
-      <TopBar title={t('orgAdmin.title')} actions={
-            <button onClick={openCreate} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('orgAdmin.newOrganization')}
-            </button>
-          } />
       <main className="page-container page-enter admin-detail-page" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         {/* Table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <EhrListHeader
+            title={t('orgAdmin.title')}
+            search={{ value: search, onChange: setGlobalSearch, placeholder: t('orgAdmin.searchPlaceholder') }}
+            actions={
+              <button onClick={openCreate} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
+                <Plus className="w-4 h-4" /> {t('orgAdmin.newOrganization')}
+              </button>
+            }
+          />
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <table className="w-full" style={{ minWidth: 840 }}>
               <thead>

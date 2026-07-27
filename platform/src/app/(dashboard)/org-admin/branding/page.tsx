@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -9,6 +8,7 @@ import {
   LayoutDashboard, BarChart3, Settings, MessageSquare,
 } from '@/components/icons/lucide';
 import type { OrganizationDoc } from '@/lib/db-types';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 
 export default function OrgBrandingPage() {
   const { currentUser } = useApp();
@@ -141,44 +141,45 @@ export default function OrgBrandingPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <TopBar title={t('branding.title')} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
-        </div>
+      <div className="flex-1 flex flex-col min-h-0 items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
       </div>
     );
   }
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <TopBar title="Branding" actions={
-        <>
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-          >
-            <RotateCcw className="w-4 h-4" />
-            {t('branding.reset')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ background: brandColor }}
-          >
-            {saving ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            {t('appointments.saveChanges')}
-          </button>
-        </>
-      } />
-
       <div className="page-container page-enter">
+        <div className="dash-card overflow-hidden mb-4">
+          <EhrListHeader
+            title={t('branding.title')}
+            actions={
+              <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
+                <button
+                  onClick={handleReset}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                  style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {t('branding.reset')}
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{ background: brandColor }}
+                >
+                  {saving ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {t('appointments.saveChanges')}
+                </button>
+              </div>
+            }
+          />
+        </div>
         {/* Banners */}
         {success && (
           <div className="mb-4 p-3 rounded-lg text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}>

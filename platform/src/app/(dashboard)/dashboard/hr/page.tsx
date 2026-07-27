@@ -45,7 +45,6 @@ export default function HRDashboardPage() {
   // Single work list (pending leave decisions) rendered as shell rows; the tab
   // is kept as state so the shared shell's tab bar stays interactive.
   const [leaveTab, setLeaveTab] = useState('pending');
-  const [selectedLeave, setSelectedLeave] = useState<string | null>(null);
   const [staffSearch, setStaffSearch] = useState('');
 
   const today = new Date().toISOString().slice(0, 10);
@@ -144,7 +143,6 @@ export default function HRDashboardPage() {
         ? { ...l, status, decidedAt, decidedBy: currentUser._id, decidedByName: currentUser.name }
         : l));
       showToast(status === 'approved' ? t('hr.leaveApproved') : t('hr.leaveRejected'), 'success');
-      setSelectedLeave(null);
       markCapability('hr.leave-decision');
     } catch (err) {
       console.error('Failed to decide leave request', err);
@@ -152,11 +150,13 @@ export default function HRDashboardPage() {
     }
   };
 
-  // Expandable per-row detail (leave window, role, reason) shown inline beneath
-  // the row via EhrCareDashboard's `row.detail` slot, gated on the selected row.
+  // Per-row detail (leave window, role, reason) shown in the shared shell's
+  // row-click sidebar via `row.popupDetail` — clicking any row always opens
+  // that sidebar (see EhrCareDashboard's `activate`/`openDetail`), so the
+  // content lives there rather than behind a separate open/closed row state.
   // Approvers get an inline approve/reject action for pending requests.
   const renderLeaveDetail = (r: LeaveRequestDoc) => (
-    <div style={{ margin: '0 0 8px', padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
+    <div style={{ padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-semibold capitalize" style={{ color: 'var(--text-primary)' }}>{r.leaveType} · {r.days}d</span>
         <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{r.startDate} → {r.endDate}</span>
@@ -230,7 +230,6 @@ export default function HRDashboardPage() {
           />
         )}
         rows={filteredPending.map((r): EhrCareDashboardRow => {
-          const isOpen = selectedLeave === r._id;
           const time = formatClockTimeOrUndefined(r.requestedAt);
           return {
             id: r._id,
@@ -238,15 +237,17 @@ export default function HRDashboardPage() {
             subtitle: `${r.leaveType} · ${r.days}d · ${r.startDate} → ${r.endDate}`,
             compactMeta: `${r.days}d`,
             time,
+            timeSecondary: r.requestedAt.slice(0, 10),
             careTeam: r.role ? titleCase(r.role) : undefined,
             careTeamLabel: 'Role',
             location: r.facilityName,
+            locationSecondary: `${r.startDate} → ${r.endDate}`,
             locationLabel: 'Facility',
             status: r.status,
             statusLabel: titleCase(r.leaveType),
+            statusSecondary: `${r.days} day${r.days === 1 ? '' : 's'}`,
             statusTone: 'warning',
-            onClick: () => setSelectedLeave(isOpen ? null : r._id),
-            detail: isOpen ? renderLeaveDetail(r) : undefined,
+            popupDetail: renderLeaveDetail(r),
           };
         })}
         metrics={[

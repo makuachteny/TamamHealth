@@ -9,6 +9,18 @@ export interface BaseDoc {
   updatedAt: string;
   createdBy?: string;
   /**
+   * Device-local sync lifecycle. This is separate from domain fields named
+   * `syncStatus` (for example facility online/offline status) and is safe to
+   * attach to any PouchDB document that should work offline-first.
+   */
+  offlineSync?: {
+    status: 'local' | 'pending' | 'synced' | 'conflict' | 'failed';
+    lastLocalChangeAt?: string;
+    lastSyncedAt?: string;
+    lastSyncedRev?: string;
+    error?: string;
+  };
+  /**
    * ISO 3166-1 alpha-2 country code of the facility that owns this record.
    * Populated at create time by the facility node so the country node
    * aggregator can partition records by jurisdiction for DHIS2 reporting

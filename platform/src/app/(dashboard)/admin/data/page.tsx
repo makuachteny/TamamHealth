@@ -9,13 +9,16 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SaPage, SaCard, SaStat, SaPill, SaTable } from '@/components/admin/sa-ui';
+import { SaPage, SaCard, SaTable, SaPill } from '@/components/admin/sa-ui';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { getAllPatients } from '@/lib/services/patient-service';
 import type { PatientDoc } from '@/lib/db-types';
-import { ArrowRight } from '@/components/icons/lucide';
+import { ArrowRight, Copy, BarChart3, AlertTriangle, GitCompareArrows } from '@/components/icons/lucide';
 
 const ROW_CAP = 50;
+
+type SectionId = 'duplicates' | 'completeness' | 'invalid' | 'reconciliation';
 
 function patientName(p: PatientDoc): string {
   const name = [p.firstName, p.surname].filter(Boolean).join(' ').trim();
@@ -42,6 +45,10 @@ export default function AdminDataGovernancePage() {
   const [loading, setLoading] = useState(true);
   const [pendingConflicts, setPendingConflicts] = useState<number | null>(null);
   const [conflictsError, setConflictsError] = useState(false);
+
+  // Section switching is in-page state only (URL never changes) — the page
+  // bundles four distinct governance topics rather than one list.
+  const [activeSection, setActiveSection] = useState<SectionId>('duplicates');
 
   const loadPatients = useCallback(async () => {
     try {
@@ -173,97 +180,225 @@ export default function AdminDataGovernancePage() {
 
   const busy = loading || hospitalsLoading;
 
-  return (
-    <SaPage title="Data Governance" subtitle="Master patient index review, facility data completeness, and validity scanning across the local patient store.">
-      <div className="sa-stat-strip">
-        <SaStat label="Patients total" value={busy ? '—' : patients.length} />
-        <SaStat label="Possible duplicates" value={busy ? '—' : duplicates.length} tone={duplicates.length > 0 ? 'warn' : 'ok'} />
-        <SaStat label="Missing required fields" value={busy ? '—' : validity.missingAny} tone={validity.missingAny > 0 ? 'warn' : 'ok'} />
-        <SaStat label="Pending conflicts" value={conflictsError ? '—' : pendingConflicts ?? '…'} tone={pendingConflicts && pendingConflicts > 0 ? 'warn' : 'ok'} />
-        <SaStat label="Facilities below 80% completeness" value={busy ? '—' : completeness.belowThreshold} tone={completeness.belowThreshold > 0 ? 'danger' : 'ok'} />
-      </div>
+  const sections: { id: SectionId; label: string; icon: typeof Copy; count: number }[] = [
+    { id: 'duplicates', label: 'Duplicate review', icon: Copy, count: duplicates.length },
+    { id: 'completeness', label: 'Completeness', icon: BarChart3, count: completeness.rows.length },
+    { id: 'invalid', label: 'Invalid values', icon: AlertTriangle, count: validity.missingAny },
+    { id: 'reconciliation', label: 'Reconciliation', icon: GitCompareArrows, count: conflictsError ? 0 : pendingConflicts ?? 0 },
+  ];
 
-      <SaCard
-        title="Duplicate patient review (MPI)"
-        meta={busy ? undefined : `${Math.min(duplicates.length, ROW_CAP)} shown${duplicates.length > ROW_CAP ? ` of ${duplicates.length} (showing first ${ROW_CAP})` : ''}`}
-      >
-        <SaTable
-          columns={['Patient A', 'Patient B', 'Match basis', 'Facility']}
-          empty={busy ? 'Loading…' : 'No duplicate candidates detected.'}
-          minWidth={680}
-        >
-          {duplicates.slice(0, ROW_CAP).map(({ a, b, basis }) => {
-            const facA = (a.registrationHospital && hospitalName.get(a.registrationHospital)) || a.registrationHospital || '—';
-            const facB = (b.registrationHospital && hospitalName.get(b.registrationHospital)) || b.registrationHospital || '—';
+  return (
+    <SaPage>
+      <div className="saside-shell">
+        <nav className="saside-nav" aria-label="Data governance sections">
+          <span className="saside-nav-title">Data Governance</span>
+          {sections.map(s => {
+            const Icon = s.icon;
             return (
-              <tr key={`${a._id}|${b._id}`}>
-                <td><strong>{patientName(a)}</strong> <span style={{ color: 'var(--text-muted)' }}>{a.hospitalNumber}</span></td>
-                <td><strong>{patientName(b)}</strong> <span style={{ color: 'var(--text-muted)' }}>{b.hospitalNumber}</span></td>
-                <td>{basis}</td>
-                <td>{facA === facB ? facA : `${facA} / ${facB}`}</td>
-              </tr>
+              <button
+                key={s.id}
+                type="button"
+                className={`saside-nav-item${activeSection === s.id ? ' is-active' : ''}`}
+                onClick={() => setActiveSection(s.id)}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{s.label}</span>
+                <b>{busy && s.id !== 'invalid' ? '…' : s.count}</b>
+              </button>
             );
           })}
-        </SaTable>
-      </SaCard>
+        </nav>
 
-      <SaCard
-        title="Data completeness by facility"
-        meta={busy ? undefined : `${Math.min(completeness.rows.length, ROW_CAP)} facilities`}
-      >
-        <SaTable
-          columns={['Facility', 'Patients', 'Complete', 'Score']}
-          empty={busy ? 'Loading…' : 'No facilities with registered patients yet.'}
-          minWidth={520}
-        >
-          {completeness.rows.slice(0, ROW_CAP).map(r => (
-            <tr key={r.hospitalId}>
-              <td><strong>{r.name}</strong></td>
-              <td className="sa-num">{r.total}</td>
-              <td className="sa-num">{r.complete}</td>
-              <td className="sa-num">
-                <SaPill tone={r.score! >= 90 ? 'ok' : r.score! >= 70 ? 'warn' : 'danger'}>{r.score}%</SaPill>
-              </td>
-            </tr>
-          ))}
-        </SaTable>
-      </SaCard>
+        <div className="saside-content">
+          {activeSection === 'duplicates' && (
+            <SaCard>
+              <EhrListHeader
+                title="Duplicate patient review (MPI)"
+                stats={[
+                  { label: 'Patients total', value: busy ? '…' : patients.length, color: LIST_STAT_COLORS.muted },
+                  { label: 'Possible duplicates', value: busy ? '…' : duplicates.length, color: duplicates.length > 0 ? LIST_STAT_COLORS.amber : LIST_STAT_COLORS.muted },
+                ]}
+              />
+              <SaTable
+                columns={['Patient A', 'Patient B', 'Match basis', 'Facility']}
+                empty={busy ? 'Loading…' : 'No duplicate candidates detected.'}
+                minWidth={680}
+              >
+                {duplicates.slice(0, ROW_CAP).map(({ a, b, basis }) => {
+                  const facA = (a.registrationHospital && hospitalName.get(a.registrationHospital)) || a.registrationHospital || '—';
+                  const facB = (b.registrationHospital && hospitalName.get(b.registrationHospital)) || b.registrationHospital || '—';
+                  return (
+                    <tr key={`${a._id}|${b._id}`}>
+                      <td><strong>{patientName(a)}</strong> <span style={{ color: 'var(--text-muted)' }}>{a.hospitalNumber}</span></td>
+                      <td><strong>{patientName(b)}</strong> <span style={{ color: 'var(--text-muted)' }}>{b.hospitalNumber}</span></td>
+                      <td>{basis}</td>
+                      <td>{facA === facB ? facA : `${facA} / ${facB}`}</td>
+                    </tr>
+                  );
+                })}
+              </SaTable>
+              {!busy && duplicates.length > ROW_CAP && (
+                <p className="sa-card-meta" style={{ padding: '10px 14px', margin: 0, borderTop: '1px solid var(--border-light)' }}>
+                  Showing first {ROW_CAP} of {duplicates.length}.
+                </p>
+              )}
+            </SaCard>
+          )}
 
-      <SaCard title="Invalid & missing values" meta={busy ? undefined : `${patients.length} records scanned`}>
-        <div className="sa-kv">
-          <div className="sa-kv-row"><span>Missing date of birth</span><span>{busy ? '—' : validity.missingDob}</span></div>
-          <div className="sa-kv-row"><span>Missing gender</span><span>{busy ? '—' : validity.missingGender}</span></div>
-          <div className="sa-kv-row"><span>Missing phone</span><span>{busy ? '—' : validity.missingPhone}</span></div>
-          <div className="sa-kv-row"><span>Future date of birth</span><span>{busy ? '—' : validity.futureDob}</span></div>
-        </div>
-      </SaCard>
+          {activeSection === 'completeness' && (
+            <SaCard>
+              <EhrListHeader
+                title="Data completeness by facility"
+                stats={[{ label: 'Facilities below 80% completeness', value: busy ? '…' : completeness.belowThreshold, color: completeness.belowThreshold > 0 ? 'var(--color-danger)' : LIST_STAT_COLORS.muted }]}
+              />
+              <SaTable
+                columns={['Facility', 'Patients', 'Complete', 'Score']}
+                empty={busy ? 'Loading…' : 'No facilities with registered patients yet.'}
+                minWidth={520}
+              >
+                {completeness.rows.slice(0, ROW_CAP).map(r => (
+                  <tr key={r.hospitalId}>
+                    <td><strong>{r.name}</strong></td>
+                    <td className="sa-num">{r.total}</td>
+                    <td className="sa-num">{r.complete}</td>
+                    <td className="sa-num">
+                      <SaPill tone={r.score! >= 90 ? 'ok' : r.score! >= 70 ? 'warn' : 'danger'}>{r.score}%</SaPill>
+                    </td>
+                  </tr>
+                ))}
+              </SaTable>
+            </SaCard>
+          )}
 
-      <SaCard title="Reconciliation & requests">
-        <div className="sa-kv">
-          <div className="sa-kv-row">
-            <span>Pending sync conflicts</span>
-            <span>{conflictsError ? '—' : pendingConflicts ?? '…'}</span>
-          </div>
+          {activeSection === 'invalid' && (
+            <SaCard title="Invalid & missing values" meta={busy ? undefined : `${patients.length} records scanned · ${validity.missingAny} with missing/invalid fields`}>
+              <div className="sa-kv">
+                <div className="sa-kv-row"><span>Missing date of birth</span><span>{busy ? '—' : validity.missingDob}</span></div>
+                <div className="sa-kv-row"><span>Missing gender</span><span>{busy ? '—' : validity.missingGender}</span></div>
+                <div className="sa-kv-row"><span>Missing phone</span><span>{busy ? '—' : validity.missingPhone}</span></div>
+                <div className="sa-kv-row"><span>Future date of birth</span><span>{busy ? '—' : validity.futureDob}</span></div>
+              </div>
+            </SaCard>
+          )}
+
+          {activeSection === 'reconciliation' && (
+            <SaCard title="Reconciliation & requests">
+              <div className="sa-kv">
+                <div className="sa-kv-row">
+                  <span>Pending sync conflicts</span>
+                  <span>{conflictsError ? '—' : pendingConflicts ?? '…'}</span>
+                </div>
+              </div>
+              <div style={{ padding: '0 14px 14px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="sa-btn primary" onClick={() => router.push('/admin/conflicts')}>
+                  Open reconciliation queue
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="sa-kv">
+                <div className="sa-kv-row">
+                  <span>Export / deletion requests</span>
+                  <span style={{ color: 'var(--text-muted)', fontFamily: 'inherit', fontWeight: 600 }}>None — policy-gated, no request store configured</span>
+                </div>
+              </div>
+              <div style={{ padding: '0 14px 14px' }}>
+                <button type="button" className="sa-btn" onClick={() => router.push('/admin/security')}>
+                  Review data policy
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </SaCard>
+          )}
         </div>
-        <div style={{ padding: '0 14px 14px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="sa-btn primary" onClick={() => router.push('/admin/conflicts')}>
-            Open reconciliation queue
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="sa-kv">
-          <div className="sa-kv-row">
-            <span>Export / deletion requests</span>
-            <span style={{ color: 'var(--text-muted)', fontFamily: 'inherit', fontWeight: 600 }}>None — policy-gated, no request store configured</span>
-          </div>
-        </div>
-        <div style={{ padding: '0 14px 14px' }}>
-          <button type="button" className="sa-btn" onClick={() => router.push('/admin/security')}>
-            Review data policy
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </SaCard>
+      </div>
+
+      <style jsx>{`
+        .saside-shell {
+          display: flex;
+          gap: 14px;
+        }
+        .saside-nav {
+          display: flex;
+          flex-direction: column;
+          flex: 0 0 220px;
+          min-width: 0;
+          gap: 2px;
+          padding: 8px;
+          border: 1px solid var(--ehr-border);
+          border-radius: 12px;
+          background: #fff;
+          align-self: flex-start;
+        }
+        .saside-nav-title {
+          padding: 6px 10px 4px;
+          color: var(--text-muted);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+        .saside-nav-item {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 9px 10px;
+          border: none;
+          border-radius: 8px;
+          background: transparent;
+          color: var(--text-secondary);
+          font-size: 12.5px;
+          font-weight: 700;
+          text-align: left;
+          cursor: pointer;
+        }
+        .saside-nav-item:hover {
+          background: var(--overlay-subtle, rgba(0, 0, 0, 0.04));
+        }
+        .saside-nav-item.is-active {
+          background: var(--accent-primary);
+          color: #fff;
+        }
+        .saside-nav-item span {
+          flex: 1;
+          min-width: 0;
+        }
+        .saside-nav-item b {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 20px;
+          height: 18px;
+          padding: 0 6px;
+          border-radius: 999px;
+          background: rgba(0, 0, 0, 0.08);
+          font-size: 10px;
+          font-weight: 800;
+        }
+        .saside-nav-item.is-active b {
+          background: rgba(255, 255, 255, 0.22);
+        }
+        .saside-content {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-width: 0;
+          gap: 14px;
+        }
+        @media (max-width: 860px) {
+          .saside-shell {
+            flex-direction: column;
+          }
+          .saside-nav {
+            flex-direction: row;
+            flex: 0 0 auto;
+            overflow-x: auto;
+          }
+          .saside-nav-item {
+            flex: 0 0 auto;
+            white-space: nowrap;
+          }
+        }
+      `}</style>
     </SaPage>
   );
 }

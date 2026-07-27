@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import TopBar from '@/components/TopBar';
 import Modal from '@/components/Modal';
 import { useStaffChat } from '@/lib/hooks/useStaffChat';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { ROLE_LABEL } from '@/lib/role-display';
-import { initials } from '@/lib/patient-utils';
+import { initials, avatarTint } from '@/lib/patient-utils';
 import type { ConversationDoc, MessageDoc, UserRole, StaffPresence } from '@/lib/db-types';
 import {
   MessageSquare, Plus, Search, Send, Users as UsersIcon,
@@ -16,7 +15,6 @@ import {
 
 /* ─────────────────────────── constants ─────────────────────────── */
 
-const AVATAR_PALETTE = ['#2191D0', '#015697', '#015697', '#015697', '#015697', '#015697', '#2191D0', '#475569'];
 const PRESENCE: Record<StaffPresence, { label: string; color: string }> = {
   active: { label: 'Active', color: 'var(--color-success)' },
   busy: { label: 'Busy', color: 'var(--color-danger)' },
@@ -29,11 +27,6 @@ const QUICK_REACTIONS = ['👍', '✅', '❤️', '👀', '🙏', '😀'];
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 
-function colorFor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
 function relTime(iso?: string): string {
   if (!iso) return '';
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -59,8 +52,8 @@ function renderBody(text: string) {
 function Avatar({ name, size = 38, seed, group, presence }: { name: string; size?: number; seed: string; group?: boolean; presence?: StaffPresence }) {
   return (
     <div
-      className="relative flex items-center justify-center flex-shrink-0 font-bold text-white"
-      style={{ width: size, height: size, borderRadius: '50%', background: group ? 'var(--accent-primary)' : colorFor(seed), fontSize: size * 0.36 }}
+      className="relative flex items-center justify-center flex-shrink-0 font-bold"
+      style={{ width: size, height: size, borderRadius: '50%', ...(group ? { background: 'var(--accent-primary)', color: '#fff' } : avatarTint(seed)), fontSize: size * 0.36 }}
     >
       {group ? <UsersIcon className="text-white" style={{ width: size * 0.5, height: size * 0.5 }} /> : initials(name)}
       {!group && (
@@ -213,8 +206,10 @@ export default function MessagesPage() {
 
   return (
     <>
-      <TopBar title="Messages" hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <span className="flex-shrink-0 mb-2" style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: 'var(--text-primary)' }}>
+        Messages
+      </span>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', borderRadius: 'var(--card-radius)', border: '1px solid var(--glass-border)', boxShadow: 'var(--card-shadow), var(--glass-highlight)', background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
 
         {/* ── Conversation list ── */}

@@ -10,19 +10,18 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 
 /* Full-page scaffold with the super-admin role guard (defense-in-depth on
-   top of the Edge proxy check — matches the existing /admin pages). */
+   top of the Edge proxy check — matches the existing /admin pages).
+   No page title/subtitle band: every surface names itself in its own list
+   header (EhrListHeader) or section rail, so the page opens straight on
+   content instead of a header card that repeats the nav label. */
 export function SaPage({
-  title,
-  subtitle,
   actions,
   children,
 }: {
-  title: string;
-  subtitle?: string;
+  /** Page-level buttons; rendered as a right-aligned row above the content. */
   actions?: ReactNode;
   children: ReactNode;
 }) {
@@ -37,14 +36,7 @@ export function SaPage({
 
   return (
     <div className="page-container page-enter sa-page">
-      <TopBar />
-      <header className="sa-page-head">
-        <div>
-          <h1>{title}</h1>
-          {subtitle && <p>{subtitle}</p>}
-        </div>
-        {actions && <div className="sa-page-actions">{actions}</div>}
-      </header>
+      {actions && <div className="sa-page-actions">{actions}</div>}
       {children}
     </div>
   );

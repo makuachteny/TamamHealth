@@ -10,7 +10,7 @@ import { Pill, X, CheckCircle2, RotateCcw, Filter } from '@/components/icons/luc
 import type { MedicationAdministration } from '@/lib/db-types';
 import { useMarEntries, type MAREntry } from './shared';
 import ListSearch from './ListSearch';
-import { initials, stateColor } from '@/lib/patient-utils';
+import { initials, stateTint, AVATAR_TINT_NEUTRAL } from '@/lib/patient-utils';
 import { formatTimeUntil } from '@/lib/format-utils';
 
 type AdminStatus = 'given' | 'held' | 'refused' | 'missed';
@@ -272,7 +272,7 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
                 : '';
               // A not-yet-due dose must not read like an administered one —
               // neutral (upcoming) keeps the grey avatar instead of green.
-              const avatarBg = tone === 'neutral' ? 'var(--ehr-muted)' : stateColor(tone.toUpperCase());
+              const avatarPlate = tone === 'neutral' ? AVATAR_TINT_NEUTRAL : stateTint(tone.toUpperCase());
               return (
                 <div
                   key={entry.id}
@@ -288,7 +288,7 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
                   }}
                 >
                   <div className="ehr-appointment-identity">
-                    <div className="ehr-patient-icon" style={{ background: avatarBg, color: '#fff' }}>{initials(entry.patientName)}</div>
+                    <div className="ehr-patient-icon" style={avatarPlate}>{initials(entry.patientName)}</div>
                     <div className="ehr-appointment-main appointment-card-patient">
                       <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`/patients/${entry.patientId}`); }}>
                         {entry.patientName}

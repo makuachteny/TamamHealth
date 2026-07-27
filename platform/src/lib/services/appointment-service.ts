@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
+import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 export type AppointmentStatusUpdateExtra = {
   cancelledReason?: string;
@@ -91,13 +92,13 @@ export async function createAppointment(
     throw new Error(`Scheduling conflict: ${data.providerName} already has an appointment at ${conflict.appointmentTime} on ${conflict.appointmentDate}`);
   }
 
-  const doc: AppointmentDoc = {
+  const doc: AppointmentDoc = withPendingOfflineSync({
     _id: `apt-${uuidv4().slice(0, 8)}`,
     type: 'appointment',
     ...data,
     createdAt: now,
     updatedAt: now,
-  };
+  }, now);
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('CREATE_APPOINTMENT', data.bookedBy, data.bookedByName,
@@ -180,7 +181,7 @@ export async function updateAppointmentStatus(
       if (actorName) statusPatch.noShowByName = actorName;
     }
 
-    const updated: AppointmentDoc = {
+    const updated: AppointmentDoc = withPendingOfflineSync({
       ...existing,
       status,
       updatedAt: now,
@@ -206,7 +207,7 @@ export async function updateAppointmentStatus(
           automated: true,
         })),
       ].slice(-30),
-    };
+    }, now);
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_APPOINTMENT', actorId, actorName, `Appointment ${id} status changed from ${existing.status} to ${status}`);
@@ -231,7 +232,7 @@ export async function updateAppointment(
   const db = appointmentsDB();
   try {
     const existing = await db.get(id) as AppointmentDoc;
-    const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+    const updated = withPendingOfflineSync({ ...existing, ...updates, updatedAt: new Date().toISOString() });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_APPOINTMENT', undefined, undefined, `Appointment ${id} updated`);
@@ -257,13 +258,13 @@ export async function rescheduleAppointment(
   const db = appointmentsDB();
   try {
     const existing = await db.get(id) as AppointmentDoc;
-    const updated = {
+    const updated = withPendingOfflineSync({
       ...existing,
       appointmentDate: newDate,
       appointmentTime: newTime,
       status: 'scheduled' as const,
       updatedAt: new Date().toISOString(),
-    };
+    });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('RESCHEDULE_APPOINTMENT', undefined, undefined,

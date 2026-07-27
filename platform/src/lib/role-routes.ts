@@ -59,7 +59,9 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/org-admin/users', '/org-admin/hospitals',
       '/org-admin/branding', '/org-admin/settings', '/org-admin/pricing',
       '/facility-settings',
-      '/it', '/system-admin',
+      // Console targets inside the IT/system console: data quality and the
+      // conflict queue (org_admin is in CONFLICT_RESOLUTION_ROLES).
+      '/it', '/system-admin', '/data-quality', '/admin/conflicts',
       '/hospitals', '/reports', '/settings',
       '/patients', '/pharmacy', '/messages',
       '/appointments',

@@ -2,16 +2,16 @@
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import type { UserDoc, UserRole } from '@/lib/db-types';
 import {
-  Users, Search, UserX, UserCheck, UserPlus, Shield, Filter
+  Users, UserX, UserCheck, UserPlus, Shield, Filter
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super Admin',
@@ -203,7 +203,6 @@ export default function AdminUsersPage() {
 
   return (
     <>
-      <TopBar title={t('adminUsers.title')} />
       <main className="page-container page-enter admin-detail-page">
 
         {/* Header stats */}
@@ -226,37 +225,33 @@ export default function AdminUsersPage() {
           ))}
         </div>
 
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="relative flex-1" style={{ minWidth: '200px', maxWidth: '360px' }}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              type="text" placeholder={t('adminUsers.searchPlaceholder')}
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{ ...inputStyle, paddingLeft: '36px' }}
-            />
-          </div>
-          <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '180px' }}>
-            <option value="all">{t('adminUsers.allRoles')}</option>
-            {Object.keys(ROLE_LABELS).map((value) => (
-              <option key={value} value={value}>{roleLabel(value)} ({roleCounts[value] || 0})</option>
-            ))}
-          </select>
-          <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '200px' }}>
-            <option value="all">{t('adminUsers.allOrganizations')}</option>
-            {organizations.map(o => <option key={o._id} value={o._id}>{o.name}</option>)}
-          </select>
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs" style={{ color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>
-            <Filter className="w-3.5 h-3.5" />
-            {filteredUsers.length} of {users.length}
-          </div>
-          <button type="button" className="btn btn-primary" style={{ gap: 6, marginLeft: 'auto' }} onClick={() => { setAddForm(emptyAddForm); setAddError(null); setShowAddUser(true); }}>
-            <UserPlus className="w-4 h-4" /> Add user
-          </button>
-        </div>
-
         {/* Table */}
         <div className="dash-card overflow-hidden">
+          <EhrListHeader
+            title={t('adminUsers.title')}
+            search={{ value: search, onChange: setSearch, placeholder: t('adminUsers.searchPlaceholder') }}
+            actions={
+              <>
+                <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '180px', height: 38 }}>
+                  <option value="all">{t('adminUsers.allRoles')}</option>
+                  {Object.keys(ROLE_LABELS).map((value) => (
+                    <option key={value} value={value}>{roleLabel(value)} ({roleCounts[value] || 0})</option>
+                  ))}
+                </select>
+                <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '200px', height: 38 }}>
+                  <option value="all">{t('adminUsers.allOrganizations')}</option>
+                  {organizations.map(o => <option key={o._id} value={o._id}>{o.name}</option>)}
+                </select>
+                <div className="flex items-center gap-1.5 px-3 rounded-lg text-xs flex-shrink-0" style={{ height: 38, color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>
+                  <Filter className="w-3.5 h-3.5" />
+                  {filteredUsers.length} of {users.length}
+                </div>
+                <button type="button" className="btn btn-primary" style={{ gap: 6, height: 38, whiteSpace: 'nowrap' }} onClick={() => { setAddForm(emptyAddForm); setAddError(null); setShowAddUser(true); }}>
+                  <UserPlus className="w-4 h-4" /> Add user
+                </button>
+              </>
+            }
+          />
           <div style={{ overflowX: 'auto' }}>
             <table className="w-full" style={{ minWidth: 840 }}>
               <thead>

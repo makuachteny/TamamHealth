@@ -14,6 +14,7 @@
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './csrf';
 
 const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const IDEMPOTENCY_HEADER = 'X-Idempotency-Key';
 
 function readCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
@@ -61,13 +62,19 @@ export async function apiFetch(
     response = await fetch(input, init);
   } else {
     const token = readCookie(CSRF_COOKIE_NAME);
+    const headers = new Headers(init.headers);
+    if (!headers.has(IDEMPOTENCY_HEADER)) {
+      const key = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      headers.set(IDEMPOTENCY_HEADER, key);
+    }
     if (!token) {
       // Don't fail outright — the request hits the server, gets a 403 with a
       // descriptive body, and the caller's normal error path takes over. That
       // gives one consistent shape for "you weren't authorized" errors.
-      response = await fetch(input, init);
+      response = await fetch(input, { ...init, headers });
     } else {
-      const headers = new Headers(init.headers);
       if (!headers.has(CSRF_HEADER_NAME)) {
         headers.set(CSRF_HEADER_NAME, token);
       }

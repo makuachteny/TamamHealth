@@ -8,6 +8,7 @@ import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { labOrder, getResultReviewSLA, type LabOrderStatus } from '../clinical-flow/order-lifecycles';
 import { maybeDecrypt, maybeEncrypt } from '../field-encryption';
+import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 const ENCRYPTED_LAB_FIELDS = ['result', 'clinicalNotes'] as const;
 
@@ -101,14 +102,14 @@ export async function createLabResult(
   const db = labResultsDB();
   const now = new Date().toISOString();
   const orgId = data.orgId || await inferOrgIdFromHospital(data.hospitalId);
-  const doc: LabResultDoc = encryptLabFields({
+  const doc: LabResultDoc = encryptLabFields(withPendingOfflineSync({
     _id: `lab-${uuidv4().slice(0, 8)}`,
     type: 'lab_result',
     ...data,
     orgId,
     createdAt: now,
     updatedAt: now,
-  } as LabResultDoc);
+  } as LabResultDoc, now));
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   const plaintextDoc = decryptLabResult(doc);
@@ -140,7 +141,7 @@ export async function updateLabResult(id: string, data: Partial<LabResultDoc>): 
   const db = labResultsDB();
   try {
     const existing = await db.get(id) as LabResultDoc;
-    const updated = encryptLabFields({ ...existing, ...data, _id: existing._id, _rev: existing._rev, updatedAt: new Date().toISOString() });
+    const updated = encryptLabFields(withPendingOfflineSync({ ...existing, ...data, _id: existing._id, _rev: existing._rev, updatedAt: new Date().toISOString() }));
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     const plaintextUpdated = decryptLabResult(updated);

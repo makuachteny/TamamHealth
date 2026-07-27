@@ -2,7 +2,7 @@
 
 import { Loader2 } from '@/components/icons/lucide';
 import Badge, { toneForStatus } from '@/components/Badge';
-import { patientInitials, avatarColor } from '@/lib/patient-utils';
+import { patientInitials, avatarTint } from '@/lib/patient-utils';
 import { useMobileShellState } from '@/lib/mobile-shell/use-mobile-shell-state';
 import { useClinicalDashboardData } from '@/lib/mobile-shell/use-clinical-dashboard-data';
 import { useLabDashboardData } from '@/lib/mobile-shell/use-lab-dashboard-data';
@@ -22,7 +22,7 @@ function AppointmentCard({ appt, onOpen }: { appt: AppointmentDoc; onOpen: () =>
   return (
     <article className="mobile-appt-card" onClick={onOpen} role="button" tabIndex={0}>
       <strong className="mobile-appt-time">{appt.appointmentTime}</strong>
-      <span className="mobile-appt-avatar" style={{ background: avatarColor(appt.patientName) }}>
+      <span className="mobile-appt-avatar" style={avatarTint(appt.patientName)}>
         {initials}
       </span>
       <span className="mobile-appt-meta">

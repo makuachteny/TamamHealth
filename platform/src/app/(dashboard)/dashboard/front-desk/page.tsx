@@ -266,6 +266,7 @@ export default function FrontDeskDashboardPage() {
     encounterId?: string;
     assignedRoom?: string; // OPD exam room/bay (walk-in/triage entries only)
     assignedDoctorName?: string;
+    assignedNurseName?: string;
     location?: string;
   }
 
@@ -277,6 +278,7 @@ export default function FrontDeskDashboardPage() {
     const genderOf = (pid: string) => patientById.get(pid)?.gender || '—';
     const ageOf = (pid: string) => { const p = patientById.get(pid); return p ? patientAgeLabel(p) : '—'; };
     const doctorOf = (pid: string) => patientById.get(pid)?.assignedDoctorName || '';
+    const nurseOf = (pid: string) => patientById.get(pid)?.assignedByName || '';
     const locationOf = (pid: string, fallback?: string) => {
       const p = patientById.get(pid);
       return fallback || patientFacilityName(p, currentUser?.hospitalName || 'Facility');
@@ -348,6 +350,7 @@ export default function FrontDeskDashboardPage() {
         encounterId: checkoutEncounter?._id,
         assignedRoom: room,
         assignedDoctorName: doctorOf(entry.patientId),
+        assignedNurseName: nurseOf(entry.patientId),
         location: locationOf(entry.patientId, room || (entry.chiefComplaint ? suggestDepartment(entry.chiefComplaint) : 'Triage')),
       });
     }
@@ -384,6 +387,7 @@ export default function FrontDeskDashboardPage() {
         sourceId: a._id,
         encounterId: checkoutEncounter?._id,
         assignedDoctorName: a.providerName || doctorOf(a.patientId),
+        assignedNurseName: nurseOf(a.patientId),
         location: a.department || a.facilityName || locationOf(a.patientId),
       });
     }
@@ -410,6 +414,7 @@ export default function FrontDeskDashboardPage() {
         sourceId: enc._id,
         encounterId: enc._id,
         assignedDoctorName: doctorOf(enc.patientId),
+        assignedNurseName: nurseOf(enc.patientId),
         location: 'Checkout',
       });
       queuedPatientIds.add(enc.patientId);
@@ -727,13 +732,17 @@ export default function FrontDeskDashboardPage() {
         meta: `${formatClockTime(appointment.appointmentTime) || 'No time'} · ${appointment.providerName || patient?.assignedDoctorName || 'Unassigned'} · ${appointment.facilityName || currentUser?.hospitalName || 'Facility'}`,
         compactMeta: formatClockTime(appointment.appointmentTime) || 'No time',
         time: formatClockTime(appointment.appointmentTime) || undefined,
+        timeSecondary: isoDateKey(appointment.appointmentDate),
         timeAt: appointmentMoment(appointment.appointmentDate, appointment.appointmentTime),
-        careTeam: appointment.providerName || patient?.assignedDoctorName || 'Unassigned',
+        careTeam: appointment.providerName || patient?.assignedDoctorName || 'Doctor unassigned',
+        careTeamSecondary: patient?.assignedByName || 'Nurse unassigned',
         careTeamLabel: 'Care team',
         location: appointment.department || appointment.facilityName || patientFacilityName(patient, currentUser?.hospitalName || 'Facility'),
+        locationSecondary: appointment.department ? patientFacilityName(patient, currentUser?.hospitalName || 'Facility') : 'Location',
         locationLabel: appointment.department ? 'Department' : 'Location',
         status: appointment.status === 'requested' ? 'requested' : 'scheduled',
         statusLabel: appointment.status === 'confirmed' ? 'Confirmed' : appointment.status === 'requested' ? 'Requested' : 'Scheduled',
+        statusSecondary: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
         statusTone: 'scheduled',
         // Only a real acuity gets the RED/YELLOW pill — routine appointments
         // show no priority pill rather than a free-text 'Appointment' label.
@@ -766,14 +775,6 @@ export default function FrontDeskDashboardPage() {
               : entry.priority === 'YELLOW'
                 ? 'warning'
                 : 'ready';
-      // Where this row entered the queue from — the same doors every station
-      // recognizes a patient by. Encounter-only rows (a checkout with no
-      // same-day triage/appointment) are labeled as the checkout they are,
-      // not as a registration-flow row.
-      const source = entry.id.startsWith('triage-') ? 'Triage'
-        : entry.id.startsWith('appt-') ? 'Appointment'
-        : entry.id.startsWith('encounter-') ? 'Checkout'
-        : 'Registration';
       // Triage-sourced rows carry the real acuity code, so they get the same
       // RED/YELLOW/GREEN pill the doctor and nurse see for this patient.
       // Appointment/registration rows have no acuity — the pill falls back
@@ -796,6 +797,13 @@ export default function FrontDeskDashboardPage() {
       const context = entry.stage ? STAGE_LABELS[entry.stage]
         : entry.type === 'appointment' ? entry.department
         : entry.location || entry.department;
+      const statusContext = entry.priority === 'RED'
+        ? 'Critical'
+        : entry.priority === 'YELLOW'
+          ? 'Urgent'
+          : entry.priority === 'GREEN'
+            ? 'Routine'
+            : entry.stageLabel || context;
       // Wait column: actual queue/slot time on the first line; the shared
       // dashboard row renders hours/minutes underneath from `timeAt`.
       const waitTime = entry.time || entry.date || undefined;
@@ -806,15 +814,19 @@ export default function FrontDeskDashboardPage() {
         meta: `${entry.gender} · ${entry.age}${entry.assignedDoctorName ? ` · ${entry.assignedDoctorName}` : ''}`,
         compactMeta: entry.waitMinutes != null ? waitLabel(entry.waitMinutes) : (entry.time || entry.date),
         time: waitTime,
+        timeSecondary: entry.waitMinutes != null ? waitLabel(entry.waitMinutes) : entry.calendarDate,
         timeAt: entry.timeAt,
         status: entry.status.toLowerCase(),
         statusLabel,
+        statusSecondary: statusContext,
         statusTone,
         priority: acuity,
         room: entry.assignedRoom,
-        careTeam: source,
-        careTeamLabel: 'Source',
+        careTeam: entry.assignedDoctorName || 'Doctor unassigned',
+        careTeamSecondary: entry.assignedNurseName || 'Nurse unassigned',
+        careTeamLabel: 'Care team',
         location: context,
+        locationSecondary: entry.stage ? entry.department : entry.location || entry.department,
         locationLabel: entry.stage ? 'Stage' : entry.type === 'appointment' ? 'Department' : 'Location',
         date: entry.calendarDate,
         onClick: () => openPatientDetail(entry.patientId, entry),
@@ -871,13 +883,17 @@ export default function FrontDeskDashboardPage() {
         meta: `${patientGenderAge(patient)} · ${registered.date}${registered.time ? ` · ${registered.time}` : ''}`,
         compactMeta: registered.time || registered.date,
         time: registered.time || undefined,
+        timeSecondary: registered.date,
         timeAt: registered.time ? patientRegisteredAt(patient) : undefined,
-        careTeam: patient.assignedDoctorName || 'Unassigned',
-        careTeamLabel: 'Assigned physician',
+        careTeam: patient.assignedDoctorName || 'Doctor unassigned',
+        careTeamSecondary: patient.assignedByName || 'Nurse unassigned',
+        careTeamLabel: 'Care team',
         location: patientFacilityName(patient, currentUser?.hospitalName || 'Registration'),
+        locationSecondary: [patient.county, patient.state].filter(Boolean).join(', ') || 'Location',
         locationLabel: 'Location',
         status: 'registered',
         statusLabel: 'Registered',
+        statusSecondary: patient.assignedDoctor ? 'Assigned' : 'Needs care team',
         statusTone: 'ready',
         date: isoDateKey(patientRegisteredAt(patient)),
         onClick: () => openPatientDetail(patient._id, null),

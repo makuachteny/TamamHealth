@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useToast } from '@/components/Toast';
@@ -134,13 +133,14 @@ export default function CheckInPage() {
   const label = (s: string) => <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>{s}</label>;
 
   return (
-    <>
-      <TopBar title="Patient Check-In" hideSearch />
-      <main className="page-container page-enter">
-        <div className="max-w-3xl mx-auto flex flex-col gap-5">
+    <main className="page-container page-enter">
+      <div className="max-w-3xl mx-auto flex flex-col gap-5">
 
-          {/* Patient selection */}
-          <div className="card-elevated p-5">
+        {/* Patient selection — carries the page title, appointments-style */}
+        <div className="card-elevated p-5">
+          <span className="block mb-3" style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: 'var(--text-primary)' }}>
+            Patient Check-In
+          </span>
             <h3 className="text-sm font-semibold mb-3 inline-flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <LogIn className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> Patient
             </h3>
@@ -262,9 +262,8 @@ export default function CheckInPage() {
             <button onClick={submit} disabled={submitting || !selected} className="btn btn-primary btn-lg">
               {submitting ? 'Checking in…' : <><LogIn className="w-4 h-4" /> Check in patient</>}
             </button>
-          </div>
         </div>
-      </main>
-    </>
+      </div>
+    </main>
   );
 }

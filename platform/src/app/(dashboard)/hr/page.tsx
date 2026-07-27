@@ -7,6 +7,7 @@ import {
   Users, Plus, X, Trash2, Download, ClipboardList, CalendarClock, Wallet,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
+import EhrListHeader, { EhrListHeaderButton, EhrListFilters } from '@/components/ehr/EhrListHeader';
 import { useApp } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
@@ -46,27 +47,8 @@ const SHIFT_TYPES: StaffScheduleDoc['shiftType'][] = ['morning', 'afternoon', 'n
 
 type TabId = 'roster' | 'leave' | 'schedule' | 'payroll';
 
-// ── Shared "All staff"-style section chrome ──────────────────────────
-// 24px card title (same as the patients registry / roster header).
-const SECTION_TITLE_STYLE: React.CSSProperties = {
-  fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000',
-};
-
 const staffInitials = (name: string) =>
   name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?';
-
-function StatDots({ stats }: { stats: { label: string; value: number | string; color: string }[] }) {
-  return (
-    <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
-      {stats.map(s => (
-        <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-          {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
-        </span>
-      ))}
-    </div>
-  );
-}
 
 function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
   return (
@@ -410,60 +392,41 @@ export default function HRPage() {
         {/* ── ROSTER ──────────────────────────────────────── */}
         {tab === 'roster' && (
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              {/* Title + staff/leave/shift stats (inline, right-aligned — mirrors the
-                  patients "All patients" header). */}
-              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
-                <span style={SECTION_TITLE_STYLE}>{sectionTitles[tab]}</span>
-                <StatDots stats={[
-                  { label: 'Total staff', value: facilityUsers.length, color: 'var(--text-muted)' },
-                  { label: 'Active', value: activeStaffCount, color: 'var(--color-success)' },
-                  { label: 'Inactive', value: inactiveStaffCount, color: 'var(--color-danger)' },
-                  { label: 'Pending leave requests', value: leaveSummary?.pending ?? 0, color: '#B8741C' },
-                  { label: 'Shifts scheduled today', value: schedules.length, color: '#2191D0' },
-                ]} />
-              </div>
-              {/* Search + role filter + download row (patients-list toolbar) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <input
-                    type="text"
-                    value={rosterSearch}
-                    onChange={e => setRosterSearch(e.target.value)}
-                    placeholder={t('hr.searchStaffPlaceholder')}
-                    style={{ padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
-                  />
-                </div>
-                <select
-                  value={rosterRole}
-                  onChange={e => setRosterRole(e.target.value)}
-                  aria-label={t('hr.colRole')}
-                  style={{ height: 38, width: 'auto', flexShrink: 0, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-secondary)', padding: '0 14px', outline: 'none' }}
-                >
-                  <option value="all">{t('hr.allRoles')} ({facilityUsers.length})</option>
-                  {Object.entries(roleCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([role, count]) => (
-                    <option key={role} value={role} className="capitalize">
-                      {role.replace(/_/g, ' ')} ({count})
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleDownloadCsv}
-                  aria-label="Download"
-                  title="Download"
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 38, height: 38, padding: 0,
-                    borderRadius: 999, background: 'var(--bg-card-solid)', color: 'var(--text-secondary)',
-                    border: '1px solid var(--border-light)',
-                    cursor: 'pointer', flexShrink: 0,
-                  }}
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <EhrListHeader
+              title={sectionTitles[tab]}
+              stats={[
+                { label: 'Total staff', value: facilityUsers.length, color: 'var(--text-muted)' },
+                { label: 'Active', value: activeStaffCount, color: 'var(--color-success)' },
+                { label: 'Inactive', value: inactiveStaffCount, color: 'var(--color-danger)' },
+                { label: 'Pending leave requests', value: leaveSummary?.pending ?? 0, color: '#B8741C' },
+                { label: 'Shifts scheduled today', value: schedules.length, color: '#2191D0' },
+              ]}
+              search={{ value: rosterSearch, onChange: setRosterSearch, placeholder: t('hr.searchStaffPlaceholder'), ariaLabel: t('hr.searchStaffPlaceholder') }}
+              actions={
+                <>
+                  <EhrListFilters activeCount={rosterRole !== 'all' ? 1 : 0} onClear={() => setRosterRole('all')}>
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.colRole')}</label>
+                      <select
+                        value={rosterRole}
+                        onChange={e => setRosterRole(e.target.value)}
+                        aria-label={t('hr.colRole')}
+                      >
+                        <option value="all">{t('hr.allRoles')} ({facilityUsers.length})</option>
+                        {Object.entries(roleCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([role, count]) => (
+                          <option key={role} value={role} className="capitalize">
+                            {role.replace(/_/g, ' ')} ({count})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </EhrListFilters>
+                  <EhrListHeaderButton onClick={handleDownloadCsv} ariaLabel="Download">
+                    <Download className="w-4 h-4" />
+                  </EhrListHeaderButton>
+                </>
+              }
+            />
             <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
             <table className="w-full" style={{ minWidth: 640 }}>
               <thead>
@@ -511,31 +474,21 @@ export default function HRPage() {
             : leave;
           return (
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
-                <span style={SECTION_TITLE_STYLE}>{sectionTitles.leave}</span>
-                <StatDots stats={[
-                  { label: 'Total', value: leave.length, color: 'var(--text-muted)' },
-                  { label: 'Pending', value: leave.filter(r => r.status === 'pending').length, color: '#B8741C' },
-                  { label: 'Approved', value: leave.filter(r => r.status === 'approved').length, color: 'var(--color-success)' },
-                  { label: 'Rejected', value: leave.filter(r => r.status === 'rejected').length, color: 'var(--color-danger)' },
-                ]} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <input
-                    type="text"
-                    value={leaveSearch}
-                    onChange={e => setLeaveSearch(e.target.value)}
-                    placeholder="Search leave requests…"
-                    style={{ width: '100%', padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
-                  />
-                </div>
-                <button onClick={() => setLeaveOpen(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  <Plus className="w-4 h-4" /> {t('hr.requestLeave')}
+            <EhrListHeader
+              title={sectionTitles.leave}
+              stats={[
+                { label: 'Total', value: leave.length, color: 'var(--text-muted)' },
+                { label: 'Pending', value: leave.filter(r => r.status === 'pending').length, color: '#B8741C' },
+                { label: 'Approved', value: leave.filter(r => r.status === 'approved').length, color: 'var(--color-success)' },
+                { label: 'Rejected', value: leave.filter(r => r.status === 'rejected').length, color: 'var(--color-danger)' },
+              ]}
+              search={{ value: leaveSearch, onChange: setLeaveSearch, placeholder: 'Search leave requests…', ariaLabel: 'Search leave requests' }}
+              actions={
+                <button type="button" className="listpage-icon-btn listpage-icon-btn-primary" onClick={() => setLeaveOpen(true)} title={t('hr.requestLeave')} aria-label={t('hr.requestLeave')}>
+                  <Plus className="w-4 h-4" color="#fff" />
                 </button>
-              </div>
-            </div>
+              }
+            />
             {leave.length === 0 ? (
               <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
                 {t('hr.noLeaveRequestsYet')} <strong>{t('hr.requestLeave')}</strong> {t('hr.above')}
@@ -605,30 +558,31 @@ export default function HRPage() {
         {/* ── SCHEDULE ───────────────────────────────────── */}
         {tab === 'schedule' && (
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
-                <span style={SECTION_TITLE_STYLE}>{sectionTitles.schedule}</span>
-                <StatDots stats={[
-                  { label: 'Shifts', value: schedules.length, color: 'var(--text-muted)' },
-                  { label: t('hr.shiftType_morning'), value: schedules.filter(s => s.shiftType === 'morning').length, color: 'var(--color-success)' },
-                  { label: t('hr.shiftType_afternoon'), value: schedules.filter(s => s.shiftType === 'afternoon').length, color: '#B8741C' },
-                  { label: t('hr.shiftType_night'), value: schedules.filter(s => s.shiftType === 'night').length, color: '#015697' },
-                  { label: t('hr.shiftType_on_call'), value: schedules.filter(s => s.shiftType === 'on_call').length, color: '#2191D0' },
-                ]} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="date"
-                  value={scheduleDate}
-                  onChange={e => setScheduleDate(e.target.value)}
-                  aria-label={t('hr.date')}
-                  style={{ flex: 1, minWidth: 0, padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
-                />
-                <button onClick={() => setScheduleOpen(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  <Plus className="w-4 h-4" /> {t('hr.scheduleShift')}
-                </button>
-              </div>
-            </div>
+            <EhrListHeader
+              title={sectionTitles.schedule}
+              stats={[
+                { label: 'Shifts', value: schedules.length, color: 'var(--text-muted)' },
+                { label: t('hr.shiftType_morning'), value: schedules.filter(s => s.shiftType === 'morning').length, color: 'var(--color-success)' },
+                { label: t('hr.shiftType_afternoon'), value: schedules.filter(s => s.shiftType === 'afternoon').length, color: '#B8741C' },
+                { label: t('hr.shiftType_night'), value: schedules.filter(s => s.shiftType === 'night').length, color: '#015697' },
+                { label: t('hr.shiftType_on_call'), value: schedules.filter(s => s.shiftType === 'on_call').length, color: '#2191D0' },
+              ]}
+              actions={
+                <>
+                  <input
+                    type="date"
+                    value={scheduleDate}
+                    onChange={e => setScheduleDate(e.target.value)}
+                    aria-label={t('hr.date')}
+                    className="listpage-toolbar-date"
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  <button type="button" className="listpage-icon-btn listpage-icon-btn-primary" onClick={() => setScheduleOpen(true)} title={t('hr.scheduleShift')} aria-label={t('hr.scheduleShift')}>
+                    <Plus className="w-4 h-4" color="#fff" />
+                  </button>
+                </>
+              }
+            />
             {schedules.length === 0 ? (
               <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
                 {t('hr.noShiftsScheduled', { date: scheduleDate })} <strong>{t('hr.scheduleShift')}</strong> {t('hr.aboveToAddOne')}
@@ -682,30 +636,31 @@ export default function HRPage() {
         {/* ── PAYROLL ───────────────────────────────────── */}
         {tab === 'payroll' && (
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
-                <span style={SECTION_TITLE_STYLE}>{sectionTitles.payroll}</span>
-                <StatDots stats={payrollSummary ? [
-                  { label: t('hr.pillEntries'), value: payrollSummary.total, color: 'var(--text-muted)' },
-                  { label: t('hr.pillGross'), value: formatMoney(payrollSummary.totalGross), color: '#2191D0' },
-                  { label: t('hr.pillDeductions'), value: formatMoney(payrollSummary.totalDeductions), color: '#B8741C' },
-                  { label: t('hr.pillNet'), value: formatMoney(payrollSummary.totalNet), color: 'var(--color-success)' },
-                  { label: t('hr.pillPaid'), value: `${payrollSummary.paid}/${payrollSummary.total}`, color: 'var(--color-success)' },
-                ] : [{ label: t('hr.pillEntries'), value: payroll.length, color: 'var(--text-muted)' }]} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="month"
-                  value={payrollPeriod}
-                  onChange={e => setPayrollPeriod(e.target.value)}
-                  aria-label={t('hr.period')}
-                  style={{ flex: 1, minWidth: 0, padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
-                />
-                <button onClick={() => setPayrollOpen(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  <Plus className="w-4 h-4" /> {t('hr.addPayrollEntry')}
-                </button>
-              </div>
-            </div>
+            <EhrListHeader
+              title={sectionTitles.payroll}
+              stats={payrollSummary ? [
+                { label: t('hr.pillEntries'), value: payrollSummary.total, color: 'var(--text-muted)' },
+                { label: t('hr.pillGross'), value: formatMoney(payrollSummary.totalGross), color: '#2191D0' },
+                { label: t('hr.pillDeductions'), value: formatMoney(payrollSummary.totalDeductions), color: '#B8741C' },
+                { label: t('hr.pillNet'), value: formatMoney(payrollSummary.totalNet), color: 'var(--color-success)' },
+                { label: t('hr.pillPaid'), value: `${payrollSummary.paid}/${payrollSummary.total}`, color: 'var(--color-success)' },
+              ] : [{ label: t('hr.pillEntries'), value: payroll.length, color: 'var(--text-muted)' }]}
+              actions={
+                <>
+                  <input
+                    type="month"
+                    value={payrollPeriod}
+                    onChange={e => setPayrollPeriod(e.target.value)}
+                    aria-label={t('hr.period')}
+                    className="listpage-toolbar-date"
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  <button type="button" className="listpage-icon-btn listpage-icon-btn-primary" onClick={() => setPayrollOpen(true)} title={t('hr.addPayrollEntry')} aria-label={t('hr.addPayrollEntry')}>
+                    <Plus className="w-4 h-4" color="#fff" />
+                  </button>
+                </>
+              }
+            />
             {payroll.length === 0 ? (
               <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
                 {t('hr.noPayrollEntries', { period: payrollPeriod })} <strong>{t('hr.addPayrollEntry')}</strong> {t('hr.aboveToStartRegister')}

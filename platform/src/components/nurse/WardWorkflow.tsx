@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useWards } from '@/lib/hooks/useWards';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { formatClockTime, formatTimeUntil } from '@/lib/format-utils';
-import { patientFullName, patientAgeLabel, initials, stateColor } from '@/lib/patient-utils';
+import { patientFullName, patientAgeLabel, initials, stateTint } from '@/lib/patient-utils';
 import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 
@@ -176,11 +176,11 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
             )}
             {displayedPatients.length > 0 && (
               <div className="appointment-card-surface">
-                {/* The appointments-page table, exactly: PATIENT / TIME /
-                    LOCATION / QUEUE / STATUS, acuity as the status cue. */}
+                {/* Patient / Time / Care team / Context / Status, with every
+                    data column using the same primary + secondary hierarchy. */}
                 <div className="appointment-card-flow">
                 <div className="appointment-card-head" aria-hidden="true">
-                  {['Patient', 'Time', 'Location', 'Queue', 'Status'].map(head => (
+                  {['Patient', 'Time', 'Care team', 'Context', 'Status'].map(head => (
                     <span key={head}>{head}</span>
                   ))}
                 </div>
@@ -202,9 +202,16 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                   const waiting = !inService && Boolean(entry || demoTriage);
                   const notTriaged = !entry && !demoTriage && !appointment;
                   const statusText = inService
-                    ? `In service${entry?.assignedToName ? ` · ${entry.assignedToName}` : ''}`
+                    ? t('nurse.statusInConsult')
                     : (entry || demoTriage) ? (demoTriage && !entry && demoTriage.status === 'seen' ? t('nurse.statusInConsult') : t('nurse.statusWaiting'))
                     : appointment ? 'Scheduled' : t('nurse.statusNotTriaged');
+                  const statusSubtext = entry?.acuity === 'RED'
+                    ? 'Critical'
+                    : entry?.acuity === 'YELLOW'
+                      ? 'Watch'
+                      : entry?.acuity === 'GREEN' || priority === 'GREEN'
+                        ? 'Stable'
+                        : ACUITY_META[priority].label;
                   // Location column (design): the admitted bed wins; otherwise
                   // the queue stage / appointment department stands in.
                   const location = admission
@@ -224,7 +231,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                     : appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime) : '—';
                   const waitSubtext = entry
                     ? waitLabel(entry.minutesWaiting)
-                    : appointmentAt && !Number.isNaN(appointmentAt.getTime()) ? formatTimeUntil(appointmentAt.toISOString(), now) : '';
+                    : appointmentAt && !Number.isNaN(appointmentAt.getTime()) ? formatTimeUntil(appointmentAt.toISOString(), now) : today;
                   const overTarget = Boolean(entry?.flaggedForReassessment);
                   const subtitle = `${triage?.chiefComplaint || patient.hospitalNumber || 'No ID'} · ${patientAgeLabel(patient)} · ${patient.gender || 'Not recorded'}`;
                   const activate = patient._demo ? undefined : () => router.push(`/patients/${patient._id}?tab=vitals`);
@@ -233,6 +240,8 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                     : demoTriage
                     ? (demoTriage.status === 'pending' ? STAGE_LABELS.awaiting_triage : STAGE_LABELS.awaiting_rooming)
                     : appointment?.department || '';
+                  const careTeamDoctor = admission?.attendingPhysicianName || patient.assignedDoctorName || 'Doctor unassigned';
+                  const careTeamNurse = admission?.nurseAssignedName || entry?.assignedToName || 'Nurse unassigned';
                   const statusPillClass = inService ? 'status-checked-in'
                     : waiting ? 'status-attention'
                     : notTriaged ? 'status-attention'
@@ -249,7 +258,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                       style={{ cursor: patient._demo ? 'default' : 'pointer' }}
                     >
                       <div className="ehr-appointment-identity">
-                        <div className="ehr-patient-icon" style={{ background: stateColor(priority), color: '#fff' }}>{initials(patientFullName(patient))}</div>
+                        <div className="ehr-patient-icon" style={stateTint(priority)}>{initials(patientFullName(patient))}</div>
                         <div className="ehr-appointment-main appointment-card-patient">
                           <strong className="ehr-queue-name">{patientFullName(patient)}</strong>
                           <p>{subtitle}</p>
@@ -266,19 +275,18 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                       </div>
 
                       <div className="appointment-card-provider">
-                        <strong>{admission ? location : (location === '—' ? 'Not placed' : location)}</strong>
-                        <span>{admission ? 'Ward · bed' : 'Location'}</span>
+                        <strong>{careTeamDoctor}</strong>
+                        <span>{careTeamNurse}</span>
                       </div>
 
                       <div className="ehr-appointment-department">
-                        {stageText
-                          ? <span className="ehr-department-pill opd">{stageText}</span>
-                          : <span className="ehr-queue-muted-cell">—</span>}
+                        <strong>{stageText || location || '—'}</strong>
+                        <span>{admission ? location : appointment ? 'Appointment' : 'Ward'}</span>
                       </div>
 
                       <div className="appointment-card-status">
                         <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText}</span>
-                        <small>{ACUITY_META[priority].label}</small>
+                        <small>{statusSubtext}</small>
                       </div>
                     </div>
                   );

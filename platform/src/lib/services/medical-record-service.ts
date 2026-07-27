@@ -9,6 +9,7 @@ import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
 import { isProviderRole, isClinicalAuthorRole } from '../clinical-roles';
 import { maybeDecrypt, maybeEncrypt } from '../field-encryption';
+import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 const ENCRYPTED_RECORD_FIELDS = [
   'chiefComplaint',
@@ -140,13 +141,13 @@ export async function createMedicalRecord(
   }
   const db = medicalRecordsDB();
   const now = new Date().toISOString();
-  const doc: MedicalRecordDoc = encryptRecordFields({
+  const doc: MedicalRecordDoc = encryptRecordFields(withPendingOfflineSync({
     _id: `rec-${uuidv4().slice(0, 12)}`,
     type: 'medical_record',
     ...data,
     createdAt: now,
     updatedAt: now,
-  } as MedicalRecordDoc);
+  } as MedicalRecordDoc, now));
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   const plaintextDoc = decryptRecord(doc);
@@ -177,13 +178,13 @@ export async function updateMedicalRecord(id: string, data: Partial<MedicalRecor
     throw new SignedRecordLockError(id);
   }
   try {
-    const updated = encryptRecordFields({
+    const updated = encryptRecordFields(withPendingOfflineSync({
       ...existing,
       ...data,
       _id: existing._id,
       _rev: existing._rev,
       updatedAt: new Date().toISOString(),
-    });
+    } as MedicalRecordDoc));
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     const plaintextUpdated = decryptRecord(updated);
@@ -232,7 +233,7 @@ export async function signMedicalRecord(
     throw new SignedRecordLockError(id);
   }
   const now = new Date().toISOString();
-  const signed: MedicalRecordDoc = {
+  const signed: MedicalRecordDoc = withPendingOfflineSync({
     ...existing,
     documentStatus: opts.awaitingCosign ? 'awaiting_cosign' : 'signed',
     signedBy: signer.userId,
@@ -241,7 +242,7 @@ export async function signMedicalRecord(
     signedAt: now,
     syncStatus: 'pending',
     updatedAt: now,
-  };
+  } as MedicalRecordDoc, now);
   const resp = await db.put(signed);
   signed._rev = resp.rev;
   const plaintextSigned = decryptRecord(signed);
@@ -300,13 +301,13 @@ export async function addAddendum(
     authorRole: author.userRole,
     createdAt: now,
   };
-  const amended: MedicalRecordDoc = encryptRecordFields({
+  const amended: MedicalRecordDoc = encryptRecordFields(withPendingOfflineSync({
     ...existing,
     addenda: [...(existing.addenda || []), addendum],
     documentStatus: 'amended',
     syncStatus: 'pending',
     updatedAt: now,
-  });
+  } as MedicalRecordDoc, now));
   const resp = await db.put(amended);
   amended._rev = resp.rev;
   const plaintextAmended = decryptRecord(amended);
@@ -351,7 +352,7 @@ export async function cosignMedicalRecord(
     throw new SigningAuthorizationError('A note must be co-signed by a different provider than the author.');
   }
   const now = new Date().toISOString();
-  const cosigned: MedicalRecordDoc = {
+  const cosigned: MedicalRecordDoc = withPendingOfflineSync({
     ...existing,
     documentStatus: 'signed',
     cosignedBy: cosigner.userId,
@@ -359,7 +360,7 @@ export async function cosignMedicalRecord(
     cosignedAt: now,
     syncStatus: 'pending',
     updatedAt: now,
-  };
+  } as MedicalRecordDoc, now);
   const resp = await db.put(cosigned);
   cosigned._rev = resp.rev;
   const plaintextCosigned = decryptRecord(cosigned);

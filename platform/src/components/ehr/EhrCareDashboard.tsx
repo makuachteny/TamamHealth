@@ -2,11 +2,11 @@
 
 import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
-import { initials, stateColor } from '@/lib/patient-utils';
+import { initials, stateTint } from '@/lib/patient-utils';
 import { formatTimeUntil } from '@/lib/format-utils';
 
 export type EhrCareDashboardAction = {
@@ -54,16 +54,20 @@ export type EhrCareDashboardRow = {
    *  patient entered the queue. Omit for rows with no time and the column reads
    *  "—". */
   time?: string;
+  timeSecondary?: string;
   /** Full ISO timestamp behind `time`. When set, the Wait column also shows a
    *  live hours/minutes relative label under the time. */
   timeAt?: string;
   meta?: string;
   compactMeta?: string;
   careTeam?: string;
+  careTeamSecondary?: string;
   careTeamLabel?: string;
   location?: string;
+  locationSecondary?: string;
   locationLabel?: string;
   status?: string;
+  statusSecondary?: string;
   statusLabel?: string;
   statusTone?: 'scheduled' | 'ready' | 'active' | 'done' | 'warning' | 'danger';
   priority?: string;
@@ -97,24 +101,6 @@ function isTriageCode(value?: string): value is 'RED' | 'YELLOW' | 'GREEN' {
   return value === 'RED' || value === 'YELLOW' || value === 'GREEN';
 }
 
-/** Department pill tone, matching the appointments table's service pills. */
-function departmentTone(value?: string) {
-  const department = (value || '').toLowerCase();
-  if (department.includes('emergency')) return 'emergency';
-  if (department.includes('maternity')) return 'maternity';
-  if (department.includes('pediatric') || department.includes('paediatric')) return 'pediatrics';
-  if (department.includes('surgery')) return 'surgery';
-  if (department.includes('lab')) return 'lab';
-  return 'opd';
-}
-
-function pillToneFromStatus(tone?: EhrCareDashboardRow['statusTone']): string {
-  if (tone === 'danger') return 'red';
-  if (tone === 'warning') return 'yellow';
-  if (tone === 'done' || tone === 'ready') return 'green';
-  return 'neutral';
-}
-
 function inferredChartSeries(row: EhrCareDashboardRow): 0 | 1 {
   if (row.chartSeries === 0 || row.chartSeries === 1) return row.chartSeries;
   const statusText = `${row.status || ''} ${row.statusLabel || ''}`.toLowerCase();
@@ -122,6 +108,10 @@ function inferredChartSeries(row: EhrCareDashboardRow): 0 | 1 {
     return 1;
   }
   return row.statusTone === 'done' ? 1 : 0;
+}
+
+function detailPair(primary?: string, secondary?: string) {
+  return [primary, secondary].filter(Boolean).join(' · ') || undefined;
 }
 
 export default function EhrCareDashboard({
@@ -443,7 +433,7 @@ export default function EhrCareDashboard({
                     <span>Patient</span>
                     <span>Time</span>
                     <span>Care team</span>
-                    <span>Department</span>
+                    <span>Context</span>
                     <span>Status</span>
                   </div>
                   {visibleRows.map(row => {
@@ -454,7 +444,9 @@ export default function EhrCareDashboard({
                     const avatarAcuity = priorityCode
                       ?? (row.statusTone === 'danger' ? 'RED' : row.statusTone === 'warning' ? 'YELLOW' : 'GREEN');
                     const sourceText = row.careTeam || row.compactMeta || row.meta || '';
+                    const sourceSubtext = row.careTeamSecondary || row.careTeamLabel || 'Care team';
                     const contextText = row.location || row.room || row.meta || '';
+                    const contextSubtext = row.locationSecondary || row.locationLabel || (row.room ? 'Room' : 'Location');
                     const statusText = row.statusLabel || (row.status ? titleCase(row.status) : '');
                     const activate = () => openDetail(row);
                     const countdown = (() => {
@@ -465,6 +457,7 @@ export default function EhrCareDashboard({
                       const tone = minutesAway < 0 ? 'is-past' : minutesAway <= 30 ? 'is-soon' : '';
                       return { label, tone };
                     })();
+                    const timeSubtext = row.timeSecondary || countdown?.label || '';
                     // Status pill tone reuses the appointment pill classes.
                     const statusPillClass = row.statusTone === 'done' ? 'status-completed'
                       : row.statusTone === 'active' ? 'status-checked-in'
@@ -487,7 +480,7 @@ export default function EhrCareDashboard({
                           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); } }}
                         >
                           <div className="ehr-appointment-identity">
-                            <div className="ehr-patient-icon" style={{ background: stateColor(avatarAcuity), color: '#fff' }}>{initials(row.title)}</div>
+                            <div className="ehr-patient-icon" style={stateTint(avatarAcuity)}>{initials(row.title)}</div>
                             <div className="ehr-appointment-main appointment-card-patient">
                               <button type="button" className="print-visible" onClick={(event) => { event.stopPropagation(); activate(); }}>
                                 {row.title}
@@ -498,23 +491,22 @@ export default function EhrCareDashboard({
 
                           <div className="ehr-appointment-time">
                             <strong>{row.time || row.date || '—'}</strong>
-                            {countdown ? <span className={countdown.tone}>{countdown.label}</span> : <span>{row.locationLabel || 'Queue'}</span>}
+                            <span className={countdown?.tone || ''}>{timeSubtext}</span>
                           </div>
 
                           <div className="appointment-card-provider">
                             <strong>{sourceText || 'Unassigned'}</strong>
-                            <span>{row.careTeamLabel || 'Care team'}</span>
+                            <span>{sourceSubtext}</span>
                           </div>
 
                           <div className="ehr-appointment-department">
-                            {contextText
-                              ? <span className={`ehr-department-pill ${departmentTone(contextText)}`}>{contextText}</span>
-                              : <span className="ehr-queue-muted-cell">—</span>}
+                            <strong>{contextText || '—'}</strong>
+                            <span>{contextText ? contextSubtext : ''}</span>
                           </div>
 
                           <div className="appointment-card-status">
                             <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText || '—'}</span>
-                            <small>{cue}</small>
+                            <small>{row.statusSecondary || cue}</small>
                           </div>
                         </div>
                         {row.detail}
@@ -614,13 +606,10 @@ export default function EhrCareDashboard({
                 <h2>{openRow.title}</h2>
                 {openRow.subtitle && <p>{openRow.subtitle}</p>}
               </div>
-              {/* Back + close live together on the right so the title (and
-                  everything under it) shares the body's left edge. Time and
-                  status stay in the Visit Information rows only. */}
+              {/* Close sits on the right so the title (and everything under it)
+                  shares the body's left edge. Time and status stay in the Visit
+                  Information rows only. */}
               <div className="appointment-detail-sidebar__header-icons">
-                <button type="button" className="appointment-detail-sidebar__back" onClick={() => setOpenRow(null)} aria-label="Back">
-                  <ChevronLeft size={20} />
-                </button>
                 <button type="button" className="appointment-detail-sidebar__close" onClick={() => setOpenRow(null)} aria-label="Close">
                   <X size={16} />
                 </button>
@@ -644,15 +633,15 @@ export default function EhrCareDashboard({
               <div className="appointment-detail-sidebar__body" role="tabpanel">
                 {(detailTab === 'visit'
                   ? [
-                      { label: 'Time', value: openRow.time || openRow.compactMeta },
+                      { label: 'Time', value: detailPair(openRow.time || openRow.compactMeta, openRow.timeSecondary) },
                       { label: 'Reason', value: openRow.subtitle },
                       // Raw triage codes (YELLOW/RED/GREEN) read like debug
                       // output — surface the clinical label instead.
                       { label: 'Priority', value: isTriageCode(openRow.priority) ? PRIORITY_META[openRow.priority].label : openRow.priority },
-                      { label: 'Status', value: openRow.statusLabel || (openRow.status ? titleCase(openRow.status) : undefined) },
+                      { label: 'Status', value: detailPair(openRow.statusLabel || (openRow.status ? titleCase(openRow.status) : undefined), openRow.statusSecondary) },
                       { label: 'Room', value: openRow.room },
-                      { label: openRow.careTeamLabel || 'Care team', value: openRow.careTeam },
-                      { label: openRow.locationLabel || 'Location', value: openRow.location },
+                      { label: openRow.careTeamLabel || 'Care team', value: openRow.careTeamSecondary ? `${openRow.careTeam || 'Unassigned'} · ${openRow.careTeamSecondary}` : openRow.careTeam },
+                      { label: openRow.locationLabel || 'Context', value: detailPair(openRow.location, openRow.locationSecondary) },
                       { label: 'Details', value: openRow.meta },
                     ]
                   : [

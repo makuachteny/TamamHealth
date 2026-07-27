@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import TopBar from '@/components/TopBar';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import {
   RefreshCw, CheckCircle, Clock, AlertTriangle,
   Download, FileJson, FileSpreadsheet, Upload, Loader2,
@@ -149,22 +149,28 @@ export default function DHIS2ExportPage() {
 
   return (
     <>
-      <TopBar title={t('dhis2.pageTitle')} actions={
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-          style={{
-            background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #2191D0, #015697)',
-            color: syncing ? 'var(--text-muted)' : '#fff',
-            boxShadow: syncing ? 'none' : '0 4px 12px rgba(33, 145, 208, 0.3)',
-          }}
-        >
-          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? t('dhis2.syncing') : t('dhis2.syncNow')}
-        </button>
-      } />
       <main className="page-container page-enter">
+
+        <div className="dash-card mb-4">
+          <EhrListHeader
+            title={t('dhis2.pageTitle')}
+            actions={
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+                style={{
+                  background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #2191D0, #015697)',
+                  color: syncing ? 'var(--text-muted)' : '#fff',
+                  boxShadow: syncing ? 'none' : '0 4px 12px rgba(33, 145, 208, 0.3)',
+                }}
+              >
+                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? t('dhis2.syncing') : t('dhis2.syncNow')}
+              </button>
+            }
+          />
+        </div>
 
         {/* Status Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">

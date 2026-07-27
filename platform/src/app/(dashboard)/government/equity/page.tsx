@@ -7,7 +7,8 @@ import {
   ResponsiveContainer, Cell,
 } from 'recharts';
 import { tooltipStyle, axisTick } from '@/components/ChartCard';
-import { FilterBar, FilterTabs } from '@/components/filters';
+import { FilterTabs } from '@/components/filters';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
@@ -100,10 +101,12 @@ export default function EquityPlanningPage() {
   }, [hospitals, alerts, immStats, ancStats, dq]);
 
   // ── Comparison view sort state ──
+  const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<keyof StateRow>('activeCases');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const sortedRows = useMemo(() => {
-    const copy = [...rows];
+    const needle = search.trim().toLowerCase();
+    const copy = needle ? rows.filter(r => r.state.toLowerCase().includes(needle)) : [...rows];
     copy.sort((a, b) => {
       const av = a[sortKey], bv = b[sortKey];
       const an = av === null ? -1 : (av as number);
@@ -112,7 +115,7 @@ export default function EquityPlanningPage() {
       return sortDir === 'asc' ? an - bn : bn - an;
     });
     return copy;
-  }, [rows, sortKey, sortDir]);
+  }, [rows, sortKey, sortDir, search]);
   const toggleSort = (key: keyof StateRow) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('desc'); }
@@ -149,15 +152,17 @@ export default function EquityPlanningPage() {
   return (
     <main className="page-container page-enter">
       <div className="dash-card mb-3">
-        <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-          <span style={SECTION_TITLE_STYLE}>Equity &amp; planning</span>
-          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Cross-state comparison · National</p>
-        </div>
-        <div className="px-4 py-3">
-          <FilterBar>
+        <EhrListHeader
+          title="Equity & planning"
+          stats={[
+            { label: 'States', value: rows.length, color: LIST_STAT_COLORS.muted },
+            { label: 'Facilities', value: rows.reduce((sum, r) => sum + r.facilities, 0), color: LIST_STAT_COLORS.blue },
+          ]}
+          search={{ value: search, onChange: setSearch, placeholder: 'Search a state…', ariaLabel: 'Search states' }}
+          actions={
             <FilterTabs ariaLabel="Equity view" active={view} onChange={k => setView(k as View)} tabs={VIEWS.map(v => ({ key: v.key, label: v.label }))} />
-          </FilterBar>
-        </div>
+          }
+        />
       </div>
 
       {loading ? (

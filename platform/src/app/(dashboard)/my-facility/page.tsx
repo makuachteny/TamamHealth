@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import TopBar from '@/components/TopBar';
 import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import {
@@ -126,29 +125,23 @@ export default function MyFacilityPage() {
   // Not assigned to a facility
   if (!hospitalId) {
     return (
-      <>
-        <TopBar title={t('breadcrumb.myFacility')} />
-        <main className="page-container page-enter">
-          <div className="card-elevated p-8 text-center max-w-md mx-auto mt-16">
-            <Building2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-            <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>{t('myFacility.notAssignedTitle')}</h2>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              {t('myFacility.notAssignedDesc')}
-            </p>
-          </div>
-        </main>
-      </>
+      <main className="page-container page-enter">
+        <div className="card-elevated p-8 text-center max-w-md mx-auto mt-16">
+          <Building2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+          <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>{t('myFacility.notAssignedTitle')}</h2>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {t('myFacility.notAssignedDesc')}
+          </p>
+        </div>
+      </main>
     );
   }
 
   if (hospitalsLoading) {
     return (
-      <>
-        <TopBar title={t('breadcrumb.myFacility')} />
-        <main className="page-container page-enter flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--text-muted)' }} />
-        </main>
-      </>
+      <main className="page-container page-enter flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--text-muted)' }} />
+      </main>
     );
   }
 

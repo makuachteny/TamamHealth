@@ -9,6 +9,7 @@ import { emitSyncEvent } from './sync-event-service';
 import { validatePrescription, ValidationError } from '../validation';
 import { checkNewPrescription, type InteractionCheckResult } from './drug-interaction-service';
 import { prescription as rxLifecycle, type PrescriptionStatus } from '../clinical-flow/order-lifecycles';
+import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 /** Granular pharmacy lifecycle stage, defaulting legacy docs from coarse status. */
 export function effectivePrescriptionStatus(
@@ -111,13 +112,13 @@ export async function createPrescription(
 
   const db = prescriptionsDB();
   const now = new Date().toISOString();
-  const doc: PrescriptionDoc = {
+  const doc: PrescriptionDoc = withPendingOfflineSync({
     _id: `rx-${uuidv4().slice(0, 8)}`,
     type: 'prescription',
     ...data,
     createdAt: now,
     updatedAt: now,
-  } as PrescriptionDoc;
+  } as PrescriptionDoc, now);
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('PRESCRIPTION_CREATED', undefined, doc.prescribedBy,
@@ -150,7 +151,7 @@ export async function updatePrescription(id: string, data: Partial<PrescriptionD
   const db = prescriptionsDB();
   try {
     const existing = await db.get(id) as PrescriptionDoc;
-    const updated = { ...existing, ...data, _id: existing._id, _rev: existing._rev, updatedAt: new Date().toISOString() };
+    const updated = withPendingOfflineSync({ ...existing, ...data, _id: existing._id, _rev: existing._rev, updatedAt: new Date().toISOString() });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('PRESCRIPTION_UPDATED', undefined, undefined, `Prescription ${id} status: ${updated.status}`);
@@ -224,11 +225,11 @@ export async function recordAdministration(
       reason: input.reason,
       notes: input.notes,
     };
-    const next: PrescriptionDoc = {
+    const next: PrescriptionDoc = withPendingOfflineSync({
       ...existing,
       administrations: [...(existing.administrations || []), entry],
       updatedAt: now,
-    };
+    }, now);
     const resp = await db.put(next);
     next._rev = resp.rev;
     await logAuditSafe(
@@ -272,7 +273,7 @@ export async function voidAdministration(
     const now = new Date().toISOString();
     const target = (existing.administrations || []).find(a => a.id === administrationId);
     if (!target) return null;
-    const next: PrescriptionDoc = {
+    const next: PrescriptionDoc = withPendingOfflineSync({
       ...existing,
       administrations: (existing.administrations || []).map(a =>
         a.id === administrationId
@@ -280,7 +281,7 @@ export async function voidAdministration(
           : a,
       ),
       updatedAt: now,
-    };
+    }, now);
     const resp = await db.put(next);
     next._rev = resp.rev;
     await logAuditSafe(

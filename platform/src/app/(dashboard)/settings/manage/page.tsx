@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -12,6 +11,7 @@ import { SUPPORTED_LOCALES } from '@/lib/i18n';
 import { hasLockPin, setLockPin, clearLockPin } from '@/lib/hooks/useAutoLock';
 import { getUserPrefs, setUserPrefs, DEFAULT_USER_PREFS, type UserPrefs } from '@/lib/user-prefs';
 import { useToast } from '@/components/Toast';
+import { getAvailableRoles, getRoleConfig } from '@/lib/permissions';
 import { statesAndCounties } from '@/data/mock';
 import type { UserRole } from '@/lib/db-types';
 import FilterBar from '@/components/filters/FilterBar';
@@ -22,22 +22,13 @@ import {
   Settings as SettingsIcon, Globe, Lock, Save, User as UserIcon,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { FacilitySettingsView } from '@/components/settings/FacilitySettingsView';
 import {
   getDhis2SyncLog, recordDhis2SyncResult, recordDhis2SyncFailure, isDhis2Configured,
   groupDhis2DataValues, type Dhis2SyncLogDoc,
 } from '@/lib/services/dhis2-sync-log-service';
 import type { DHIS2ExportScope } from '@/lib/services/dhis2-export-service';
-
-const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'doctor', label: 'Doctor' },
-  { value: 'clinical_officer', label: 'Clinical Officer' },
-  { value: 'nurse', label: 'Nurse' },
-  { value: 'lab_tech', label: 'Lab Technician' },
-  { value: 'pharmacist', label: 'Pharmacist' },
-  { value: 'front_desk', label: 'Medical Receptionist' },
-  { value: 'government', label: 'Government Admin' },
-];
 
 const FACILITY_TYPES = [
   { value: 'national_referral', label: 'National Referral' },
@@ -76,7 +67,24 @@ export default function SettingsPage() {
   const { locale, setLocale } = useTranslation();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'facility' | 'users' | 'hospitals' | 'sync'>('users');
+  type SettingsTab = 'facility' | 'users' | 'hospitals' | 'sync';
+  const [activeTab, setActiveTab] = useState<SettingsTab>('users');
+  const visibleTabs = useMemo<Array<{ key: SettingsTab; label: string; icon: typeof Building2 }>>(() => [
+    ...(canAccess('/facility-settings') ? [
+      { key: 'facility' as const, label: 'Facility Settings', icon: Building2 },
+    ] : []),
+    ...(canManageUsers ? [
+      { key: 'users' as const, label: 'User Management', icon: Users },
+      { key: 'hospitals' as const, label: 'Hospital Management', icon: Building2 },
+    ] : []),
+    { key: 'sync' as const, label: 'Facility Sync', icon: RefreshCw },
+  ], [canAccess, canManageUsers]);
+
+  useEffect(() => {
+    if (!visibleTabs.some(tab => tab.key === activeTab)) {
+      setActiveTab(visibleTabs[0]?.key || 'sync');
+    }
+  }, [activeTab, visibleTabs]);
 
   // ── Facility Sync (DHIS2) ──
   const [syncRunning, setSyncRunning] = useState(false);
@@ -293,7 +301,11 @@ export default function SettingsPage() {
 
   if (!currentUser) return null;
 
-  const roleLabel = (role: string) => ROLES.find(r => r.value === role)?.label || role;
+  const roleOptions = getAvailableRoles('public', currentUser.role === 'super_admin')
+    .filter(role => currentUser.role === 'super_admin' || role !== 'super_admin')
+    .map(role => ({ value: role, label: getRoleConfig(role).label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const roleLabel = (role: UserRole) => getRoleConfig(role).label || role;
 
   // ─── User Handlers ────────────────────────────────────────
   const openCreateUser = () => {
@@ -420,12 +432,12 @@ export default function SettingsPage() {
 
   // ─── Styles ─────────────────────────────────────────────
   const card: React.CSSProperties = {
-    background: 'var(--card-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '6px', overflow: 'hidden',
+    background: '#fff', border: '1px solid var(--ehr-border)',
+    borderRadius: '12px', overflow: 'hidden',
   };
   const inputStyle: React.CSSProperties = {
-    background: 'var(--input-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
+    background: '#fff', border: '1px solid var(--ehr-border)',
+    borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const selectStyle: React.CSSProperties = {
@@ -434,15 +446,15 @@ export default function SettingsPage() {
     backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
   };
   const btnPrimary: React.CSSProperties = {
-    background: 'var(--accent-primary)', color: 'white',
-    border: 'none', borderRadius: '4px', padding: '10px 20px',
-    fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+    background: '#2191D0', color: 'white',
+    border: '1px solid #2191D0', borderRadius: '999px', padding: '9px 16px',
+    fontSize: '13px', fontWeight: 800, cursor: 'pointer',
     display: 'flex', alignItems: 'center', gap: '8px',
   };
   const btnSecondary: React.CSSProperties = {
-    background: 'var(--input-bg)', color: 'var(--text-primary)',
-    border: '1px solid var(--border-light)', borderRadius: '4px', padding: '10px 20px',
-    fontSize: '14px', fontWeight: 500, cursor: 'pointer',
+    background: '#fff', color: 'var(--text-primary)',
+    border: '1px solid var(--ehr-border)', borderRadius: '999px', padding: '9px 16px',
+    fontSize: '13px', fontWeight: 750, cursor: 'pointer',
   };
   const labelStyle: React.CSSProperties = {
     fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)',
@@ -460,37 +472,26 @@ export default function SettingsPage() {
 
   return (
     <>
-      <TopBar
-        title="User & hospital management"
-        titleIcon={<SettingsIcon className="w-4 h-4 flex-shrink-0" color="var(--accent-primary)" />}
-      />
-      <main className="page-container space-y-6 page-enter">
+      <main className="page-container page-enter settings-manage-shell">
+        <section className="ehr-set-section">
+          <div className="ehr-set-section-head">
+            <span><SettingsIcon /></span>
+            <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+              <h3>User &amp; hospital management</h3>
+              <small>Facility setup, account administration, and sync controls</small>
+            </div>
+          </div>
+        </section>
 
         {/* Tab bar */}
-        <div className="flex gap-2" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '0' }}>
+        <div className="settings-tab-strip">
           {[
-            ...(canAccess('/facility-settings') ? [
-              { key: 'facility' as const, label: 'Facility Settings', icon: Building2 },
-            ] : []),
-            ...(canManageUsers ? [
-              { key: 'users' as const, label: 'User Management', icon: Users },
-              { key: 'hospitals' as const, label: 'Hospital Management', icon: Building2 },
-            ] : []),
-            { key: 'sync' as const, label: 'Facility Sync', icon: RefreshCw },
+            ...visibleTabs,
           ].map(tab => (
             <button
               key={tab.key}
               onClick={() => { setActiveTab(tab.key); setSearch(''); setFilterFacilityType('all'); }}
-              className="flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors"
-              style={{
-                color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-muted)',
-                borderBottom: activeTab === tab.key ? '2px solid #2191D0' : '2px solid transparent',
-                marginBottom: '-1px',
-                background: 'transparent', border: 'none', borderBottomStyle: 'solid',
-                borderBottomWidth: '2px',
-                borderBottomColor: activeTab === tab.key ? 'var(--accent-primary)' : 'transparent',
-                cursor: 'pointer',
-              }}
+              className={activeTab === tab.key ? 'active' : undefined}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
@@ -508,7 +509,7 @@ export default function SettingsPage() {
             <div className="flex flex-wrap items-center gap-3">
               <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={selectStyle}>
                 <option value="all">All Roles</option>
-                {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                {roleOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
               <select value={filterHospital} onChange={e => setFilterHospital(e.target.value)} style={{ ...selectStyle, maxWidth: '220px' }}>
                 <option value="all">All Hospitals</option>
@@ -831,7 +832,7 @@ export default function SettingsPage() {
               <div>
                 <label style={labelStyle}>Role</label>
                 <select value={userForm.role} onChange={e => setUserForm(p => ({ ...p, role: e.target.value as UserRole }))} style={selectStyle}>
-                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  {roleOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
 

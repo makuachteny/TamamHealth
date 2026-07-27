@@ -191,29 +191,16 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         <section className="pl-hero" style={{ backgroundImage: 'url(/assets/doctor-nurse-consultation.jpg)' }}>
           <Link href="/" aria-label="Close" className="pl-hero-close"><X size={18} /></Link>
 
-          {/* Floating: next-visit chip */}
-          <div className="pl-chip pl-chip-task">
-            <div className="pl-chip-title">Upcoming visit</div>
-            <div className="pl-chip-time">Antenatal Care Clinic · 08:00am</div>
-          </div>
-
-          {/* Floating: week strip */}
-          <div className="pl-week">
-            {[['Sun', '22'], ['Mon', '23'], ['Tue', '24'], ['Wed', '25'], ['Thu', '26'], ['Fri', '27'], ['Sat', '28']].map(([d, n], i) => (
-              <div key={d} className={`pl-week-day ${i === 3 ? 'is-on' : ''}`}>
-                <span className="pl-week-dow">{d}</span>
-                <span className="pl-week-num">{n}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Floating: records card */}
-          <div className="pl-meeting">
-            <div className="pl-meeting-top">
-              <span className="pl-meeting-title">Records synced</span>
-              <span className="pl-meeting-dot" />
-            </div>
-            <p className="pl-meeting-time">Available offline · Lab results, prescriptions &amp; visits</p>
+          {/* What the portal offers — replaces the old decorative chips, which
+              advertised an invented appointment and a fixed calendar week. */}
+          <div className="pl-promo">
+            <span className="pl-promo-eyebrow">Tamam Patient Portal</span>
+            <h2 className="pl-promo-title">Your health record, in your hands.</h2>
+            <ul className="pl-promo-points">
+              <li><Calendar size={15} /> Book and track your visits</li>
+              <li><FlaskConical size={15} /> See lab results and prescriptions as they&rsquo;re ready</li>
+              <li><Lock size={15} /> Private to you, shared only with your care team</li>
+            </ul>
           </div>
         </section>
       </div>
@@ -273,20 +260,14 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pl-hero::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--accent-hover) 18%, transparent); }
         .pl-hero-close { position: absolute; top: 18px; right: 18px; z-index: 3; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: var(--bg-card-solid); color: var(--text-primary); cursor: pointer; box-shadow: none; }
         .pl-hero-close:hover { background: var(--bg-card-solid); }
-        .pl-chip { position: absolute; z-index: 2; backdrop-filter: blur(6px); }
-        .pl-chip-task { top: 64px; left: 34px; background: var(--accent-primary); color: var(--color-white); border-radius: 14px; padding: 11px 15px; box-shadow: none; }
-        .pl-chip-title { font-size: 13px; font-weight: 700; }
-        .pl-chip-time { font-size: 11.5px; opacity: 0.9; margin-top: 2px; }
-        .pl-week { position: absolute; z-index: 2; right: 30px; bottom: 150px; display: flex; gap: 4px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--color-white) 22%, transparent); border: 1px solid color-mix(in srgb, var(--color-white) 45%, transparent); backdrop-filter: blur(10px); }
-        .pl-week-day { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 34px; padding: 4px 0; border-radius: 10px; color: var(--color-white); }
-        .pl-week-day.is-on { background: var(--accent-primary); }
-        .pl-week-dow { font-size: 10px; font-weight: 600; opacity: 0.85; }
-        .pl-week-num { font-size: 14px; font-weight: 700; }
-        .pl-meeting { position: absolute; z-index: 2; left: 30px; bottom: 36px; width: 232px; padding: 15px 17px; border-radius: 18px; background: var(--bg-card-solid); box-shadow: none; }
-        .pl-meeting-top { display: flex; align-items: center; justify-content: space-between; }
-        .pl-meeting-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
-        .pl-meeting-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-primary); }
-        .pl-meeting-time { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+        /* Value panel over the hero photo: a readable scrim rather than
+           floating cards, so the copy stays legible on any background image. */
+        .pl-promo { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; padding: 92px 34px 34px; background: linear-gradient(180deg, rgba(2, 26, 45, 0) 0%, rgba(2, 26, 45, 0.55) 30%, rgba(2, 26, 45, 0.9) 62%, rgba(2, 26, 45, 0.95) 100%); color: var(--color-white); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
+        .pl-promo-eyebrow { display: block; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; opacity: 0.82; }
+        .pl-promo-title { margin: 9px 0 0; color: #fff; font-family: var(--font-platform); font-size: 25px; line-height: 1.24; font-weight: 800; letter-spacing: -0.02em; max-width: 22ch; }
+        .pl-promo-points { margin: 16px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+        .pl-promo-points li { display: flex; color: #fff; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; opacity: 0.94; }
+        .pl-promo-points svg { flex: none; opacity: 0.9; }
 
         .pl-spin { width: 13px; height: 13px; border: 2px solid var(--accent-border); border-top-color: var(--accent-primary); border-radius: 50%; display: inline-block; animation: pl-rot .7s linear infinite; }
         .pl-spin-light { border-color: rgba(255,255,255,0.4); border-top-color: #fff; }

@@ -9,7 +9,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SaPage, SaCard, SaStat, SaPill, SaTable, formatWhen } from '@/components/admin/sa-ui';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import { SaPage, SaCard, SaPill, SaTable, formatWhen } from '@/components/admin/sa-ui';
 import { useToast } from '@/components/Toast';
 import { apiFetch } from '@/lib/api-fetch';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -156,19 +157,21 @@ export default function AdminSyncPage() {
   const anyRunning = pushingCountryNode || syncPushing || dhis2Pushing;
 
   return (
-    <SaPage title="Sync & Jobs" subtitle="Replication outbox, manual job runners, and conflict reconciliation.">
-      <div className="sa-stat-strip">
-        <SaStat label="Pending" value={loading ? '—' : stats?.pending ?? 0} tone={stats && stats.pending > 0 ? 'warn' : 'ok'} />
-        <SaStat label="Syncing" value={loading ? '—' : stats?.syncing ?? 0} />
-        <SaStat label="Synced" value={loading ? '—' : stats?.synced ?? 0} tone="ok" />
-        <SaStat label="Failed" value={loading ? '—' : stats?.failed ?? 0} tone={stats && stats.failed > 0 ? 'danger' : 'muted'} />
-        <SaStat label="Oldest pending" value={loading ? '—' : formatWhen(stats?.oldestPending)} tone="muted" />
-      </div>
-
-      <SaCard
-        title="Replication queue"
-        meta={!loading ? `${events.length} shown${events.length === 100 ? ' (capped at 100)' : ''}` : undefined}
-      >
+    <SaPage>
+      <SaCard>
+        <EhrListHeader
+          title="Sync &amp; Jobs"
+          stats={[
+            { label: 'Pending', value: loading ? '—' : stats?.pending ?? 0, color: stats && stats.pending > 0 ? LIST_STAT_COLORS.amber : LIST_STAT_COLORS.muted },
+            { label: 'Syncing', value: loading ? '—' : stats?.syncing ?? 0, color: LIST_STAT_COLORS.blue },
+            { label: 'Synced', value: loading ? '—' : stats?.synced ?? 0, color: LIST_STAT_COLORS.green },
+            { label: 'Failed', value: loading ? '—' : stats?.failed ?? 0, color: stats && stats.failed > 0 ? 'var(--color-danger)' : LIST_STAT_COLORS.muted },
+            { label: 'Oldest pending', value: loading ? '—' : formatWhen(stats?.oldestPending), color: LIST_STAT_COLORS.muted },
+          ]}
+        />
+        <div style={{ padding: '2px 16px 0', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+          {!loading && `${events.length} shown${events.length === 100 ? ' (capped at 100)' : ''}`}
+        </div>
         <SaTable
           columns={['When', 'Resource', 'Operation', 'Facility', 'Status', 'Error']}
           empty={loading ? 'Loading…' : 'Queue is drained — all events synced.'}

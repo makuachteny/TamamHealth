@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  FileText,
   AlertTriangle,
   Plus,
   X,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
-import TopBar from '@/components/TopBar';
 import DataTile from '@/components/DataTile';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -72,7 +71,7 @@ interface NewClaimForm {
 
 export default function ClaimsPage() {
   const { t } = useTranslation();
-  const { currentUser, globalSearch } = useApp();
+  const { currentUser, globalSearch, setGlobalSearch } = useApp();
   const [claims, setClaims] = useState<ClaimDoc[]>([]);
   const [filteredClaims, setFilteredClaims] = useState<ClaimDoc[]>([]);
   const [kpis, setKpis] = useState<ClaimKPIs>({
@@ -85,7 +84,7 @@ export default function ClaimsPage() {
     denied: 0,
     deniedAmount: 0,
   });
-  // Text search comes from the shared global search bar (TopBar).
+  // Text search comes from the shared global search state, surfaced via the card header's search box.
   const searchQuery = globalSearch;
   // Status filter retained for the claims list logic; the header filter UI was
   // removed, so it stays at 'all'.
@@ -407,15 +406,6 @@ export default function ClaimsPage() {
 
   return (
     <>
-      <TopBar title={t('claims.title')} hideSearch actions={
-        <button
-          onClick={() => setNewClaimOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
-          style={{ background: 'var(--accent-primary)', color: '#fff' }}
-        >
-          <Plus className="w-4 h-4" /> New claim
-        </button>
-      } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
       {/* KPI Cards */}
@@ -450,10 +440,19 @@ export default function ClaimsPage() {
 
       {/* Claims Table */}
       <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-        <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-          <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('claims.title')}</h3>
-        </div>
+        <EhrListHeader
+          title={t('claims.title')}
+          search={{ value: globalSearch, onChange: setGlobalSearch, placeholder: 'Search claims…' }}
+          actions={
+            <button
+              onClick={() => setNewClaimOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--accent-primary)', color: '#fff', height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              <Plus className="w-4 h-4" /> New claim
+            </button>
+          }
+        />
         <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
         {loading ? (
           <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>

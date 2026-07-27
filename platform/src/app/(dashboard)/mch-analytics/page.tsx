@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import TopBar from '@/components/TopBar';
 import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useMCHAnalytics } from '@/lib/hooks/useMCHAnalytics';
 import {
@@ -23,7 +22,6 @@ export default function MCHAnalyticsPage() {
   if (loading || !data) {
     return (
       <>
-        <TopBar title={t('mch.topbarTitle')} />
         <main className="page-container flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'transparent' }}>
@@ -102,25 +100,39 @@ export default function MCHAnalyticsPage() {
           ))}
         </div>
 
-        {/* ═══ TAB NAVIGATION ═══ */}
-        <div className="flex gap-1 mb-4 p-1 rounded-md" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-              style={{
-                background: activeTab === tab.key ? 'var(--bg-card)' : 'transparent',
-                color: activeTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                border: activeTab === tab.key ? '1px solid var(--border-light)' : '1px solid transparent',
-                boxShadow: activeTab === tab.key ? 'var(--card-shadow)' : 'none',
-              }}
-            >
-              <tab.icon className="w-3.5 h-3.5" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* ═══ SECTION SHELL: sidebar nav + content panel (replaces old pill-tab bar) ═══ */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <aside style={{ width: 224, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="dash-card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="listpage-header-icon"><HeartPulse size={20} /></div>
+                <div style={{ minWidth: 0 }}>
+                  <p className="listpage-eyebrow" style={{ margin: 0 }}>Maternal &amp; Child Health</p>
+                  <h1 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{t('mch.topbarTitle')}</h1>
+                </div>
+              </div>
+            </div>
+            <nav className="ehr-set-nav" aria-label={t('mch.topbarTitle')}>
+              {tabs.map(tab => {
+                const Icon = tab.icon;
+                const count = tab.key === 'high-risk' ? highRiskPregnancies.length : undefined;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={activeTab === tab.key ? 'active' : undefined}
+                    onClick={() => setActiveTab(tab.key)}
+                  >
+                    <Icon />
+                    <em>{tab.label}</em>
+                    {count !== undefined && <b>{count}</b>}
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          <section style={{ flex: 1, minWidth: 0 }}>
 
         {/* ═══ OVERVIEW TAB ═══ */}
         {activeTab === 'overview' && (
@@ -947,6 +959,9 @@ export default function MCHAnalyticsPage() {
             </div>
           </div>
         )}
+
+          </section>
+        </div>
       </main>
     </>
   );

@@ -27,9 +27,9 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import TopBar from '@/components/TopBar';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import {
   Building2, Users, BedDouble, Package, Pill, Calendar,
   Activity, Settings, ArrowLeft, Loader2, AlertTriangle,
@@ -74,12 +74,20 @@ const TABS: { id: TabId; labelKey: string; icon: typeof Building2 }[] = [
 ];
 
 // ── Page ────────────────────────────────────────────────────────────────────
-export default function HospitalManagePage({ params }: { params: { hospitalId: string } }) {
-  const { hospitalId } = params;
+export default function HospitalManagePage() {
+  // Next 16: the `params` prop is a Promise in client components — use the
+  // hook (reading the prop synchronously yielded undefined and every
+  // facility 404'd as "Hospital not found").
+  const { hospitalId } = useParams<{ hospitalId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentUser } = useApp();
   const { t } = useTranslation();
-  const [tab, setTab] = useState<TabId>('overview');
+  // ?tab= deep link (e.g. the facility-settings picker opens ?tab=settings).
+  const requestedTab = searchParams.get('tab');
+  const [tab, setTab] = useState<TabId>(
+    TABS.some(item => item.id === requestedTab) ? requestedTab as TabId : 'overview',
+  );
 
   // Hospital itself (always loaded — Overview tab needs it, and Settings does too).
   const [hospital, setHospital] = useState<HospitalDoc | null>(null);
@@ -140,12 +148,9 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
   // Block render until role check completes.
   if (!currentUser) {
     return (
-      <>
-        <TopBar title={t('hospitals.manageFacility')} />
-        <main className="page-container flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
-        </main>
-      </>
+      <main className="page-container flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
+      </main>
     );
   }
   if (!MANAGE_ROLES.includes(currentUser.role)) {
@@ -155,18 +160,14 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
 
   if (hospitalLoading) {
     return (
-      <>
-        <TopBar title={t('hospitals.manageFacility')} />
-        <main className="page-container flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
-        </main>
-      </>
+      <main className="page-container flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
+      </main>
     );
   }
   if (hospitalError || !hospital) {
     return (
       <>
-        <TopBar title={t('hospitals.manageFacility')} />
         <main className="page-container page-enter">
           <div className="card-elevated p-8 text-center max-w-md mx-auto mt-16">
             <Building2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
@@ -186,12 +187,17 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
 
   return (
     <>
-      <TopBar title={t('hospitals.manageTitle', { name: hospital.name })} actions={
-        <Link href="/hospitals" className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-          <ArrowLeft style={{ width: 13, height: 13 }} /> {t('hospitals.hospitalNetwork')}
-        </Link>
-      } />
       <main className="page-container page-enter">
+        <div className="dash-card overflow-hidden mb-4">
+          <EhrListHeader
+            title={t('hospitals.manageTitle', { name: hospital.name })}
+            actions={
+              <Link href="/hospitals" className="btn btn-secondary btn-sm" style={{ gap: 4, marginLeft: 'auto' }}>
+                <ArrowLeft style={{ width: 13, height: 13 }} /> {t('hospitals.hospitalNetwork')}
+              </Link>
+            }
+          />
+        </div>
         {/* Tab bar */}
         <div className="flex gap-2 mb-4 flex-wrap">
           {TABS.map(tabItem => (

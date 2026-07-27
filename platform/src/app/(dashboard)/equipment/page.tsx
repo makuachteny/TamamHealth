@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import Modal from '@/components/Modal';
-import TopBar from '@/components/TopBar';
 import { Plus, X, CheckCircle2, Settings as Wrench } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import { useApp } from '@/lib/context';
@@ -10,6 +9,7 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AssetDoc, AssetCategory, AssetStatus } from '@/lib/db-types-asset';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 
 const CATEGORIES: { id: AssetCategory; labelKey: string }[] = [
   { id: 'medical_equipment', labelKey: 'equipment.categoryMedicalEquipment' },
@@ -33,12 +33,12 @@ const STATUS_TOKENS: Record<AssetStatus, { labelKey: string; color: string; bg: 
 };
 
 export default function AssetsPage() {
-  const { currentUser, globalSearch } = useApp();
+  const { currentUser, globalSearch, setGlobalSearch } = useApp();
   const { assets, summary, create, setStatus, logService } = useAssets();
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  // Text search comes from the shared global search bar (TopBar).
+  // Text search comes from the shared global search state, surfaced via the card header's search box.
   const q = globalSearch;
   const [createOpen, setCreateOpen] = useState(false);
   const [serviceFor, setServiceFor] = useState<AssetDoc | null>(null);
@@ -129,11 +129,6 @@ export default function AssetsPage() {
 
   return (
     <>
-      <TopBar title={t('equipment.topBarTitle')} actions={
-        <button onClick={() => setCreateOpen(true)} className="btn btn-primary">
-          <Plus className="w-4 h-4" /> {t('equipment.registerAsset')}
-        </button>
-      } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* KPI strip */}
         {summary && (
@@ -155,6 +150,15 @@ export default function AssetsPage() {
 
         {/* Asset table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <EhrListHeader
+            title={t('equipment.topBarTitle')}
+            search={{ value: globalSearch, onChange: setGlobalSearch, placeholder: 'Search assets…' }}
+            actions={
+              <button onClick={() => setCreateOpen(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <Plus className="w-4 h-4" /> {t('equipment.registerAsset')}
+              </button>
+            }
+          />
           <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           <table className="data-table" style={{ minWidth: 720 }}>
             <thead>

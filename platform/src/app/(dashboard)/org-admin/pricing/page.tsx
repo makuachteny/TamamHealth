@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import TopBar from '@/components/TopBar';
 import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { Plus, Save, Search, Trash2 } from '@/components/icons/lucide';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import {
   getFeeSchedule, createFee, updateFee, deleteFee, type FeeInput,
 } from '@/lib/services/fee-schedule-service';
@@ -122,13 +122,16 @@ export default function ServicePricingPage() {
 
   return (
     <>
-      <TopBar title="Service Pricing" actions={
-            <button onClick={openAdd} className="btn btn-primary inline-flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Add service
-            </button>
-          } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <div className="dash-card overflow-hidden flex flex-col" style={{ marginTop: 16, flex: 1, minHeight: 0 }}>
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <EhrListHeader
+            title="Service Pricing"
+            actions={
+              <button onClick={openAdd} className="btn btn-primary inline-flex items-center gap-2" style={{ marginLeft: 'auto' }}>
+                <Plus className="w-4 h-4" /> Add service
+              </button>
+            }
+          />
           <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <Search className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <input

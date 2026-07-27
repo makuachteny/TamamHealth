@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -113,8 +112,12 @@ export default function AdminAnalyticsPage() {
 
   return (
     <>
-      <TopBar title={t('analytics.title')} />
       <main className="page-container page-enter admin-detail-page">
+        <div className="dash-card mb-4" style={{ padding: '16px 20px' }}>
+          <span style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 24, lineHeight: '100%', color: 'var(--text-primary)' }}>
+            {t('analytics.title')}
+          </span>
+        </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">

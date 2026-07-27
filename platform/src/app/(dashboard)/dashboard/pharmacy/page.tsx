@@ -871,6 +871,7 @@ export default function PharmacyDashboardPage() {
               meta: `${rx.prescribedBy} · ${formatTime(rx.createdAt)}`,
               compactMeta: formatTime(rx.createdAt),
               time: formatTime(rx.createdAt),
+              timeSecondary: rx.createdAt.slice(0, 10),
               careTeam: rx.prescribedBy,
               careTeamLabel: 'Prescriber',
               // Status pill = the real dispense-pipeline stage, not a
@@ -878,8 +879,16 @@ export default function PharmacyDashboardPage() {
               // in a pill — see `location` and `statusTone` below instead).
               status: stage,
               statusLabel: rx.status === 'discontinued' ? 'Discontinued' : pharmacyStageLabel(stage),
+              statusSecondary: paymentDue
+                ? formatMoney(balance)
+                : rx.urgency === 'immediate'
+                  ? 'Immediate'
+                  : controlled
+                    ? 'Controlled'
+                    : 'Standard',
               statusTone: rx.status === 'discontinued' ? 'danger' : paymentDue ? 'warning' : rx.urgency === 'immediate' ? 'warning' : pharmacyStageTone(stage),
-              location,
+              location: location || rx.medication,
+              locationSecondary: location ? (controlled && !paymentDue ? 'Substance' : 'Payment') : 'Medication',
               locationLabel: location ? (controlled && !paymentDue ? 'Substance' : 'Payment') : undefined,
               popupDetail: renderWorkflowPopup(rx),
             };

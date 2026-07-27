@@ -487,10 +487,14 @@ export default function RadiologyDashboard() {
             compactMeta: study.date,
             date: study.date,
             time,
+            timeSecondary: study.date,
             careTeam: study.orderedBy,
             careTeamLabel: 'Ordered by',
+            location: study.modality,
+            locationSecondary: study.bodyPart,
             status: study.status,
             statusLabel: radiologyStatusLabel(study.status),
+            statusSecondary: study.priority === 'emergency' ? 'Emergency' : study.priority === 'urgent' ? 'Urgent' : 'Routine',
             statusTone: study.status === 'completed' ? 'done'
               : study.status === 'in_progress' ? 'active'
               : study.priority === 'emergency' ? 'danger'

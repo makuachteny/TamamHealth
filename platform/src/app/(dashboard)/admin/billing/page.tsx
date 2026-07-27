@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
 import DataTile from '@/components/DataTile';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import {
   CreditCard, Edit3, Check, X,
 } from '@/components/icons/lucide';
@@ -15,10 +15,11 @@ import {
 export default function AdminBillingPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { currentUser, globalSearch } = useApp();
+  const { currentUser, globalSearch, setGlobalSearch } = useApp();
   const { organizations, loading, update } = useOrganizations();
 
-  // Text search comes from the shared global search bar (TopBar).
+  // Text search comes from the shared global search state, surfaced via this
+  // page's own list header search box (the TopBar strip is gone).
   const search = globalSearch;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPlan, setEditPlan] = useState<'basic' | 'professional' | 'enterprise'>('basic');
@@ -95,7 +96,6 @@ export default function AdminBillingPage() {
 
   return (
     <>
-      <TopBar title={t('adminBilling.title')} />
       <main className="page-container page-enter admin-detail-page" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         {/* KPI Cards */}
@@ -127,6 +127,15 @@ export default function AdminBillingPage() {
 
         {/* Table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <EhrListHeader
+            title={t('adminBilling.title')}
+            stats={[
+              { label: t('adminBilling.statusActive'), value: totalActive, color: LIST_STAT_COLORS.green },
+              { label: t('adminBilling.statusTrial'), value: totalTrial, color: LIST_STAT_COLORS.amber },
+              { label: t('adminBilling.statusSuspended'), value: totalSuspended, color: LIST_STAT_COLORS.muted },
+            ]}
+            search={{ value: search, onChange: setGlobalSearch, placeholder: t('adminBilling.searchPlaceholder') }}
+          />
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <table className="w-full" style={{ minWidth: 720 }}>
               <thead>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import TopBar from '@/components/TopBar';
 import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -17,7 +16,7 @@ import type {
   PatientIntakeFormDoc,
   UserRole,
 } from '@/lib/db-types';
-import { ClipboardPen, Mail, MessageSquare, Plus, Settings, X } from '@/components/icons/lucide';
+import { ClipboardPen, Mail, MessageSquare, Plus, X } from '@/components/icons/lucide';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 
 const TABS: { key: IntakeFormStatus; label: string }[] = [
@@ -270,21 +269,6 @@ export default function PatientIntakePage() {
 
   return (
     <>
-      <TopBar
-        title="Patient Intake"
-        hideSearch
-        titleIcon={<Settings className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
-        titleActions={
-          <a
-            href="mailto:support.tamam@gmail.com?subject=Patient%20Intake%20feedback"
-            className="text-[12px] font-medium hidden sm:inline"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            How can we improve this feature? <span className="underline">Let us know</span>
-          </a>
-        }
-      />
-
       <main className="page-container page-enter">
         <div className="flex gap-5 items-start">
           {/* Status tabs */}
@@ -329,14 +313,23 @@ export default function PatientIntakePage() {
               ]}
               search={{ value: patientQuery, onChange: setPatientQuery, placeholder: 'Patient', ariaLabel: 'Search by patient' }}
               actions={
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  style={{ background: 'var(--color-warning-600)', borderColor: 'var(--color-warning-600)', color: '#fff' }}
-                  onClick={() => setSendOpen(true)}
-                >
-                  Send forms
-                </button>
+                <>
+                  <a
+                    href="mailto:support.tamam@gmail.com?subject=Patient%20Intake%20feedback"
+                    className="text-[12px] font-medium hidden sm:inline"
+                    style={{ color: 'var(--accent-primary)' }}
+                  >
+                    How can we improve this feature? <span className="underline">Let us know</span>
+                  </a>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{ background: 'var(--color-warning-600)', borderColor: 'var(--color-warning-600)', color: '#fff' }}
+                    onClick={() => setSendOpen(true)}
+                  >
+                    Send forms
+                  </button>
+                </>
               }
             />
 
@@ -353,7 +346,7 @@ export default function PatientIntakePage() {
                     <tr>
                       <th>Received</th>
                       <th>Patient</th>
-                      <th>Provider</th>
+                      <th>Care team</th>
                       <th className="text-right">Actions</th>
                     </tr>
                   </thead>
@@ -367,7 +360,12 @@ export default function PatientIntakePage() {
                             {form.patientName}
                           </span>
                         </td>
-                        <td style={{ color: 'var(--text-muted)' }}>{form.providerName || '—'}</td>
+                        <td>
+                          <div className="appointment-card-provider">
+                            <strong>{form.providerName || 'Clinician unassigned'}</strong>
+                            <span>Review clinician</span>
+                          </div>
+                        </td>
                         <td className="text-right">
                           {form.status === 'pending_review' ? (
                             <button type="button" className="btn btn-sm btn-secondary" onClick={() => openReview(form)}>

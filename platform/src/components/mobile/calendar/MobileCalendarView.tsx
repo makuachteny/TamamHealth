@@ -5,7 +5,7 @@ import { Loader2 } from '@/components/icons/lucide';
 import Badge, { toneForStatus } from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { useAppointments } from '@/lib/hooks/useAppointments';
-import { patientInitials, avatarColor } from '@/lib/patient-utils';
+import { patientInitials, avatarTint } from '@/lib/patient-utils';
 import { useMobileShellState } from '@/lib/mobile-shell/use-mobile-shell-state';
 import MobileWeekStrip from './MobileWeekStrip';
 
@@ -39,7 +39,7 @@ export default function MobileCalendarView() {
             return (
               <article key={appt._id} className="mobile-appt-card" onClick={() => shell.openChart(appt.patientId)} role="button" tabIndex={0}>
                 <strong className="mobile-appt-time">{appt.appointmentTime}</strong>
-                <span className="mobile-appt-avatar" style={{ background: avatarColor(appt.patientName) }}>{initials}</span>
+                <span className="mobile-appt-avatar" style={avatarTint(appt.patientName)}>{initials}</span>
                 <span className="mobile-appt-meta">
                   <p className="mobile-appt-name">{appt.patientName}</p>
                   <p className="mobile-appt-reason">{appt.reason}</p>

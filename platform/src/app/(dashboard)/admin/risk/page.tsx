@@ -6,14 +6,17 @@
  * fabricated owners or due-dates — each row is derived from a real service
  * call, and severity is computed the same way the dashboard classifies it.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import { FilterSelect } from '@/components/filters';
+import { Filter, X } from '@/components/icons/lucide';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { apiFetch } from '@/lib/api-fetch';
 import type { AuditLogDoc, ConflictQueueDoc, SyncEventDoc } from '@/lib/db-types';
 import {
-  SaPage, SaCard, SaStat, SaPill, SaTable,
+  SaPage, SaCard, SaPill, SaTable,
   classifyAuditRisk, SEVERITY_TONE, formatWhen,
   type SaSeverity,
 } from '@/components/admin/sa-ui';
@@ -235,36 +238,82 @@ export default function RiskCenterPage() {
     return c;
   }, [rows]);
 
-  return (
-    <SaPage
-      title="Risk Center"
-      subtitle="Unified open-risk queue across audit, sync, data, tenants, and continuity signals."
-    >
-      <div className="sa-stat-strip">
-        <SaStat label="Critical" value={counts.critical} tone={counts.critical ? 'danger' : 'muted'} />
-        <SaStat label="High" value={counts.high} tone={counts.high ? 'danger' : 'muted'} />
-        <SaStat label="Medium" value={counts.medium} tone={counts.medium ? 'warn' : 'muted'} />
-        <SaStat label="Low" value={counts.low} tone="muted" />
-        <SaStat label="Total open" value={rows.length} />
-      </div>
+  // Filters live in a popover (same control as wards/hospitals/org users)
+  // rather than as full-width selects stacked above the table.
+  const [showFilters, setShowFilters] = useState(false);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showFilters) return;
+    const onDown = (e: MouseEvent) => { if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) setShowFilters(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFilters(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [showFilters]);
+  const activeFilterCount = (severityFilter !== 'all' ? 1 : 0) + (sourceFilter !== 'all' ? 1 : 0);
 
-      <SaCard title="Risk queue" meta={`${filtered.length} of ${rows.length}`}>
-        <div className="sa-filter-bar">
-          <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value as 'all' | SaSeverity)}>
-            <option value="all">All severities</option>
-            {SEVERITIES.map(s => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
-          </select>
-          <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value as 'all' | Source)}>
-            <option value="all">All sources</option>
-            {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <input
-            type="search"
-            placeholder="Search signal or detail…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
+  return (
+    <SaPage>
+      <SaCard>
+        <EhrListHeader
+          title="Risk Center"
+          stats={[
+            { label: 'Showing', value: `${filtered.length} of ${rows.length}`, color: LIST_STAT_COLORS.muted },
+            { label: 'Critical', value: counts.critical, color: 'var(--color-danger)' },
+            { label: 'High', value: counts.high, color: 'var(--color-danger)' },
+            { label: 'Medium', value: counts.medium, color: LIST_STAT_COLORS.amber },
+            { label: 'Low', value: counts.low, color: LIST_STAT_COLORS.muted },
+          ]}
+          search={{ value: search, onChange: setSearch, placeholder: 'Search signal or detail…', ariaLabel: 'Search risk signals' }}
+          actions={
+            <div className="relative" ref={filtersRef}>
+              <EhrListHeaderButton onClick={() => setShowFilters(v => !v)} active={activeFilterCount > 0} ariaExpanded={showFilters} ariaLabel="Filters">
+                <Filter className="w-4 h-4" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold" style={{ top: -4, right: -4, background: 'var(--accent-primary)', color: '#fff' }}>
+                    {activeFilterCount}
+                  </span>
+                )}
+              </EhrListHeaderButton>
+              {showFilters && (
+                <div
+                  className="absolute right-0 mt-2 rounded-2xl overflow-hidden z-50"
+                  style={{ width: 'min(92vw, 320px)', background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
+                >
+                  <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Filters</span>
+                    <div className="flex items-center gap-2">
+                      {activeFilterCount > 0 && (
+                        <button type="button" onClick={() => { setSeverityFilter('all'); setSourceFilter('all'); }} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>Clear all</button>
+                      )}
+                      <button type="button" onClick={() => setShowFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label="Close">
+                        <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-4 flex flex-col gap-3">
+                    <FilterSelect
+                      label="Severity"
+                      value={severityFilter}
+                      onChange={value => setSeverityFilter(value as 'all' | SaSeverity)}
+                      neutralValue="all"
+                      size="sm"
+                      options={[{ value: 'all', label: 'All severities' }, ...SEVERITIES.map(x => ({ value: x, label: x[0].toUpperCase() + x.slice(1) }))]}
+                    />
+                    <FilterSelect
+                      label="Source"
+                      value={sourceFilter}
+                      onChange={value => setSourceFilter(value as 'all' | Source)}
+                      neutralValue="all"
+                      size="sm"
+                      options={[{ value: 'all', label: 'All sources' }, ...SOURCES.map(x => ({ value: x, label: x }))]}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          }
+        />
         <SaTable
           columns={['Severity', 'Signal', 'Source', 'Detail', 'Age', 'Status']}
           empty={loading ? 'Loading risk signals…' : 'No open risk signals — the platform is clean.'}

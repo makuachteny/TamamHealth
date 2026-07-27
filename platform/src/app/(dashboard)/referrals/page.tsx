@@ -613,7 +613,7 @@ export default function ReferralsPage() {
                   <th>Patient</th>
                   <th>Hospital ID</th>
                   <th>Route</th>
-                  <th>Department</th>
+                  <th>Context</th>
                   <th>Urgency</th>
                   <th>Status</th>
                   <th>Date</th>
@@ -672,7 +672,12 @@ export default function ReferralsPage() {
                       </td>
                       <td className="font-mono text-[11px]" style={{ color: 'var(--text-secondary)' }}>{hospitalNoFor(ref.patientId)}</td>
                       <td className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{ref.fromHospital} → {ref.toHospital}</td>
-                      <td className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{ref.department}</td>
+                      <td>
+                        <div className="appointment-card-provider">
+                          <strong>{ref.department || 'Department unassigned'}</strong>
+                          <span>Referral service</span>
+                        </div>
+                      </td>
                       <td>
                         <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: ref.urgency === 'emergency' ? '#C24435' : ref.urgency === 'urgent' ? '#8F6823' : '#157E5F' }}>
                           {t(`referrals.urgency_${ref.urgency}`)}

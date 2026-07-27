@@ -372,10 +372,14 @@ export default function NutritionDashboard() {
             compactMeta: s.date,
             date: s.date,
             time,
+            timeSecondary: s.date,
             careTeam: s.screenedBy,
             careTeamLabel: 'Screened by',
+            location: `${s.muac} cm MUAC`,
+            locationSecondary: `${s.weight} kg · ${s.height} cm`,
             status: s.status,
             statusLabel: s.status,
+            statusSecondary: s.status === 'Normal' ? 'Within range' : 'Follow-up needed',
             statusTone: s.status === 'SAM' ? 'danger'
               : s.status === 'MAM' ? 'warning'
               : (s.status === 'At Risk' || s.status === 'Underweight') ? 'warning'

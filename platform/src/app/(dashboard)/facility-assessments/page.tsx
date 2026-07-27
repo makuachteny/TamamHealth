@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Modal from '@/components/Modal';
-import TopBar from '@/components/TopBar';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { useFacilityAssessments } from '@/lib/hooks/useFacilityAssessments';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
@@ -54,7 +54,7 @@ export default function FacilityAssessmentsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
 
-  if (loading) return <><TopBar title={t('facilityAssessments.topBarTitle')} /><main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p></main></>;
+  if (loading) return <main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p></main>;
 
   const scoreColor = (score: number) => score >= 70 ? 'var(--accent-primary)' : score >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
   const scoreBg = (score: number) => score >= 70 ? 'rgba(33, 145, 208, 0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
@@ -120,13 +120,7 @@ export default function FacilityAssessmentsPage() {
   };
 
   return (
-    <>
-      <TopBar title={t('facilityAssessments.topBarTitle')} actions={canAssessFacility && (
-        <button onClick={() => setShowForm(true)} className="btn btn-primary">
-          <Plus className="w-4 h-4" /> {t('facilityAssessments.newAssessment')}
-        </button>
-      )} />
-      <main className="page-container page-enter">
+    <main className="page-container page-enter">
         {summary && (
           <>
             {/* National averages */}
@@ -157,9 +151,14 @@ export default function FacilityAssessmentsPage() {
 
         {/* Facility detail table */}
         <div className="card-elevated overflow-hidden">
-          <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <h3 className="font-semibold text-sm">{t('facilityAssessments.individualTitle')}</h3>
-          </div>
+          <EhrListHeader
+            title={t('facilityAssessments.individualTitle')}
+            actions={canAssessFacility && (
+              <button onClick={() => setShowForm(true)} className="btn btn-primary">
+                <Plus className="w-4 h-4" /> {t('facilityAssessments.newAssessment')}
+              </button>
+            )}
+          />
           <div className="overflow-x-auto">
           <table className="data-table" style={{ minWidth: 1120 }}>
             <thead>
@@ -347,7 +346,6 @@ export default function FacilityAssessmentsPage() {
             </div>
           </Modal>
         )}
-      </main>
-    </>
+    </main>
   );
 }

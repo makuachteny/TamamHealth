@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import TopBar from '@/components/TopBar';
+import Link from 'next/link';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { useToast } from '@/components/Toast';
+import { useHospitals } from '@/lib/hooks/useHospitals';
 import {
   Settings, Building2, Stethoscope, FlaskConical, Wallet, ShieldCheck,
   Trash2, Plus, Save, X, Clock, ClipboardCheck, Database, Server,
 } from '@/components/icons/lucide';
 import { useSettings, useSettingsContext } from '@/lib/settings/SettingsProvider';
-import { saveFacilitySettings } from '@/lib/settings/settings-service';
+import { getFacilitySettings, saveFacilitySettings } from '@/lib/settings/settings-service';
 import {
   type FacilitySettings,
   type EncounterStationKey,
@@ -82,19 +84,43 @@ export function FacilitySettingsView({ embedded = false }: { embedded?: boolean 
   const { showToast } = useToast();
   const { hospitalId, orgId } = useSettingsContext();
   const settings = useSettings();
+  // Facility picker for multi-facility admins (already role/org-scoped).
+  const { hospitals: pickerHospitals } = useHospitals();
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>('');
+  const [selectedSettings, setSelectedSettings] = useState<FacilitySettings | null>(null);
+  const [loadingSelected, setLoadingSelected] = useState(false);
+  const effectiveHospitalId = hospitalId || selectedHospitalId;
+  const effectiveSettings = hospitalId ? settings : (selectedSettings || settings);
+  const selectedHospital = pickerHospitals.find(h => h._id === effectiveHospitalId);
+
+  useEffect(() => {
+    if (hospitalId || !selectedHospitalId) {
+      setSelectedSettings(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingSelected(true);
+    getFacilitySettings(selectedHospitalId)
+      .then(next => { if (!cancelled) setSelectedSettings(next); })
+      .catch(() => { if (!cancelled) setSelectedSettings(settings); })
+      .finally(() => { if (!cancelled) setLoadingSelected(false); });
+    return () => { cancelled = true; };
+  }, [hospitalId, selectedHospitalId, settings]);
 
   // Local editable copy, re-synced whenever the persisted settings change.
-  const [draft, setDraft] = useState<FacilitySettings>(settings);
-  useEffect(() => { setDraft(settings); }, [settings]);
+  const [draft, setDraft] = useState<FacilitySettings>(effectiveSettings);
+  useEffect(() => { setDraft(effectiveSettings); }, [effectiveSettings]);
 
   // Per-section saving flags so each card's button has its own pending state.
   const [saving, setSaving] = useState<string | null>(null);
 
   const saveSection = async (patch: Partial<FacilitySettings>, section: string) => {
-    if (!hospitalId) return;
+    if (!effectiveHospitalId) return;
     setSaving(section);
     try {
-      await saveFacilitySettings(hospitalId, patch, orgId);
+      const saved = await saveFacilitySettings(effectiveHospitalId, patch, orgId);
+      if (!hospitalId) setSelectedSettings(saved);
+      setDraft(saved);
       showToast('Facility settings saved', 'success');
     } catch {
       showToast('Could not save settings', 'error');
@@ -103,30 +129,89 @@ export function FacilitySettingsView({ embedded = false }: { embedded?: boolean 
     }
   };
 
-  // ── No-facility guard (super-admin / org-admin / government) ───────────────
-  if (!hospitalId) {
+  // ── No-facility picker (super-admin / org-admin / government) ──────────────
+  // These accounts aren't tied to one facility, so instead of a dead end,
+  // list the facilities they govern and open each one's Settings tab.
+  if (!effectiveHospitalId) {
     const guard = (
-      <div className="dash-card card-elevated" style={{ marginTop: 16, padding: 48, textAlign: 'center' }}>
-        <Building2 className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-          No facility selected
-        </p>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-          Select or open a facility to edit its settings.
-        </p>
+      <div className="ehr-set-section fs-section" style={{ marginTop: embedded ? 0 : 16 }}>
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+          <Building2 className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Choose a facility to configure
+          </p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+            Your account governs multiple facilities — workflow settings are per facility.
+          </p>
+        </div>
+        {pickerHospitals.length === 0 ? (
+          <p className="text-sm text-center" style={{ color: 'var(--text-muted)' }}>
+            No facilities registered yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ maxWidth: 720, margin: '0 auto' }}>
+            {pickerHospitals.map(h => (
+              embedded ? (
+                <button
+                  key={h._id}
+                  type="button"
+                  className="fs-facility-tile"
+                  onClick={() => setSelectedHospitalId(h._id)}
+                >
+                  <strong>{h.name}</strong>
+                  <span>{[h.town || h.state, h.facilityType?.replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Facility'}</span>
+                </button>
+              ) : (
+                <Link key={h._id} href={`/hospitals/${h._id}/manage?tab=settings`} className="fs-facility-tile">
+                  <strong>{h.name}</strong>
+                  <span>{[h.town || h.state, h.facilityType?.replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Facility'}</span>
+                </Link>
+              )
+            ))}
+          </div>
+        )}
+        {embedded && pickerHospitals.length > 0 && (
+          <p className="text-xs text-center mt-4" style={{ color: 'var(--text-muted)' }}>
+            Facility-specific workflow settings stay inside Settings. Choose a facility to load and edit its operational details.
+          </p>
+        )}
       </div>
     );
     return embedded ? guard : (
-      <>
-        <TopBar title="Facility Settings" />
-        <main className="page-container page-enter">{guard}</main>
-      </>
+      <main className="page-container page-enter">
+        <div className="dash-card overflow-hidden mb-4">
+          <EhrListHeader title="Facility Settings" />
+        </div>
+        {guard}
+      </main>
     );
   }
 
   const content = (
     <>
-      <div className="grid grid-cols-1 gap-6" style={{ marginTop: 16 }}>
+      <div className="fs-settings-stack">
+          {!hospitalId && (
+            <section className="ehr-set-section fs-section">
+              <div className="ehr-set-section-head">
+                <span><Building2 /></span>
+                <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+                  <h3>{selectedHospital?.name || 'Selected facility'}</h3>
+                  <small>{selectedHospital ? [selectedHospital.town || selectedHospital.state, selectedHospital.facilityType?.replace(/_/g, ' ')].filter(Boolean).join(' · ') : 'Facility settings'}</small>
+                </div>
+                <button type="button" className="ehr-set-btn" onClick={() => setSelectedHospitalId('')}>
+                  Change facility
+                </button>
+              </div>
+              {loadingSelected && (
+                <div className="fs-section-body">
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading facility settings…</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {!loadingSelected && (
+          <>
           {/* ── General ──────────────────────────────────────────────── */}
           <SectionCard icon={Settings} title="General">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -582,6 +667,8 @@ export function FacilitySettingsView({ embedded = false }: { embedded?: boolean 
               onSave={() => saveSection({ lockTimeoutMinutes: draft.lockTimeoutMinutes }, 'security')}
             />
           </SectionCard>
+          </>
+          )}
         </div>
 
       <style>{`
@@ -600,10 +687,12 @@ export function FacilitySettingsView({ embedded = false }: { embedded?: boolean 
 
   if (embedded) return content;
   return (
-    <>
-      <TopBar title="Facility Settings" />
-      <main className="page-container page-enter">{content}</main>
-    </>
+    <main className="page-container page-enter">
+      <div className="dash-card overflow-hidden mb-4">
+        <EhrListHeader title="Facility Settings" />
+      </div>
+      {content}
+    </main>
   );
 }
 
@@ -633,13 +722,16 @@ function orderByReference<K extends string>(list: K[], reference: readonly K[]):
 
 function SectionCard({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; title: string; children: React.ReactNode }) {
   return (
-    <div className="dash-card overflow-hidden">
-      <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-        <Icon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+    <section className="ehr-set-section fs-section">
+      <div className="ehr-set-section-head">
+        <span><Icon /></span>
+        <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+          <h3>{title}</h3>
+          <small>Facility-level configuration</small>
+        </div>
       </div>
-      <div className="p-4">{children}</div>
-    </div>
+      <div className="fs-section-body">{children}</div>
+    </section>
   );
 }
 

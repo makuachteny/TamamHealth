@@ -21,7 +21,6 @@ import {
   Syringe,
   HeartPulse,
   Globe,
-  Sparkles,
   CreditCard,
   Settings,
   Calendar,
@@ -128,9 +127,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     label: 'Organization Admin',
     defaultDashboard: ROLE_ROUTE_TABLE.org_admin.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.org_admin.allowed],
-    // Grouping follows the FHIR administration module / DHIS2 admin split:
-    // overview → facility network → people & access → clinical service lines →
-    // finance → intelligence → risk/assets → IT & system controls.
+    // Main navigation is for daily operational work. Setup/configuration
+    // destinations (users, pricing, branding, facility settings) live under
+    // Settings so org admins do not see duplicate management surfaces.
     navItems: [
       { href: '/facility-management', label: 'Dashboard', icon: Gauge, section: 'OVERVIEW' },
       // /org-admin (Org Overview) stays a reachable route for deep links but
@@ -140,23 +139,20 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/hospitals', label: 'Facilities', icon: HospitalIcon, section: 'FACILITIES & OPERATIONS' },
       { href: '/wards', label: 'Bed Management', icon: BedDouble, section: 'FACILITIES & OPERATIONS' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'FACILITIES & OPERATIONS' },
-      { href: '/org-admin/users', label: 'Manage Users', icon: Users, section: 'PEOPLE & ACCESS' },
       { href: '/hr', label: 'Doctors & Staff', icon: Stethoscope, section: 'PEOPLE & ACCESS' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL SERVICES' },
       { href: '/pharmacy', label: 'Prescriptions & Medicines', icon: Pill, section: 'CLINICAL SERVICES' },
       { href: '/blood-bank', label: 'Blood Bank', icon: Droplets, section: 'CLINICAL SERVICES' },
       { href: '/payments', label: 'Billing & Payments', icon: Wallet, section: 'FINANCE' },
       { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'FINANCE' },
-      { href: '/org-admin/pricing', label: 'Service Pricing', icon: CreditCard, section: 'FINANCE' },
       { href: '/reports', label: 'Reports', icon: ClipboardCheck, section: 'INTELLIGENCE & REPORTING' },
-      // Package (crate) for assets and Sparkles for branding — Wrench/Palette
-      // rendered as the same gear/settings-style glyphs as the Settings items.
       { href: '/equipment', label: 'Assets', icon: Package, section: 'RISK, ASSETS & PREPAREDNESS' },
       { href: '/emergency-preparedness', label: 'Emergency Prep', icon: ShieldAlert, section: 'RISK, ASSETS & PREPAREDNESS' },
-      { href: '/it', label: 'IT Operations', icon: Server, section: 'IT & SYSTEM' },
-      { href: '/system-admin', label: 'System & Data Controls', icon: Database, section: 'IT & SYSTEM' },
-      { href: '/org-admin/branding', label: 'Branding', icon: Sparkles, section: 'IT & SYSTEM' },
-      { href: '/org-admin/settings', label: 'Settings', icon: Settings, section: 'IT & SYSTEM' },
+      // IT Operations lives inside System Administration (its first sidebar
+      // section); /it stays routable for deep links but has no nav entry.
+      { href: '/system-admin', label: 'System Administration', icon: Database, section: 'IT & SYSTEM' },
+      // Org settings live inside the personal Settings page (Settings →
+      // Organization); /org-admin/settings redirects there, so no nav item.
     ],
     color: BRAND_PRIMARY,
     gradientFrom: BRAND_SECONDARY,

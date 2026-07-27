@@ -14,9 +14,9 @@ import { useStaffChat } from '@/lib/hooks/useStaffChat';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useMessagingDock } from '@/lib/messaging-dock-context';
 import { getRoleConfig } from '@/lib/permissions';
-import { initials } from '@/lib/patient-utils';
+import { initials, avatarTint } from '@/lib/patient-utils';
 import { ROLE_LABEL } from '@/lib/role-display';
-import { BRAND_PRIMARY, BRAND_SECONDARY } from '@/lib/theme-colors';
+import { BRAND_PRIMARY } from '@/lib/theme-colors';
 import type { ConversationDoc, UserRole, StaffPresence } from '@/lib/db-types';
 import {
   MessageSquare, Minus, Plus, Search, Send, ArrowLeft, Users as UsersIcon,
@@ -45,14 +45,8 @@ const AVAILABILITY_COLORS: Record<StaffPresence, string> = {
   offline:   'var(--text-muted)',
 };
 
-const AVATAR_PALETTE = ['var(--accent-primary)', BRAND_SECONDARY, '#369FDA', '#2191D0', '#015697', '#015697', '#015697', '#475569'];
 const NON_MESSAGEABLE_ROLES: UserRole[] = ['super_admin', 'government'];
 
-function colorFor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
 function relTime(iso?: string): string {
   if (!iso) return '';
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -70,8 +64,8 @@ function clockTime(iso?: string): string {
 function Avatar({ name, size = 36, group }: { name: string; size?: number; group?: boolean }) {
   return (
     <div
-      className="flex items-center justify-center flex-shrink-0 font-bold text-white"
-      style={{ width: size, height: size, borderRadius: '50%', background: group ? 'var(--accent-primary)' : colorFor(name), fontSize: size * 0.36 }}
+      className="flex items-center justify-center flex-shrink-0 font-bold"
+      style={{ width: size, height: size, borderRadius: '50%', ...(group ? { background: 'var(--accent-primary)', color: '#fff' } : avatarTint(name)), fontSize: size * 0.36 }}
     >
       {group ? <UsersIcon style={{ width: size * 0.5, height: size * 0.5 }} /> : initials(name)}
     </div>

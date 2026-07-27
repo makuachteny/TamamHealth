@@ -20,7 +20,6 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Pill, CheckCircle2, X, AlertTriangle, ShieldAlert, Printer, BedDouble,
 } from '@/components/icons/lucide';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useWards } from '@/lib/hooks/useWards';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -250,27 +249,22 @@ export default function MARPage() {
 
   if (!admission) {
     return (
-      <>
-        <TopBar title={t('mar.title')} />
-        <main className="page-container">
-          <div className="card-elevated p-6 text-center">
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              {t('mar.admissionNotFound')}
-            </p>
-            <button onClick={() => router.push('/wards')} className="btn btn-primary mt-3">
-              {t('mar.returnToWards')}
-            </button>
-          </div>
-        </main>
-      </>
+      <main className="page-container">
+        <div className="card-elevated p-6 text-center">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            {t('mar.admissionNotFound')}
+          </p>
+          <button onClick={() => router.push('/wards')} className="btn btn-primary mt-3">
+            {t('mar.returnToWards')}
+          </button>
+        </div>
+      </main>
     );
   }
 
   return (
-    <>
-      <TopBar title={t('mar.title')} />
-      <main className="page-container">
-        {/* Page header card */}
+    <main className="page-container">
+      {/* Page header card */}
         <div className="card-elevated p-5 flex items-start justify-between flex-wrap gap-4 mb-4">
           <div className="flex items-start gap-3 min-w-0">
             <button
@@ -623,7 +617,6 @@ export default function MARPage() {
             </div>
           </div>
         )}
-      </main>
-    </>
+    </main>
   );
 }

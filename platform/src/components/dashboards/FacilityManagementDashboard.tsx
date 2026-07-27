@@ -16,8 +16,9 @@ import {
 import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
 import {
   Stethoscope, Users, HeartPulse, BedDouble, ChevronRight,
-  Eye,
+  Eye, Pencil, Trash2, Plus,
 } from '@/components/icons/lucide';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { formatMoney } from '@/lib/format-utils';
 import type { MessageDoc, UserDoc } from '@/lib/db-types';
 import { ROLE_LABEL } from '@/lib/role-display';
@@ -74,6 +75,7 @@ export default function FacilityManagementDashboard() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [localEdits, setLocalEdits] = useState<Record<string, Partial<UserDoc> | 'deleted'>>({});
+  const [userSearch, setUserSearch] = useState('');
 
   const canManageUsers = currentUser?.role === 'org_admin' || currentUser?.role === 'super_admin';
 
@@ -169,8 +171,13 @@ export default function FacilityManagementDashboard() {
 
   const userInquiryRows = useMemo(() => {
     const priorityRoles = new Set(['front_desk', 'clinic_clerk', 'central_registration_clerk', 'doctor', 'clinician', 'clinical_officer', 'nurse', 'pharmacist', 'lab_tech']);
+    const q = userSearch.trim().toLowerCase();
     return visibleUsers
       .filter(user => priorityRoles.has(user.role) || user.isActive)
+      .filter(user => !q
+        || user.name.toLowerCase().includes(q)
+        || user.username.toLowerCase().includes(q)
+        || (ROLE_LABEL[user.role] || user.role).toLowerCase().includes(q))
       .sort((a, b) => {
         const activeDelta = Number(b.isActive !== false) - Number(a.isActive !== false);
         if (activeDelta) return activeDelta;
@@ -178,13 +185,14 @@ export default function FacilityManagementDashboard() {
         if (availableDelta) return availableDelta;
         return a.name.localeCompare(b.name);
       })
-      .slice(0, 5)
+      // While searching, show the full match list; the idle view stays a top-5 digest.
+      .slice(0, q ? 20 : 5)
       .map(user => ({
         user,
         available: availableProviderIds.has(user._id),
         active: user.isActive !== false,
       }));
-  }, [availableProviderIds, visibleUsers]);
+  }, [availableProviderIds, visibleUsers, userSearch]);
 
   const openUser = (user: UserDoc) => {
     setSelectedUser(user);
@@ -305,14 +313,12 @@ export default function FacilityManagementDashboard() {
                 <div className="flex-1 space-y-2">
                   <div className="rounded-xl p-2.5" style={{ background: 'rgba(12,163,12,0.10)', border: '1px solid rgba(12,163,12,0.28)' }}>
                     <p className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                      <span className="w-2 h-2 rounded-full inline-block" style={{ background: CASH_RECEIVED }} />
                       Received Amount
                     </p>
                     <p className="text-base font-bold" style={{ color: CASH_RECEIVED }}>{formatMoney(received)}</p>
                   </div>
                   <div className="rounded-xl p-2.5" style={{ background: 'rgba(237,161,0,0.12)', border: '1px solid rgba(237,161,0,0.35)' }}>
                     <p className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                      <span className="w-2 h-2 rounded-full inline-block" style={{ background: CASH_PENDING }} />
                       Pending Amount
                     </p>
                     <p className="text-base font-bold" style={{ color: CASH_PENDING_TEXT }}>{formatMoney(pending)}</p>
@@ -402,22 +408,33 @@ export default function FacilityManagementDashboard() {
 
           {/* ═══ ROW 2 — Users & Inquiries ═══ */}
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            <div className="px-5 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <div>
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Users & Inquiries</h3>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {visibleUsers.length} users · {unreadEnquiries.length} open inquiries · Last {lastInquiryLabel}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={() => router.push('/messages')} className="text-[12px] font-medium inline-flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                  Inquiries <ChevronRight className="w-3 h-3" />
-                </button>
-                <button onClick={() => router.push('/hr')} className="text-[12px] font-medium inline-flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                  Users <ChevronRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
+            {/* Appointments-style list header: stats, search bar, icon actions. */}
+            <EhrListHeader
+              title="Users & Inquiries"
+              stats={[
+                { label: 'Users', value: visibleUsers.length, color: LIST_STAT_COLORS.muted },
+                { label: 'Open inquiries', value: unreadEnquiries.length, color: LIST_STAT_COLORS.amber },
+                { label: 'Last inquiry', value: lastInquiryLabel, color: LIST_STAT_COLORS.blue },
+              ]}
+              search={{ value: userSearch, onChange: setUserSearch, placeholder: 'Search users by name, username, or role…' }}
+              actions={
+                <>
+                  {canManageUsers && (
+                    <button
+                      type="button"
+                      className="listpage-icon-btn listpage-icon-btn-primary"
+                      onClick={() => router.push('/org-admin/users?new=1')}
+                      title="Add user"
+                      aria-label="Add user"
+                    >
+                      {/* The icon shim defaults to brand blue — invisible on the
+                          blue primary button, so force white. */}
+                      <Plus size={16} color="#fff" />
+                    </button>
+                  )}
+                </>
+              }
+            />
             <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
               <table className="w-full" style={{ minWidth: 640 }}>
                 <thead>
@@ -431,7 +448,7 @@ export default function FacilityManagementDashboard() {
                   {userInquiryRows.length === 0 && (
                     <tr><td colSpan={5} className="px-5 py-8 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No users available for this facility.</td></tr>
                   )}
-                  {userInquiryRows.map(({ user, available, active }, i) => (
+                  {userInquiryRows.map(({ user, available, active }) => (
                     <tr key={user._id} role="button" tabIndex={0}
                       className="cursor-pointer hover:bg-[var(--table-row-hover)]"
                       onClick={() => openUser(user)}
@@ -439,7 +456,6 @@ export default function FacilityManagementDashboard() {
                       style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td className="px-5 py-2">
                         <div className="flex items-center gap-3">
-                          <span className="text-[12px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{String(i + 1).padStart(2, '0')}</span>
                           <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: active ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
                             {(user.name || '?').split(' ').map(part => part[0]).slice(0, 2).join('')}
                           </span>
@@ -454,14 +470,37 @@ export default function FacilityManagementDashboard() {
                       <td className="px-5 py-2">{statusPill(!active ? 'Inactive' : available ? 'Available' : 'Active')}</td>
                       <td className="px-5 py-2">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openUser(user); }}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--overlay-medium)]"
-                            title={canManageUsers ? 'Manage user' : 'View user'}
-                            aria-label={canManageUsers ? 'Manage user' : 'View user'}
-                          >
-                            <Eye className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                          </button>
+                          {canManageUsers ? (
+                            <>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openUser(user); }}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--overlay-medium)]"
+                                title="Edit user"
+                                aria-label="Edit user"
+                              >
+                                <Pencil className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                              </button>
+                              {user._id !== currentUser?._id && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openUser(user); setConfirmingDelete(true); }}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--overlay-medium)]"
+                                  title="Delete user"
+                                  aria-label="Delete user"
+                                >
+                                  <Trash2 className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openUser(user); }}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--overlay-medium)]"
+                              title="View user"
+                              aria-label="View user"
+                            >
+                              <Eye className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

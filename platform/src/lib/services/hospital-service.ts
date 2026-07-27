@@ -15,7 +15,10 @@ export async function getHospitalById(id: string): Promise<HospitalDoc | null> {
   try {
     const db = hospitalsDB();
     return await db.get(id) as HospitalDoc;
-  } catch {
+  } catch (err) {
+    // Surface the real failure — a swallowed non-404 here once masqueraded
+    // as "Hospital not found" on the manage page.
+    console.warn('[hospital-service] getHospitalById failed for', id, err);
     return null;
   }
 }

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import {
   Building2, Plus, X, MapPin, ChevronDown, AlertCircle, Users,
@@ -10,6 +9,7 @@ import {
 import type { HospitalDoc, UserRole } from '@/lib/db-types';
 import type { DataScope } from '@/lib/services/data-scope';
 import { SOUTH_SUDAN_STATES } from '@/lib/geographic-data';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 
 const FACILITY_TYPES = [
   { value: 'national_referral', label: 'National Referral', labelKey: 'hospitals.typeNationalReferral' },
@@ -21,7 +21,7 @@ const FACILITY_TYPES = [
 
 export default function OrgHospitalsPage() {
   const { t } = useTranslation();
-  const { currentUser, globalSearch } = useApp();
+  const { currentUser, globalSearch, setGlobalSearch } = useApp();
   const [hospitals, setHospitals] = useState<HospitalDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -142,28 +142,14 @@ export default function OrgHospitalsPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <TopBar title={t('orgHospitals.topBarTitle')} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
-        </div>
+      <div className="flex-1 flex flex-col min-h-0 items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
       </div>
     );
   }
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <TopBar title={t('orgHospitals.topBarTitle')} actions={
-        <button
-          onClick={() => { setError(''); setShowCreateModal(true); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-          style={{ background: brandColor }}
-        >
-          <Plus className="w-4 h-4" />
-          {t('orgHospitals.addFacility')}
-        </button>
-      } />
-
       <div className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Success/Error */}
         {success && (
@@ -179,10 +165,21 @@ export default function OrgHospitalsPage() {
 
         {/* Hospitals Table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgHospitals.headerTitle')}</h3>
-          </div>
+          <EhrListHeader
+            title={t('orgHospitals.headerTitle')}
+            stats={[{ label: 'Facilities', value: hospitals.length, color: LIST_STAT_COLORS.muted }]}
+            search={{ value: globalSearch, onChange: setGlobalSearch, placeholder: 'Search facilities…' }}
+            actions={
+              <button
+                onClick={() => { setError(''); setShowCreateModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
+                style={{ background: brandColor, height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                <Plus className="w-4 h-4" />
+                {t('orgHospitals.addFacility')}
+              </button>
+            }
+          />
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
           <table className="w-full" style={{ minWidth: 720 }}>
             <thead>

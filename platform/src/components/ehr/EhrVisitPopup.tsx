@@ -6,7 +6,7 @@ import Modal from '@/components/Modal';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { STAGE_LABELS, type QueueEntry, type QueueStage } from '@/lib/services/patient-queue-service';
 import { formatClockTime } from '@/lib/format-utils';
-import { initials, stateColor } from '@/lib/patient-utils';
+import { initials, stateTint } from '@/lib/patient-utils';
 import type { AppointmentDoc, TriageDoc } from '@/lib/db-types';
 
 /* ─── Visit popup + move dialog (clinician worklist) ───
@@ -115,7 +115,7 @@ export default function EhrVisitPopup({
     <Modal onClose={onClose} width={640} labelledBy="ehr-visit-pop-title">
       <div className="modal-content card-elevated ehr-visit-pop">
         <div className="ehr-visit-pop-head">
-          <span className="ehr-patient-icon" style={{ background: stateColor(acuity), color: '#fff' }} aria-hidden>
+          <span className="ehr-patient-icon" style={stateTint(acuity)} aria-hidden>
             {initials(name)}
           </span>
           <div className="ehr-visit-pop-head-text">

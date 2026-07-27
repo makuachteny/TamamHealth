@@ -12,7 +12,6 @@ import { apiFetch } from '@/lib/api-fetch';
 import { useToast } from '@/components/Toast';
 import { CONFLICT_RESOLUTION_ROLES } from '@/lib/permissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import TopBar from '@/components/TopBar';
 
 const RISK_STYLES: Record<ConflictQueueDoc['risk'], { bg: string; fg: string; border: string; label: string }> = {
   high:   { bg: 'rgba(229,46,66,0.08)',  fg: '#C44536', border: 'rgba(229,46,66,0.25)', label: 'HIGH' },
@@ -107,7 +106,6 @@ export default function ConflictsPage() {
   if (!allowed) {
     return (
       <>
-        <TopBar title={t('conflicts.title')} />
         <main className="page-container page-enter admin-detail-page">
           <section className="admin-detail-empty">
             <h1>{t('conflicts.title')}</h1>
@@ -120,7 +118,6 @@ export default function ConflictsPage() {
 
   return (
     <>
-      <TopBar title={t('conflicts.title')} />
       <main className="page-container page-enter admin-detail-page">
         <section className="admin-detail-header">
           <div>

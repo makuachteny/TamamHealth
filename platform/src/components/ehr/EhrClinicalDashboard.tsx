@@ -24,7 +24,7 @@ import {
   Video,
   X,
 } from '@/components/icons/lucide';
-import { initials, stateColor } from '@/lib/patient-utils';
+import { initials, stateTint, AVATAR_TINT_NEUTRAL } from '@/lib/patient-utils';
 import { formatClockTime, formatTimeUntil } from '@/lib/format-utils';
 import { useToast } from '@/components/Toast';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -617,12 +617,23 @@ export default function EhrClinicalDashboard({
       comingFrom: entry
         ? (entry.stage === 'awaiting_triage' ? 'Registration' : 'Triage')
         : row.appointment ? 'Appointment' : 'Registry',
+      careTeamPrimary: row.provider || 'Doctor unassigned',
+      careTeamSecondary: row.patient?.nurse || entry?.assignedToName || 'Nurse unassigned',
       statusText: inService
-        ? `In service${entry?.assignedToName ? ` · ${entry.assignedToName}` : ''}`
+        ? 'In service'
         : entry ? 'Waiting' : statusLabel(row.status),
       queueText: entry ? STAGE_LABELS[entry.stage] : typeLabel(row.department),
       waitText: entry ? formatClockTime(entry.enteredStageAt) : row.appointment?.appointmentTime ? formatClockTime(row.appointment.appointmentTime) : '—',
-      waitSubtext: entry ? waitLabel(entry.minutesWaiting) : appointmentRelative,
+      waitSubtext: entry
+        ? waitLabel(entry.minutesWaiting)
+        : row.appointment?.appointmentDate || appointmentRelative || 'Assigned list',
+      statusSubtext: entry?.acuity === 'RED'
+        ? 'Critical'
+        : entry?.acuity === 'YELLOW'
+          ? 'Urgent'
+          : entry?.acuity === 'GREEN'
+            ? 'Routine'
+            : PRIORITY_META[row.triagePriority].label,
       overTarget: Boolean(entry?.flaggedForReassessment),
       inService,
     };
@@ -1140,15 +1151,14 @@ export default function EhrClinicalDashboard({
 
             {visiblePatientRows.length > 0 && (
               <div className="ehr-queue-scroll">
-                {/* The appointments-page table, exactly: PATIENT / TIME /
-                    COMING FROM / QUEUE / STATUS with the acuity as the small
-                    cue under the status pill. */}
+                {/* Patient / Time / Care team / Context / Status, with every
+                    column using a primary line plus a secondary line. */}
                 <div className="appointment-card-flow">
                   <div className="appointment-card-head" aria-hidden="true">
                     <span>Patient</span>
                     <span>Time</span>
-                    <span>Coming from</span>
-                    <span>Queue</span>
+                    <span>Care team</span>
+                    <span>Context</span>
                     <span>Status</span>
                   </div>
                   {filteredPatientRows.length === 0 && (
@@ -1185,7 +1195,7 @@ export default function EhrClinicalDashboard({
                         }}
                       >
                         <div className="ehr-appointment-identity">
-                          <div className="ehr-patient-icon" style={{ background: stateColor(row.triagePriority), color: '#fff' }}>
+                          <div className="ehr-patient-icon" style={stateTint(row.triagePriority)}>
                             {initials(row.name)}
                           </div>
                           <div className="ehr-appointment-main appointment-card-patient">
@@ -1209,19 +1219,18 @@ export default function EhrClinicalDashboard({
                         </div>
 
                         <div className="appointment-card-provider">
-                          <strong>{columns.comingFrom}</strong>
-                          <span>Source</span>
+                          <strong>{columns.careTeamPrimary}</strong>
+                          <span>{columns.careTeamSecondary}</span>
                         </div>
 
                         <div className="ehr-appointment-department">
-                          {columns.queueText
-                            ? <span className={`ehr-department-pill ${departmentTone(columns.queueText)}`}>{columns.queueText}</span>
-                            : <span className="ehr-queue-muted-cell">—</span>}
+                          <strong>{columns.queueText || '—'}</strong>
+                          <span>{columns.comingFrom}</span>
                         </div>
 
                         <div className="appointment-card-status">
                           <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{columns.statusText}</span>
-                          <small>{PRIORITY_META[row.triagePriority].label}</small>
+                          <small>{columns.statusSubtext}</small>
                         </div>
                       </div>
                     );
@@ -1304,7 +1313,7 @@ export default function EhrClinicalDashboard({
                       return (
                         <li key={patient._id}>
                           <button type="button" onClick={() => openFoundPatient(patient)}>
-                            <span className="ehr-patient-icon" style={{ background: 'var(--accent-primary)', color: '#fff' }}>{initials(name)}</span>
+                            <span className="ehr-patient-icon" style={AVATAR_TINT_NEUTRAL}>{initials(name)}</span>
                             <span className="ehr-find-patient-identity">
                               <strong>{name}</strong>
                               <small>{[patient.hospitalNumber, patient.gender, patient.phone].filter(Boolean).join(' · ')}</small>

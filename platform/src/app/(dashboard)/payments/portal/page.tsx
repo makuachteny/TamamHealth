@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import TopBar from '@/components/TopBar';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import {
   CreditCard, Smartphone, Building2, CheckCircle,
@@ -292,7 +291,6 @@ export default function PatientPortalPage() {
 
   return (
     <>
-      <TopBar title={t('portal.title')} />
       <main className="page-container page-enter">
 
         {usingDemo && realBills !== null && <DemoModeBanner />}

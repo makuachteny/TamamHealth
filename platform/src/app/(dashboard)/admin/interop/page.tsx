@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { SaPage, SaCard, SaStatusDot, SaPill, SaTable, formatWhen } from '@/components/admin/sa-ui';
 import { useToast } from '@/components/Toast';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
@@ -111,8 +112,8 @@ export default function AdminInteropPage() {
   const entries = dhisLog?.entries ?? [];
 
   return (
-    <SaPage title="Interoperability" subtitle="Integration endpoints, DHIS2 push history, and code mappings actually shipped in this build.">
-      <SaCard title="Integration endpoints" meta={loading || configLoading ? 'Loading…' : undefined}>
+    <SaPage>
+      <SaCard title="Interoperability" meta={loading || configLoading ? 'Loading…' : 'Integration endpoints'}>
         <SaTable columns={['Endpoint', 'Kind', 'Target', 'Status', 'Last activity']} minWidth={720}>
           <tr>
             <td><strong>DHIS2 export</strong></td>
@@ -148,7 +149,11 @@ export default function AdminInteropPage() {
         </div>
       </SaCard>
 
-      <SaCard title="DHIS2 push log" meta={loading ? undefined : `${entries.length} entries`}>
+      <SaCard>
+        <EhrListHeader
+          title="DHIS2 push log"
+          stats={[{ label: 'Entries', value: loading ? '—' : entries.length, color: LIST_STAT_COLORS.muted }]}
+        />
         <SaTable
           columns={['When', 'Dataset', 'Period', 'Result', 'Detail']}
           empty={loading ? 'Loading…' : 'No DHIS2 push attempts recorded yet.'}
@@ -166,16 +171,17 @@ export default function AdminInteropPage() {
         </SaTable>
       </SaCard>
 
-      <SaCard
-        title="Failed pushes & retry"
-        meta={loading ? undefined : `${failedEvents.length} shown${failedEvents.length === 50 ? ' (capped at 50)' : ''}`}
-        actions={
-          <button type="button" className="sa-btn" disabled={retrying} onClick={handleRetryBatch}>
-            <RefreshCw className="w-3.5 h-3.5" />
-            {retrying ? 'Retrying…' : 'Retry batch'}
-          </button>
-        }
-      >
+      <SaCard>
+        <EhrListHeader
+          title="Failed pushes & retry"
+          stats={[{ label: 'Shown', value: loading ? '—' : `${failedEvents.length}${failedEvents.length === 50 ? ' (capped)' : ''}`, color: failedEvents.length ? 'var(--color-danger)' : LIST_STAT_COLORS.muted }]}
+          actions={
+            <button type="button" className="sa-btn" disabled={retrying} onClick={handleRetryBatch}>
+              <RefreshCw className="w-3.5 h-3.5" />
+              {retrying ? 'Retrying…' : 'Retry batch'}
+            </button>
+          }
+        />
         <SaTable
           columns={['When', 'Resource', 'Operation', 'Error']}
           empty={loading ? 'Loading…' : 'No failed pushes.'}

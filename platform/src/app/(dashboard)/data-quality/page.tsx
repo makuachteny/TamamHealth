@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useDataQuality } from '@/lib/hooks/useDataQuality';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Wifi, Users, TrendingUp, AlertTriangle } from '@/components/icons/lucide';
-import { FilterBar, FilterTabs } from '@/components/filters';
+import { FilterTabs } from '@/components/filters';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import type { DataCompletenessEntry } from '@/lib/services/data-quality-service';
 
 type View = 'completeness' | 'timeliness' | 'outliers' | 'scores';
@@ -68,6 +68,17 @@ export default function DataQualityPage() {
   const belowCompleteness80 = useMemo(() => assessedEntries.filter(e => e.reportingCompleteness < 80).length, [assessedEntries]);
   const belowTimeliness80 = useMemo(() => assessedEntries.filter(e => e.reportingTimeliness < 80).length, [assessedEntries]);
 
+  // Free-text filter over the active view's rows. Completeness/timeliness/scores
+  // match on facility name or state; outliers (a different row shape sourced
+  // from surveillance alerts) match on disease or location instead.
+  const [rowQuery, setRowQuery] = useState('');
+  const q = rowQuery.trim().toLowerCase();
+  const filterFacilityRows = (rows: DataCompletenessEntry[]) =>
+    q ? rows.filter(e => e.facilityName.toLowerCase().includes(q) || e.state.toLowerCase().includes(q)) : rows;
+  const filteredCompletenessRows = useMemo(() => filterFacilityRows(completenessRows), [completenessRows, q]);
+  const filteredTimelinessRows = useMemo(() => filterFacilityRows(timelinessRows), [timelinessRows, q]);
+  const filteredScoreRows = useMemo(() => filterFacilityRows(scoreRows), [scoreRows, q]);
+
   // Honest, simple outlier check: an alert's cases are >3x the median cases
   // reported for that same disease across all alerts on file. No validation
   // ruleset exists yet — this is a heuristic flag to verify at source, not a
@@ -94,14 +105,47 @@ export default function DataQualityPage() {
       .sort((a, b) => b.cases - a.cases);
   }, [alerts]);
 
-  if (loading || !data) return <><TopBar title={t('dataQuality.topBarTitle')} /><main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.loading')}</p></main></>;
+  const filteredOutliers = useMemo(
+    () => q ? outliers.filter(a => a.disease.toLowerCase().includes(q) || a.county.toLowerCase().includes(q) || a.state.toLowerCase().includes(q)) : outliers,
+    [outliers, q]
+  );
+
+  if (loading || !data) return <main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.loading')}</p></main>;
 
   const scoreColor = (score: number) => score >= 70 ? 'var(--accent-primary)' : score >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
 
+  // Header stat pills reflect the whole (unfiltered) view, matching the
+  // appointments-page convention where the search box narrows the table but
+  // not the summary counts. Only completeness/timeliness carry a "Below 80%"
+  // pill — scores has no comparable threshold and outliers is a different
+  // (alert-based) row shape entirely.
+  const listHeaderStats =
+    view === 'completeness'
+      ? [
+          { label: 'Facilities', value: completenessRows.length, color: LIST_STAT_COLORS.muted },
+          { label: 'Below 80%', value: belowCompleteness80, color: LIST_STAT_COLORS.amber },
+        ]
+      : view === 'timeliness'
+      ? [
+          { label: 'Facilities', value: timelinessRows.length, color: LIST_STAT_COLORS.muted },
+          { label: 'Below 80%', value: belowTimeliness80, color: LIST_STAT_COLORS.amber },
+        ]
+      : view === 'scores'
+      ? [{ label: 'Facilities', value: scoreRows.length, color: LIST_STAT_COLORS.muted }]
+      : [{ label: 'Outliers flagged', value: outliers.length, color: LIST_STAT_COLORS.amber }];
+
+  const listHeaderSearch =
+    view === 'outliers'
+      ? { value: rowQuery, onChange: setRowQuery, placeholder: 'Search disease or location', ariaLabel: 'Search outliers by disease or location' }
+      : { value: rowQuery, onChange: setRowQuery, placeholder: 'Search facility or state', ariaLabel: 'Search facilities by name or state' };
+
   return (
-    <>
-      <TopBar title={t('dataQuality.topBarTitle')} />
-      <main className="page-container page-enter">
+    <main className="page-container page-enter">
+        <div className="card-elevated px-4 pt-4 pb-3 mb-4">
+          <span style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: 'var(--text-primary)' }}>
+            {t('dataQuality.topBarTitle')}
+          </span>
+        </div>
         {/* National indicators */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="card-elevated p-4">
@@ -166,31 +210,24 @@ export default function DataQualityPage() {
 
         {/* Facility-level views */}
         <div className="dash-card overflow-hidden">
-          <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <FilterBar>
+          <EhrListHeader
+            title="Facility data quality"
+            stats={listHeaderStats}
+            search={listHeaderSearch}
+            actions={
               <FilterTabs ariaLabel="Data quality view" active={view} onChange={k => setView(k as View)} tabs={VIEWS.map(v => ({ key: v.key, label: v.label }))} />
-            </FilterBar>
-            {view === 'completeness' && (
-              <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: AMBER }} /> Below 80% ({belowCompleteness80})
-              </span>
-            )}
-            {view === 'timeliness' && (
-              <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: AMBER }} /> Below 80% ({belowTimeliness80})
-              </span>
-            )}
-          </div>
+            }
+          />
 
           {view === 'completeness' && (
             <div className="overflow-x-auto">
               <table className="w-full" style={{ minWidth: 640 }}>
                 <thead><tr><Th>Facility</Th><Th>State</Th><Th>Reporting completeness</Th><Th>Last assessment</Th></tr></thead>
                 <tbody>
-                  {completenessRows.length === 0 && (
+                  {filteredCompletenessRows.length === 0 && (
                     <tr><td colSpan={4} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No facility assessments on file.</td></tr>
                   )}
-                  {completenessRows.map((e: DataCompletenessEntry) => (
+                  {filteredCompletenessRows.map((e: DataCompletenessEntry) => (
                     <tr key={e.facilityId} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td className="px-4 py-2.5 text-[14px]" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{e.facilityName}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{e.state}</td>
@@ -208,10 +245,10 @@ export default function DataQualityPage() {
               <table className="w-full" style={{ minWidth: 640 }}>
                 <thead><tr><Th>Facility</Th><Th>State</Th><Th>Reporting timeliness</Th><Th>Last assessment</Th></tr></thead>
                 <tbody>
-                  {timelinessRows.length === 0 && (
+                  {filteredTimelinessRows.length === 0 && (
                     <tr><td colSpan={4} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No facility assessments on file.</td></tr>
                   )}
-                  {timelinessRows.map((e: DataCompletenessEntry) => (
+                  {filteredTimelinessRows.map((e: DataCompletenessEntry) => (
                     <tr key={e.facilityId} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td className="px-4 py-2.5 text-[14px]" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{e.facilityName}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{e.state}</td>
@@ -229,10 +266,10 @@ export default function DataQualityPage() {
               <table className="w-full" style={{ minWidth: 640 }}>
                 <thead><tr><Th>Rank</Th><Th>Facility</Th><Th>State</Th><Th>Data quality score</Th><Th>Last assessment</Th></tr></thead>
                 <tbody>
-                  {scoreRows.length === 0 && (
+                  {filteredScoreRows.length === 0 && (
                     <tr><td colSpan={5} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No facility assessments on file.</td></tr>
                   )}
-                  {scoreRows.map((e: DataCompletenessEntry, i: number) => (
+                  {filteredScoreRows.map((e: DataCompletenessEntry, i: number) => (
                     <tr key={e.facilityId} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td className="px-4 py-2.5 text-[13px] font-mono" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
                       <td className="px-4 py-2.5 text-[14px]" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{e.facilityName}</td>
@@ -256,14 +293,14 @@ export default function DataQualityPage() {
               </div>
               {alertsLoading ? (
                 <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading surveillance alerts…</div>
-              ) : outliers.length === 0 ? (
+              ) : filteredOutliers.length === 0 ? (
                 <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No outliers detected against this heuristic.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full" style={{ minWidth: 640 }}>
                     <thead><tr><Th>Disease</Th><Th>Location</Th><Th right>Cases</Th><Th>Reported</Th></tr></thead>
                     <tbody>
-                      {outliers.map(a => (
+                      {filteredOutliers.map(a => (
                         <tr key={a._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                           <td className="px-4 py-2.5 text-[14px]" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{a.disease}</td>
                           <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{a.county}, {a.state}</td>
@@ -278,7 +315,6 @@ export default function DataQualityPage() {
             </div>
           )}
         </div>
-      </main>
-    </>
+    </main>
   );
 }

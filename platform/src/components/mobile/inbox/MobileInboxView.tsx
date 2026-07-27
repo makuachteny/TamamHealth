@@ -5,7 +5,7 @@ import { Loader2 } from '@/components/icons/lucide';
 import EmptyState from '@/components/EmptyState';
 import { useApp } from '@/lib/context';
 import { useMessages } from '@/lib/hooks/useMessages';
-import { initials, avatarColor } from '@/lib/patient-utils';
+import { initials, avatarTint } from '@/lib/patient-utils';
 
 export default function MobileInboxView() {
   const { currentUser } = useApp();
@@ -36,7 +36,7 @@ export default function MobileInboxView() {
         const unread = !isOwn && !(m.readBy || []).includes(currentUser?._id || '');
         return (
           <button key={m._id} type="button" className="mobile-inbox-row">
-            <span className="mobile-inbox-avatar" style={{ background: avatarColor(displayName) }}>
+            <span className="mobile-inbox-avatar" style={avatarTint(displayName)}>
               {initials(displayName)}
             </span>
             <span className="mobile-inbox-meta">

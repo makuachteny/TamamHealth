@@ -7,6 +7,7 @@ import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
 import { jubaDate } from '../time-juba';
+import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 /**
  * ETAT priority calculator — encodes the WHO decision tree.
@@ -70,13 +71,13 @@ export async function createTriage(
 ): Promise<TriageDoc> {
   const db = triageDB();
   const now = new Date().toISOString();
-  const doc: TriageDoc = {
+  const doc: TriageDoc = withPendingOfflineSync({
     _id: `triage-${uuidv4().slice(0, 8)}`,
     type: 'triage',
     ...data,
     createdAt: now,
     updatedAt: now,
-  };
+  }, now);
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('TRIAGE_RECORDED', data.triagedBy, data.triagedByName,
@@ -110,7 +111,7 @@ export async function updateTriage(
       }
     }
 
-    const updated: TriageDoc = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+    const updated: TriageDoc = withPendingOfflineSync({ ...existing, ...updates, updatedAt: new Date().toISOString() });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     if (updates.status) {

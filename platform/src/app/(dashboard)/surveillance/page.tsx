@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Modal from '@/components/Modal';
-import TopBar from '@/components/TopBar';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import {
   AlertTriangle, Shield, TrendingUp, TrendingDown,
   Minus, MapPin, Activity, FileText, Calendar, ChevronRight,
@@ -411,21 +411,27 @@ export default function SurveillancePage() {
 
   return (
     <>
-      <TopBar title={t('nav.surveillance')} actions={
-              <>
-                {canReportAlert && (
-                  <button className="btn btn-primary btn-sm" onClick={() => setShowNewAlert(true)}>
-                    <Plus className="w-4 h-4" />
-                    {t('surveillance.reportAlert')}
-                  </button>
-                )}
-                <button className="btn btn-secondary btn-sm" onClick={handleExport}>
-                  <Download className="w-4 h-4" />
-                  {t('surveillance.exportReport')}
-                </button>
-              </>
-            } />
       <main className="page-container page-enter">
+
+          <div className="dash-card mb-4">
+            <EhrListHeader
+              title={t('nav.surveillance')}
+              actions={
+                <>
+                  {canReportAlert && (
+                    <button className="btn btn-primary btn-sm" onClick={() => setShowNewAlert(true)}>
+                      <Plus className="w-4 h-4" />
+                      {t('surveillance.reportAlert')}
+                    </button>
+                  )}
+                  <button className="btn btn-secondary btn-sm" onClick={handleExport}>
+                    <Download className="w-4 h-4" />
+                    {t('surveillance.exportReport')}
+                  </button>
+                </>
+              }
+            />
+          </div>
 
           {/* Aggregate summary strip */}
           <div className="card-elevated p-4 mb-6 flex items-center justify-between">

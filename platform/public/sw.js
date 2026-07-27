@@ -38,6 +38,20 @@ const STATIC_ASSETS = [
   '/facility-assessments',
 ];
 
+const ONLINE_REQUIRED_API_PREFIXES = [
+  '/api/auth',
+  '/api/users',
+  '/api/admin',
+  '/api/receipts',
+  '/api/payment-link',
+  '/api/checkout',
+  '/api/patient-portal/login',
+];
+
+function isOnlineRequiredApi(pathname) {
+  return ONLINE_REQUIRED_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 // Background sync queue stored in IndexedDB
 const SYNC_DB_NAME = 'tamamhealth-sync-queue';
 const SYNC_STORE = 'pending-requests';
@@ -65,6 +79,7 @@ async function queueRequest(url, options) {
       method: options.method || 'POST',
       headers: options.headers || {},
       body: options.body || null,
+      idempotencyKey: options.idempotencyKey || null,
       timestamp: Date.now(),
     });
     return new Promise((resolve, reject) => {
@@ -89,11 +104,14 @@ async function flushSyncQueue() {
 
     for (const entry of all) {
       try {
-        await fetch(entry.url, {
+        const response = await fetch(entry.url, {
           method: entry.method,
           headers: entry.headers,
           body: entry.body,
         });
+        if (!response.ok) {
+          break;
+        }
         // Remove from queue on success
         const delTx = db.transaction(SYNC_STORE, 'readwrite');
         delTx.objectStore(SYNC_STORE).delete(entry.id);
@@ -145,18 +163,47 @@ self.addEventListener('fetch', (event) => {
 
   // For other API POST/PUT/DELETE: try network, queue if offline
   if (request.method !== 'GET') {
+    if (url.origin !== self.location.origin || !url.pathname.startsWith('/api/')) {
+      return;
+    }
+    if (url.pathname.startsWith('/api/') && isOnlineRequiredApi(url.pathname)) {
+      event.respondWith(
+        fetch(request).catch(() => new Response(JSON.stringify({
+          offline: true,
+          queued: false,
+          error: 'This action requires a connection.',
+        }), {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-TamamHealth-Offline': 'required-online',
+          },
+        }))
+      );
+      return;
+    }
     event.respondWith(
       fetch(request).catch(async () => {
         // Queue the request for background sync
         const body = await request.clone().text();
+        const idempotencyKey = request.headers.get('X-Idempotency-Key') ||
+          (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
         await queueRequest(request.url, {
           method: request.method,
-          headers: Object.fromEntries(request.headers.entries()),
+          headers: {
+            ...Object.fromEntries(request.headers.entries()),
+            'X-Idempotency-Key': idempotencyKey,
+          },
           body,
+          idempotencyKey,
         });
         return new Response(JSON.stringify({ queued: true, offline: true }), {
           status: 202,
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-TamamHealth-Offline': 'queued',
+            'X-Idempotency-Key': idempotencyKey,
+          },
         });
       })
     );

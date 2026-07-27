@@ -67,23 +67,49 @@ export function initials(name: string): string {
   return ((base.slice(0, 2) || clean.slice(0, 2)) || '?').toUpperCase();
 }
 
-/** Round-avatar fill palette. Deterministic per name, so the same person always
- *  gets the same colour. White initials sit on top. */
-const AVATAR_COLORS = ['#F8593E', '#FF7F00', '#00A95D'];
-export function avatarColor(seed: string): string {
+/** The avatar treatment used across the app: a faint tinted plate with the
+ *  initials inked in the matching saturated hue (never white-on-solid). Same
+ *  values as the triage-tinted `.ehr-patient-icon` variants in globals.css. */
+export interface AvatarTint { background: string; color: string }
+
+export const AVATAR_TINT_RED: AvatarTint = { background: '#FFF0EF', color: '#C24135' };
+export const AVATAR_TINT_AMBER: AvatarTint = { background: '#FFF4E9', color: '#B55E13' };
+export const AVATAR_TINT_GREEN: AvatarTint = { background: '#E8F7F1', color: '#167755' };
+export const AVATAR_TINT_NEUTRAL: AvatarTint = { background: '#EEF4F6', color: '#3D5967' };
+
+const AVATAR_TINTS: AvatarTint[] = [AVATAR_TINT_RED, AVATAR_TINT_AMBER, AVATAR_TINT_GREEN];
+
+function seedHash(seed: string): number {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+  return hash;
 }
 
-/** State/acuity avatar colour: critical (red), watch (orange), stable (green).
+/** Deterministic faint avatar tint for a person — the same name always gets the
+ *  same plate. Spread straight onto a style prop: `style={avatarTint(name)}`. */
+export function avatarTint(seed: string): AvatarTint {
+  return AVATAR_TINTS[seedHash(seed || '') % AVATAR_TINTS.length];
+}
+
+/** Legacy accessor: the avatar's background only. Prefer `avatarTint`, which
+ *  also carries the ink colour the faint plate needs. */
+export function avatarColor(seed: string): string {
+  return avatarTint(seed).background;
+}
+
+/** State/acuity avatar tint: critical (red), watch (amber), stable (green).
  *  Accepts triage priority (RED/YELLOW/GREEN) or a free-text priority/status;
  *  anything unknown reads as stable. */
-export function stateColor(state?: string | null): string {
+export function stateTint(state?: string | null): AvatarTint {
   const s = (state || '').toLowerCase();
-  if (s === 'red' || s.includes('critical') || s.includes('emerg')) return '#F8593E';
-  if (s === 'yellow' || s.includes('watch') || s.includes('urgent')) return '#FF7F00';
-  return '#00A95D';
+  if (s === 'red' || s.includes('critical') || s.includes('emerg')) return AVATAR_TINT_RED;
+  if (s === 'yellow' || s.includes('watch') || s.includes('urgent')) return AVATAR_TINT_AMBER;
+  return AVATAR_TINT_GREEN;
+}
+
+/** Legacy accessor: the state plate's background only. Prefer `stateTint`. */
+export function stateColor(state?: string | null): string {
+  return stateTint(state).background;
 }
 
 /**

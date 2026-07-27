@@ -195,7 +195,7 @@ export default function PatientsPage() {
 
   // Export the currently filtered/sorted registry to CSV.
   const handleDownloadCsv = () => {
-    const header = ['Name', 'Hospital number', 'Gender', 'Age', 'Location', 'Assigned provider'];
+    const header = ['Name', 'Hospital number', 'Gender', 'Age', 'Location', 'Assigned doctor', 'Assigned nurse'];
     const rows = sorted.map(p => [
       patientFullName(p),
       p.hospitalNumber || '',
@@ -203,6 +203,7 @@ export default function PatientsPage() {
       patientAgeLabel(p),
       [p.county, p.state].filter(Boolean).join(', '),
       p.assignedDoctorName || '',
+      p.assignedByName || '',
     ]);
     const csv = [header, ...rows]
       .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
@@ -215,79 +216,91 @@ export default function PatientsPage() {
     URL.revokeObjectURL(url);
   };
 
-  // ── Role-aware columns ──────────────────────────────────────────────────
-  // Every role sees the common identity columns (who + how to reach + where +
-  // recency). Beyond that the registry adapts to what the role needs to act on:
-  //   • clinical roles  → Conditions (allergies / chronic) for safe care
-  //   • billing desk    → Balance (outstanding) for collections
-  //   • reception       → an Assign action to route the patient to a provider
-  // Non-billing roles keep the Registered date; billers swap it for Balance.
+  const formatRegistryDate = (value?: string) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const facilityNameOf = (p: typeof patients[number]) => {
+    const named = p as typeof p & { registrationHospitalName?: string; lastVisitHospitalName?: string };
+    return named.registrationHospitalName || named.lastVisitHospitalName || p.registrationHospital || p.lastVisitHospital || 'Facility unknown';
+  };
+
+  // ── Shared patient-list columns ─────────────────────────────────────────
+  // Same five-column hierarchy as the care dashboards:
+  // Patient / Registered / Care team / Location / Status.
+  // Care team always stacks doctor first and nurse/routing staff below.
   type PatientCol = { key: string; label: string; width: number; align?: 'right'; render: (p: typeof patients[number]) => React.ReactNode };
   const columns: PatientCol[] = [
     {
-      key: 'patient', label: t('nurse.colPatientName'), width: 20,
-      // Dashboard row look: 40px square .ehr-patient-icon avatar + 14px/800 name.
+      key: 'patient', label: 'Patient', width: 30,
       render: (p) => (
         <div className="flex items-center gap-2.5 min-w-0">
           <PatientAvatar patient={p} size={40} />
-          <span className="text-[14px] truncate" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{patientFullName(p)}</span>
+          <span className="patient-data-main">
+            <b>{patientFullName(p)}</b>
+            <small>{p.hospitalNumber || 'No hospital number'} · {patientAgeLabel(p)} · {p.gender || 'Not recorded'}</small>
+          </span>
         </div>
       ),
     },
     {
-      key: 'gender', label: t('nurse.colGender'), width: 9,
-      render: (p) => <span className="text-[13px] whitespace-nowrap" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{p.gender || '—'}</span>,
-    },
-    {
-      key: 'age', label: t('nurse.colAge'), width: 8,
-      render: (p) => <span className="text-[13px] tabular-nums whitespace-nowrap" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{patientAgeLabel(p)}</span>,
-    },
-    { key: 'hospitalNo', label: t('patients.colHospitalNo'), width: 13, render: (p) => <span className="text-[13px] font-mono tabular-nums whitespace-nowrap" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{p.hospitalNumber || '—'}</span> },
-    { key: 'location', label: t('patient.location'), width: 16, render: (p) => <span className="text-[13px] block truncate" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{[p.county, p.state].filter(Boolean).join(', ') || '—'}</span> },
-  ];
-
-  if (isBilling) {
-    columns.push({
-      key: 'balance', label: t('patients.colBalance'), width: 14,
-      render: (p) => {
-        const bal = balanceByPatient.get(p._id) || 0;
-        return bal > 0
-          ? <span className="text-[13px] font-bold whitespace-nowrap" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(bal)}</span>
-          : <span className="text-[12px]" style={{ color: 'var(--color-success)' }}>{t('billing.paidInFull')}</span>;
-      },
-    });
-  }
-
-  columns.push({
-    key: 'assigned', label: t('patients.colAssigned'), width: 12,
-    render: (p) => p.assignedDoctorName
-      ? <span className="text-[13px] block truncate" style={{ color: 'var(--ehr-muted, var(--text-secondary))' }}>{p.assignedDoctorName}</span>
-      : <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>—</span>,
-  });
-
-  // The whole row is clickable (navigates to the patient), so there is no bare
-  // chevron column. An action column is added only when the role actually has a
-  // row action — the reception "Assign to provider" button.
-  if (canAssignPatients) {
-    columns.push({
-      key: 'action', label: t('frontDesk.colAction'), width: 12, align: 'right',
+      key: 'registered', label: 'Registered', width: 15,
       render: (p) => (
-        <div className="flex items-center justify-end">
-          <RowActionsMenu
-            ariaLabel={t('frontDesk.colAction')}
-            actions={[
-              {
-                key: 'assign',
-                label: p.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign'),
-                icon: <Stethoscope className="w-4 h-4" />,
-                onClick: () => setAssignTarget({ patientId: p._id, patientName: patientFullName(p), hospitalNumber: p.hospitalNumber, currentDoctorId: p.assignedDoctor }),
-              },
-            ]}
-          />
+        <span className="patient-data-main">
+          <b>{formatRegistryDate(p.registeredAt || p.registrationDate)}</b>
+          <small>{p.lastConsultedAt ? `Last visit ${formatRegistryDate(p.lastConsultedAt)}` : 'No recent visit'}</small>
+        </span>
+      ),
+    },
+    {
+      key: 'careTeam', label: 'Care team', width: 22,
+      render: (p) => (
+        <span className="patient-data-main">
+          <b>{p.assignedDoctorName || 'Doctor unassigned'}</b>
+          <small>{p.assignedByName || 'Nurse unassigned'}</small>
+        </span>
+      ),
+    },
+    {
+      key: 'location', label: 'Location', width: 18,
+      render: (p) => (
+        <span className="patient-data-main">
+          <b>{[p.county, p.state].filter(Boolean).join(', ') || 'Location unknown'}</b>
+          <small>{facilityNameOf(p)}</small>
+        </span>
+      ),
+    },
+    {
+      key: 'status', label: 'Status', width: 15, align: 'right',
+      render: (p) => (
+        <div className="patient-data-status">
+          <span className={`appointment-status-pill ${p.isActive ? 'status-confirmed' : 'status-no-show'}`.trim()}>
+            {p.isActive ? 'Active' : 'Archived'}
+          </span>
+          <small>
+            {isBilling
+              ? ((balanceByPatient.get(p._id) || 0) > 0 ? formatMoney(balanceByPatient.get(p._id) || 0) : t('billing.paidInFull'))
+              : p.assignedDoctor ? 'Assigned' : 'Needs care team'}
+          </small>
+          {canAssignPatients && (
+            <RowActionsMenu
+              ariaLabel={t('frontDesk.colAction')}
+              actions={[
+                {
+                  key: 'assign',
+                  label: p.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign'),
+                  icon: <Stethoscope className="w-4 h-4" />,
+                  onClick: () => setAssignTarget({ patientId: p._id, patientName: patientFullName(p), hospitalNumber: p.hospitalNumber, currentDoctorId: p.assignedDoctor }),
+                },
+              ]}
+            />
+          )}
         </div>
       ),
-    });
-  }
+    },
+  ];
 
   const totalColWidth = columns.reduce((s, c) => s + c.width, 0);
 
@@ -441,8 +454,8 @@ export default function PatientsPage() {
                 </button>
               </div>
             </div>
-            <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
-              <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 880 }}>
+            <div className="show-scrollbar patient-data-scroll">
+              <table className="patient-data-table w-full">
                 <colgroup>
                   {columns.map(c => (
                     <col key={c.key} style={{ width: `${(c.width / totalColWidth * 100).toFixed(2)}%` }} />
@@ -453,11 +466,10 @@ export default function PatientsPage() {
                     {columns.map(c => (
                       <th
                         key={c.key}
-                        className={`${c.align === 'right' ? 'text-right' : 'text-left'} px-4 py-2.5`}
-                        style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}
+                        className={`${c.align === 'right' ? 'text-right' : 'text-left'} patient-data-head-cell`}
                       >
                         <div className={`flex items-center gap-1.5 ${c.align === 'right' ? 'justify-end' : ''}`}>
-                          <span className="text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">{c.label}</span>
+                          <span>{c.label}</span>
                         </div>
                       </th>
                     ))}
@@ -480,15 +492,14 @@ export default function PatientsPage() {
                       key={patient._id}
                       role="button"
                       tabIndex={0}
-                      className="group cursor-pointer transition-colors hover:bg-[var(--table-row-hover)]"
+                      className="patient-data-row group"
                       onClick={() => router.push(`/patients/${patient._id}`)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
-                      style={{ borderBottom: '1px solid var(--border-light)' }}
                     >
                       {columns.map((col, ci) => {
                         const isLast = ci === columns.length - 1;
                         return (
-                          <td key={col.key} className={`px-4 py-2.5 ${isLast ? 'relative' : ''}`}>
+                          <td key={col.key} className={`patient-data-cell ${col.align === 'right' ? 'is-right' : ''} ${isLast ? 'relative' : ''}`}>
                             {col.render(patient)}
                             {/* Subtle hover affordance: the whole row is clickable, so for roles
                                 without an explicit action button we fade in a chevron on hover. */}

@@ -329,11 +329,15 @@ export default function StateDashboardPage() {
               subtitle: t('state.countyStats', { births: c.birthCount, deaths: c.deathCount, anc: c.ancTotal }),
               careTeam: facilityCount > 0 ? `${facilityCount} facilit${facilityCount === 1 ? 'y' : 'ies'}` : undefined,
               careTeamLabel: 'Reporting facilities',
+              location: t('state.countyStats', { births: c.birthCount, deaths: c.deathCount, anc: c.ancTotal }),
+              locationSecondary: 'Monthly indicators',
               statusLabel: reportingCurrent === undefined ? undefined : reportingCurrent ? 'Current' : 'Behind',
+              statusSecondary: reportingCurrent === undefined ? 'No report' : thisMonth,
               statusTone: reportingCurrent === undefined ? undefined : reportingCurrent ? 'ready' : 'warning',
               time: c.lastReportAt
                 ? new Date(c.lastReportAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : undefined,
+              timeSecondary: c.lastReportAt ? c.lastReportAt.slice(0, 10) : 'No report',
             };
           })}
           metrics={[

@@ -1266,8 +1266,8 @@ export default function PatientDetailPage() {
                         <tr>
                           <th>Date</th>
                           <th>Time</th>
-                          <th>Provider</th>
-                          <th>Reason</th>
+                          <th>Care team</th>
+                          <th>Context</th>
                           <th>Status</th>
                         </tr>
                       </thead>
@@ -1276,8 +1276,18 @@ export default function PatientDetailPage() {
                           <tr key={appt._id}>
                             <td className="font-mono">{formatDate(appt.appointmentDate)}</td>
                             <td>{formatClockTime(appt.appointmentTime) || '—'}</td>
-                            <td>{appt.providerName || '—'}</td>
-                            <td>{appt.reason || appt.department || 'Follow-up'}</td>
+                            <td>
+                              <div className="appointment-card-provider">
+                                <strong>{appt.providerName || patient.assignedDoctorName || 'Doctor unassigned'}</strong>
+                                <span>{patient.assignedByName || 'Nurse unassigned'}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="appointment-card-provider">
+                                <strong>{appt.reason || appt.department || 'Follow-up'}</strong>
+                                <span>{appt.department || 'Appointment'}</span>
+                              </div>
+                            </td>
                             <td><span className="badge badge-normal text-[10px]">{appt.status}</span></td>
                           </tr>
                         ))}
@@ -1697,7 +1707,7 @@ export default function PatientDetailPage() {
                       <th>Date</th>
                       <th>Type</th>
                       <th>Chief Complaint</th>
-                      <th>Provider</th>
+                      <th>Care team</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -1713,7 +1723,12 @@ export default function PatientDetailPage() {
                         <td className="font-mono text-xs">{formatDateTime(rec.consultedAt || rec.visitDate)}</td>
                         <td className="text-xs uppercase">{rec.visitType || 'SOAP'}</td>
                         <td className="font-medium text-sm">{rec.chiefComplaint || 'Clinical encounter'}</td>
-                        <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{rec.providerName || '—'}</td>
+                        <td>
+                          <div className="appointment-card-provider">
+                            <strong>{rec.providerName || patient.assignedDoctorName || 'Clinician unassigned'}</strong>
+                            <span>{rec.department || rec.visitType || 'Encounter clinician'}</span>
+                          </div>
+                        </td>
                         <td><span className="badge badge-normal text-[10px]">Open</span></td>
                       </tr>
                     ))}
@@ -1805,8 +1820,8 @@ export default function PatientDetailPage() {
                     <tr>
                       <th>Date</th>
                       <th>Time</th>
-                      <th>Provider</th>
-                      <th>Reason</th>
+                      <th>Care team</th>
+                      <th>Context</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -1821,8 +1836,18 @@ export default function PatientDetailPage() {
                       <tr key={appt._id}>
                         <td className="font-mono text-xs">{formatDate(appt.appointmentDate)}</td>
                         <td>{formatClockTime(appt.appointmentTime) || '—'}</td>
-                        <td>{appt.providerName || '—'}</td>
-                        <td>{appt.reason || appt.department || 'Follow-up'}</td>
+                        <td>
+                          <div className="appointment-card-provider">
+                            <strong>{appt.providerName || patient.assignedDoctorName || 'Doctor unassigned'}</strong>
+                            <span>{patient.assignedByName || 'Nurse unassigned'}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="appointment-card-provider">
+                            <strong>{appt.reason || appt.department || 'Follow-up'}</strong>
+                            <span>{appt.department || 'Appointment'}</span>
+                          </div>
+                        </td>
                         <td><span className="badge badge-normal text-[10px]">{appt.status}</span></td>
                       </tr>
                     ))}
@@ -3056,14 +3081,24 @@ function PatientDemographicsView({
       {(activeTab === 'upcoming' || activeTab === 'past') && (
         <section className="tebra-demo-panel">
           <table className="tebra-demo-table">
-            <thead><tr><th>Date</th><th>Time</th><th>Provider</th><th>Reason</th><th>Status</th></tr></thead>
+            <thead><tr><th>Date</th><th>Time</th><th>Care team</th><th>Context</th><th>Status</th></tr></thead>
             <tbody>
               {(activeTab === 'upcoming' ? upcoming : past).length ? (activeTab === 'upcoming' ? upcoming : past).map(appt => (
                 <tr key={appt._id}>
                   <td>{formatDate(appt.appointmentDate)}</td>
                   <td>{formatClockTime(appt.appointmentTime) || '-'}</td>
-                  <td>{appt.providerName || '-'}</td>
-                  <td>{appt.reason || appt.department || '-'}</td>
+                  <td>
+                    <div className="appointment-card-provider">
+                      <strong>{appt.providerName || patient.assignedDoctorName || 'Doctor unassigned'}</strong>
+                      <span>{patient.assignedByName || 'Nurse unassigned'}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="appointment-card-provider">
+                      <strong>{appt.reason || appt.department || '-'}</strong>
+                      <span>{appt.department || 'Appointment'}</span>
+                    </div>
+                  </td>
                   <td>{appt.status}</td>
                 </tr>
               )) : (

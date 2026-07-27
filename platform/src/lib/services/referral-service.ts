@@ -8,6 +8,7 @@ import { assembleTransferPackage } from './transfer-service';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
+import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 /* istanbul ignore next -- private utility: org ID inference from hospital IDs */
 async function inferOrgId(fromHospitalId?: string, toHospitalId?: string): Promise<string | undefined> {
@@ -56,14 +57,14 @@ export async function createReferral(
   const db = referralsDB();
   const now = new Date().toISOString();
   const orgId = data.orgId || await inferOrgId(data.fromHospitalId, data.toHospitalId);
-  const doc: ReferralDoc = {
+  const doc: ReferralDoc = withPendingOfflineSync({
     _id: `ref-${uuidv4().slice(0, 8)}`,
     type: 'referral',
     ...data,
     orgId,
     createdAt: now,
     updatedAt: now,
-  } as ReferralDoc;
+  } as ReferralDoc, now);
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('CREATE_REFERRAL', undefined, undefined, `Referral ${doc._id}: patient ${doc.patientId} to ${doc.toHospital}`);
@@ -100,7 +101,7 @@ export async function createReferralWithTransfer(
   const db = referralsDB();
   const now = new Date().toISOString();
   const orgId = data.orgId || await inferOrgId(data.fromHospitalId, data.toHospitalId);
-  const doc: ReferralDoc = {
+  const doc: ReferralDoc = withPendingOfflineSync({
     _id: `ref-${uuidv4().slice(0, 8)}`,
     type: 'referral',
     ...data,
@@ -109,7 +110,7 @@ export async function createReferralWithTransfer(
     referralAttachments: referralAttachments.length > 0 ? referralAttachments : undefined,
     createdAt: now,
     updatedAt: now,
-  } as ReferralDoc;
+  } as ReferralDoc, now);
   const resp2 = await db.put(doc);
   doc._rev = resp2.rev;
   // Mirror the audit + sync hand-off from the plain createReferral path.
@@ -140,7 +141,7 @@ export async function updateReferralStatus(
   const db = referralsDB();
   try {
     const existing = await db.get(id) as ReferralDoc;
-    const updated = { ...existing, status, updatedAt: new Date().toISOString() };
+    const updated = withPendingOfflineSync({ ...existing, status, updatedAt: new Date().toISOString() });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_REFERRAL', undefined, undefined, `Referral ${id} status changed to ${status}`);
@@ -176,13 +177,13 @@ export async function completeReferralWithOutcome(
     const noteLine =
       `[${outcome.recordedAt.slice(0, 10)} ${outcome.recordedBy}] OUTCOME (${dispositionLabel}): ${outcome.summary}`
       + (outcome.followUp ? ` | Follow-up: ${outcome.followUp}` : '');
-    const updated: ReferralDoc = {
+    const updated: ReferralDoc = withPendingOfflineSync({
       ...existing,
       status: 'completed',
       outcome,
       notes: existing.notes ? `${existing.notes}\n\n${noteLine}` : noteLine,
       updatedAt: new Date().toISOString(),
-    };
+    } as ReferralDoc);
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_REFERRAL', undefined, undefined, `Referral ${id} completed with outcome (${outcome.disposition})`);
@@ -206,7 +207,7 @@ export async function updateReferralNotes(
 ): Promise<ReferralDoc> {
   const db = referralsDB();
   const existing = await db.get(id) as ReferralDoc;
-  const updated = { ...existing, notes, updatedAt: new Date().toISOString() };
+  const updated = withPendingOfflineSync({ ...existing, notes, updatedAt: new Date().toISOString() });
   const resp = await db.put(updated);
   updated._rev = resp.rev;
   await logAuditSafe('UPDATE_REFERRAL', undefined, undefined, `Referral ${id} notes updated`);
@@ -241,7 +242,7 @@ export async function recordReferralIntake(
   }
   const now = new Date().toISOString();
   const handover = referral.notes?.trim();
-  const doc: MedicalRecordDoc = {
+  const doc: MedicalRecordDoc = withPendingOfflineSync({
     _id: intakeId,
     type: 'medical_record',
     patientId: referral.patientId,
@@ -267,7 +268,7 @@ export async function recordReferralIntake(
     syncStatus: 'pending',
     createdAt: now,
     updatedAt: now,
-  } as MedicalRecordDoc;
+  } as MedicalRecordDoc, now);
   try {
     const resp = await db.put(doc);
     doc._rev = resp.rev;
@@ -362,7 +363,7 @@ export async function acceptReferral(referralId: string): Promise<ReferralDoc | 
     // Step 2: mark referral as seen. Runs after transfer succeeded (or the
     // transfer was a no-op due to missing fields). If this fails, the
     // patient is at the new facility and the user can re-run acceptance.
-    const updated = { ...referral, status: 'seen' as const, updatedAt: new Date().toISOString() };
+    const updated = withPendingOfflineSync({ ...referral, status: 'seen' as const, updatedAt: new Date().toISOString() });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
 

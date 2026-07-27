@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useANC } from '@/lib/hooks/useANC';
@@ -99,19 +100,15 @@ export default function ExecutiveBriefingPage() {
   return (
     <main className="page-container page-enter">
       <div className="dash-card mb-3">
-        <div className="px-4 pt-4 pb-3 flex items-end justify-between gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--border-light)' }}>
-          <div>
-            <span style={SECTION_TITLE_STYLE}>Executive briefing</span>
-            <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{today} · National</p>
-          </div>
-          <button
-            onClick={() => window.print()}
-            className="btn btn-secondary print-visible"
-            style={{ height: 36 }}
-          >
-            <Printer className="w-4 h-4" /> Print briefing
-          </button>
-        </div>
+        <EhrListHeader
+          title="Executive briefing"
+          stats={[{ label: 'As of', value: `${today} · National` }]}
+          actions={
+            <button onClick={() => window.print()} className="btn btn-secondary print-visible" style={{ height: 36 }}>
+              <Printer className="w-4 h-4" /> Print briefing
+            </button>
+          }
+        />
       </div>
 
       <Section heading="Situation overview">

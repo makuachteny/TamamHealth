@@ -9,8 +9,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { AuditLogDoc } from '@/lib/db-types';
+import EhrListHeader, { EhrListFilters, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import { FilterSelect } from '@/components/filters';
 import {
-  SaPage, SaCard, SaStat, SaPill, SaTable,
+  SaPage, SaCard, SaPill, SaTable,
   classifyAuditRisk, SEVERITY_TONE, formatWhen,
   type SaSeverity,
 } from '@/components/admin/sa-ui';
@@ -19,7 +21,6 @@ type RangeFilter = '24h' | '7d' | '30d' | 'all';
 type SuccessFilter = 'all' | 'success' | 'failure';
 type RiskFilter = 'all' | SaSeverity;
 
-const PAGE_SIZE = 50;
 const SEVERITIES: SaSeverity[] = ['critical', 'high', 'medium', 'low'];
 
 const RANGE_MS: Record<Exclude<RangeFilter, 'all'>, number> = {
@@ -42,7 +43,6 @@ export default function AuditLogsPage() {
   const [riskFilter, setRiskFilter] = useState<RiskFilter>('all');
   const [orgFilter, setOrgFilter] = useState<'all' | string>('all');
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -102,13 +102,6 @@ export default function AuditLogsPage() {
     });
   }, [inRange, successFilter, riskFilter, orgFilter, search]);
 
-  // Filters changed underneath the current page — snap back to page 1 rather
-  // than showing an empty page past the new result count.
-  useEffect(() => { setPage(0); }, [successFilter, riskFilter, orgFilter, search, range]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageRows = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-
   const exportCsv = () => {
     const header = ['timestamp', 'user', 'org', 'action', 'details', 'success', 'risk'];
     const lines = [header.join(',')];
@@ -134,58 +127,77 @@ export default function AuditLogsPage() {
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <SaPage title="Audit Logs" subtitle="Every recorded platform action, filterable and exportable for compliance evidence.">
-      <div className="sa-stat-strip">
-        <SaStat label="Events in range" value={stats.events} />
-        <SaStat label="Failures" value={stats.failures} tone={stats.failures ? 'danger' : 'muted'} />
-        <SaStat label="High-risk actions" value={stats.highRisk} tone={stats.highRisk ? 'warn' : 'muted'} />
-        <SaStat label="Distinct users" value={stats.users} />
-      </div>
+  const activeFilterCount =
+    (successFilter !== 'all' ? 1 : 0) +
+    (riskFilter !== 'all' ? 1 : 0) +
+    (orgFilter !== 'all' ? 1 : 0) +
+    (range !== '7d' ? 1 : 0);
 
-      <SaCard
-        title="Audit trail"
-        meta={`Page ${page + 1} of ${pageCount} · ${filtered.length} events`}
-        actions={
-          <>
-            <button type="button" className="sa-btn" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}>Prev</button>
-            <button type="button" className="sa-btn" disabled={page >= pageCount - 1} onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}>Next</button>
-            <button type="button" className="sa-btn primary" onClick={exportCsv}>Export evidence (CSV)</button>
-          </>
-        }
-      >
-        <div className="sa-filter-bar">
-          <input
-            type="search"
-            placeholder="Search action, user, or details…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <select value={successFilter} onChange={e => setSuccessFilter(e.target.value as SuccessFilter)}>
-            <option value="all">All results</option>
-            <option value="success">Success</option>
-            <option value="failure">Failure</option>
-          </select>
-          <select value={riskFilter} onChange={e => setRiskFilter(e.target.value as RiskFilter)}>
-            <option value="all">All risk</option>
-            {SEVERITIES.map(s => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
-          </select>
-          <select value={orgFilter} onChange={e => setOrgFilter(e.target.value)}>
-            <option value="all">All organizations</option>
-            {organizations.map(org => <option key={org._id} value={org._id}>{org.name}</option>)}
-          </select>
-          <select value={range} onChange={e => setRange(e.target.value as RangeFilter)}>
-            <option value="24h">Last 24h</option>
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-            <option value="all">All time</option>
-          </select>
-        </div>
+  return (
+    <SaPage>
+      <SaCard>
+        <EhrListHeader
+          title="Audit Logs"
+          stats={[
+            { label: 'Showing', value: `${filtered.length} of ${inRange.length}`, color: LIST_STAT_COLORS.muted },
+            { label: 'Failures', value: stats.failures, color: stats.failures ? 'var(--color-danger)' : LIST_STAT_COLORS.muted },
+            { label: 'High-risk actions', value: stats.highRisk, color: stats.highRisk ? 'var(--color-danger)' : LIST_STAT_COLORS.amber },
+            { label: 'Distinct users', value: stats.users, color: LIST_STAT_COLORS.muted },
+          ]}
+          search={{ value: search, onChange: setSearch, placeholder: 'Search action, user, or details…', ariaLabel: 'Search audit log' }}
+          actions={
+            <>
+              <EhrListFilters activeCount={activeFilterCount} onClear={() => { setSuccessFilter('all'); setRiskFilter('all'); setOrgFilter('all'); setRange('7d'); }}>
+                <FilterSelect
+                  label="Result"
+                  value={successFilter}
+                  onChange={value => setSuccessFilter(value as SuccessFilter)}
+                  neutralValue="all"
+                  size="sm"
+                  options={[{ value: 'all', label: 'All results' }, { value: 'success', label: 'Success' }, { value: 'failure', label: 'Failure' }]}
+                />
+                <FilterSelect
+                  label="Risk"
+                  value={riskFilter}
+                  onChange={value => setRiskFilter(value as RiskFilter)}
+                  neutralValue="all"
+                  size="sm"
+                  options={[{ value: 'all', label: 'All risk' }, ...SEVERITIES.map(s => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }))]}
+                />
+                <FilterSelect
+                  label="Organization"
+                  value={orgFilter}
+                  onChange={setOrgFilter}
+                  neutralValue="all"
+                  size="sm"
+                  options={[{ value: 'all', label: 'All organizations' }, ...organizations.map(org => ({ value: org._id, label: org.name }))]}
+                />
+                <FilterSelect
+                  label="Date range"
+                  value={range}
+                  onChange={value => setRange(value as RangeFilter)}
+                  neutralValue="7d"
+                  size="sm"
+                  options={[
+                    { value: '24h', label: 'Last 24h' },
+                    { value: '7d', label: 'Last 7 days' },
+                    { value: '30d', label: 'Last 30 days' },
+                    { value: 'all', label: 'All time' },
+                  ]}
+                />
+              </EhrListFilters>
+              <button type="button" className="sa-btn primary" onClick={exportCsv}>Export evidence (CSV)</button>
+            </>
+          }
+        />
+        {/* No pager: every matching event lives in one scroll area, and the
+            header's "Showing X of Y" chip states the count. */}
+        <div style={{ maxHeight: 620, overflowY: 'auto' }}>
         <SaTable
           columns={['When', 'User', 'Org', 'Action', 'Detail', 'Result', 'Risk']}
           empty={loading ? 'Loading audit logs…' : 'No audit events match these filters.'}
         >
-          {pageRows.map(({ log, risk }) => (
+          {filtered.map(({ log, risk }) => (
             <tr key={log._id}>
               <td>{formatWhen(log.createdAt)}</td>
               <td><strong>{log.username || log.userId || 'System'}</strong></td>
@@ -197,6 +209,7 @@ export default function AuditLogsPage() {
             </tr>
           ))}
         </SaTable>
+        </div>
       </SaCard>
     </SaPage>
   );

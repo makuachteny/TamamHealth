@@ -6,7 +6,8 @@ import { useToast } from '@/components/Toast';
 import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
-import { SaPage, SaCard, SaStat, SaTable, SaPill } from '@/components/admin/sa-ui';
+import { SaPage, SaCard, SaTable, SaPill } from '@/components/admin/sa-ui';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { ToggleLeft, ToggleRight } from '@/components/icons/lucide';
 
 type FlagKey = keyof OrganizationDoc['featureFlags'];
@@ -30,6 +31,7 @@ export default function AdminFlagsPage() {
   const { organizations, loading: orgsLoading, update: updateOrg } = useOrganizations();
 
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [matrixSearch, setMatrixSearch] = useState('');
 
   const globalFlagsOn = config
     ? (config.globalFeatureFlags.signupsEnabled ? 1 : 0) + (config.maintenanceMode ? 1 : 0)
@@ -69,6 +71,12 @@ export default function AdminFlagsPage() {
     }
   };
 
+  const filteredOrgs = useMemo(() => {
+    const q = matrixSearch.trim().toLowerCase();
+    if (!q) return organizations;
+    return organizations.filter(o => o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q));
+  }, [organizations, matrixSearch]);
+
   const toggleTenantFlag = async (org: OrganizationDoc, key: FlagKey, next: boolean) => {
     const cellKey = `${org._id}:${key}`;
     setSavingKey(cellKey);
@@ -83,16 +91,9 @@ export default function AdminFlagsPage() {
   };
 
   return (
-    <SaPage title="Feature Flags" subtitle="Platform-wide toggles and per-tenant feature enablement.">
+    <SaPage>
 
-      <div className="sa-stat-strip">
-        <SaStat label="Global flags on" value={configLoading ? '…' : globalFlagsOn} />
-        <SaStat label="Orgs total" value={orgsLoading ? '…' : organizations.length} />
-        <SaStat label="Orgs with all flags off" value={orgsLoading ? '…' : orgsWithAllFlagsOff} tone={orgsWithAllFlagsOff > 0 ? 'warn' : 'ok'} />
-        <SaStat label="Most-enabled flag" value={mostEnabledFlag ? mostEnabledFlag.label : '—'} note={mostEnabledFlag ? `${mostEnabledFlag.count} org${mostEnabledFlag.count === 1 ? '' : 's'}` : undefined} />
-      </div>
-
-      <SaCard title="Global platform flags">
+      <SaCard title="Feature Flags" meta={configLoading ? undefined : `${globalFlagsOn} of 2 on`}>
         {configLoading || !config ? (
           <p className="sa-empty">Loading…</p>
         ) : (
@@ -137,13 +138,22 @@ export default function AdminFlagsPage() {
         )}
       </SaCard>
 
-      <SaCard title="Per-tenant feature matrix">
+      <SaCard>
+        <EhrListHeader
+          title="Per-tenant feature matrix"
+          stats={[
+            { label: 'Orgs total', value: orgsLoading ? '…' : organizations.length, color: LIST_STAT_COLORS.muted },
+            { label: 'Orgs with all flags off', value: orgsLoading ? '…' : orgsWithAllFlagsOff, color: orgsWithAllFlagsOff > 0 ? LIST_STAT_COLORS.amber : LIST_STAT_COLORS.muted },
+            { label: mostEnabledFlag ? `Most enabled: ${mostEnabledFlag.label}` : 'Most enabled', value: mostEnabledFlag ? mostEnabledFlag.count : '—', color: LIST_STAT_COLORS.green },
+          ]}
+          search={{ value: matrixSearch, onChange: setMatrixSearch, placeholder: 'Search organizations…', ariaLabel: 'Search organizations' }}
+        />
         <SaTable
           columns={['Organization', ...TENANT_FLAGS.map(f => f.label)]}
-          empty={orgsLoading ? 'Loading organizations…' : 'No organizations found.'}
+          empty={orgsLoading ? 'Loading organizations…' : 'No organizations match this search.'}
           minWidth={880}
         >
-          {organizations.map(org => (
+          {filteredOrgs.map(org => (
             <tr key={org._id}>
               <td>
                 <strong>{org.name}</strong>{' '}

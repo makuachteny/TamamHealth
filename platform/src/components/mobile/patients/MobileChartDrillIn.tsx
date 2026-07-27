@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Loader2 } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
-import { patientFullName, patientInitials, patientGenderAge, avatarColor } from '@/lib/patient-utils';
+import { patientFullName, patientInitials, patientGenderAge, avatarTint } from '@/lib/patient-utils';
 import MobileFacesheetTab from './tabs/MobileFacesheetTab';
 import MobileVitalsTab from './tabs/MobileVitalsTab';
 import MobileMedicationsTab from './tabs/MobileMedicationsTab';
@@ -59,7 +59,7 @@ export default function MobileChartDrillIn({ patientId, onClose }: MobileChartDr
         <button type="button" onClick={onClose} aria-label="Back">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <span className="mobile-chart-header-avatar" style={{ background: avatarColor(patientFullName(patient)) }}>
+        <span className="mobile-chart-header-avatar" style={avatarTint(patientFullName(patient))}>
           {patientInitials(patient)}
         </span>
         <div className="mobile-chart-header-text">

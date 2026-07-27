@@ -13,28 +13,43 @@
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useUsers } from '@/lib/hooks/useUsers';
+import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SUPPORTED_LOCALES } from '@/lib/i18n';
 import { getUserPrefs, setUserPrefs } from '@/lib/user-prefs';
 import { hasLockPin, setLockPin, clearLockPin } from '@/lib/hooks/useAutoLock';
 import { getRoleConfig } from '@/lib/permissions';
+import { isPathAllowed } from '@/lib/role-routes';
 import {
   specForRole, getStoredRoleSettings, saveStoredRoleSettings,
   type RoleSettingsValues, type RoleSettingRow, type RoleSettingSection,
 } from '@/lib/role-settings';
-import { initials } from '@/lib/patient-utils';
+import { initials, avatarTint } from '@/lib/patient-utils';
 import { FacilitySettingsView } from '@/components/settings/FacilitySettingsView';
+import OrganizationSettingsPanel, { type OrganizationSettingsSection } from '@/components/settings/OrganizationSettingsPanel';
+import OrgBrandingPage from '@/app/(dashboard)/org-admin/branding/page';
+import OrgHospitalsPage from '@/app/(dashboard)/org-admin/hospitals/page';
+import OrgUsersPage from '@/app/(dashboard)/org-admin/users/page';
+import ServicePricingPage from '@/app/(dashboard)/org-admin/pricing/page';
+import ManagementSettingsPage from '@/app/(dashboard)/settings/manage/page';
+import {
+  SYSTEM_ADMIN_SECTIONS_META,
+  systemAdminSectionCount,
+  useSystemAdminConfig,
+  SystemAdminSectionContent,
+  SystemAdminEditorModal,
+  SystemAdminStyles,
+} from '@/components/settings/SystemAdminSections';
 import { getDhis2SyncLog, isDhis2Configured, type Dhis2SyncLogDoc } from '@/lib/services/dhis2-sync-log-service';
 import {
   AlertTriangle, Bell, BedDouble, Building2, Check, ChevronRight, Clock, CreditCard,
-  FileText, FlaskConical, KeyRound, List, Lock, Pencil, Pill, Plus, RefreshCw,
-  Shield, Stethoscope, Trash2, User, Users, type LucideIcon,
+  FileText, FlaskConical, KeyRound, List, Lock, Palette, Pencil, Pill, Plus, RefreshCw,
+  Settings, Shield, Stethoscope, Trash2, User, Users, Zap, type LucideIcon,
 } from '@/components/icons/lucide';
 
 const SECTION_ICONS: Record<string, LucideIcon> = {
@@ -67,16 +82,26 @@ function roleGroupTitle(role: string): string {
 const PERSONAL_IDS = new Set(['account', 'notifications', 'security']);
 /** Admin-spec sections replaced by real design-10 panels. */
 const ADMIN_REPLACED_IDS = new Set(['facility', 'users', 'integrations']);
+const ORG_SETTINGS_PANEL_IDS = new Set([
+  'org-profile',
+  'org-subscription',
+  'org-security',
+  'org-modules',
+  'org-branding',
+  'org-facilities',
+  'org-people',
+  'org-billing',
+]);
 
 type NavItem = { id: string; label: string; icon: LucideIcon; badge?: string };
 type NavGroup = { title: string; items: NavItem[] };
 
 export default function RoleSettingsView() {
-  const router = useRouter();
   const { currentUser, isOnline, syncPaused, lastSync } = useApp();
   const { showToast } = useToast();
   const { canManageUsers, canAccess } = usePermissions();
   const { users, update: updateUser } = useUsers();
+  const { hospitals } = useHospitals();
   const { locale, setLocale } = useTranslation();
 
   const spec = useMemo(() => (currentUser ? specForRole(currentUser.role) : null), [currentUser]);
@@ -114,6 +139,18 @@ export default function RoleSettingsView() {
     [draft, baseline],
   );
 
+  const buildDefaultSettings = (): RoleSettingsValues => {
+    if (!spec || !currentUser) return {};
+    const defaults: RoleSettingsValues = {};
+    for (const section of spec.sections) {
+      for (const row of section.rows) {
+        if (row.kind !== 'toggle' && row.kind !== 'select' && row.kind !== 'text') continue;
+        defaults[row.key] = rowDefault(row, wired) as boolean | string;
+      }
+    }
+    return defaults;
+  };
+
   const [activePanel, setActivePanel] = useState<string>('account');
   const [saving, setSaving] = useState(false);
 
@@ -125,6 +162,11 @@ export default function RoleSettingsView() {
   const [pinForm, setPinForm] = useState({ next: '', confirm: '' });
   const [pinIsSet, setPinIsSet] = useState(false);
   const [pinSaving, setPinSaving] = useState(false);
+
+  // ── Update-account popup (gear on the My account header) ──
+  const [acctOpen, setAcctOpen] = useState(false);
+  const [acctName, setAcctName] = useState('');
+  const [acctSaving, setAcctSaving] = useState(false);
   useEffect(() => { setPinIsSet(hasLockPin()); }, [pinOpen]);
 
   // ── Integration status (real: DHIS2 push log + offline sync state) ──
@@ -140,6 +182,15 @@ export default function RoleSettingsView() {
     () => Boolean(spec?.sections.some(section => section.id === 'clinical' && section.title === 'Clinical policy')),
     [spec],
   );
+
+  // ── System administration (design-10 console, embedded lean) ──
+  // Reachable both from the main nav (the standalone /system-admin console)
+  // and here — same shared components (SystemAdminSections.tsx), so there's
+  // one source of truth for the apps/extensions/privileges/metadata/
+  // properties logic. Gated on the role's real route table, same as the
+  // console itself, not a separate permission check.
+  const showSystemAdmin = Boolean(currentUser && isPathAllowed(currentUser.role, '/system-admin'));
+  const sysAdminData = useSystemAdminConfig(showSystemAdmin);
 
   const navGroups = useMemo<NavGroup[]>(() => {
     if (!spec || !currentUser) return [];
@@ -157,16 +208,57 @@ export default function RoleSettingsView() {
       .map(section => ({ id: section.id, label: section.title, icon: SECTION_ICONS[section.icon] || User }));
     if (roleItems.length > 0) groups.push({ title: roleGroupTitle(currentUser.role), items: roleItems });
 
+    // Org admins manage org-level preferences here instead of a separate
+    // nav destination (the old /org-admin/settings page redirects here).
+    if (currentUser.role === 'org_admin') {
+      groups.push({
+        title: 'Organization',
+        items: [
+          { id: 'org-profile', label: 'Profile', icon: Building2 },
+          { id: 'org-subscription', label: 'Subscription & limits', icon: CreditCard },
+          { id: 'org-branding', label: 'Branding', icon: Palette },
+          { id: 'org-modules', label: 'Modules & features', icon: Zap },
+        ],
+      });
+      groups.push({
+        title: 'Operations setup',
+        items: [
+          { id: 'org-facilities', label: 'Facilities', icon: Building2, badge: hospitals.length ? String(hospitals.length) : undefined },
+          ...(showFacility ? [{ id: 'facility-config', label: 'Facility configuration', icon: Stethoscope }] : []),
+          { id: 'org-people', label: 'People & access', icon: Users, badge: users.length ? String(users.length) : undefined },
+        ],
+      });
+      groups.push({
+        title: 'Finance setup',
+        items: [
+          { id: 'org-billing', label: 'Billing & pricing', icon: CreditCard },
+        ],
+      });
+      groups.push({
+        title: 'Security & policy',
+        items: [
+          { id: 'org-security', label: 'Security policy', icon: Shield },
+          { id: 'restricted', label: 'Restricted actions', icon: AlertTriangle },
+        ],
+      });
+      groups.push({
+        title: 'System',
+        items: [
+          { id: 'integrations-live', label: 'Integrations & sync', icon: RefreshCw },
+        ],
+      });
+    }
+
     if (isAdminSpec || showFacility || canManageUsers) {
       const facilityItems: NavItem[] = [];
-      if (showFacility) facilityItems.push({ id: 'facility-editor', label: 'Facility settings', icon: Building2 });
+      if (showFacility && currentUser.role !== 'org_admin') facilityItems.push({ id: 'facility-editor', label: 'Facility settings', icon: Building2 });
       const clinical = spec.sections.find(s => s.id === 'clinical');
       if (isAdminSpec && clinical) facilityItems.push({ id: 'clinical', label: clinical.title, icon: Stethoscope });
       const reporting = spec.sections.find(s => s.id === 'reporting');
       if (isAdminSpec && reporting) facilityItems.push({ id: 'reporting', label: reporting.title, icon: FileText });
       if (facilityItems.length > 0) groups.push({ title: 'Facility', items: facilityItems });
 
-      if (canManageUsers) {
+      if (canManageUsers && currentUser.role !== 'org_admin') {
         groups.push({
           title: 'People & access',
           items: [
@@ -175,7 +267,7 @@ export default function RoleSettingsView() {
           ],
         });
       }
-      if (isAdminSpec) {
+      if (isAdminSpec && currentUser.role !== 'org_admin') {
         groups.push({
           title: 'System',
           items: [
@@ -185,8 +277,20 @@ export default function RoleSettingsView() {
         });
       }
     }
+
+    if (showSystemAdmin) {
+      groups.push({
+        title: 'System administration',
+        items: SYSTEM_ADMIN_SECTIONS_META.map(section => ({
+          id: `sysadmin-${section.id}`,
+          label: section.label,
+          icon: section.icon,
+          badge: String(systemAdminSectionCount(section.id, sysAdminData)),
+        })),
+      });
+    }
     return groups;
-  }, [spec, currentUser, isAdminSpec, showFacility, canManageUsers, users.length]);
+  }, [spec, currentUser, isAdminSpec, showFacility, canManageUsers, users.length, hospitals.length, showSystemAdmin, sysAdminData]);
 
   if (!currentUser || !spec) return null;
 
@@ -222,6 +326,15 @@ export default function RoleSettingsView() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetSettings = () => {
+    if (!window.confirm('Reset all settings on this device to their defaults?')) return;
+    const defaults = buildDefaultSettings();
+    saveStoredRoleSettings(currentUser._id, {});
+    setDraft(defaults);
+    setBaseline(defaults);
+    showToast('Settings reset', 'success');
   };
 
   const handleChangePassword = async () => {
@@ -264,7 +377,7 @@ export default function RoleSettingsView() {
   };
 
   const handleNav = (id: string) => {
-    if (id === 'manage-link') { router.push('/settings/manage'); return; }
+    if (id === 'manage-link') { setActivePanel('manage-screen'); return; }
     setActivePanel(id);
   };
 
@@ -364,7 +477,7 @@ export default function RoleSettingsView() {
           <h3>Users &amp; roles</h3>
           <small>{users.filter(u => u.isActive).length} active · {users.filter(u => !u.isActive).length} inactive</small>
         </div>
-        <button type="button" className="ehr-set-btn primary" style={{ minHeight: 30, padding: '0 13px', fontSize: 12 }} onClick={() => router.push('/settings/manage')}>
+        <button type="button" className="ehr-set-btn primary" style={{ minHeight: 30, padding: '0 13px', fontSize: 12 }} onClick={() => setActivePanel('manage-screen')}>
           <Plus /> Invite user
         </button>
       </div>
@@ -377,7 +490,7 @@ export default function RoleSettingsView() {
           return (
             <div key={user._id} className="ehr-set-user-row">
               <div className="ehr-set-user-id">
-                <span style={{ background: userSpec.accent }}>{initials(user.name)}</span>
+                <span style={avatarTint(user.name)}>{initials(user.name)}</span>
                 <div>
                   <b>{user.name}</b>
                   <small>{user.username}</small>
@@ -391,10 +504,10 @@ export default function RoleSettingsView() {
                 </i>
               </span>
               <span className="ehr-set-user-actions">
-                <button type="button" className="ehr-queue-action" title="Edit in user management" onClick={() => router.push('/settings/manage')}>
+                <button type="button" className="ehr-queue-action" title="Edit in user management" onClick={() => setActivePanel('manage-screen')}>
                   <Pencil className="w-4 h-4" />
                 </button>
-                <button type="button" className="ehr-queue-action" title="Reset password in user management" onClick={() => router.push('/settings/manage')}>
+                <button type="button" className="ehr-queue-action" title="Reset password in user management" onClick={() => setActivePanel('manage-screen')}>
                   <KeyRound className="w-4 h-4" />
                 </button>
               </span>
@@ -474,8 +587,8 @@ export default function RoleSettingsView() {
         {
           label: 'Merge duplicate patient records',
           hint: 'Review suspected duplicates in the patient registry. Merges are audited and cannot be undone.',
-          action: 'Review patients',
-          onClick: () => router.push('/patients'),
+          action: 'Not available here',
+          onClick: () => showToast('Patient merge review opens from the patient registry, not from Settings.', 'error'),
         },
         {
           label: 'Export the full patient database',
@@ -487,11 +600,7 @@ export default function RoleSettingsView() {
           label: 'Reset settings on this device',
           hint: 'Restores every preference on this page to its default. Facility data is untouched.',
           action: 'Reset',
-          onClick: () => {
-            if (!window.confirm('Reset all settings on this device to their defaults?')) return;
-            saveStoredRoleSettings(currentUser._id, {});
-            window.location.reload();
-          },
+          onClick: handleResetSettings,
         },
       ].map(row => (
         <div key={row.label} className="ehr-set-row">
@@ -506,10 +615,61 @@ export default function RoleSettingsView() {
   );
 
   const renderPanel = (): ReactNode => {
-    if (activePanel === 'facility-editor') {
+    if (activePanel === 'facility-editor' || activePanel === 'facility-config') {
       return (
         <section className="ehr-set-section ehr-set-embed">
           <FacilitySettingsView embedded />
+        </section>
+      );
+    }
+    if (ORG_SETTINGS_PANEL_IDS.has(activePanel)) {
+      const section = activePanel.replace(/^org-/, '') as OrganizationSettingsSection;
+      return (
+        <section className="ehr-set-section org-set-wrapper">
+          <OrganizationSettingsPanel section={section} users={users} hospitals={hospitals} onNavigate={setActivePanel} />
+        </section>
+      );
+    }
+    if (activePanel === 'org-branding-editor') {
+      return (
+        <section className="ehr-set-section settings-embedded-page">
+          <OrgBrandingPage />
+        </section>
+      );
+    }
+    if (activePanel === 'org-facilities-editor') {
+      return (
+        <section className="ehr-set-section settings-embedded-page">
+          <OrgHospitalsPage />
+        </section>
+      );
+    }
+    if (activePanel === 'org-people-editor') {
+      return (
+        <section className="ehr-set-section settings-embedded-page">
+          <OrgUsersPage />
+        </section>
+      );
+    }
+    if (activePanel === 'org-billing-editor') {
+      return (
+        <section className="ehr-set-section settings-embedded-page">
+          <ServicePricingPage />
+        </section>
+      );
+    }
+    if (activePanel === 'manage-screen') {
+      return (
+        <section className="ehr-set-section settings-embedded-page">
+          <ManagementSettingsPage />
+        </section>
+      );
+    }
+    if (activePanel.startsWith('sysadmin-')) {
+      const sectionId = activePanel.slice('sysadmin-'.length) as typeof SYSTEM_ADMIN_SECTIONS_META[number]['id'];
+      return (
+        <section className="ehr-set-section ehr-set-embed">
+          <SystemAdminSectionContent sectionId={sectionId} data={sysAdminData} showLocalFilter />
         </section>
       );
     }
@@ -519,6 +679,33 @@ export default function RoleSettingsView() {
     const section = spec.sections.find(s => s.id === activePanel) || spec.sections[0];
     return (
       <>
+        {section.id === 'account' && (
+          <section className="ehr-set-section">
+            <div className="ehr-set-account-head">
+              <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+                <b>{currentUser.name}</b>
+                <small>{currentUser.username}</small>
+              </div>
+              <button
+                type="button"
+                className="ehr-set-account-gear"
+                title="Update account"
+                aria-label="Update account"
+                onClick={() => { setAcctName(currentUser.name || ''); setAcctOpen(true); }}
+              >
+                <Settings />
+              </button>
+            </div>
+            <div className="ehr-set-account-rows">
+              {identityRows.map(row => (
+                <div key={row.label}>
+                  <span>{row.label}</span>
+                  <b title={row.value}>{row.value}</b>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         {section.id === 'account' && (
           <div className="ehr-set-scope-grid">
             <div className="ehr-set-scope">
@@ -539,6 +726,17 @@ export default function RoleSettingsView() {
   };
 
   const userInitials = initials(currentUser.name || spec.title);
+  const isNavActive = (id: string) => {
+    if (activePanel === id) return true;
+    const editorParent: Record<string, string> = {
+      'org-branding-editor': 'org-branding',
+      'org-facilities-editor': 'org-facilities',
+      'org-people-editor': 'org-people',
+      'org-billing-editor': 'org-billing',
+      'manage-screen': 'manage-link',
+    };
+    return editorParent[activePanel] === id;
+  };
 
   return (
     <div className="ehr-schedule-shell ehr-set-shell">
@@ -569,28 +767,8 @@ export default function RoleSettingsView() {
       </section>
 
       <section className="ehr-set-grid">
-        {/* ── Left rail: identity + grouped nav (drives the body) ── */}
+        {/* ── Left rail: grouped nav only — identity lives in My account ── */}
         <aside className="ehr-set-rail">
-          <div className="ehr-set-identity">
-            <div className="ehr-set-identity-body">
-              <div className="ehr-set-identity-head">
-                <span style={{ background: spec.accent }}>{userInitials}</span>
-                <div style={{ minWidth: 0 }}>
-                  <b>{currentUser.name}</b>
-                  <small>{currentUser.username}{currentUser.hospitalName ? ` · ${currentUser.hospitalName}` : ''}</small>
-                </div>
-              </div>
-              <div className="ehr-set-identity-rows">
-                {identityRows.map(row => (
-                  <div key={row.label}>
-                    <span>{row.label}</span>
-                    <b title={row.value}>{row.value}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
           <nav className="ehr-set-nav" aria-label="Settings sections">
             {navGroups.map(group => (
               <div key={group.title} className="ehr-set-nav-group">
@@ -601,7 +779,7 @@ export default function RoleSettingsView() {
                     <button
                       key={item.id}
                       type="button"
-                      className={activePanel === item.id ? 'active' : undefined}
+                      className={isNavActive(item.id) ? 'active' : undefined}
                       onClick={() => handleNav(item.id)}
                     >
                       <Icon />
@@ -620,6 +798,80 @@ export default function RoleSettingsView() {
           {renderPanel()}
         </main>
       </section>
+
+      {/* ── Update-account popup: edit the display name, then jump to the
+             password / screen-lock actions without leaving Settings. ── */}
+      {acctOpen && (
+        <Modal onClose={() => setAcctOpen(false)} width={420}>
+          <div className="ehr-handoff-modal" role="dialog" aria-modal="true" aria-label="Update account">
+            <div className="ehr-handoff-head">
+              <div className="ehr-handoff-head-title">
+                <User />
+                <div>
+                  <h2>Update account</h2>
+                  <p>{currentUser.username}</p>
+                </div>
+              </div>
+              <div className="ehr-handoff-head-actions">
+                <button type="button" className="ehr-handoff-close" aria-label="Close" onClick={() => setAcctOpen(false)}>✕</button>
+              </div>
+            </div>
+            <div className="ehr-handoff-body">
+              <div>
+                <label className="ehr-handoff-label">Display name</label>
+                <input
+                  type="text"
+                  className="ehr-handoff-input"
+                  autoComplete="name"
+                  value={acctName}
+                  onChange={e => setAcctName(e.target.value)}
+                />
+              </div>
+              {identityRows.filter(row => row.label !== 'Username').map(row => (
+                <div key={row.label} className="ehr-set-acct-readonly">
+                  <span>{row.label}</span>
+                  <b title={row.value}>{row.value}</b>
+                </div>
+              ))}
+              <p className="ehr-set-acct-note">
+                Role and facility are assigned by an administrator and can&rsquo;t be changed here.
+              </p>
+              <button
+                type="button"
+                className="ehr-handoff-btn primary"
+                disabled={acctSaving || !acctName.trim() || acctName.trim() === currentUser.name}
+                onClick={async () => {
+                  const next = acctName.trim();
+                  setAcctSaving(true);
+                  try {
+                    await updateUser(currentUser._id, { name: next }, currentUser._id, currentUser.username);
+                    // Keep the settings draft in step so the name row doesn't
+                    // show the old value or read as an unsaved change.
+                    setDraft(prev => ({ ...prev, 'account.displayName': next }));
+                    setBaseline(prev => ({ ...prev, 'account.displayName': next }));
+                    showToast('Account updated', 'success');
+                    setAcctOpen(false);
+                  } catch {
+                    showToast('Failed to update account', 'error');
+                  } finally {
+                    setAcctSaving(false);
+                  }
+                }}
+              >
+                {acctSaving ? 'Saving…' : 'Save changes'}
+              </button>
+              <div className="ehr-set-acct-actions">
+                <button type="button" className="ehr-handoff-btn" onClick={() => { setAcctOpen(false); setPwOpen(true); }}>
+                  <KeyRound /> Change password
+                </button>
+                <button type="button" className="ehr-handoff-btn" onClick={() => { setAcctOpen(false); setPinOpen(true); }}>
+                  <Lock /> {pinIsSet ? 'Change screen-lock PIN' : 'Set screen-lock PIN'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* ── Change password popup ── */}
       {pwOpen && (
@@ -706,6 +958,11 @@ export default function RoleSettingsView() {
           </div>
         </Modal>
       )}
+
+      {/* ── System administration: inline editor (global properties / no-page
+          "configurable" notes) — shared with the standalone /system-admin console ── */}
+      {showSystemAdmin && <SystemAdminEditorModal data={sysAdminData} />}
+      {showSystemAdmin && <SystemAdminStyles />}
     </div>
   );
 }

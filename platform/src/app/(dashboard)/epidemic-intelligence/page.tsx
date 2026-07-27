@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import TopBar from '@/components/TopBar';
+import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { useEpidemicIntelligence } from '@/lib/hooks/useEpidemicIntelligence';
 import {
   Activity, AlertTriangle, TrendingUp,
@@ -62,7 +62,6 @@ export default function EpidemicIntelligencePage() {
   if (loading || !data) {
     return (
       <>
-        <TopBar title={t('epidemic.pageTitle')} />
         <main className="page-container flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'transparent' }}>
@@ -119,24 +118,30 @@ export default function EpidemicIntelligencePage() {
 
   return (
     <>
-      <TopBar title={t('epidemic.pageTitle')} actions={
-        <>
-          <div className="px-4 py-2 rounded-xl flex items-center gap-2" style={{
-            background: risk.bg,
-            border: `1px solid ${risk.border}`,
-          }}>
-            <Shield className="w-4 h-4" style={{ color: risk.text }} />
-            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: risk.text }}>
-              {t('epidemic.riskSuffix', { level: summary.overallRiskLevel })}
-            </span>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('epidemic.idsrWeek')}</p>
-            <p className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{idsrReport.reportingWeek}</p>
-          </div>
-        </>
-      } />
       <main className="page-container page-enter">
+
+        <div className="dash-card mb-4">
+          <EhrListHeader
+            title={t('epidemic.pageTitle')}
+            actions={
+              <>
+                <div className="px-4 py-2 rounded-xl flex items-center gap-2" style={{
+                  background: risk.bg,
+                  border: `1px solid ${risk.border}`,
+                }}>
+                  <Shield className="w-4 h-4" style={{ color: risk.text }} />
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: risk.text }}>
+                    {t('epidemic.riskSuffix', { level: summary.overallRiskLevel })}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('epidemic.idsrWeek')}</p>
+                  <p className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{idsrReport.reportingWeek}</p>
+                </div>
+              </>
+            }
+          />
+        </div>
 
         {/* ═══ KPI STRIP ═══ */}
         <div className="kpi-grid mb-4">

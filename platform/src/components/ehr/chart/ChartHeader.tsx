@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
 import { Icon as DuotoneIcon } from '@/components/icons';
 import { Stethoscope } from '@/components/icons/lucide';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { patientFullName, patientInitials, patientAgeLabel, avatarColor } from '@/lib/patient-utils';
+import { patientFullName, patientInitials, patientAgeLabel, avatarTint } from '@/lib/patient-utils';
 import type { PatientDoc } from '@/lib/db-types';
 
 /** dd-MMM-yyyy, e.g. "17-Jun-1990" — the OpenMRS convention, distinct from
@@ -69,7 +69,7 @@ export default function ChartHeader({
     <div className="omrs-header">
       <div
         className="omrs-avatar"
-        style={{ background: avatarColor(patientFullName(patient)) }}
+        style={avatarTint(patientFullName(patient))}
         aria-hidden
       >
         {photoUrl ? (

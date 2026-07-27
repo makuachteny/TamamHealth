@@ -9,6 +9,7 @@ import {
   Copy, Check, RefreshCw, ShieldCheck, Filter,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
+import { avatarTint } from '@/lib/patient-utils';
 import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { FilterSelect } from '@/components/filters';
 import EmptyState from '@/components/EmptyState';
@@ -117,6 +118,12 @@ export default function OrgUsersPage() {
   }, [currentUser]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Deep link: /org-admin/users?new=1 opens the create-user modal directly
+  // (used by the facility dashboard's Add-user button).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('new')) setShowCreateModal(true);
+  }, []);
 
   const ROLES_WITHOUT_HOSPITAL: UserRole[] = ['super_admin', 'org_admin', 'government'];
   const needsHospital = !ROLES_WITHOUT_HOSPITAL.includes(formRole);
@@ -362,39 +369,29 @@ export default function OrgUsersPage() {
             }
           />
 
-          <div className="px-4 pt-3 pb-1 flex items-center justify-end flex-shrink-0">
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              {t('orgUsers.showingCount', { shown: filteredUsers.length, total: users.length })}
-            </span>
-          </div>
-
-          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {/* Same list anatomy as the appointments page: card-list wrapper,
+              compact column head, card rows. */}
+          <div className="appointment-card-list">
             {filteredUsers.length === 0 ? (
               <EmptyState icon={Users} title={t('orgUsers.heading')} message={t('orgUsers.noUsersFound')} />
             ) : (
-              <div style={{ minWidth: 640, padding: '0 12px 12px' }}>
-                {/* Column header — aligned to the card grid below */}
-                <div
-                  className="grid items-center px-3 py-2.5 sticky top-0 z-10"
-                  style={{ gridTemplateColumns: USER_GRID, gap: 8, background: 'var(--bg-card-solid)' }}
-                >
-                  {[t('orgUsers.colName'), t('orgUsers.colRole'), t('orgUsers.colHospital'), t('orgUsers.colStatus'), ''].map((h, i) => (
-                    <div key={i} className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</div>
-                  ))}
+              <>
+                <div className="appointment-card-head" aria-hidden="true" style={{ gridTemplateColumns: USER_GRID }}>
+                  <span>{t('orgUsers.colName')}</span>
+                  <span>{t('orgUsers.colRole')}</span>
+                  <span>{t('orgUsers.colHospital')}</span>
+                  <span>{t('orgUsers.colStatus')}</span>
+                  <span />
                 </div>
-
-                {/* Card rows — same anatomy as the appointments list: square
-                    avatar · 14/800 name · pill columns · status pill. */}
-                <div className="flex flex-col" style={{ gap: 8 }}>
-                  {filteredUsers.map(user => (
+                {filteredUsers.map(user => (
                     <div
                       key={user._id}
-                      className="ehr-appointment-row"
+                      className="ehr-appointment-row appointment-card-row"
                       style={{ gridTemplateColumns: USER_GRID, cursor: 'default' }}
                     >
                       {/* User: square avatar + name/username */}
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="ehr-patient-icon">
+                        <div className="ehr-patient-icon" style={avatarTint(user.name)}>
                           {user.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'}
                         </div>
                         <div className="min-w-0">
@@ -403,21 +400,20 @@ export default function OrgUsersPage() {
                         </div>
                       </div>
 
-                      {/* Role — department-style pill, uniform for every role */}
-                      <div className="min-w-0">
-                        <span className="ehr-department-pill" style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {roleLabel(user.role)}
-                        </span>
+                      {/* Role — value + scope, matching the shared row hierarchy. */}
+                      <div className="appointment-card-provider">
+                        <strong>{roleLabel(user.role)}</strong>
+                        <span>{user.department || user.specialty || 'Access role'}</span>
                       </div>
 
-                      {/* Facility — value + label, like the Care team column */}
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-bold truncate" style={{ color: 'var(--ehr-text, var(--text-primary))' }}>{user.hospitalName || '—'}</div>
-                        <div className="text-[11px]" style={{ color: 'var(--ehr-muted, var(--text-muted))' }}>{t('orgUsers.colHospital')}</div>
+                      {/* Facility — value + label, like the Context column. */}
+                      <div className="appointment-card-provider">
+                        <strong>{user.hospitalName || 'Facility unassigned'}</strong>
+                        <span>{t('orgUsers.colHospital')}</span>
                       </div>
 
                       {/* Status pill — shared appointment pill metrics */}
-                      <div>
+                      <div className="appointment-card-status">
                         <span
                           className="appointment-status-pill"
                           style={user.isActive
@@ -426,6 +422,7 @@ export default function OrgUsersPage() {
                         >
                           {user.isActive ? t('orgUsers.statusActive') : t('orgUsers.statusInactive')}
                         </span>
+                        <small>{user.mustChangePassword ? 'Password reset required' : 'Credentials current'}</small>
                       </div>
 
                       {/* Edit / row actions */}
@@ -440,9 +437,8 @@ export default function OrgUsersPage() {
                         />
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                ))}
+              </>
             )}
           </div>
         </div>

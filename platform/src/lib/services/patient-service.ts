@@ -9,6 +9,7 @@ import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
 import { getSettings } from '../settings/settings-store';
 import { normalizePhone, normalizeEmail, normalizeNationalId } from '../field-formats';
+import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 /**
  * Canonicalize contact/identity fields before validation + storage so every
@@ -205,7 +206,7 @@ export async function createPatient(rawData: Omit<PatientDoc, '_id' | '_rev' | '
   const id = `pat-${uuidv4().slice(0, 8)}`;
   const hospitalNumber = data.hospitalNumber || await generateHospitalNumber(data.registrationHospital);
   const orgId = data.orgId || await inferOrgIdFromHospital(data.registrationHospital);
-  const doc: PatientDoc = {
+  const doc: PatientDoc = withPendingOfflineSync({
     _id: id,
     type: 'patient',
     ...data,
@@ -214,7 +215,7 @@ export async function createPatient(rawData: Omit<PatientDoc, '_id' | '_rev' | '
     registeredAt: data.registeredAt || now,
     createdAt: now,
     updatedAt: now,
-  } as PatientDoc;
+  } as PatientDoc, now);
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('CREATE_PATIENT', undefined, undefined, `Created patient ${doc._id}: ${data.firstName} ${data.surname} (${hospitalNumber})`);
@@ -244,14 +245,14 @@ export async function updatePatient(id: string, rawData: Partial<PatientDoc>): P
     throw err;
   }
   const inferredOrg = data.orgId || existing.orgId || await inferOrgIdFromHospital(data.registrationHospital || existing.registrationHospital);
-  const updated = {
+  const updated = withPendingOfflineSync({
     ...existing,
     ...data,
     orgId: inferredOrg,
     _id: existing._id,
     _rev: existing._rev,
     updatedAt: new Date().toISOString(),
-  };
+  } as PatientDoc);
   // Validate the merged document, but only *block* on errors for fields the
   // caller is actually writing. Full-document validation here used to reject
   // any partial update to a record with pre-existing gaps (e.g. legacy/seed
@@ -319,13 +320,13 @@ export async function mutatePatient(
     }
     const patch = mutate(existing);
     if (patch === null) return existing;
-    const updated = {
+    const updated = withPendingOfflineSync({
       ...existing,
       ...patch,
       _id: existing._id,
       _rev: existing._rev,
       updatedAt: new Date().toISOString(),
-    } as PatientDoc;
+    } as PatientDoc);
     const errors = validatePatientData(updated as unknown as Record<string, unknown>);
     if (Object.keys(errors).length > 0) {
       throw new ValidationError(errors);
@@ -386,11 +387,11 @@ export async function archivePatient(id: string, actor?: string): Promise<Patien
   } catch {
     return null;
   }
-  const updated: PatientDoc = {
+  const updated: PatientDoc = withPendingOfflineSync({
     ...existing,
     isActive: false,
     updatedAt: new Date().toISOString(),
-  };
+  });
   const resp = await db.put(updated);
   updated._rev = resp.rev;
   await logAuditSafe('ARCHIVE_PATIENT', undefined, actor, `Archived patient ${id}`);
@@ -414,11 +415,11 @@ export async function unarchivePatient(id: string, actor?: string): Promise<Pati
   } catch {
     return null;
   }
-  const updated: PatientDoc = {
+  const updated: PatientDoc = withPendingOfflineSync({
     ...existing,
     isActive: true,
     updatedAt: new Date().toISOString(),
-  };
+  });
   const resp = await db.put(updated);
   updated._rev = resp.rev;
   await logAuditSafe('UNARCHIVE_PATIENT', undefined, actor, `Restored patient ${id}`);

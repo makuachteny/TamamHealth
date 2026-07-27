@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, ChevronRight, X } from '@/components/icons/lucide';
+import { Eye, EyeOff, ChevronRight, X, WifiOff, Users, BarChart3 } from '@/components/icons/lucide';
 import { Icon } from '@/components/icons';
 import { useApp } from '@/lib/context';
 import { resolveLandingPage } from '@/lib/user-prefs';
@@ -62,14 +62,6 @@ const IMAGE_POOL = [
   '/assets/patients/founder-toye.jpg',
   '/assets/moh.jpg',
   '/assets/landing-img.jpg',
-];
-
-// Small avatars used in the hero "team" cluster.
-const TEAM_AVATARS = [
-  '/assets/patients/founder-teny.jpg',
-  '/assets/patients/founder-ekow.jpg',
-  '/assets/patients/founder-toye.jpg',
-  '/assets/patients/african-nurse.jpg',
 ];
 
 // Demo roster — passwords are fetched at runtime from /api/demo-credentials.
@@ -303,35 +295,17 @@ export default function LoginPage() {
           <section className="tl-hero" style={{ backgroundImage: `url(${hero})` }}>
             <button type="button" onClick={backToList} aria-label="Close" className="tl-hero-close"><X size={18} /></button>
 
-            {/* Floating: schedule chip */}
-            <div className="tl-chip tl-chip-task">
-              <div className="tl-chip-title">Antenatal Care Clinic</div>
-              <div className="tl-chip-time">08:00am – 10:30am</div>
-            </div>
-
-            {/* Floating: week strip */}
-            <div className="tl-week">
-              {[['Sun','22'],['Mon','23'],['Tue','24'],['Wed','25'],['Thu','26'],['Fri','27'],['Sat','28']].map(([d,n], i) => (
-                <div key={d} className={`tl-week-day ${i === 3 ? 'is-on' : ''}`}>
-                  <span className="tl-week-dow">{d}</span>
-                  <span className="tl-week-num">{n}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Floating: meeting card with avatar cluster */}
-            <div className="tl-meeting">
-              <div className="tl-meeting-top">
-                <span className="tl-meeting-title">Community Vaccination Drive</span>
-                <span className="tl-meeting-dot" />
-              </div>
-              <div className="tl-meeting-time">09:00am – 01:00pm</div>
-              <div className="tl-avatars">
-                {TEAM_AVATARS.map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={src} alt="" aria-hidden className="tl-avatar" style={{ marginLeft: i ? -10 : 0, zIndex: TEAM_AVATARS.length - i }} />
-                ))}
-              </div>
+            {/* What the platform actually does — replaces the old decorative
+                schedule/calendar chips, which showed invented appointments,
+                fixed dates, and stock-photo faces. */}
+            <div className="tl-promo">
+              <span className="tl-promo-eyebrow">Tamam Healthcare System</span>
+              <h2 className="tl-promo-title">One patient record, every facility &mdash; online or off.</h2>
+              <ul className="tl-promo-points">
+                <li><WifiOff size={15} /> Keeps working when the network drops, then syncs</li>
+                <li><Users size={15} /> One chart shared across your organization&rsquo;s clinics</li>
+                <li><BarChart3 size={15} /> HMIS-ready reporting, built for national programmes</li>
+              </ul>
             </div>
           </section>
         </div>
@@ -482,22 +456,14 @@ const sharedStyles = (
     .tl-hero::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--accent-hover) 18%, transparent); }
     .tl-hero-close { position: absolute; top: 18px; right: 18px; z-index: 3; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: var(--bg-card-solid); color: var(--text-primary); cursor: pointer; box-shadow: none; }
     .tl-hero-close:hover { background: var(--bg-card-solid); }
-    .tl-chip { position: absolute; z-index: 2; backdrop-filter: blur(6px); }
-    .tl-chip-task { top: 64px; left: 34px; background: ${ACCENT}; color: var(--color-white); border-radius: 14px; padding: 11px 15px; box-shadow: none; }
-    .tl-chip-title { font-size: 13px; font-weight: 700; }
-    .tl-chip-time { font-size: 11.5px; opacity: 0.9; margin-top: 2px; }
-    .tl-week { position: absolute; z-index: 2; right: 30px; bottom: 150px; display: flex; gap: 4px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--color-white) 22%, transparent); border: 1px solid color-mix(in srgb, var(--color-white) 45%, transparent); backdrop-filter: blur(10px); }
-    .tl-week-day { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 34px; padding: 4px 0; border-radius: 10px; color: var(--color-white); }
-    .tl-week-day.is-on { background: ${ACCENT}; }
-    .tl-week-dow { font-size: 10px; font-weight: 600; opacity: 0.85; }
-    .tl-week-num { font-size: 14px; font-weight: 700; }
-    .tl-meeting { position: absolute; z-index: 2; left: 30px; bottom: 36px; width: 232px; padding: 15px 17px; border-radius: 18px; background: var(--bg-card-solid); box-shadow: none; }
-    .tl-meeting-top { display: flex; align-items: center; justify-content: space-between; }
-    .tl-meeting-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
-    .tl-meeting-dot { width: 8px; height: 8px; border-radius: 50%; background: ${ACCENT}; }
-    .tl-meeting-time { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-    .tl-avatars { display: flex; margin-top: 11px; }
-    .tl-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 2px solid var(--color-white); background: var(--border-light); }
+    /* Value panel over the hero photo: a readable scrim rather than floating
+       cards, so the copy stays legible on any background image. */
+    .tl-promo { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; padding: 92px 34px 34px; background: linear-gradient(180deg, rgba(2, 26, 45, 0) 0%, rgba(2, 26, 45, 0.55) 30%, rgba(2, 26, 45, 0.9) 62%, rgba(2, 26, 45, 0.95) 100%); color: var(--color-white); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
+    .tl-promo-eyebrow { display: block; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; opacity: 0.82; }
+    .tl-promo-title { margin: 9px 0 0; color: #fff; font-family: var(--font-platform); font-size: 25px; line-height: 1.24; font-weight: 800; letter-spacing: -0.02em; max-width: 22ch; }
+    .tl-promo-points { margin: 16px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+    .tl-promo-points li { display: flex; color: #fff; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; opacity: 0.94; }
+    .tl-promo-points svg { flex: none; opacity: 0.9; }
 
     .tl-spin { width: 13px; height: 13px; border: 2px solid var(--accent-border); border-top-color: ${ACCENT}; border-radius: 50%; display: inline-block; animation: tl-rot .7s linear infinite; }
     .tl-spin-light { border-color: color-mix(in srgb, var(--color-white) 40%, transparent); border-top-color: var(--color-white); }

@@ -152,32 +152,25 @@ function PanelHead({ title, meta, action }: { title: string; meta?: string; acti
   );
 }
 
-/** SVG ring gauge for a single 0–100 indicator (Performance-panel style). */
-function CircularGauge({ value, label, sub, color, size = 104, strokeWidth = 9 }: {
-  value: number; label: string; sub?: string; color: string; size?: number; strokeWidth?: number;
+/** Horizontal coverage bar for a single 0–100 indicator: value against the
+ *  100% track, colour carrying the WHO-style threshold tone. Reads faster than
+ *  a ring at small sizes and stacks in far less vertical space. */
+function CoverageBar({ value, label, sub, color }: {
+  value: number; label: string; sub?: string; color: string;
 }) {
   const pct = Math.min(100, Math.max(0, value));
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (pct / 100) * circumference;
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          {/* Track is a light step of the ring's own hue so the state reads
-              across the whole circle, not just the filled arc. */}
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeOpacity={0.16} strokeWidth={strokeWidth} />
-          <circle
-            cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={strokeWidth}
-            strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[19px] font-extrabold" style={{ color: 'var(--text-primary)' }}>{pct}%</span>
-        </div>
+    <div className="py-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[12px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+          {label}
+          {sub && <span className="font-medium" style={{ color: 'var(--text-muted)' }}> · {sub}</span>}
+        </span>
+        <span className="text-[13px] font-extrabold tabular-nums flex-none" style={{ color }}>{pct}%</span>
       </div>
-      <span className="text-[11px] font-bold mt-1.5 text-center" style={{ color: 'var(--text-primary)' }}>{label}</span>
-      {sub && <span className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>{sub}</span>}
+      <div className="mt-1 rounded-full overflow-hidden" style={{ height: 7, background: 'var(--border-light)' }}>
+        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: color }} />
+      </div>
     </div>
   );
 }
@@ -257,18 +250,6 @@ export default function GovernmentNationalDashboard() {
     () => alerts.filter(a => a.alertLevel === 'watch' || a.alertLevel === 'warning' || a.alertLevel === 'emergency'),
     [alerts],
   );
-  const emergencyCount = activeAlerts.filter(a => a.alertLevel === 'emergency').length;
-  const warningCount = activeAlerts.filter(a => a.alertLevel === 'warning').length;
-
-  // Outbreak risk — derived strictly from the worst active alert level.
-  const outbreakRisk = emergencyCount > 0
-    ? { label: 'High', tone: RED }
-    : warningCount > 0
-      ? { label: 'Elevated', tone: AMBER }
-      : activeAlerts.length > 0
-        ? { label: 'Guarded', tone: BLUE }
-        : { label: 'Low', tone: GREEN };
-
   // ── Per-state aggregates for the map layers ──
   const stateAgg = useMemo(() => {
     const agg = new Map<string, { alertCases: number; facilities: number; immRecords: number; completenessSum: number; completenessN: number }>();
@@ -503,7 +484,10 @@ export default function GovernmentNationalDashboard() {
   const selected = selectedState ? stateAgg.get(selectedState) : null;
 
   return (
-    <main className="page-container page-enter">
+    <main
+      className="page-container page-enter gov-dash"
+      style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
+    >
       {/* ── Header: what/where/when — no decorative hero ── */}
       <div className="flex items-end justify-between gap-3 flex-wrap mb-3">
         <div>
@@ -525,8 +509,8 @@ export default function GovernmentNationalDashboard() {
       </div>
 
       {/* ── Row: national map + weekly disease trends ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-3">
-        <div className="dash-card overflow-hidden lg:col-span-3">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-3 gov-row" style={{ flex: '1.9 1 0', minHeight: 0 }}>
+        <div className="dash-card overflow-hidden lg:col-span-3 flex flex-col">
           <PanelHead
             title="By state"
             meta={`${MAP_LAYERS.find(l => l.key === layer)?.legend} · ranked · National`}
@@ -549,7 +533,7 @@ export default function GovernmentNationalDashboard() {
               </div>
             }
           />
-          <div className="p-3 flex flex-col md:flex-row gap-3">
+          <div className="p-3 flex flex-col md:flex-row gap-3 flex-1 min-h-0">
             {/* Real South Sudan choropleth: each state polygon shaded by the
                 active layer's value; click a state to drill down. The map
                 fills the card, with the legend + drill-down on a side rail. */}
@@ -568,8 +552,8 @@ export default function GovernmentNationalDashboard() {
                 value === null || value === 0 ? '' : isPercentLayer ? `${value}%` : value.toLocaleString();
               return (
                 <>
-                  <div className="flex-1 min-w-0">
-                    <svg viewBox={`0 0 ${GOV_MAP_W} ${GOV_MAP_H}`} className="w-full h-full" style={{ minHeight: 300, maxHeight: 430 }}>
+                  <div className="flex-1 min-w-0 min-h-0">
+                    <svg viewBox={`0 0 ${GOV_MAP_W} ${GOV_MAP_H}`} style={{ display: 'block', width: '100%', height: '100%' }}>
                       {SOUTH_SUDAN_STATES.map(s => {
                         const entry = byName.get(s.name);
                         const value = entry?.value ?? null;
@@ -679,7 +663,7 @@ export default function GovernmentNationalDashboard() {
             weeklyByDisease.length === 0 || diseaseList.length === 0 ? (
               <p className="text-[12px] p-6 text-center" style={{ color: 'var(--text-muted)' }}>No surveillance reports on file.</p>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" minHeight={240}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={0}>
                 {chartType === 'bar' ? (
                   <BarChart data={weeklyByDisease} margin={{ top: 6, right: 8, left: -12, bottom: 0 }}>
                     <CartesianGrid stroke="var(--border-light)" vertical={false} />
@@ -724,7 +708,7 @@ export default function GovernmentNationalDashboard() {
       {/* ── Row: facility mix · vital events · programme coverage, one line ──
           DOM keeps the vital card first for the mobile stack; lg:order-* puts
           the on-screen order at Facility types · Vital events · Programme. */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 gov-row" style={{ flex: '1 1 0', minHeight: 0, maxHeight: 300 }}>
           {/* Vital events per month */}
           <div className="dash-card overflow-hidden flex flex-col lg:order-2">
             <PanelHead title="Vital events per month" meta="Births vs deaths registered · last 6 months · National" action={
@@ -737,7 +721,7 @@ export default function GovernmentNationalDashboard() {
               {vitalMonthly.length === 0 ? (
                 <p className="text-[12px] p-6 text-center" style={{ color: 'var(--text-muted)' }}>No birth/death registrations on file.</p>
               ) : (
-                <ResponsiveContainer width="100%" height="100%" minHeight={180}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={0}>
                   <BarChart data={vitalMonthly} margin={{ top: 6, right: 8, left: -12, bottom: 0 }} barCategoryGap="24%">
                     <CartesianGrid stroke="var(--border-light)" vertical={false} />
                     <XAxis dataKey="month" tick={axisTick} tickLine={false} axisLine={false} />
@@ -802,27 +786,13 @@ export default function GovernmentNationalDashboard() {
                 </button>
               </span>
             } />
-            {/* Surveillance headline — the two non-percentage indicators from
-                the retired situation strip. */}
-            <div className="grid grid-cols-2 px-4 pt-3">
-              <div className="pr-3">
-                <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Active alerts</div>
-                <div className="text-[20px] font-extrabold leading-tight" style={{ color: emergencyCount > 0 ? RED : warningCount > 0 ? AMBER : GREEN }}>{activeAlerts.length}</div>
-                <div className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{emergencyCount} emergency · {warningCount} warning</div>
-              </div>
-              <div className="pl-3" style={{ borderLeft: '1px solid var(--border-light)' }}>
-                <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Outbreak risk</div>
-                <div className="text-[20px] font-extrabold leading-tight" style={{ color: outbreakRisk.tone }}>{outbreakRisk.label}</div>
-                <div className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>Worst active alert level</div>
-              </div>
-            </div>
             {/* Birth/death certification lives with the Vital events chart —
                 only reporting + programme indicators here. */}
-            <div className="grid grid-cols-2 gap-3 p-4">
-              <CircularGauge size={92} strokeWidth={8} value={dq?.avgCompleteness ?? 0} label="Reporting" sub={`${dq?.facilitiesReporting ?? 0}/${dq?.totalFacilities ?? 0} facilities`} color={pctTone(dq?.avgCompleteness ?? 0, 80, 60)} />
-              <CircularGauge size={92} strokeWidth={8} value={dq?.avgTimeliness ?? 0} label="Timeliness" sub="latest assessments" color={pctTone(dq?.avgTimeliness ?? 0, 80, 60)} />
-              <CircularGauge size={92} strokeWidth={8} value={imm?.coverageRate ?? 0} label="Immunization" sub={`${imm?.totalChildren ?? 0} children`} color={pctTone(imm?.coverageRate ?? 0, 90, 60)} />
-              <CircularGauge size={92} strokeWidth={8} value={anc?.anc4PlusRate ?? 0} label="ANC 4+" sub={`${anc?.totalMothers ?? 0} mothers`} color={pctTone(anc?.anc4PlusRate ?? 0, 80, 50)} />
+            <div className="px-4 py-2">
+              <CoverageBar value={dq?.avgCompleteness ?? 0} label="Reporting" sub={`${dq?.facilitiesReporting ?? 0}/${dq?.totalFacilities ?? 0} facilities`} color={pctTone(dq?.avgCompleteness ?? 0, 80, 60)} />
+              <CoverageBar value={dq?.avgTimeliness ?? 0} label="Timeliness" sub="latest assessments" color={pctTone(dq?.avgTimeliness ?? 0, 80, 60)} />
+              <CoverageBar value={imm?.coverageRate ?? 0} label="Immunization" sub={`${imm?.totalChildren ?? 0} children`} color={pctTone(imm?.coverageRate ?? 0, 90, 60)} />
+              <CoverageBar value={anc?.anc4PlusRate ?? 0} label="ANC 4+" sub={`${anc?.totalMothers ?? 0} mothers`} color={pctTone(anc?.anc4PlusRate ?? 0, 80, 50)} />
             </div>
             <p className="text-[10px] px-4 pb-3" style={{ color: 'var(--text-muted)' }}>
               Rates use facility-recorded denominators, not population estimates.
