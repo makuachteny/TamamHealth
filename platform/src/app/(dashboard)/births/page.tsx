@@ -115,11 +115,22 @@ export default function BirthsPage() {
               )
             }
           />
-          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0, padding: '0 16px' }}>
           {loading ? (
             <div className="p-8 text-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p></div>
           ) : (
-            <table className="data-table" style={{ minWidth: 1080 }}>
+            <table className="data-table" style={{ minWidth: 1080, tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '17%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '6%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Certificate #</th>

@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import { useLabResults } from '@/lib/hooks/useLabResults';
-import { formatDate } from '@/lib/format-utils';
+import { formatDate , humanizeStatus } from '@/lib/format-utils';
 
 const PAGE_SIZE = 8;
 
@@ -32,7 +32,7 @@ interface ResultsSectionProps {
 }
 
 export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId }: ResultsSectionProps) {
-  const { results } = useLabResults();
+  const { results } = useLabResults(patientId);
   const [page, setPage] = useState(1);
 
   const patientLabs = useMemo(
@@ -91,7 +91,7 @@ export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId
                   {l.result || '—'}{l.unit ? ` ${l.unit}` : ''}
                 </td>
                 <td>{l.referenceRange || '—'}</td>
-                <td><span className={STATUS_BADGE[l.status] || 'omrs-panel-badge omrs-panel-badge--pending'}>{l.status.replace('_', ' ')}</span></td>
+                <td><span className={STATUS_BADGE[l.status] || 'omrs-panel-badge omrs-panel-badge--pending'}>{humanizeStatus(l.status)}</span></td>
                 <td>{formatDate(l.completedAt || l.orderedAt || l.createdAt)}</td>
               </tr>
             ))}

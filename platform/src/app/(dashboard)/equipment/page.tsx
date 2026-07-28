@@ -159,8 +159,16 @@ export default function AssetsPage() {
               </button>
             }
           />
-          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-          <table className="data-table" style={{ minWidth: 720 }}>
+          <div style={{ padding: '0 16px', overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <table className="data-table" style={{ minWidth: 820, tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '26%' }} />
+              <col style={{ width: '15%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '10%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>{t('equipment.colAsset')}</th>

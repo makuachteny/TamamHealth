@@ -13,7 +13,7 @@ import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import { Search, Pill, FlaskConical } from '@/components/icons/lucide';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useLabResults } from '@/lib/hooks/useLabResults';
-import { formatDate } from '@/lib/format-utils';
+import { formatDate , formatRxSig , humanizeStatus } from '@/lib/format-utils';
 
 const PAGE_SIZE = 10;
 
@@ -62,7 +62,7 @@ export default function OrdersSection({ patientId, canPrescribe, canOrderLabs, o
         orderNumber: `ORD-${rx._id.slice(-6).toUpperCase()}`,
         date: rx.createdAt,
         orderType: 'Drug order',
-        description: `${rx.medication} ${rx.dose} · ${rx.frequency}`.trim(),
+        description: `${rx.medication} · ${formatRxSig(rx)}`,
         priority: rx.urgency === 'immediate' ? 'STAT' : 'Routine',
         orderedBy: rx.prescribedBy || '—',
         status: rx.status,
@@ -172,7 +172,7 @@ export default function OrdersSection({ patientId, canPrescribe, canOrderLabs, o
                   </span>
                 </td>
                 <td>{r.orderedBy}</td>
-                <td><span className={STATUS_BADGE[r.status] || 'omrs-panel-badge omrs-panel-badge--active'}>{r.status.replace('_', ' ')}</span></td>
+                <td><span className={STATUS_BADGE[r.status] || 'omrs-panel-badge omrs-panel-badge--active'}>{humanizeStatus(r.status)}</span></td>
               </tr>
             ))}
           </tbody>

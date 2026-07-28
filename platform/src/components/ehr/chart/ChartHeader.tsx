@@ -51,6 +51,10 @@ export default function ChartHeader({
   onCollectPayment, onMessage, onPrint, onPatientEd, onNote, onScripts, onOrders, onExchange, onEdit, onStickyNote, onAssignProvider,
 }: ChartHeaderProps) {
   const [showMore, setShowMore] = useState(true);
+  // Secondary actions live behind one ⋯ menu — the header previously stacked
+  // up to 11 buttons in two rows, several of them duplicating the right-rail
+  // workspace panels under different names.
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Only surface the actions this role actually uses — e.g. a registration
   // clerk never writes clinical notes or prescriptions, so those buttons are
@@ -107,6 +111,7 @@ export default function ChartHeader({
         {showMore && (
           <div className="omrs-header-more">
             <span>Phone: <strong>{patient.phone || '—'}</strong></span>
+            <span>Caregiver: <strong>{patient.nokName || '—'}</strong></span>
             <span>Location: <strong>{patient.state || '—'}{patient.county ? `, ${patient.county}` : ''}</strong></span>
             <button type="button" className="omrs-vitals-link" onClick={onCollectPayment}>
               Balance: <strong style={{ color: patientBalance > 0 ? 'var(--color-danger)' : 'inherit' }}>${patientBalance.toFixed(2)} due</strong>
@@ -116,41 +121,73 @@ export default function ChartHeader({
       </div>
 
       <div className="omrs-header-actions no-print">
-        {canViewClinical && (
-          <button type="button" className="omrs-header-actions-btn omrs-link" onClick={onStickyNote} title="Open patient notes">
-            <DuotoneIcon name="record" size={15} /> Sticky note
-          </button>
-        )}
         <button type="button" className="omrs-header-actions-btn omrs-link" onClick={() => setShowMore(v => !v)}>
           {showMore ? 'Show less ▲' : 'Show more ▼'}
         </button>
-        {canSendMessages && (
-          <button type="button" className="omrs-header-actions-btn" onClick={onMessage}><DuotoneIcon name="message" size={15} /> Pt. Msg</button>
-        )}
-        {onAssignProvider && (
-          <button type="button" className="omrs-header-actions-btn" onClick={onAssignProvider}>
-            <Stethoscope className="w-3.5 h-3.5" /> {patient.assignedDoctor ? 'Reassign' : 'Assign'}
-          </button>
-        )}
-        <button type="button" className="omrs-header-actions-btn" onClick={onPrint}><DuotoneIcon name="printer" size={15} /> Print</button>
-        {canViewClinical && (
-          <button type="button" className="omrs-header-actions-btn" onClick={onPatientEd}><DuotoneIcon name="fileText" size={15} /> Pt. Ed.</button>
-        )}
+
+        {/* Primary clinical actions — one clear verb each. */}
         {canViewClinical && (
           <button type="button" className="omrs-header-actions-btn" onClick={onNote}><DuotoneIcon name="prescription" size={15} /> + Note</button>
         )}
         {(canPrescribe || canDispense) && (
-          <button type="button" className="omrs-header-actions-btn" onClick={onScripts}><DuotoneIcon name="pill" size={15} /> Scripts</button>
+          <button type="button" className="omrs-header-actions-btn" onClick={onScripts}><DuotoneIcon name="pill" size={15} /> Prescribe</button>
         )}
         {(canOrderLabs || canEnterLabResults) && (
-          <button type="button" className="omrs-header-actions-btn" onClick={onOrders}><DuotoneIcon name="flask" size={15} /> Orders</button>
+          <button type="button" className="omrs-header-actions-btn" onClick={onOrders}><DuotoneIcon name="flask" size={15} /> Order labs</button>
         )}
         {canManageReferrals && (
-          <button type="button" className="omrs-header-actions-btn" onClick={onExchange}><DuotoneIcon name="arrowRightLeft" size={15} /> Exchange</button>
+          <button type="button" className="omrs-header-actions-btn" onClick={onExchange}><DuotoneIcon name="arrowRightLeft" size={15} /> Refer</button>
         )}
-        {canRegisterPatients && (
-          <button type="button" className="omrs-header-actions-btn" onClick={onEdit}><DuotoneIcon name="edit" size={15} /> Edit</button>
-        )}
+
+        {/* Everything else behind one overflow menu. */}
+        <div className="omrs-header-overflow">
+          <button
+            type="button"
+            className="omrs-header-actions-btn"
+            onClick={() => setMenuOpen(v => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="More actions"
+            title="More actions"
+          >
+            ⋯
+          </button>
+          {menuOpen && (
+            <>
+              <div className="omrs-header-overflow-backdrop" onClick={() => setMenuOpen(false)} />
+              <div className="omrs-actions-menu" role="menu">
+                {canSendMessages && (
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onMessage(); }}>
+                    <DuotoneIcon name="message" size={15} /> Message patient
+                  </button>
+                )}
+                {canViewClinical && (
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onPatientEd(); }}>
+                    <DuotoneIcon name="fileText" size={15} /> Patient education
+                  </button>
+                )}
+                {canViewClinical && (
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onStickyNote(); }}>
+                    <DuotoneIcon name="record" size={15} /> Patient notes
+                  </button>
+                )}
+                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onPrint(); }}>
+                  <DuotoneIcon name="printer" size={15} /> Print chart
+                </button>
+                {onAssignProvider && (
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAssignProvider(); }}>
+                    <Stethoscope className="w-3.5 h-3.5" /> {patient.assignedDoctor ? 'Reassign provider' : 'Assign provider'}
+                  </button>
+                )}
+                {canRegisterPatients && (
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onEdit(); }}>
+                    <DuotoneIcon name="edit" size={15} /> Edit details
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

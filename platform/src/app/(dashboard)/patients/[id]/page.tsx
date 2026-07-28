@@ -7,12 +7,12 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, ArrowRightLeft,
   AlertTriangle, FileText, FlaskConical,
-  Pill, Activity, Brain, ChevronDown, ChevronUp,
-  ShieldAlert, TestTubes, ChevronRight,
-  CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
-  User as UserIcon, Building2, Search, X, Wallet, Syringe,
-  Heart, Printer, History, Calendar, Stethoscope,
-  Bandage, Layers, Plus, Pencil,
+  Pill, Activity,
+  ShieldAlert, ChevronRight,
+  ClipboardList,
+  User as UserIcon, Building2, X, Wallet, Syringe,
+  Heart, Printer, History, Calendar,
+  Bandage, Layers, Plus,
 } from '@/components/icons/lucide';
 import Badge from '@/components/Badge';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -22,7 +22,7 @@ import { usePatientReferrals } from '@/lib/hooks/useReferrals';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useANC } from '@/lib/hooks/useANC';
-import { Package, Clock, MessageSquare } from '@/components/icons/lucide';
+import { Package, MessageSquare } from '@/components/icons/lucide';
 import { Icon as DuotoneInfoIcon } from '@/components/icons';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import dynamic from 'next/dynamic';
@@ -37,7 +37,8 @@ import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 // Canonical geography — the same lists patient registration writes from, so an
 // edit here can't introduce a state/county spelling the geo rollups don't know.
 import { states as SOUTH_SUDAN_STATES, statesAndCounties } from '@/data/mock';
-import { formatDateTime, formatDate, formatClockTime } from '@/lib/format-utils';
+import { formatDateTime, formatDate, formatClockTime, formatRxSig, humanizeStatus } from '@/lib/format-utils';
+import { isScreeningOverdue } from '@/lib/services/screening-service';
 import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
@@ -46,10 +47,7 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatientPayments } from '@/lib/hooks/usePayments';
 import BillingTab from '@/components/patients/BillingTab';
 import PatientSBAR from '@/components/patients/PatientSBAR';
-import RecordSignatureBar from '@/components/patients/RecordSignatureBar';
 import DirectiveList from '@/components/patients/DirectiveList';
-import ChartSummaryPanel from '@/components/patients/ChartSummaryPanel';
-import CareAlertsBanner from '@/components/patients/CareAlertsBanner';
 import PhoneNotes from '@/components/patients/PhoneNotes';
 import AssessmentsPanel from '@/components/patients/AssessmentsPanel';
 import ScreeningsPanel from '@/components/patients/ScreeningsPanel';
@@ -95,17 +93,25 @@ import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignD
 // these roles — see TransferHistoryPanel's canViewClinical prop — so the tab
 // answers accountability without exposing the chart.
 const ADMIN_TAB_IDS = ['overview', 'appointments', 'demographics', 'billing', 'documents', 'recall', 'referrals'];
-type FacesheetPanelId = 'medications' | 'problems' | 'allergies' | 'vitals' | 'history' | 'labs' | 'recommendations' | 'demographics';
+type PrintSectionId = 'consultation' | 'problems' | 'vitals' | 'medications' | 'allergies' | 'labs' | 'immunizations' | 'appointments';
+const PRINT_SECTION_OPTIONS: Array<{ id: PrintSectionId; label: string; description: string }> = [
+  { id: 'consultation', label: 'Latest consultation', description: 'Reason for visit, examination, assessment, and plan' },
+  { id: 'problems', label: 'Problems and diagnoses', description: 'Current problem list and diagnoses from the latest visit' },
+  { id: 'vitals', label: 'Vital signs', description: 'Most recently recorded observations' },
+  { id: 'medications', label: 'Current medications', description: 'Active prescriptions and instructions' },
+  { id: 'allergies', label: 'Allergies', description: 'Active allergies and adverse reactions' },
+  { id: 'labs', label: 'Laboratory results', description: 'Recent results, values, units, and reference ranges' },
+  { id: 'immunizations', label: 'Immunizations', description: 'Recorded vaccines and doses' },
+  { id: 'appointments', label: 'Next appointment', description: 'Upcoming appointment and follow-up details' },
+];
+const DEFAULT_PRINT_SECTIONS = new Set<PrintSectionId>(PRINT_SECTION_OPTIONS.map(section => section.id));
+type FacesheetPanelId = 'medications' | 'problems' | 'vitals' | 'recommendations';
 
 const FACESHEET_PANEL_OPTIONS: Array<{ id: FacesheetPanelId; label: string }> = [
+  { id: 'problems', label: 'Safety alerts' },
   { id: 'medications', label: 'Medications' },
-  { id: 'problems', label: 'Problems' },
-  { id: 'allergies', label: 'Allergies' },
-  { id: 'vitals', label: 'Vitals' },
-  { id: 'history', label: 'History' },
-  { id: 'labs', label: 'Labs/Studies' },
-  { id: 'recommendations', label: 'Clinical Recommendations' },
-  { id: 'demographics', label: 'Demographics' },
+  { id: 'vitals', label: 'Latest observations' },
+  { id: 'recommendations', label: 'Next care actions' },
 ];
 
 const DEFAULT_FACESHEET_PANELS = FACESHEET_PANEL_OPTIONS.map(panel => panel.id);
@@ -128,6 +134,7 @@ const DEEP_LINK_TAB_IDS = new Set([
     'overview', 'appointments', 'history', 'problems', 'prescriptions', 'immunizations',
   'allergies', 'vitals', 'notes', 'labs', 'demographics', 'billing', 'careChecklist',
     'documents', 'recall', 'referrals', 'sbar', 'transfers',
+    'orders', 'procedures', 'programs',
 ]);
 
 export default function PatientDetailPage() {
@@ -142,7 +149,7 @@ export default function PatientDetailPage() {
   const initialTab = searchParams.get('tab');
   const focusId = searchParams.get('focus') || undefined;
   const [activeTab, setActiveTab] = useState(
-    initialTab === 'transfers' ? 'referrals' : initialTab && DEEP_LINK_TAB_IDS.has(initialTab) ? initialTab : 'overview',
+    initialTab === 'transfers' ? 'referrals' : initialTab === 'recall' ? 'appointments' : initialTab && DEEP_LINK_TAB_IDS.has(initialTab) ? initialTab : 'overview',
   );
   const [demographicsTab, setDemographicsTab] = useState('profile');
   const [vitalsView, setVitalsView] = useState<'table' | 'flowsheet'>('table');
@@ -154,10 +161,6 @@ export default function PatientDetailPage() {
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [activeTab]);
-  const [expandedAI, setExpandedAI] = useState<Set<string>>(new Set());
-  const [encSearch, setEncSearch] = useState('');
-  const [encFilter, setEncFilter] = useState('all');
-  const [encSort, setEncSort] = useState<'newest' | 'oldest' | 'provider' | 'complaint'>('newest');
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [messageSubject, setMessageSubject] = useState('Follow-up from your care team');
   const [messageBody, setMessageBody] = useState('');
@@ -183,17 +186,22 @@ export default function PatientDetailPage() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSignature, setPrintSignature] = useState('');
   const [printSigned, setPrintSigned] = useState(false);
-  // Trigger print AFTER React commits the DOM update so printSigned content is present
+  const [printSections, setPrintSections] = useState<Set<PrintSectionId>>(() => new Set(DEFAULT_PRINT_SECTIONS));
+  // Trigger print after React commits the selected document into the DOM.
   useEffect(() => {
-    if (printSigned) { window.print(); }
+    if (!printSigned) return;
+    const printFrame = window.requestAnimationFrame(() => window.print());
+    const reset = () => setPrintSigned(false);
+    window.addEventListener('afterprint', reset);
+    return () => {
+      window.cancelAnimationFrame(printFrame);
+      window.removeEventListener('afterprint', reset);
+    };
   }, [printSigned]);
 
-  // Full History filters & expansion
-  const [historySearch, setHistorySearch] = useState('');
   // OpenMRS-style client-side pagination for the Appointments tab (Stage 3).
   const [apptPage, setApptPage] = useState(1);
   const APPT_PAGE_SIZE = 8;
-  const [expandedEncounters, setExpandedEncounters] = useState<Set<string>>(new Set());
   const toggleFacesheetPanel = (panelId: FacesheetPanelId) => {
     setFacesheetPanels(prev => {
       const next = new Set(prev);
@@ -264,7 +272,7 @@ export default function PatientDetailPage() {
 
   // Patient care notes (free-text staff notes) — surfaced on the overview only
   // when present, so the page never shows an empty "Notes" placeholder.
-  const [patientNotes, setPatientNotes] = useState<PatientNoteDoc[]>([]);
+  const [, setPatientNotes] = useState<PatientNoteDoc[]>([]);
   const patientIdForNotes = patient?._id;
   const reloadPatientNotes = useCallback(() => {
     if (!patientIdForNotes) { setPatientNotes([]); return; }
@@ -351,12 +359,8 @@ export default function PatientDetailPage() {
   const facesheetActions: FacesheetActions = {
     ...(canPrescribe ? { medications: { label: 'Prescribe', onClick: () => setShowPrescribeModal(true) } } : {}),
     ...(canConsult ? { problems: { label: 'Add', onClick: () => openSectionAdd('problems') } } : {}),
-    ...(canConsult ? { allergies: { label: 'Add', onClick: () => openSectionAdd('allergies') } } : {}),
     ...(canConsult && patient ? { vitals: { label: 'Record', onClick: () => router.push(`/consultation?patientId=${patient._id}`) } } : {}),
-    ...(canConsult ? { history: { label: 'Note', onClick: () => setChartPanelRequest('visit-note') } } : {}),
-    ...(canOrderLabs ? { labs: { label: 'Order', onClick: () => setShowOrderLabModal(true) } } : {}),
     ...(canConsult ? { recommendations: { label: 'Review', onClick: () => setActiveTab('careChecklist'), icon: ClipboardList } } : {}),
-    demographics: { label: 'Edit', onClick: openEditModal, icon: Pencil },
   };
 
   const handleEditSubmit = async () => {
@@ -393,28 +397,6 @@ export default function PatientDetailPage() {
       setEditSubmitting(false);
     }
   };
-
-  // ── Filtered Full History ──────────────────────────────────────────────
-  const filteredHistory = useMemo(() => {
-    const q = historySearch.trim().toLowerCase();
-    return records.filter(r => {
-      if (q) {
-        const haystack = [
-          JSON.stringify(r),
-          formatDateTime(r.consultedAt || r.visitDate),
-          r.chiefComplaint,
-          r.historyOfPresentIllness,
-          r.providerName,
-          r.department,
-          r.hospitalName,
-          r.visitType,
-          ...(r.diagnoses || []).map(d => `${d.icd10Code} ${d.name}`),
-        ].join(' ').toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [records, historySearch]);
 
   // Still "loading" while the scoped list loads OR while the out-of-facility
   // fallback lookup is in flight — only declare "not found" once both are done.
@@ -476,19 +458,12 @@ export default function PatientDetailPage() {
     }
   };
 
-  // Last & next appointment (surfaced on the overview only when they exist).
+  // Appointment sort key for the Appointments tab.
   const apptTs = (a: { appointmentDate: string; appointmentTime?: string }) =>
     new Date(`${a.appointmentDate}T${a.appointmentTime || '00:00'}:00`).getTime();
-  const upcomingAppts = [...(patientAppointments || [])]
-    .filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
-    .sort((x, y) => apptTs(x) - apptTs(y));
-  const nextAppt = upcomingAppts.find(a => apptTs(a) >= Date.now());
-  const lastAppt = [...upcomingAppts].reverse().find(a => apptTs(a) < Date.now());
-  const latestNote = patientNotes[0];
 
   const allTabs = [
-    { id: 'overview', label: 'Facesheet', icon: Heart },
-    { id: 'appointments', label: 'Appointments', icon: Calendar },
+    { id: 'overview', label: 'Summary', icon: Heart },
     { id: 'history', label: 'Activity', icon: FileText },
     { id: 'problems', label: 'Problems', icon: AlertTriangle },
     { id: 'prescriptions', label: 'Medications', icon: Pill },
@@ -496,12 +471,15 @@ export default function PatientDetailPage() {
     { id: 'allergies', label: 'Allergies', icon: ShieldAlert },
     { id: 'vitals', label: 'Vitals', icon: Activity },
     { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'labs', label: 'Labs/Studies', icon: FlaskConical },
+    { id: 'labs', label: 'Results', icon: FlaskConical },
+    { id: 'orders', label: 'Orders', icon: ClipboardList },
+    { id: 'procedures', label: 'Procedures', icon: Bandage },
+    { id: 'programs', label: 'Programs', icon: Layers },
     { id: 'demographics', label: 'Demographics', icon: UserIcon },
     { id: 'billing', label: 'Account', icon: Wallet },
     { id: 'careChecklist', label: 'Care Plan', icon: ClipboardList },
     { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'recall', label: 'Recall', icon: CalendarClock },
+    { id: 'appointments', label: 'Appointments & follow-up', icon: Calendar },
     { id: 'referrals', label: 'Care coordination', icon: ArrowRightLeft },
   ];
   const tabs = canViewClinical ? allTabs : allTabs.filter(tb => ADMIN_TAB_IDS.includes(tb.id));
@@ -515,36 +493,24 @@ export default function PatientDetailPage() {
   // freshness timestamp follows this record too, so "X days old" is meaningful.
   const latestVitalsRecord = records.find(r => r.vitalSigns);
 
-  const lastConsultedRaw = patient.lastConsultedAt || latestRecord?.consultedAt || latestRecord?.visitDate || patient.lastVisitDate;
-  const lastConsultedDisplay = formatDateTime(lastConsultedRaw);
 
   // ── OpenMRS-style chart shell wiring ────────────────────────────────────
-  // Left nav rail: the OpenMRS O3 section set, mapped onto this page's
-  // existing activeTab ids. 'orders' / 'procedures' / 'programs' are NEW ids
-  // with no legacy tab — they're clinical-only placeholders (Stage 3 builds
-  // real content) and are gated the same way every other clinical tab is.
+  // Keep the primary rail focused on the six tasks staff perform repeatedly.
+  // Less frequent clinical sections remain available under More.
   const OMRS_RAIL_DEFS: { id: string; label: string; icon: typeof Heart; clinicalOnly?: boolean }[] = [
-    { id: 'overview', label: 'Patient summary', icon: Heart },
-    { id: 'vitals', label: 'Vitals & Biometrics', icon: Activity },
-    { id: 'prescriptions', label: 'Medications', icon: Pill },
-    { id: 'orders', label: 'Orders', icon: ClipboardList, clinicalOnly: true },
-    { id: 'labs', label: 'Results', icon: FlaskConical },
+    { id: 'overview', label: 'Summary', icon: Heart },
     { id: 'history', label: 'Activity', icon: History },
-    { id: 'allergies', label: 'Allergies', icon: ShieldAlert },
-    { id: 'problems', label: 'Conditions', icon: AlertTriangle },
-    { id: 'immunizations', label: 'Immunizations', icon: Syringe },
-    { id: 'procedures', label: 'Procedures', icon: Bandage, clinicalOnly: true },
-    { id: 'documents', label: 'Attachments', icon: FileText },
-    { id: 'programs', label: 'Programs', icon: Layers, clinicalOnly: true },
-    { id: 'appointments', label: 'Appointments', icon: Calendar },
-    // Billing remains available under More so it does not compete with
-    // clinical work in the primary rail.
+    { id: 'prescriptions', label: 'Medications', icon: Pill },
+    { id: 'labs', label: 'Results', icon: FlaskConical },
+    { id: 'careChecklist', label: 'Care plan', icon: ClipboardList },
+    // Referrals and internal transfers are one coordination workflow. Keep it
+    // in the primary rail so ownership changes cannot be hidden under More.
+    { id: 'referrals', label: 'Care coordination', icon: ArrowRightLeft },
   ];
   const omrsRailIds = new Set(OMRS_RAIL_DEFS.map(d => d.id));
   const omrsRailItems = OMRS_RAIL_DEFS.filter(item => (item.clinicalOnly ? canViewClinical : tabs.some(t => t.id === item.id)));
-  // Everything reachable from the legacy tab bar that doesn't have an
-  // OpenMRS-rail slot (notes, demographics, care checklist, recall) still
-  // needs a way in — surfaced under a "More" section at the rail's foot.
+  // Everything reachable from the full chart model that doesn't have an
+  // OpenMRS-rail slot is available under More.
   const omrsMoreItems = tabs.filter(t => !omrsRailIds.has(t.id));
 
   // Sticky header: "Active Visit" chip — a checked-in/in-progress appointment
@@ -879,11 +845,11 @@ export default function PatientDetailPage() {
                   <div className="rx-header-left">
                     <div className="rx-logo-wrap">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="TamamHealth" />
+                      <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="Tamam" />
                     </div>
                     <div>
-                      <div className="rx-facility-name">{patient.registrationHospital || 'Juba Teaching Hospital'}</div>
-                      <div className="rx-facility-sub">TamamHealth Digital Health · Republic of South Sudan</div>
+                      <div className="rx-facility-name">{patient.registrationHospital || 'Tamam Facility'}</div>
+                      <div className="rx-facility-sub">Tamam · Patient record</div>
                     </div>
                   </div>
                   <div className="rx-doc-label">
@@ -905,7 +871,7 @@ export default function PatientDetailPage() {
                     <div className="rx-patient-field"><label>Hospital Number</label><span>{patient.hospitalNumber || '—'}</span></div>
                     <div className="rx-patient-field"><label>Phone</label><span>{patient.phone || '—'}</span></div>
                     <div className="rx-patient-field"><label>State / County</label><span>{patient.state || '—'}{patient.county ? ` · ${patient.county}` : ''}</span></div>
-                    <div className="rx-patient-field"><label>Facility</label><span>{patient.registrationHospital || 'Juba Teaching Hospital'}</span></div>
+                    <div className="rx-patient-field"><label>Facility</label><span>{patient.registrationHospital || 'Tamam Facility'}</span></div>
                     <div className="rx-patient-field"><label>Visit Date</label><span>{new Date().toLocaleDateString(undefined, { dateStyle: 'long' })}</span></div>
                     <div className="rx-patient-field"><label>Blood Group</label><span>{(patient as unknown as Record<string, string>).bloodGroup || '—'}</span></div>
                   </div>
@@ -915,7 +881,7 @@ export default function PatientDetailPage() {
                 <div className="rx-body">
 
                   {/* Consultation Note */}
-                  {latestRecord && (
+                  {printSections.has('consultation') && latestRecord && (
                     <div className="rx-section">
                       <div className="rx-section-title">Consultation Note</div>
                       <div className="rx-section-body">
@@ -942,7 +908,7 @@ export default function PatientDetailPage() {
                   )}
 
                   {/* Diagnoses + Active Problems side by side */}
-                  <div className="rx-two-col">
+                  {printSections.has('problems') && <div className="rx-two-col">
                     {latestRecord?.diagnoses && latestRecord.diagnoses.length > 0 && (
                       <div className="rx-section">
                         <div className="rx-section-title">Diagnoses (This Visit)</div>
@@ -971,10 +937,10 @@ export default function PatientDetailPage() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </div>}
 
                   {/* Vital Signs */}
-                  {latestVitals && (
+                  {printSections.has('vitals') && latestVitals && (
                     <div className="rx-section">
                       <div className="rx-section-title">Vital Signs</div>
                       <div className="rx-section-body">
@@ -997,7 +963,7 @@ export default function PatientDetailPage() {
                   )}
 
                   {/* Prescriptions */}
-                  {currentMeds.length > 0 && (
+                  {printSections.has('medications') && currentMeds.length > 0 && (
                     <div className="rx-section">
                       <div className="rx-section-title">Prescriptions</div>
                       <div className="rx-section-body">
@@ -1013,7 +979,7 @@ export default function PatientDetailPage() {
                   )}
 
                   {/* Allergies */}
-                  {(activeAllergies.length > 0 || legacyAllergies.length > 0) && (
+                  {printSections.has('allergies') && (activeAllergies.length > 0 || legacyAllergies.length > 0) && (
                     <div className="rx-section">
                       <div className="rx-section-title">Allergy &amp; Adverse Reaction Record</div>
                       <div className="rx-section-body">
@@ -1035,7 +1001,7 @@ export default function PatientDetailPage() {
                   )}
 
                   {/* Lab Results */}
-                  {patientLabs.length > 0 && (
+                  {printSections.has('labs') && patientLabs.length > 0 && (
                     <div className="rx-section">
                       <div className="rx-section-title">Recent Laboratory Results</div>
                       <div className="rx-section-body">
@@ -1066,7 +1032,7 @@ export default function PatientDetailPage() {
                   )}
 
                   {/* Immunizations */}
-                  {patientImms.length > 0 && (
+                  {printSections.has('immunizations') && patientImms.length > 0 && (
                     <div className="rx-section">
                       <div className="rx-section-title">Immunization Record</div>
                       <div className="rx-section-body">
@@ -1083,14 +1049,14 @@ export default function PatientDetailPage() {
                   )}
 
                   {/* Next Appointment */}
-                  {upcomingPrint && (
+                  {printSections.has('appointments') && upcomingPrint && (
                     <div className="rx-section">
                       <div className="rx-section-title">Next Appointment</div>
                       <div className="rx-section-body rx-two-col">
                         <div className="rx-field"><b>Date &amp; Time:</b> {new Date(`${upcomingPrint.appointmentDate}T${upcomingPrint.appointmentTime || '00:00'}`).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}</div>
                         {upcomingPrint.reason && <div className="rx-field"><b>Reason:</b> {upcomingPrint.reason}</div>}
                         {upcomingPrint.providerName && <div className="rx-field"><b>Provider:</b> {upcomingPrint.providerName}</div>}
-                        <div className="rx-field"><b>Facility:</b> {patient.registrationHospital || 'Juba Teaching Hospital'}</div>
+                        <div className="rx-field"><b>Facility:</b> {patient.registrationHospital || 'Tamam Facility'}</div>
                       </div>
                     </div>
                   )}
@@ -1117,7 +1083,7 @@ export default function PatientDetailPage() {
                 {/* Fixed footer on every page */}
                 <div className="rx-footer">
                   <span className="rx-footer-conf">CONFIDENTIAL — Patient Medical Record</span>
-                  <span>TamamHealth Digital Health · {patient.hospitalNumber || patient.geocodeId} · {patient.registrationHospital || 'Juba Teaching Hospital'}</span>
+                  <span>Tamam · {patient.hospitalNumber || patient.geocodeId} · {patient.registrationHospital || 'Tamam Facility'}</span>
                   <span>Printed: {printedAt}</span>
                 </div>
 
@@ -1127,17 +1093,50 @@ export default function PatientDetailPage() {
 
           {/* ══════ SIGN BEFORE PRINT MODAL ══════ */}
           {showPrintModal && (
-            <Modal onClose={() => setShowPrintModal(false)} width={440} labelledBy="print-sign-title">
+            <Modal onClose={() => setShowPrintModal(false)} width={560} labelledBy="print-sign-title">
               <div className="rounded-xl p-6 space-y-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
                 <div className="flex items-center justify-between">
-                  <h2 id="print-sign-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>Sign before printing</h2>
+                  <h2 id="print-sign-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>Print patient record</h2>
                   <button className="p-1 rounded" onClick={() => setShowPrintModal(false)} style={{ color: 'var(--text-muted)' }}>
                     <X className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-                  Enter your full name and credentials to sign this patient record. Your signature will appear on the printed document.
+                  Patient identity is always included. Select the sections needed for this printout, then sign the document.
                 </p>
+                <div className="rounded-lg p-3" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>Sections to print</span>
+                    <button
+                      type="button"
+                      className="text-[11px] font-semibold"
+                      style={{ color: 'var(--tamamhealth-blue)' }}
+                      onClick={() => setPrintSections(prev => prev.size === PRINT_SECTION_OPTIONS.length ? new Set() : new Set(DEFAULT_PRINT_SECTIONS))}
+                    >
+                      {printSections.size === PRINT_SECTION_OPTIONS.length ? 'Clear all' : 'Select all'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {PRINT_SECTION_OPTIONS.map(section => (
+                      <label key={section.id} className="flex items-start gap-2 rounded-md p-2 cursor-pointer" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+                        <input
+                          type="checkbox"
+                          checked={printSections.has(section.id)}
+                          onChange={() => setPrintSections(prev => {
+                            const next = new Set(prev);
+                            if (next.has(section.id)) next.delete(section.id); else next.add(section.id);
+                            return next;
+                          })}
+                          className="mt-0.5"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{section.label}</span>
+                          <span className="block text-[10px] leading-snug" style={{ color: 'var(--text-muted)' }}>{section.description}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Clinician name &amp; title</label>
                   <input
@@ -1148,7 +1147,7 @@ export default function PatientDetailPage() {
                     className="w-full p-2.5 rounded-md text-[13px]"
                     style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                     onKeyDown={e => {
-                      if (e.key === 'Enter' && printSignature.trim()) {
+                      if (e.key === 'Enter' && printSignature.trim() && printSections.size > 0) {
                         setShowPrintModal(false);
                         setPrintSigned(true);
                       }
@@ -1159,13 +1158,13 @@ export default function PatientDetailPage() {
                   <button className="btn btn-sm btn-secondary" onClick={() => setShowPrintModal(false)}>Cancel</button>
                   <button
                     className="btn btn-sm btn-primary"
-                    disabled={!printSignature.trim()}
+                    disabled={!printSignature.trim() || printSections.size === 0}
                     onClick={() => {
                       setShowPrintModal(false);
                       setPrintSigned(true);
                     }}
                   >
-                    <Printer className="w-3.5 h-3.5" /> Sign &amp; Print
+                    <Printer className="w-3.5 h-3.5" /> Sign &amp; Print selected
                   </button>
                 </div>
               </div>
@@ -1201,7 +1200,7 @@ export default function PatientDetailPage() {
                 patientBalance={patientBalance}
                 onCollectPayment={openPaymentFromHeader}
                 onMessage={() => setShowMessageModal(true)}
-                onPrint={() => { setPrintSignature(currentUser?.name || ''); setPrintSigned(false); setShowPrintModal(true); }}
+                onPrint={() => { setPrintSignature(currentUser?.name || ''); setPrintSections(new Set(DEFAULT_PRINT_SECTIONS)); setPrintSigned(false); setShowPrintModal(true); }}
                 onPatientEd={() => {
                   // Real patient-education action: a message queued to the
                   // patient (app/SMS), pre-labelled — not just a tab switch.
@@ -1211,7 +1210,7 @@ export default function PatientDetailPage() {
                 onNote={() => (canConsult ? setChartPanelRequest('visit-note') : setActiveTab('notes'))}
                 onScripts={() => (canPrescribe ? setShowPrescribeModal(true) : setActiveTab('prescriptions'))}
                 onOrders={() => (canOrderLabs ? setShowOrderLabModal(true) : setActiveTab('labs'))}
-                onExchange={() => (canManageReferrals ? setShowReferModal(true) : setActiveTab('recall'))}
+                onExchange={() => (canManageReferrals ? setShowReferModal(true) : setActiveTab('appointments'))}
                 onEdit={openEditModal}
                 onStickyNote={() => { if (canViewClinical) setActiveTab('notes'); }}
                 onAssignProvider={canAssignPatients ? () => setAssignTarget({
@@ -1245,12 +1244,11 @@ export default function PatientDetailPage() {
           {activeTab === 'overview' && (
             <PatientFacesheetView
               patient={patient}
-              latestVitals={latestVitals}
+              latestVitals={latestVitalsRecord?.vitalSigns}
               problems={patientProblems}
               prescriptions={(allPrescriptions || []).filter(rx => rx.patientId === patient._id)}
               labResults={(allLabResults || []).filter(lab => lab.patientId === patient._id)}
               immunizations={(allImmunizations || []).filter(imm => imm.patientId === patient._id)}
-              records={records}
               canViewClinical={canViewClinical}
               onOpenTab={setActiveTab}
               actions={facesheetActions}
@@ -1267,11 +1265,6 @@ export default function PatientDetailPage() {
             const apptPageRows = sortedAppts.slice((apptPage - 1) * APPT_PAGE_SIZE, apptPage * APPT_PAGE_SIZE);
             return (
               <div className="space-y-2">
-                {nextAppt && (
-                  <p className="text-[12px] px-1" style={{ color: 'var(--text-muted)' }}>
-                    Next: {formatDate(nextAppt.appointmentDate)} {formatClockTime(nextAppt.appointmentTime)} · {nextAppt.providerName || 'Unassigned'}
-                  </p>
-                )}
                 <ChartSection
                   title="Appointments"
                   addLabel="New appointment"
@@ -1313,7 +1306,7 @@ export default function PatientDetailPage() {
                                 <span>{appt.department || 'Appointment'}</span>
                               </div>
                             </td>
-                            <td><span className="badge badge-normal text-[10px]">{appt.status}</span></td>
+                            <td><span className="badge badge-normal text-[10px]">{humanizeStatus(appt.status)}</span></td>
                           </tr>
                         ))}
                       </tbody>
@@ -1324,347 +1317,6 @@ export default function PatientDetailPage() {
             );
           })()}
 
-          {/* Overview Tab — full clinical overview (clinical roles only) */}
-          {activeTab === '__legacy_overview' && canViewClinical && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
-                {/* Chart-permanent care alerts — patient-safety banner shown
-                    on every visit (Centricity care alert). */}
-                <CareAlertsBanner patient={patient} hideAddButton />
-                {/* Unified chart summary — Problems, Medications, Allergies,
-                    Directives, and Most Recent Record in one full-width card. */}
-                <ChartSummaryPanel
-                  patient={patient}
-                  problems={patientProblems}
-                  prescriptions={(allPrescriptions || []).filter(r => r.patientId === patient._id)}
-                  onOpenProblems={() => setActiveTab('problems')}
-                />
-
-                {/* Latest Vitals */}
-                <div className="card-elevated ehr-vitals-panel lg:col-span-2 lg:order-2">
-                  <div className="ehr-vitals-header px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <div className="icon-box-sm">
-                        <Activity className="w-4 h-4" style={{ color: 'var(--color-danger-500)' }} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-sm" style={{ letterSpacing: -0.1 }}>{t('vitals.title')}</h3>
-                        {latestVitals && (
-                          <p className="text-[11px]" style={{ color: 'var(--text-muted)', marginTop: 1 }}>
-                            Today · Updated automatically from latest consultation
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => { setActiveTab('vitals'); setVitalsView('flowsheet'); }}
-                      className="text-xs font-semibold inline-flex items-center gap-1 px-2.5 py-1 rounded-md"
-                      style={{ color: 'var(--tamamhealth-blue)', background: 'rgba(33, 145, 208, 0.08)' }}
-                    >
-                      <TrendingUpIcon className="w-3.5 h-3.5" /> View Trends
-                    </button>
-                  </div>
-                  <div className="ehr-vitals-body">
-                    {latestVitals ? (
-                      <div className="ehr-vitals-grid">
-                        {[
-                          { label: t('vitals.pulse'), value: latestVitals.pulse, unit: 'bpm' },
-                          { label: t('vitals.bloodPressure'), value: latestVitals.systolic && latestVitals.diastolic ? `${latestVitals.systolic}/${latestVitals.diastolic}` : null, unit: 'mmHg' },
-                          { label: t('vitals.temperature'), value: latestVitals.temperature, unit: '°C' },
-                          { label: t('vitals.spo2'), value: latestVitals.oxygenSaturation, unit: '%' },
-                          { label: t('vitals.respRate'), value: latestVitals.respiratoryRate, unit: '/min' },
-                          { label: t('vitals.bmi'), value: latestVitals.bmi, unit: 'kg/m²' },
-                          { label: t('vitals.weight'), value: latestVitals.weight, unit: 'kg' },
-                          { label: t('vitals.height'), value: latestVitals.height, unit: 'cm' },
-                        ].map(item => (
-                          <div className="ehr-vital-row" key={item.label}>
-                            <span className="ehr-vital-label">{item.label}</span>
-                            <strong>{item.value ?? '—'}</strong>
-                            {item.value != null && <span className="ehr-vital-unit">{item.unit}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="ehr-vitals-empty flex items-center justify-center text-center rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No vitals recorded yet for this patient.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Recent Encounters — compact summary, click row or View full history for detail */}
-                {records.length > 0 && (() => {
-                  const q = encSearch.toLowerCase();
-                  const filtered = records
-                    .filter(rec => {
-                      const matchSearch = !q || rec.chiefComplaint?.toLowerCase().includes(q) || rec.providerName?.toLowerCase().includes(q) || (rec.diagnoses || []).some(d => d.name.toLowerCase().includes(q) || d.icd10Code?.toLowerCase().includes(q));
-                      const matchFilter = encFilter === 'all' || rec.visitType === encFilter || (encFilter === 'signed' && (rec as unknown as Record<string,string>).status === 'signed') || (encFilter === 'draft' && (rec as unknown as Record<string,string>).status !== 'signed');
-                      return matchSearch && matchFilter;
-                    })
-                    .sort((a, b) => {
-                      const da = a.consultedAt || a.visitDate || '';
-                      const db = b.consultedAt || b.visitDate || '';
-                      if (encSort === 'newest') return db.localeCompare(da);
-                      if (encSort === 'oldest') return da.localeCompare(db);
-                      if (encSort === 'provider') return (a.providerName || '').localeCompare(b.providerName || '');
-                      return 0;
-                    });
-                  const preview = filtered.slice(0, 5);
-                  return (
-                  <div className="card-elevated lg:col-span-3 lg:order-5" style={{ overflow: 'hidden' }}>
-                    {/* ── Header ── */}
-                    <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
-                        <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Recent Encounters</span>
-                        <span className="text-[11px] px-1.5 py-0.5 rounded font-semibold" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>{records.length}</span>
-                      </div>
-                      {/* Search + combined filter on one row */}
-                      <div className="flex items-center gap-2">
-                        <div className="relative">
-                          <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                          <input
-                            type="search"
-                            value={encSearch}
-                            onChange={e => setEncSearch(e.target.value)}
-                            placeholder="Search…"
-                            style={{ paddingLeft: 26, paddingRight: 10, paddingTop: 5, paddingBottom: 5, borderRadius: 6, border: '1px solid var(--border-light)', background: 'transparent', fontSize: 12, width: 160, outline: 'none', color: 'var(--text-primary)' }}
-                          />
-                        </div>
-                        <select
-                          value={`${encFilter}|${encSort}`}
-                          onChange={e => {
-                            const [f, s] = e.target.value.split('|');
-                            setEncFilter(f);
-                            setEncSort(s as typeof encSort);
-                          }}
-                          style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border-light)', background: 'transparent', fontSize: 12, cursor: 'pointer', outline: 'none', color: 'var(--text-primary)' }}
-                        >
-                          <option value="all|newest">All · Newest first</option>
-                          <option value="all|oldest">All · Oldest first</option>
-                          <option value="outpatient|newest">Outpatient</option>
-                          <option value="inpatient|newest">Inpatient</option>
-                          <option value="emergency|newest">Emergency</option>
-                          <option value="signed|newest">Signed only</option>
-                          <option value="draft|newest">Unsigned only</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* ── Compact row list ── */}
-                    {filtered.length === 0 ? (
-                      <div className="px-5 py-8 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No encounters match.</div>
-                    ) : (
-                      <>
-                        {preview.map((rec, idx) => {
-                          const primaryDx = (rec.diagnoses || [])[0];
-                          return (
-                            <div
-                              key={rec._id}
-                              className="flex items-center gap-3 cursor-pointer hover:bg-[var(--table-row-hover)] transition-colors"
-                              style={{ padding: '10px 20px', borderBottom: idx < preview.length - 1 ? '1px solid var(--border-light)' : 'none' }}
-                              onClick={() => setActiveTab('history')}
-                            >
-                              {/* Date */}
-                              <div className="flex-shrink-0 text-right" style={{ minWidth: 82 }}>
-                                <div className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{formatDate(rec.consultedAt || rec.visitDate)}</div>
-                              </div>
-                              {/* Visit type badge */}
-                              <span className={`badge text-[10px] flex-shrink-0 ${rec.visitType === 'emergency' ? 'badge-emergency' : rec.visitType === 'inpatient' ? 'badge-warning' : 'badge-normal'}`}>
-                                {rec.visitType}
-                              </span>
-                              {/* Chief complaint */}
-                              <span className="flex-1 min-w-0 text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{rec.chiefComplaint || '—'}</span>
-                              {/* Primary diagnosis */}
-                              <span className="flex-shrink-0 text-[11px] truncate" style={{ color: 'var(--text-muted)', width: 200 }}>
-                                {primaryDx ? <>{primaryDx.icd10Code && <span className="font-mono">{primaryDx.icd10Code} · </span>}{primaryDx.name}</> : '—'}
-                              </span>
-                              {/* Provider */}
-                              {rec.providerName && (
-                                <span className="text-[11px] flex-shrink-0 truncate" style={{ color: 'var(--text-muted)', maxWidth: 140 }}>{rec.providerName}</span>
-                              )}
-                              <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--border-light)' }} />
-                            </div>
-                          );
-                        })}
-                        {/* View full history footer */}
-                        <div className="flex items-center justify-between px-5 py-2.5" style={{ borderTop: '1px solid var(--border-light)' }}>
-                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                            Showing {preview.length} of {filtered.length} encounter{filtered.length !== 1 ? 's' : ''}
-                          </span>
-                          <button
-                            className="flex items-center gap-1 text-[12px] font-semibold"
-                            style={{ color: 'var(--tamamhealth-blue)' }}
-                            onClick={() => setActiveTab('history')}
-                          >
-                            View full history <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  );
-                })()}
-
-                {/* Outcome measures — scored intake assessments, held then signed (P2.2). */}
-                <div className="card-elevated lg:col-span-3 lg:order-6 p-5">
-                  <AssessmentsPanel patient={patient} />
-                </div>
-
-                {/* Phone notes — log patient calls and route to a provider (P1.4). */}
-                <div className="card-elevated lg:col-span-3 lg:order-7 p-5">
-                  <PhoneNotes patient={patient} />
-                </div>
-
-                {/* Preventive-care screening reminders (health maintenance). */}
-                <div className="lg:col-span-3 lg:order-8">
-                  <ScreeningsPanel patient={patient} />
-                </div>
-
-                {/* Queued patient reminders (e.g. follow-up "come fasted"). */}
-                <div className="lg:col-span-3 lg:order-8">
-                  <RemindersPanel patient={patient} />
-                </div>
-
-                {/* Scanned / uploaded chart documents (radiology, letters, IDs). */}
-                <div className="lg:col-span-3 lg:order-9">
-                  <DocumentsPanel patient={patient} />
-                </div>
-
-              {/* Sidebar info — only data that is NOT already its own tab.
-                  Allergies (header flag) and chronic conditions (Problems tab)
-                  live elsewhere; records with dedicated tabs (history, referrals,
-                  labs, prescriptions, immunizations, billing) are on the tab bar.
-                  Cards stretch to fill the column beside the main content. */}
-              <div className="lg:col-span-1 lg:order-2 lg:self-stretch flex flex-col gap-5">
-                <div className="card-elevated flex-1">
-                  <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                    <UserIcon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                    <h3 className="font-semibold text-sm">{t('patient.demographics')}</h3>
-                  </div>
-                  <div className="p-5 data-row-divider-sm">
-                    {/* Full demographics — every contact, identity, and registration
-                        detail lives here now that the header only carries identity. */}
-                    {[
-                      { l: 'Name', v: patientFullName(patient) },
-                      { l: 'Hospital No.', v: patient.hospitalNumber },
-                      { l: 'Gender', v: patient.gender },
-                      { l: t('patient.phone'), v: patient.phone ? formatPhoneDisplay(patient.phone) : null },
-                      { l: t('patient.bloodType'), v: patient.bloodType },
-                      { l: 'Date of Birth', v: patient.dateOfBirth ? formatDate(patient.dateOfBirth) : null },
-                      { l: 'National ID', v: patient.nationalId },
-                      { l: t('patient.location'), v: [patient.county, patient.state].filter(Boolean).join(', ') || null },
-                      { l: t('patient.tribe'), v: patient.tribe },
-                      { l: t('patient.language'), v: patient.primaryLanguage },
-                      { l: t('patient.registered'), v: (patient.registrationDate || patient.registeredAt) ? formatDate(patient.registrationDate || patient.registeredAt) : null },
-                      { l: t('patient.facility'), v: regHospital?.name || patient.registrationHospital || null },
-                      { l: t('patient.nextOfKin'), v: patient.nokName ? `${patient.nokName}${patient.nokRelationship ? ` (${patient.nokRelationship})` : ''}` : null },
-                      { l: t('patient.nokPhone'), v: patient.nokPhone ? formatPhoneDisplay(patient.nokPhone) : null },
-                    ].filter(item => item.v).map(item => (
-                      <div key={item.l} className="flex justify-between gap-3">
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.l}</span>
-                        <span className="text-xs font-medium text-right max-w-[60%] truncate">{item.v}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Appointments — shown only when the patient has one on record */}
-                {(lastAppt || nextAppt) && (
-                  <div className="card-elevated">
-                    <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                      <div className="icon-box-sm">
-                        <CalendarClock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                      </div>
-                      <h3 className="font-semibold text-sm">Appointments</h3>
-                    </div>
-                    <div className="p-5 space-y-4">
-                      {lastAppt && (
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Last visit</p>
-                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(`${lastAppt.appointmentDate}T${lastAppt.appointmentTime || '00:00'}:00`)} · {formatClockTime(lastAppt.appointmentTime)}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{lastAppt.providerName} · {lastAppt.department || lastAppt.reason}</p>
-                        </div>
-                      )}
-                      {nextAppt && (
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent-primary)' }}>Next visit</p>
-                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(`${nextAppt.appointmentDate}T${nextAppt.appointmentTime || '00:00'}:00`)} · {formatClockTime(nextAppt.appointmentTime)}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{nextAppt.providerName} · {nextAppt.department || nextAppt.reason}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Care Notes — shown only when a note exists */}
-                {latestNote && (
-                  <div className="card-elevated">
-                    <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                      <div className="icon-box-sm">
-                        <FileText className="w-3.5 h-3.5" style={{ color: 'var(--color-warning-400)' }} />
-                      </div>
-                      <h3 className="font-semibold text-sm">Care Notes</h3>
-                    </div>
-                    <div className="p-5">
-                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{latestNote.body}</p>
-                      <p className="text-[11px] mt-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                        <Clock className="w-3 h-3" /> {latestNote.authorName} · {formatDate(latestNote.createdAt)}
-                        {patientNotes.length > 1 && ` · +${patientNotes.length - 1} more`}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
-          )}
-
-          {/* Overview Tab — administrative-only summary (non-clinical roles, e.g. Medical Receptionist).
-              Minimum-necessary: contact + registration + next of kin, with shortcuts to the
-              admin tabs. No clinical notes, diagnoses, vitals, labs, or medications. */}
-          {activeTab === '__legacy_overview_admin' && !canViewClinical && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <div className="card-elevated">
-                <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                  <div className="icon-box-sm">
-                    <UserIcon className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
-                  </div>
-                  <h3 className="font-semibold text-sm">{t('patient.demographics')}</h3>
-                </div>
-                <div className="p-5 data-row-divider-sm">
-                  {/* Header already shows Phone, Location, Next of Kin name and
-                      Registered date — only the fields it omits are repeated here. */}
-                  {[
-                    { l: t('patient.language'), v: patient.primaryLanguage },
-                    { l: t('patient.facility'), v: regHospital?.name || 'N/A' },
-                    { l: t('patient.nokPhone'), v: patient.nokPhone },
-                  ].map(item => (
-                    <div key={item.l} className="flex justify-between gap-3">
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.l}</span>
-                      <span className="text-xs font-medium text-right max-w-[60%] truncate">{item.v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="card-elevated p-5">
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Clinical information (notes, test results, diagnoses, vitals, and medications) is restricted for your role. Use the tabs below for the administrative tasks you handle.
-                </p>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <button onClick={() => setActiveTab('billing')} className="btn btn-secondary btn-sm"><Wallet className="w-4 h-4" /> {t('billing.sidebarTitle')}</button>
-                  <button onClick={() => setActiveTab('referrals')} className="btn btn-secondary btn-sm"><ArrowRightLeft className="w-4 h-4" /> {t('tab.referrals')}</button>
-                  <button onClick={() => router.push(`/appointments?patientId=${patient._id}`)} className="btn btn-secondary btn-sm"><ClipboardList className="w-4 h-4" /> {t('nav.appointments')}</button>
-                </div>
-              </div>
-              {/* Intake / outcome measures — front desk enters these at check-in
-                  and they are held for the provider to review and sign (P2.2). */}
-              <div className="lg:col-span-2 card-elevated p-5">
-                <AssessmentsPanel patient={patient} />
-              </div>
-            </div>
-          )}
-
-          {/* SBAR Handoff — auto-generated from chart for shift change */}
           {activeTab === 'sbar' && patient && (
             <div className="card-elevated p-5">
               <PatientSBAR
@@ -1714,51 +1366,26 @@ export default function PatientDetailPage() {
               <div className="card-elevated p-5">
                 <PhoneNotes patient={patient} />
               </div>
-              <div className="card-elevated overflow-hidden">
-                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                  <div>
-                    <h3 className="font-semibold text-sm">Clinical Notes</h3>
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Encounter notes and signed chart records.</p>
-                  </div>
+              {/* Encounter documentation lives on the Activity feed — this tab
+                  is for persistent care-team notes only, so the same encounters
+                  are not listed twice under two names. */}
+              <div className="card-elevated p-5 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-sm">Looking for encounter notes?</h3>
+                  <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    Consultations and their documentation are on the Activity feed.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
                   {canConsult && (
-                    <button onClick={() => router.push(`/consultation?patientId=${patient._id}`)} className="btn btn-primary btn-sm">
-                      <ClipboardList className="w-4 h-4" /> Create Note
+                    <button className="btn btn-secondary text-[12px]" onClick={() => router.push(`/consultation?patientId=${patient._id}`)}>
+                      Start consultation
                     </button>
                   )}
+                  <button className="btn btn-primary text-[12px]" onClick={() => setActiveTab('history')}>
+                    Open Activity
+                  </button>
                 </div>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Type</th>
-                      <th>Chief Complaint</th>
-                      <th>Care team</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {records.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
-                          No clinical notes recorded yet.
-                        </td>
-                      </tr>
-                    ) : records.map(rec => (
-                      <tr key={rec._id}>
-                        <td className="font-mono text-xs">{formatDateTime(rec.consultedAt || rec.visitDate)}</td>
-                        <td className="text-xs uppercase">{rec.visitType || 'SOAP'}</td>
-                        <td className="font-medium text-sm">{rec.chiefComplaint || 'Clinical encounter'}</td>
-                        <td>
-                          <div className="appointment-card-provider">
-                            <strong>{rec.providerName || patient.assignedDoctorName || 'Clinician unassigned'}</strong>
-                            <span>{rec.department || rec.visitType || 'Encounter clinician'}</span>
-                          </div>
-                        </td>
-                        <td><span className="badge badge-normal text-[10px]">Open</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             </div>
           )}
@@ -1774,45 +1401,6 @@ export default function PatientDetailPage() {
             />
           )}
 
-          {activeTab === '__legacy_demographics' && patient && (
-            <div className="card-elevated overflow-hidden">
-              <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                <div>
-                  <h3 className="font-semibold text-sm">{t('patient.demographics')}</h3>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Identity, contact, registration, and next-of-kin information.</p>
-                </div>
-                <button onClick={openEditModal} className="btn btn-secondary btn-sm">
-                  <DuotoneInfoIcon name="edit" size={14} /> Edit
-                </button>
-              </div>
-              <div className="ehr-demo-grid p-5">
-                {[
-                  { l: 'Legal Name', v: patientFullName(patient) },
-                  { l: 'Hospital No.', v: patient.hospitalNumber },
-                  { l: 'Geocode ID', v: patient.geocodeId },
-                  { l: 'Date of Birth', v: patient.dateOfBirth ? formatDate(patient.dateOfBirth) : null },
-                  { l: 'Sex', v: patient.gender },
-                  { l: 'Blood Type', v: patient.bloodType },
-                  { l: 'Primary Phone', v: patient.phone ? formatPhoneDisplay(patient.phone) : null },
-                  { l: 'National ID', v: patient.nationalId },
-                  { l: 'State', v: patient.state },
-                  { l: 'County', v: patient.county },
-                  { l: 'Tribe', v: patient.tribe },
-                  { l: 'Language', v: patient.primaryLanguage },
-                  { l: 'Registered', v: (patient.registrationDate || patient.registeredAt) ? formatDate(patient.registrationDate || patient.registeredAt) : null },
-                  { l: 'Facility', v: regHospital?.name || patient.registrationHospital },
-                  { l: 'Next of Kin', v: patient.nokName ? `${patient.nokName}${patient.nokRelationship ? ` (${patient.nokRelationship})` : ''}` : null },
-                  { l: 'NOK Phone', v: patient.nokPhone ? formatPhoneDisplay(patient.nokPhone) : null },
-                ].map(item => (
-                  <div className="ehr-demo-row" key={item.l}>
-                    <span>{item.l}</span>
-                    <strong>{item.v || '—'}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {activeTab === 'careChecklist' && patient && (
             <div className="space-y-4">
               <ScreeningsPanel patient={patient} />
@@ -1826,414 +1414,9 @@ export default function PatientDetailPage() {
           {activeTab === 'documents' && patient && (
             <div className="space-y-4">
               <DocumentsPanel patient={patient} />
-              <div className="card-elevated p-5">
-                <AssessmentsPanel patient={patient} />
-              </div>
             </div>
           )}
 
-          {activeTab === 'transfers' && patient && (
-            <TransferHistoryPanel patient={patient} canViewClinical={canViewClinical} />
-          )}
-
-          {activeTab === 'recall' && patient && (
-            <div className="space-y-4">
-              <RemindersPanel patient={patient} />
-              <div className="card-elevated overflow-hidden">
-                <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                  <h3 className="font-semibold text-sm">Recall</h3>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Upcoming and prior appointments for follow-up planning.</p>
-                </div>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Time</th>
-                      <th>Care team</th>
-                      <th>Context</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {patientAppointments.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
-                          No appointments recorded for this patient.
-                        </td>
-                      </tr>
-                    ) : patientAppointments.map(appt => (
-                      <tr key={appt._id}>
-                        <td className="font-mono text-xs">{formatDate(appt.appointmentDate)}</td>
-                        <td>{formatClockTime(appt.appointmentTime) || '—'}</td>
-                        <td>
-                          <div className="appointment-card-provider">
-                            <strong>{appt.providerName || patient.assignedDoctorName || 'Doctor unassigned'}</strong>
-                            <span>{patient.assignedByName || 'Nurse unassigned'}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="appointment-card-provider">
-                            <strong>{appt.reason || appt.department || 'Follow-up'}</strong>
-                            <span>{appt.department || 'Appointment'}</span>
-                          </div>
-                        </td>
-                        <td><span className="badge badge-normal text-[10px]">{appt.status}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Timeline Tab */}
-          {activeTab === 'timeline' && patient && (
-            <PatientTimeline
-              medicalRecords={records}
-              labResults={(allLabResults || []).filter(l => l.patientId === patient._id)}
-              prescriptions={(allPrescriptions || []).filter(r => r.patientId === patient._id)}
-              immunizations={(allImmunizations || []).filter(i => i.patientId === patient._id)}
-              referrals={patientReferrals}
-              appointments={patientAppointments}
-              triages={patientTriages}
-            />
-          )}
-
-          {/* Medical History Tab */}
-          {activeTab === '__legacy_history' && (
-            <ChartSection
-              title="Visits"
-              filterSlot={records.length > 0 ? (
-                <span
-                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                  style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}
-                >
-                  <CalendarClock className="w-3 h-3" />
-                  First visit: {formatDateTime(records[records.length - 1]?.consultedAt || records[records.length - 1]?.visitDate)}
-                </span>
-              ) : undefined}
-            >
-              <p className="text-[11px] -mt-2 mb-2" style={{ color: 'var(--text-muted)' }}>
-                Showing {filteredHistory.length} of {records.length} encounter{records.length === 1 ? '' : 's'}, most recent first
-              </p>
-
-              {/* Filter bar */}
-              {records.length > 0 && (
-                <div
-                  className="px-5 py-3 border-b"
-                  style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
-                >
-                  <div
-                    className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg"
-                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
-                  >
-                    <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                    <input
-                      type="text"
-                      placeholder="Search all encounters by complaint, diagnosis, ICD-10, provider, visit type, date, notes, or recorded details…"
-                      value={historySearch}
-                      onChange={e => setHistorySearch(e.target.value)}
-                      className="flex-1 bg-transparent text-xs outline-none"
-                      style={{ color: 'var(--text-primary)' }}
-                    />
-                    {historySearch && (
-                      <button
-                        onClick={() => setHistorySearch('')}
-                        className="flex-shrink-0"
-                        title="Clear search"
-                      >
-                        <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-              {records.length === 0 ? (
-                <div className="px-6 py-7 text-center">
-                  <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No encounters recorded yet.</p>
-                </div>
-              ) : filteredHistory.length === 0 ? (
-                <div className="px-6 py-7 text-center">
-                  <Search className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No encounters match the current search.</p>
-                  <button
-                    onClick={() => setHistorySearch('')}
-                    className="text-xs font-semibold mt-2"
-                    style={{ color: 'var(--tamamhealth-blue)' }}
-                  >
-                    Clear search
-                  </button>
-                </div>
-              ) : (
-              <div className="relative px-6 py-5" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
-                {filteredHistory.map((rec) => {
-                  const ai = (rec as unknown as Record<string, unknown>).aiEvaluation as { suggestedDiagnoses: { icd10Code: string; name: string; confidence: number; reasoning: string; severity: string; suggestedTreatment?: string }[]; vitalSignAlerts: string[]; recommendedTests: string[]; severityAssessment: string; clinicalNotes: string; evaluatedAt: string } | undefined;
-                  const isAIExpanded = expandedAI.has(rec._id + '-history');
-                  const isExpanded = expandedEncounters.has(rec._id);
-                  const isEmergency = rec.visitType === 'emergency';
-                  const isInpatient = rec.visitType === 'inpatient';
-                  const markerColor = isEmergency ? 'var(--tamamhealth-red)' : isInpatient ? 'var(--color-warning)' : 'var(--tamamhealth-blue)';
-                  const labCount = (rec.labResults || []).length;
-                  const rxCount = (rec.prescriptions || []).length;
-                  const toggleExpand = () => setExpandedEncounters(prev => {
-                    const next = new Set(prev);
-                    if (next.has(rec._id)) next.delete(rec._id); else next.add(rec._id);
-                    return next;
-                  });
-                  return (
-                  <div key={rec._id} className="relative pb-5 last:pb-0">
-                    {/* Encounter card */}
-                    <div
-                      className="ehr-encounter-card rounded-xl transition-all hover:shadow-md"
-                      style={{
-                        border: '1px solid var(--border-light)',
-                        background: 'var(--bg-card)',
-                        boxShadow: 'none',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {/* Header strip — clickable to expand */}
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={toggleExpand}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(); } }}
-                        className="ehr-encounter-card__head px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 cursor-pointer hover:bg-[var(--accent-light)] transition-colors"
-                        style={{
-                          background: 'var(--overlay-subtle)',
-                          borderBottom: '1px solid var(--border-light)',
-                        }}
-                        title={isExpanded ? 'Collapse details' : 'Click to view full record details'}
-                      >
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full font-mono"
-                            style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-                          >
-                            <CalendarClock className="w-3 h-3" style={{ color: markerColor }} />
-                            {formatDateTime(rec.consultedAt || rec.visitDate)}
-                          </span>
-                          <span className={`badge text-[10px] ${isEmergency ? 'badge-emergency' : isInpatient ? 'badge-warning' : 'badge-normal'}`}>
-                            {rec.visitType}
-                          </span>
-                          {ai && (
-                            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(139,92,246,0.12)', color: 'var(--color-purple-500)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                              <Brain className="w-3 h-3" /> AI
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {labCount > 0 && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)' }}>
-                              <FlaskConical className="w-2.5 h-2.5" /> {labCount} lab{labCount === 1 ? '' : 's'}
-                            </span>
-                          )}
-                          {rxCount > 0 && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)' }}>
-                              <Pill className="w-2.5 h-2.5" /> {rxCount} rx
-                            </span>
-                          )}
-                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </div>
-                      </div>
-
-                      {/* Body */}
-                      <div className="ehr-encounter-card__body p-4">
-                        <p className="text-sm font-semibold leading-snug mb-1" style={{ color: 'var(--text-primary)' }}>
-                          {rec.chiefComplaint}
-                        </p>
-                        <p className="text-xs mb-3 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                          {isExpanded
-                            ? (rec.historyOfPresentIllness || '')
-                            : `${(rec.historyOfPresentIllness || '').slice(0, 180)}${(rec.historyOfPresentIllness || '').length > 180 ? '…' : ''}`}
-                        </p>
-                        {(rec.diagnoses || []).length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-3">
-                            {(rec.diagnoses || []).map((d, j) => (
-                              <span
-                                key={j}
-                                className="inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full"
-                                style={{
-                                  background: 'var(--bg-card)',
-                                  color: 'var(--tamamhealth-blue)',
-                                  border: '1px solid var(--accent-border)',
-                                }}
-                              >
-                                <span className="font-mono text-[9px] px-1 py-0.5 rounded" style={{ background: 'var(--accent-light)' }}>
-                                  {d.icd10Code}
-                                </span>
-                                {d.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 flex-wrap text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                          <span className="inline-flex items-center gap-1">
-                            <UserIcon className="w-3 h-3" />
-                            <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{rec.providerName}</span>
-                          </span>
-                          <span>·</span>
-                          <span className="inline-flex items-center gap-1">
-                            <Activity className="w-3 h-3" />
-                            {rec.department}
-                          </span>
-                          {rec.hospitalName && (
-                            <>
-                              <span>·</span>
-                              <span className="inline-flex items-center gap-1">
-                                <Building2 className="w-3 h-3" />
-                                {rec.hospitalName}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Expanded details: vitals, treatment plan, prescriptions, labs */}
-                        {isExpanded && (
-                          <div className="mt-4 pt-4 space-y-3" style={{ borderTop: '1px dashed var(--border-light)' }}>
-                            {rec.vitalSigns && (
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-                                  Vital signs at this visit
-                                </p>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {[
-                                    { l: 'Temp', v: `${rec.vitalSigns.temperature}°C` },
-                                    { l: 'BP', v: `${rec.vitalSigns.systolic}/${rec.vitalSigns.diastolic}` },
-                                    { l: 'Pulse', v: `${rec.vitalSigns.pulse} bpm` },
-                                    { l: 'SpO₂', v: `${rec.vitalSigns.oxygenSaturation}%` },
-                                  ].map(v => (
-                                    <div key={v.l} className="px-2 py-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                                      <p className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{v.l}</p>
-                                      <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{v.v}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {rec.physicalExamination && Object.entries(rec.physicalExamination).filter(([, v]) => v).length > 0 && (
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                  <Stethoscope className="w-3 h-3" style={{ color: 'var(--tamamhealth-blue)' }} />
-                                  Physical examination
-                                </p>
-                                <div className="text-xs leading-relaxed p-2.5 rounded-lg space-y-1" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
-                                  {Object.entries(rec.physicalExamination).filter(([, v]) => v).map(([sys, v]) => (
-                                    <p key={sys}><span className="font-semibold capitalize">{sys}:</span> {v}</p>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {rec.treatmentPlan && (
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                  <ClipboardList className="w-3 h-3" style={{ color: 'var(--tamamhealth-blue)' }} />
-                                  Treatment plan
-                                </p>
-                                <p className="text-xs leading-relaxed p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
-                                  {rec.treatmentPlan}
-                                </p>
-                              </div>
-                            )}
-                            {(rec.prescriptions || []).length > 0 && (
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                  <Pill className="w-3 h-3" style={{ color: '#2191D0' }} />
-                                  Prescriptions ({rec.prescriptions!.length})
-                                </p>
-                                <ul className="space-y-1">
-                                  {rec.prescriptions!.map((rx, k) => (
-                                    <li key={k} className="text-xs p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                                      <span>
-                                        <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{rx.drugName}</span>{' '}
-                                        <span style={{ color: 'var(--text-muted)' }}>· {rx.dose} · {rx.route} · {rx.frequency} · {rx.duration}</span>
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {(rec.labResults || []).length > 0 && (
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                  <FlaskConical className="w-3 h-3" style={{ color: 'var(--color-purple-500)' }} />
-                                  Lab results ({rec.labResults!.length})
-                                </p>
-                                <ul className="space-y-1">
-                                  {rec.labResults!.map((lab, k) => (
-                                    <li key={k} className="text-xs flex items-center gap-2 p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                                      <span className="font-medium flex-1" style={{ color: 'var(--text-primary)' }}>{lab.testName}</span>
-                                      <span className={lab.abnormal ? 'font-semibold' : ''} style={{ color: lab.abnormal ? (lab.critical ? 'var(--color-danger)' : 'var(--color-warning)') : 'var(--text-secondary)' }}>
-                                        {lab.result} {lab.unit}
-                                      </span>
-                                      {lab.abnormal && (
-                                        <span className={`badge text-[9px] ${lab.critical ? 'badge-emergency' : 'badge-warning'}`}>
-                                          {lab.critical ? 'CRIT' : 'ABN'}
-                                        </span>
-                                      )}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      {ai && (
-                        <>
-                          <button
-                            onClick={() => setExpandedAI(prev => {
-                              const next = new Set(prev);
-                              const key = rec._id + '-history';
-                              if (next.has(key)) next.delete(key); else next.add(key);
-                              return next;
-                            })}
-                            className="flex items-center gap-1 text-xs mt-2 font-medium"
-                            style={{ color: 'var(--color-purple-500)' }}
-                          >
-                            <Brain className="w-3 h-3" />
-                            {isAIExpanded ? 'Hide' : 'View'} AI Evaluation
-                            {isAIExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                          </button>
-                          {isAIExpanded && (
-                            <div className="mt-2 p-3 rounded-lg space-y-2" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
-                              <div className="flex items-center gap-2">
-                                <ShieldAlert className="w-3.5 h-3.5" style={{ color: ai.severityAssessment.includes('HIGH') ? 'var(--tamamhealth-red)' : ai.severityAssessment.includes('MODERATE') ? 'var(--color-warning)' : 'var(--accent-primary)' }} />
-                                <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{ai.severityAssessment}</span>
-                              </div>
-                              {ai.suggestedDiagnoses.slice(0, 3).map(dx => (
-                                <div key={dx.icd10Code} className="flex items-center gap-2 text-xs">
-                                  <span className="font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(139,92,246,0.12)', color: 'var(--color-purple-500)', fontSize: '10px' }}>{dx.icd10Code}</span>
-                                  <span className="font-medium">{dx.name}</span>
-                                  <span style={{ color: 'var(--text-muted)' }}>({dx.confidence}%)</span>
-                                </div>
-                              ))}
-                              {ai.recommendedTests.length > 0 && (
-                                <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--tamamhealth-blue)' }}>
-                                  <TestTubes className="w-3 h-3" />
-                                  Recommended: {ai.recommendedTests.join(', ')}
-                                </div>
-                              )}
-                              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{ai.clinicalNotes}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      <div className="mt-3">
-                        <RecordSignatureBar record={rec} />
-                      </div>
-                      </div>
-                    </div>
-                  </div>
-                );})}
-              </div>
-              )}
-            </ChartSection>
-          )}
-
-          {/* Unified longitudinal activity. The old visit table remains below
-              as a compatibility implementation, but the chart's active
-              History/Activity destination is this cross-care timeline. */}
           {activeTab === 'history' && patient && (
             <PatientTimeline
               medicalRecords={records}
@@ -2285,23 +1468,9 @@ export default function PatientDetailPage() {
 
           {/* Vitals Tab */}
           {activeTab === 'vitals' && (
-            <div className="card-elevated overflow-hidden">
-              <div className="px-5 py-3 border-b flex items-center justify-between flex-wrap gap-3" style={{ borderColor: 'var(--border-light)' }}>
-                <div>
-                  <h3 className="font-semibold text-sm flex items-center gap-2">
-                    {vitalsView === 'flowsheet' ? (
-                      <TrendingUpIcon className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-                    ) : (
-                      <Activity className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-                    )}
-                    {vitalsView === 'flowsheet' ? 'Vital Sign Flowsheet' : 'Vitals'}
-                  </h3>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {vitalsView === 'flowsheet'
-                      ? 'Chronological trends across all recorded visits.'
-                      : 'Recorded vital signs from patient encounters.'}
-                  </p>
-                </div>
+            <ChartSection
+              title={vitalsView === 'flowsheet' ? 'Vital sign flowsheet' : 'Vitals'}
+              toggleSlot={(
                 <div className="ehr-chart-subtabs" role="tablist" aria-label="Vitals view">
                   <button
                     type="button"
@@ -2322,14 +1491,15 @@ export default function PatientDetailPage() {
                     Flowsheet
                   </button>
                 </div>
-              </div>
+              )}
+            >
               {vitalsView === 'flowsheet' ? (
                 <div className="p-5">
                   <VitalsTrends records={records} />
                 </div>
               ) : (
                 <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
-                <table className="data-table" style={{ minWidth: 1080 }}>
+                <table className="omrs-table" style={{ minWidth: 1080 }}>
                   <thead>
                     <tr>
                       <th>Date</th>
@@ -2355,7 +1525,7 @@ export default function PatientDetailPage() {
                       const v = rec.vitalSigns;
                       return (
                         <tr key={rec._id}>
-                          <td className="font-mono text-xs">{rec.visitDate}</td>
+                          <td className="font-mono text-xs">{formatDate(rec.visitDate)}</td>
                           <td style={{ color: v.temperature > 37.5 ? 'var(--color-danger)' : 'inherit', fontWeight: v.temperature > 37.5 ? 600 : 400 }}>{v.temperature}</td>
                           <td style={{ color: v.systolic > 140 ? 'var(--color-danger)' : 'inherit', fontWeight: v.systolic > 140 ? 600 : 400 }}>{v.systolic}/{v.diastolic}</td>
                           <td style={{ color: v.pulse > 100 ? 'var(--color-danger)' : 'inherit' }}>{v.pulse}</td>
@@ -2371,7 +1541,7 @@ export default function PatientDetailPage() {
                 </table>
                 </div>
               )}
-            </div>
+            </ChartSection>
           )}
 
           {/* Immunizations Tab */}
@@ -2411,7 +1581,7 @@ export default function PatientDetailPage() {
                             <td style={{ textTransform: 'capitalize' }}>{im.site || '—'}</td>
                             <td className="font-mono">{im.batchNumber || '—'}</td>
                             <td>
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ background: s.bg, color: s.color }}>{im.status}</span>
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ background: s.bg, color: s.color }}>{humanizeStatus(im.status)}</span>
                             </td>
                           </tr>
                         );
@@ -2424,7 +1594,8 @@ export default function PatientDetailPage() {
             );
           })()}
 
-          {/* Referrals Tab */}
+          {/* Care coordination: internal transfers and external referrals share
+              one ownership and follow-up destination. */}
           {activeTab === 'referrals' && (
             <div className="space-y-3">
               <TransferHistoryPanel patient={patient} canViewClinical={canViewClinical} />
@@ -2433,10 +1604,10 @@ export default function PatientDetailPage() {
                   <div className="icon-box-sm">
                     <ArrowRightLeft className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
                   </div>
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referral.title')}</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Referrals</span>
                 </div>
                 <button onClick={() => router.push(`/referrals?patient=${encodeURIComponent(patientFullName(patient))}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
-                  View in Referrals <ChevronRight className="w-3.5 h-3.5" />
+                  All referrals <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
               {patientReferrals.length === 0 ? (
@@ -2796,7 +1967,6 @@ function PatientFacesheetView({
   prescriptions,
   labResults,
   immunizations,
-  records,
   canViewClinical,
   onOpenTab,
   actions,
@@ -2812,7 +1982,6 @@ function PatientFacesheetView({
   prescriptions: PrescriptionDoc[];
   labResults: LabResultDoc[];
   immunizations: ImmunizationDoc[];
-  records: MedicalRecordDoc[];
   canViewClinical: boolean;
   onOpenTab: (tab: string) => void;
   /** Per-panel primary actions. A missing entry hides that panel's action
@@ -2825,12 +1994,19 @@ function PatientFacesheetView({
   onResetPanels: () => void;
 }) {
   const activeProblems = problems.filter(problem => problem.status === 'active' || problem.status === 'chronic');
-  const currentMeds = prescriptions.filter(rx => rx.status !== 'dispensed').slice(0, 4);
+  const activeAllergies = patient.structuredAllergies !== undefined
+    ? patient.structuredAllergies.filter(a => a.status === 'active').map(a => ({ name: a.substance, detail: a.reaction || a.criticality }))
+    : (patient.allergies || [])
+        .filter(a => a && a.toLowerCase() !== 'none known' && a.toLowerCase() !== 'none')
+        .map(a => ({ name: a, detail: undefined as string | undefined }));
+  // "Current" = anything not stopped. A dispensed medicine is the one the
+  // patient is actually taking — excluding it (the old filter) made the panel
+  // read "(None documented)" for fully-dispensed patients.
+  const currentMeds = prescriptions.filter(rx => rx.status !== 'discontinued').slice(0, 4);
   const recentLabs = [...labResults]
     .sort((a, b) => (b.completedAt || b.createdAt || '').localeCompare(a.completedAt || a.createdAt || ''))
     .slice(0, 4);
-  const latestHistory = records[0];
-  const recommendations = buildClinicalRecommendations(patient, immunizations, activeProblems);
+  const careActions = buildCareActions(patient, immunizations);
   const showPanel = (panelId: FacesheetPanelId) => visiblePanelIds.has(panelId);
 
   if (!canViewClinical) {
@@ -2851,7 +2027,7 @@ function PatientFacesheetView({
   return (
     <div className="tebra-facesheet">
       <div className="tebra-section-title">
-        <h1>Facesheet</h1>
+        <h1>Patient summary</h1>
         <button type="button" onClick={onToggleCustomize}>
           {customizeOpen ? 'Done' : 'Customize View'}
         </button>
@@ -2887,7 +2063,7 @@ function PatientFacesheetView({
             {currentMeds.map(rx => (
               <div key={rx._id} className="tebra-list-row">
                 <strong>{rx.medication}</strong>
-                <span>{[rx.dose, rx.frequency, rx.duration].filter(Boolean).join(' · ')}</span>
+                <span>{formatRxSig(rx)}</span>
               </div>
             ))}
           </div>
@@ -2897,10 +2073,10 @@ function PatientFacesheetView({
 
       {showPanel('problems') && (
       <section className="tebra-panel" onClick={() => onOpenTab('problems')}>
-        <FacesheetPanelHead icon={AlertTriangle} title="Problems" action={actions.problems} />
-        {activeProblems.length ? (
+        <FacesheetPanelHead icon={ShieldAlert} title="Safety alerts" action={actions.problems} />
+        {activeProblems.length || activeAllergies.length ? (
           <div className="tebra-list">
-            {activeProblems.slice(0, 5).map(problem => (
+            {activeProblems.slice(0, 4).map(problem => (
               <div key={problem._id} className="tebra-list-row">
                 <strong>{problem.name}</strong>
                 <span className="tebra-list-row-meta">
@@ -2909,33 +2085,16 @@ function PatientFacesheetView({
                 </span>
               </div>
             ))}
-          </div>
-        ) : <p className="tebra-none">(None documented)</p>}
-      </section>
-      )}
-
-      {showPanel('allergies') && (() => {
-        const activeAllergies = patient.structuredAllergies !== undefined
-          ? patient.structuredAllergies.filter(a => a.status === 'active').map(a => ({ name: a.substance, detail: a.reaction || a.criticality }))
-          : (patient.allergies || [])
-              .filter(a => a && a.toLowerCase() !== 'none known' && a.toLowerCase() !== 'none')
-              .map(a => ({ name: a, detail: undefined as string | undefined }));
-        return (
-      <section className="tebra-panel" onClick={() => onOpenTab('allergies')}>
-        <FacesheetPanelHead icon={ShieldAlert} title="Allergies" action={actions.allergies} />
-        {activeAllergies.length ? (
-          <div className="tebra-list">
-            {activeAllergies.slice(0, 6).map((a, i) => (
-              <div key={`${a.name}-${i}`} className="tebra-list-row">
-                <strong>{a.name}</strong>
-                {a.detail && <span>{a.detail}</span>}
+            {activeAllergies.slice(0, 4).map((allergy, index) => (
+              <div key={`${allergy.name}-${index}`} className="tebra-list-row">
+                <strong>Allergy: {allergy.name}</strong>
+                <span>{allergy.detail || 'Active'}</span>
               </div>
             ))}
           </div>
-        ) : <p className="tebra-none">(No known allergies documented)</p>}
+        ) : <p className="tebra-none">No active problems or allergies documented.</p>}
       </section>
-        );
-      })()}
+      )}
 
       {showPanel('vitals') && (() => {
         const bpElevated = !!(latestVitals?.systolic && latestVitals.systolic >= 140) || !!(latestVitals?.diastolic && latestVitals.diastolic >= 90);
@@ -2943,7 +2102,7 @@ function PatientFacesheetView({
         const spo2Low = !!(latestVitals?.oxygenSaturation && latestVitals.oxygenSaturation < 94);
         return (
       <section className="tebra-panel tebra-panel--highlight" onClick={() => onOpenTab('vitals')}>
-        <FacesheetPanelHead icon={Activity} title="Vitals" action={actions.vitals} />
+        <FacesheetPanelHead icon={Activity} title="Latest observations" action={actions.vitals} />
         {latestVitals ? (
           <div className="tebra-vitals">
             <span className={bpElevated ? 'is-out-of-range' : ''}>BP <strong>{latestVitals.systolic && latestVitals.diastolic ? `${latestVitals.systolic}/${latestVitals.diastolic}` : '-'}</strong></span>
@@ -2952,89 +2111,42 @@ function PatientFacesheetView({
             <span className={spo2Low ? 'is-out-of-range' : ''}>SpO2 <strong>{latestVitals.oxygenSaturation ?? '-'}</strong></span>
           </div>
         ) : <p className="tebra-none">(None documented)</p>}
+        {recentLabs.length > 0 && (
+          <div className="tebra-list mt-2">
+            <div className="tebra-list-row"><strong>Recent results</strong><span>{recentLabs.length} recorded</span></div>
+            {recentLabs.slice(0, 2).map(lab => (
+              <div key={lab._id} className="tebra-list-row">
+                <strong>{lab.testName}</strong>
+                <span>{[lab.result, lab.unit].filter(Boolean).join(' ') || lab.status || 'Pending'}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
         );
       })()}
 
-      {showPanel('history') && (
-      <section className="tebra-panel" onClick={() => onOpenTab('history')}>
-        <FacesheetPanelHead icon={History} title="History" action={actions.history} />
-        {latestHistory ? (
-          <div className="tebra-list-row">
-            <strong>{latestHistory.chiefComplaint || 'Recent encounter'}</strong>
-            <span>{formatDateTime(latestHistory.consultedAt || latestHistory.visitDate)} · {latestHistory.providerName || 'Provider not listed'}</span>
-          </div>
-        ) : <p className="tebra-none">(None Documented)</p>}
-      </section>
-      )}
-
-      {showPanel('labs') && (
-      <section className="tebra-panel" onClick={() => onOpenTab('labs')}>
-        <FacesheetPanelHead icon={FlaskConical} title="Labs/Studies" action={actions.labs} />
-        {recentLabs.length ? (
-          <div className="tebra-list">
-            {recentLabs.map(lab => {
-              const resultText = /positive|reactive|abnormal/i.test(lab.result || '') ? 'danger'
-                : /negative|non-reactive|normal/i.test(lab.result || '') ? 'success'
-                : null;
-              return (
-                <div key={lab._id} className="tebra-list-row">
-                  <strong>{lab.testName}</strong>
-                  <span className="tebra-list-row-meta">
-                    {lab.result && (
-                      <span className={resultText ? `tebra-lab-result is-${resultText}` : 'tebra-lab-result'}>
-                        {[lab.result, lab.unit].filter(Boolean).join(' ')}
-                      </span>
-                    )}
-                    {lab.status && <span>{lab.status}</span>}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        ) : <p className="tebra-none">(None documented)</p>}
-      </section>
-      )}
-
       {showPanel('recommendations') && (
       <section className="tebra-panel tebra-recommendations" onClick={() => onOpenTab('careChecklist')}>
-        <FacesheetPanelHead icon={ClipboardList} title="Clinical Recommendations" action={actions.recommendations} />
-        <div className="tebra-reco-list">
-          {recommendations.map(item => (
-            <div key={item.title} className="tebra-reco-row">
-              <span className={item.grade === 'A' ? 'tebra-reco-grade is-rec' : 'tebra-reco-grade is-info'}>{item.grade}</span>
-              <div>
-                <small>{item.category}</small>
-                <strong>{item.title}</strong>
+        <FacesheetPanelHead icon={ClipboardList} title="Next care actions" action={actions.recommendations} />
+        {careActions.length ? (
+          <div className="tebra-reco-list">
+            {careActions.map(item => (
+              <div key={item.key} className="tebra-reco-row">
+                <span className={item.overdue ? 'tebra-reco-grade is-rec' : 'tebra-reco-grade is-info'}>
+                  {item.overdue ? '!' : '•'}
+                </span>
+                <div>
+                  <small>{item.category}{item.detail ? ` · ${item.detail}` : ''}{item.overdue ? ' · overdue' : ''}</small>
+                  <strong>{item.title}</strong>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : <p className="tebra-none">No outstanding care actions — manage screenings on the Care plan tab.</p>}
       </section>
       )}
 
-      {showPanel('demographics') && (
-      <section className="tebra-panel" onClick={() => onOpenTab('demographics')}>
-        <FacesheetPanelHead icon={UserIcon} title="Demographics" action={actions.demographics} />
-        <div className="tebra-list">
-          {[
-            { label: 'Patient ID', value: patient.hospitalNumber || patient.geocodeId || '—' },
-            { label: 'Age', value: patientAgeLabel(patient) },
-            { label: 'Gender', value: patient.gender || '—' },
-            { label: 'Date of birth', value: patient.dateOfBirth || '—' },
-            { label: 'Phone', value: patient.phone || '—' },
-            { label: 'Blood type', value: patient.bloodType || '—' },
-            { label: 'Address', value: patient.address || [patient.boma, patient.payam, patient.county].filter(Boolean).join(', ') || '—' },
-            { label: 'Language', value: patient.primaryLanguage || '—' },
-          ].map(row => (
-            <div key={row.label} className="tebra-list-row">
-              <strong>{row.label}</strong>
-              <span>{row.value}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-      )}
     </div>
   );
 }
@@ -3209,16 +2321,36 @@ function DemoField({ label, value, wide }: { label: string; value: string; wide?
   );
 }
 
-function buildClinicalRecommendations(patient: PatientDoc, immunizations: ImmunizationDoc[], problems: ProblemDoc[]) {
-  const hasInfluenza = immunizations.some(imm => /influenza|flu/i.test(imm.vaccine || ''));
-  const hasHivScreen = problems.some(problem => /hiv/i.test(problem.name));
-  const ageText = patientAgeLabel(patient);
-  const adult = !ageText.includes('mo') && !ageText.includes('day') && !ageText.includes('week');
-  return [
-    { grade: 'i', category: 'Preventive Care and Screening:', title: 'Colorectal Cancer Screening' },
-    { grade: 'i', category: 'Documentation of Current Medications in the Medical Record:', title: 'Maintain current medication list' },
-    { grade: 'i', category: 'Preventive Care and Screening:', title: hasInfluenza ? 'Influenza immunization documented' : 'Influenza Immunizations' },
-    { grade: 'A', category: 'Colorectal Cancer: Screening', title: 'Colorectal Cancer: Screening - Adults aged 50 to 75 years' },
-    { grade: 'A', category: 'Human Immunodeficiency Virus (HIV) Infection: Screening', title: hasHivScreen || adult ? 'HIV Infection: Screening - Adolescents and adults aged 15 to 65 years' : 'HIV Infection: Screening' },
-  ];
+/**
+ * "Next care actions" for the facesheet — the patient's REAL outstanding work,
+ * from the same `patient.screenings` model the Care plan tab manages (so the
+ * two surfaces can never contradict each other) plus overdue/due vaccine doses.
+ * Replaces a hardcoded USPSTF measure list that told every patient to get a
+ * colorectal screening regardless of their data.
+ */
+function buildCareActions(patient: PatientDoc, immunizations: ImmunizationDoc[]) {
+  const items: Array<{ key: string; overdue: boolean; category: string; title: string; detail?: string }> = [];
+  for (const s of patient.screenings ?? []) {
+    if (s.status !== 'due') continue;
+    items.push({
+      key: `scr-${s.id}`,
+      overdue: isScreeningOverdue(s),
+      category: 'Screening',
+      title: s.type,
+      detail: s.dueDate ? `Due ${formatDate(s.dueDate)}` : undefined,
+    });
+  }
+  const todayIso = new Date().toISOString().slice(0, 10);
+  for (const imm of immunizations) {
+    if (imm.status === 'completed' || !imm.nextDueDate) continue;
+    items.push({
+      key: `imm-${imm._id}`,
+      overdue: imm.status === 'overdue' || imm.nextDueDate < todayIso,
+      category: 'Immunization',
+      title: `${imm.vaccine}${imm.doseNumber > 0 ? ` · dose ${imm.doseNumber}` : ''}`,
+      detail: `Due ${formatDate(imm.nextDueDate)}`,
+    });
+  }
+  // Overdue first, then soonest due.
+  return items.sort((a, b) => Number(b.overdue) - Number(a.overdue)).slice(0, 6);
 }

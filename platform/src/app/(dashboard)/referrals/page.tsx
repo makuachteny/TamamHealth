@@ -126,6 +126,15 @@ export default function ReferralsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedReferral]);
 
+  // The referral open in the detail popup. Resolved against the unfiltered
+  // list on purpose: a status change made from the popup (accept, complete)
+  // can move the row out of the current filter, and the dialog should not
+  // vanish mid-read because of it.
+  const detailReferral = expandedReferral
+    ? activeReferrals.find(r => r._id === expandedReferral)
+    : undefined;
+  const detailPackage = detailReferral?.transferPackage as TransferPackage | undefined;
+
   // Search filtering (+ status filter)
   const combinedSearch = localSearch.toLowerCase().trim();
   const filteredReferrals = activeReferrals.filter(r => {
@@ -584,7 +593,9 @@ export default function ReferralsPage() {
             }
           />
 
-          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          {/* 16px gutter matches the card's title/search inset, so the first
+              column starts under the search box rather than 15px left of it. */}
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0, padding: '0 16px' }}>
             {filteredReferrals.length === 0 ? (
               <div className="p-8">
                 <EmptyState
@@ -622,9 +633,7 @@ export default function ReferralsPage() {
               </thead>
               <tbody>
                 {filteredReferrals.map(ref => {
-                const isExpanded = expandedReferral === ref._id;
                 const tp = ref.transferPackage as TransferPackage | undefined;
-                const refAtts = ref.referralAttachments as Attachment[] | undefined;
                 // Status-driven actions, collapsed into a single kebab menu.
                 const rowActions: RowAction[] = [
                   ...(canManageReferrals && activeTab === 'incoming' && (ref.status === 'sent' || ref.status === 'received') ? [
@@ -649,7 +658,7 @@ export default function ReferralsPage() {
                   <Fragment key={ref._id}>
                     <tr
                       className="cursor-pointer hover:bg-[var(--table-row-hover)]"
-                      onClick={() => setExpandedReferral(isExpanded ? null : ref._id)}
+                      onClick={() => setExpandedReferral(ref._id)}
                     >
                       <td>
                         {ref.patientId && !ref.patientId.startsWith('demo-') && !ref.patientId.includes('_demo') ? (
@@ -701,51 +710,6 @@ export default function ReferralsPage() {
                         </td>
                     </tr>
 
-                    {/* Expanded View: Transfer Package */}
-                    {isExpanded && (
-                      <tr><td colSpan={8} style={{ padding: 0, background: 'var(--overlay-subtle)' }}>
-                      <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
-                        {ref.outcome && (
-                          <div className="mt-4 p-3 rounded-lg" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <ClipboardCheck className="w-4 h-4" style={{ color: '#16A34A' }} />
-                              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#16A34A' }}>{t('referrals.outcomeReceived')}</p>
-                              <Badge tone="success">{t(`referrals.disposition_${ref.outcome.disposition}`)}</Badge>
-                            </div>
-                            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{ref.outcome.summary}</p>
-                            {ref.outcome.followUp && (
-                              <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
-                                <span className="font-semibold">{t('referrals.outcomeFollowUp')}: </span>{ref.outcome.followUp}
-                              </p>
-                            )}
-                            <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
-                              {t('referrals.outcomeRecordedBy', { name: ref.outcome.recordedBy, date: ref.outcome.recordedAt.slice(0, 10) })}
-                            </p>
-                          </div>
-                        )}
-                        {tp ? (
-                          <TransferPackageViewer pkg={tp} refAttachments={refAtts} reason={ref.reason} notes={ref.notes} />
-                        ) : (
-                          <div className="mt-4 space-y-3">
-                            <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('referral.reason')}</p>
-                              <p className="text-sm">{ref.reason}</p>
-                            </div>
-                            <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('referral.notes')}</p>
-                              <p className="text-sm whitespace-pre-wrap">{ref.notes || t('referrals.none')}</p>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                              <div className="icon-box-sm">
-                                <AlertTriangle className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
-                              </div>
-                              {t('referrals.noDataPackage')}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      </td></tr>
-                    )}
                   </Fragment>
                 );
               })}
@@ -757,6 +721,80 @@ export default function ReferralsPage() {
 
         {showNewReferral && (
           <ReferralFormModal onClose={() => setShowNewReferral(false)} />
+        )}
+
+        {/* Referral detail — a popup rather than an inline expansion row: the
+            package viewer is taller than a table row wants to be, and pushing
+            every row below it down the page lost the reader's place. */}
+        {detailReferral && (
+          <Modal onClose={() => setExpandedReferral(null)} width={760} align="top" labelledBy="referral-detail-title">
+            <div className="modal-panel" onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 80px)', overflow: 'hidden' }}>
+              <div className="flex items-start justify-between gap-3 mb-4 flex-shrink-0">
+                <div className="min-w-0">
+                  <h3 id="referral-detail-title" className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    {detailReferral.patientName}
+                  </h3>
+                  <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
+                    {detailReferral.fromHospital} → {detailReferral.toHospital}
+                    {detailReferral.department ? ` · ${detailReferral.department}` : ''}
+                    {` · ${detailReferral.referralDate}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge tone={toneForStatus(detailReferral.status)}>{getStatusLabel(detailReferral.status)}</Badge>
+                  <button onClick={() => setExpandedReferral(null)} aria-label={t('action.close')} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ overflowY: 'auto', minHeight: 0 }}>
+                {detailReferral.outcome && (
+                  <div className="mb-3 p-3 rounded-lg" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <ClipboardCheck className="w-4 h-4" style={{ color: '#16A34A' }} />
+                      <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#16A34A' }}>{t('referrals.outcomeReceived')}</p>
+                      <Badge tone="success">{t(`referrals.disposition_${detailReferral.outcome.disposition}`)}</Badge>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{detailReferral.outcome.summary}</p>
+                    {detailReferral.outcome.followUp && (
+                      <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
+                        <span className="font-semibold">{t('referrals.outcomeFollowUp')}: </span>{detailReferral.outcome.followUp}
+                      </p>
+                    )}
+                    <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                      {t('referrals.outcomeRecordedBy', { name: detailReferral.outcome.recordedBy, date: detailReferral.outcome.recordedAt.slice(0, 10) })}
+                    </p>
+                  </div>
+                )}
+                {detailPackage ? (
+                  <TransferPackageViewer
+                    pkg={detailPackage}
+                    refAttachments={detailReferral.referralAttachments as Attachment[] | undefined}
+                    reason={detailReferral.reason}
+                    notes={detailReferral.notes}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('referral.reason')}</p>
+                      <p className="text-sm">{detailReferral.reason}</p>
+                    </div>
+                    <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('referral.notes')}</p>
+                      <p className="text-sm whitespace-pre-wrap">{detailReferral.notes || t('referrals.none')}</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <div className="icon-box-sm">
+                        <AlertTriangle className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
+                      </div>
+                      {t('referrals.noDataPackage')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Modal>
         )}
 
         {/* Reverse status confirmation — undo an acceptance or reopen a

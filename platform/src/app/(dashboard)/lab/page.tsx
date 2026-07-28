@@ -376,16 +376,23 @@ export default function LabPage() {
   // Field style for the selects inside the header's Filters popover (mirrors
   // the patients registry's Filters panel fields).
   const popoverFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
-  const labCols: { key: string; label: string }[] = [
-    { key: 'patient', label: t('lab.patient') },
-    { key: 'test', label: t('lab.testName') },
-    { key: 'specimen', label: t('lab.specimen') },
-    { key: 'status', label: t('lab.status') },
-    { key: 'result', label: t('lab.result') },
-    { key: 'orderedBy', label: t('lab.orderedByLabel') },
-    { key: 'time', label: t('lab.time') },
-    ...(canEnterLabResults ? [{ key: 'action', label: t('lab.action') }] : []),
+  // `width` is a share, not a percentage — it is normalised against the row's
+  // own total below, so the two shapes of this table (with and without the
+  // Action column) each add up without a second set of numbers. Sized to the
+  // content each column actually carries: Result holds a short value plus an
+  // "Abnormal" chip, not the widest column on the page, while Time needs a
+  // full "2026-07-28 12:11" on one line.
+  const labCols: { key: string; label: string; width: number }[] = [
+    { key: 'patient', label: t('lab.patient'), width: 19 },
+    { key: 'test', label: t('lab.testName'), width: 19 },
+    { key: 'specimen', label: t('lab.specimen'), width: 10 },
+    { key: 'status', label: t('lab.status'), width: 11 },
+    { key: 'result', label: t('lab.result'), width: 17 },
+    { key: 'orderedBy', label: t('lab.orderedByLabel'), width: 13 },
+    { key: 'time', label: t('lab.time'), width: 11 },
+    ...(canEnterLabResults ? [{ key: 'action', label: t('lab.action'), width: 14 }] : []),
   ];
+  const labColTotal = labCols.reduce((sum, c) => sum + c.width, 0);
 
   // Results back but not yet reviewed by a clinician past their SLA
   // (24h critical / 7 days routine) — surfaced so they can't sit unseen.
@@ -758,8 +765,17 @@ export default function LabPage() {
                 </>
               }
             />
-            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-            <table className="data-table" style={{ minWidth: 960 }}>
+            {/* 16px gutter matches the card's title/search inset, so the first
+              column starts under the search box rather than 15px left of it. */}
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0, padding: '0 16px' }}>
+            {/* `table-layout: fixed` is what makes the colgroup binding: without
+                it the browser re-sizes from content and Result swallows the row. */}
+            <table className="data-table" style={{ minWidth: 1040, tableLayout: 'fixed' }}>
+              <colgroup>
+                {labCols.map(c => (
+                  <col key={c.key} style={{ width: `${(c.width / labColTotal * 100).toFixed(2)}%` }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   {labCols.map(c => (

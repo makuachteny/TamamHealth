@@ -133,6 +133,194 @@
   background: var(--ehr-panel, #fff);
 }
 
+/* Shared destination context. Individual modules own their data controls;
+   this keeps navigation context, typography, and spacing consistent across
+   every chart destination. */
+
+.tamam-activity-filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.tamam-activity-filters button {
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ehr-muted, #8395A8);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tamam-activity-filters button:hover,
+.tamam-activity-filters button.is-active {
+  border-color: var(--omrs-teal-border);
+  background: var(--omrs-teal-soft);
+  color: var(--omrs-teal);
+}
+
+.tamam-activity-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--ehr-border-soft, #E7EEF5);
+  color: var(--ehr-muted, #8395A8);
+  font-size: 11px;
+}
+
+.tamam-activity-summary strong {
+  color: var(--ehr-text-title, #132C44);
+  font-size: 12px;
+}
+
+/* ── Activity table ────────────────────────────────────────────────────────
+   Was a timeline feed: a 30px marker rail (dot + connector) down the left and
+   every event's subtitle/meta stacked under its title, which cost roughly 3x
+   the height per event. Now one table row per event, with the subtitle/meta
+   behind a per-row disclosure. The rail is gone entirely — the Date column
+   already carries the ordering it was drawing. */
+.tamam-activity-table {
+  table-layout: auto;
+}
+
+.tamam-activity-tr.has-detail {
+  cursor: pointer;
+}
+
+.tamam-activity-tr.has-detail:hover {
+  background: var(--ehr-hover, #FAFCFE);
+}
+
+.tamam-activity-date {
+  color: var(--ehr-muted, #8395A8);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tamam-activity-title {
+  color: var(--ehr-text-title, #132C44);
+  font-weight: 600;
+}
+
+/* Category reads as a coloured dot + label rather than the old pill: at table
+   density a filled chip per row turns the column into a stripe of colour. */
+.tamam-activity-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ehr-text-body, #39536B);
+  white-space: nowrap;
+}
+
+.tamam-activity-type i {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.tamam-activity-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tamam-activity-severity {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.tamam-activity-dash {
+  color: var(--ehr-muted, #8395A8);
+}
+
+.tamam-activity-toggle-cell {
+  width: 34px;
+  text-align: right;
+}
+
+.tamam-activity-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ehr-muted, #8395A8);
+  cursor: pointer;
+  transition: transform .12s ease, background .12s ease;
+}
+
+.tamam-activity-toggle:hover {
+  background: var(--ehr-hover, #FAFCFE);
+  color: var(--ehr-text-title, #132C44);
+}
+
+.tamam-activity-tr.is-open .tamam-activity-toggle {
+  transform: rotate(180deg);
+}
+
+/* An alarming event (critical result, high-risk triage) keeps a danger edge —
+   at one line per row the badge alone is easy to scan past. */
+.tamam-activity-tr.is-alarm td:first-child {
+  box-shadow: inset 2px 0 0 var(--color-danger, #E52E42);
+}
+
+.tamam-activity-detail > td {
+  padding-top: 0;
+  background: transparent;
+}
+
+.tamam-activity-detail p {
+  margin: 0;
+  color: var(--ehr-text-body, #39536B);
+  font-size: 12px;
+}
+
+.tamam-activity-detail small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ehr-muted, #8395A8);
+  font-size: 11px;
+}
+
+.tamam-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  .tamam-activity-filters {
+    justify-content: flex-start;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+}
+
 /* ── Sticky patient header ── */
 
 .omrs-header {
@@ -468,7 +656,7 @@
 .omrs-section {
   background: var(--ehr-panel, #fff);
   border: 1px solid var(--ehr-border, #D8E3EC);
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -498,9 +686,8 @@
 
 .omrs-section-underline {
   display: block;
-  width: 40px;
-  height: 3px;
-  border-radius: 2px;
+  width: 28px;
+  height: 2px;
   background: var(--omrs-teal);
 }
 
@@ -625,6 +812,10 @@
   font-size: 12.5px;
 }
 
+/* No fill behind the column labels: the rule beneath them already separates
+   header from data, and the tinted strip read as a second, competing surface
+   inside an already-bordered section. Applies to every chart table —
+   medications, results, activity. */
 .omrs-root .omrs-table thead th {
   text-align: left;
   font-size: 10.5px;
@@ -632,7 +823,7 @@
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: var(--ehr-muted, #8395A8);
-  background: var(--ehr-head, #F7FAFC);
+  background: transparent;
   padding: 8px 12px;
   border-bottom: 1px solid var(--ehr-border, #D8E3EC);
   white-space: nowrap;
@@ -1139,4 +1330,24 @@
     width: 30px;
     height: 30px;
   }
+}
+
+/* ── Header overflow (⋯) menu ── secondary actions collapsed behind one
+   button; reuses .omrs-actions-menu for the popup itself. */
+.omrs-header-overflow {
+  position: relative;
+  display: inline-flex;
+}
+.omrs-header-overflow > .omrs-header-actions-btn {
+  font-size: 16px;
+  line-height: 1;
+  padding: 6px 9px;
+}
+.omrs-header-overflow-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+}
+.omrs-header-overflow .omrs-actions-menu {
+  width: 210px;
 }

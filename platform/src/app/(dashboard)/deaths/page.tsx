@@ -96,17 +96,21 @@ export default function DeathsPage() {
     };
   }, [deaths, thisMonthPrefix]);
 
+  // `width` is a share normalised against the row total below — sized to the
+  // content each column carries, so Cause of death (free text) doesn't take
+  // the row on auto layout while Sex and Age sit narrower than their labels.
   const deathCols = [
-    { key: 'certificate', label: t('deaths.colCertificate') },
-    { key: 'deceased', label: t('deaths.colDeceased') },
-    { key: 'sex', label: t('nurse.colGender') },
-    { key: 'age', label: t('deaths.colAge') },
-    { key: 'dateOfDeath', label: t('deaths.colDateOfDeath') },
-    { key: 'cause', label: t('deaths.colCause') },
-    { key: 'manner', label: t('deaths.colManner') },
-    { key: 'facility', label: t('deaths.colFacility') },
-    { key: 'registered', label: t('deaths.colRegistered') },
+    { key: 'certificate', label: t('deaths.colCertificate'), width: 12 },
+    { key: 'deceased', label: t('deaths.colDeceased'), width: 16 },
+    { key: 'sex', label: t('nurse.colGender'), width: 7 },
+    { key: 'age', label: t('deaths.colAge'), width: 6 },
+    { key: 'dateOfDeath', label: t('deaths.colDateOfDeath'), width: 11 },
+    { key: 'cause', label: t('deaths.colCause'), width: 17 },
+    { key: 'manner', label: t('deaths.colManner'), width: 10 },
+    { key: 'facility', label: t('deaths.colFacility'), width: 12 },
+    { key: 'registered', label: t('deaths.colRegistered'), width: 9 },
   ];
+  const deathColTotal = deathCols.reduce((sum, c) => sum + c.width, 0);
 
   const handleSubmit = async () => {
     if (!form.deceasedFirstName || !form.immediateCause) return;
@@ -205,8 +209,13 @@ export default function DeathsPage() {
               </>
             }
           />
-          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-          <table className="data-table" style={{ minWidth: 960 }}>
+          <div style={{ padding: '0 16px', overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <table className="data-table" style={{ minWidth: 1040, tableLayout: 'fixed' }}>
+            <colgroup>
+              {deathCols.map(c => (
+                <col key={c.key} style={{ width: `${(c.width / deathColTotal * 100).toFixed(2)}%` }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
                 {deathCols.map(c => (

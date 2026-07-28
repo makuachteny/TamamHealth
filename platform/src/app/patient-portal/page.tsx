@@ -18,7 +18,7 @@ import {
 } from '@/components/icons/lucide';
 import type { PatientDoc, AppointmentDoc, LabResultDoc, MedicalRecordDoc, PrescriptionDoc, ImmunizationDoc } from '@/lib/db-types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { formatMoney, formatClockTime } from '@/lib/format-utils';
+import { formatMoney, formatClockTime , formatRxSig } from '@/lib/format-utils';
 
 type Tab = 'overview' | 'appointments' | 'records' | 'lab' | 'prescriptions' | 'radiology' | 'immunizations' | 'messages' | 'chat' | 'billing' | 'profile';
 
@@ -1076,7 +1076,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--overlay-subtle)' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{rx.medication}</p>
-                          <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{rx.dose} · {rx.frequency}</p>
+                          <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatRxSig(rx)}</p>
                         </div>
                         <Badge text={rx.status} color={rx.status === 'dispensed' ? 'var(--color-success)' : 'var(--color-warning)'} />
                       </div>
@@ -1271,7 +1271,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 <div key={rx._id} className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{rx.medication}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{rx.dose} · {rx.route} · {rx.frequency} · {rx.duration}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{formatRxSig(rx)}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('patientPortal.prescribedBy', { name: rx.prescribedBy })}</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>

@@ -159,8 +159,23 @@ export default function FacilityAssessmentsPage() {
               </button>
             )}
           />
-          <div className="overflow-x-auto">
-          <table className="data-table" style={{ minWidth: 1120 }}>
+          <div className="overflow-x-auto" style={{ padding: '0 16px' }}>
+          <table className="data-table" style={{ minWidth: 1120, tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>{t('facilityAssessments.colFacility')}</th>

@@ -42,7 +42,7 @@ import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
 import type { SuperbillPreview } from '@/lib/services/superbill-service';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
-import { formatMoney } from '@/lib/format-utils';
+import { formatMoney , formatRxSig } from '@/lib/format-utils';
 import { useToast } from '@/components/Toast';
 import {
   CONSULT_SECTION,
@@ -3338,7 +3338,7 @@ export default function ConsultationPage() {
                       { title: 'Intake', items: vitalNotes },
                       { title: 'Examination', items: examNotes },
                       { title: 'Assessment', items: diagnoses.map(d => `${d.name} (${d.type} · ${d.certainty})`) },
-                      { title: 'Prescriptions', items: prescriptions.map(rx => `${rx.medication} ${rx.dose} · ${rx.frequency}${rx.duration ? ` · ${rx.duration}` : ''}`) },
+                      { title: 'Prescriptions', items: prescriptions.map(rx => `${rx.medication} · ${formatRxSig(rx)}`) },
                       { title: 'Lab orders', items: orderedTests },
                       { title: 'Plan', items: [
                         treatmentPlan,

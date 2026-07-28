@@ -109,7 +109,8 @@ export default function OpenmrsChartShell({
   const closeDrawer = () => { setOpenPanel(null); setDrawerMaximized(false); };
 
   const goToRecallTab = () => {
-    setActiveTab('recall');
+    // Recall is consolidated into the patient's appointments/follow-up view.
+    setActiveTab('appointments');
     closeDrawer();
   };
 

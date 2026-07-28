@@ -18,7 +18,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import type {
   PatientDoc, MedicalRecordDoc, LabResultDoc, PrescriptionDoc, TriageDoc, ProblemDoc,
 } from '@/lib/db-types';
-import { formatDateTime } from '@/lib/format-utils';
+import { formatDateTime , formatRxSig } from '@/lib/format-utils';
 import { patientAge, patientFullName } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
 import { formatPhoneDisplay } from '@/lib/field-formats';
@@ -264,7 +264,7 @@ export default function PatientSBAR({
                 {activeRx.map(rx => (
                   <li key={rx._id} className="text-sm px-3 py-1.5 rounded-md" style={{ background: 'var(--overlay-subtle)' }}>
                     <span className="font-semibold">{rx.medication}</span>
-                    <span style={{ color: 'var(--text-muted)' }}> · {rx.dose} · {rx.frequency} · {rx.route}</span>
+                    <span style={{ color: 'var(--text-muted)' }}> · {formatRxSig(rx)}</span>
                   </li>
                 ))}
               </ul>

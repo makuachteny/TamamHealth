@@ -11,7 +11,7 @@ import { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
 import { checkNewPrescription, type DrugInteraction, type InteractionSeverity } from '@/lib/services/drug-interaction-service';
-import { formatMoney } from '@/lib/format-utils';
+import { formatMoney , formatRxSig } from '@/lib/format-utils';
 import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel, pharmacyStageTone } from '@/lib/pharmacy-workflow';
 import type { PrescriptionDoc, PharmacyInventoryDoc, UserDoc } from '@/lib/db-types';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
@@ -144,7 +144,7 @@ function DispenseModal({
           </div>
           <div className="flex justify-between">
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.dose')}</span>
-            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{rx.dose} {rx.frequency}{rx.duration ? ` x ${rx.duration}` : ''}</span>
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{formatRxSig(rx)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.prescriber')}</span>
@@ -745,7 +745,7 @@ export default function PharmacyDashboardPage() {
             </div>
             <div>
               <span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dose</span>
-              <strong style={{ color: 'var(--text-primary)' }}>{rx.dose} {rx.frequency}{rx.duration ? ` x ${rx.duration}` : ''}</strong>
+              <strong style={{ color: 'var(--text-primary)' }}>{formatRxSig(rx)}</strong>
             </div>
             <div>
               <span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Payment</span>
@@ -849,7 +849,7 @@ export default function PharmacyDashboardPage() {
             return {
               id: rx._id,
               title: rx.patientName,
-              subtitle: `${rx.medication} · ${rx.dose} ${rx.frequency}${rx.duration ? ` x ${rx.duration}` : ''}`,
+              subtitle: `${rx.medication} · ${formatRxSig(rx)}`,
               meta: `${rx.prescribedBy} · ${formatTime(rx.createdAt)}`,
               compactMeta: formatTime(rx.createdAt),
               time: formatTime(rx.createdAt),

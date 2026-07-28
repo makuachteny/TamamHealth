@@ -171,8 +171,18 @@ export default function ControlledSubstancesPage() {
               message="Record the first controlled-substance movement to start the audit trail."
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table" style={{ minWidth: 960 }}>
+            <div className="overflow-x-auto" style={{ padding: '0 16px' }}>
+              <table className="data-table" style={{ minWidth: 960, tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '10%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Medication</th>

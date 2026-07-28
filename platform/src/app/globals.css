@@ -1470,14 +1470,24 @@ button, a, .nav-item, .kpi, .card-elevated, [role="button"] { transition-timing-
 svg.lucide:not([style*="color"]) {
   color: var(--icon-color);
 }
+/* Icons on a coloured surface must repaint their STROKE, not just `color`.
+   The Icon component renders lucide with `color=`, which lucide writes out as
+   a literal `stroke="#2191D0"` attribute — `currentColor` is never consulted,
+   so a rule that only sets `color` leaves a brand-blue glyph sitting on a
+   brand-blue button (the "New Referral" plus was invisible until you hovered
+   nothing at all — it was never visible). Setting `stroke` in CSS beats the
+   presentation attribute, which is what the top-rail rule below already does. */
+
 /* Active nav items: white icon on solid blue pill */
 .nav-item-active svg.lucide {
   color: var(--color-white) !important;
+  stroke: currentColor !important;
 }
 /* White icons inside primary-colored buttons/elements */
 .btn-primary svg.lucide,
 .pp-btn-primary svg.lucide {
   color: var(--color-white) !important;
+  stroke: currentColor !important;
 }
 /* Icons on any white-text surface (FABs, custom colored buttons, banners)
    inherit white. The Icon component always sets an inline semantic color, so
@@ -1485,6 +1495,7 @@ svg.lucide:not([style*="color"]) {
    (e.g. the blue message icon on a blue FAB) renders invisible. */
 .text-white svg.lucide {
   color: var(--color-white) !important;
+  stroke: currentColor !important;
 }
 
 .ehr-top-rail svg.lucide {
@@ -8455,7 +8466,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-chart-content .data-table tbody td,
-.ehr-chart-content table tbody td {
+.ehr-chart-content table:not(.omrs-table) tbody td {
   min-height: 46px;
   padding: 12px 14px !important;
   border-bottom: 1px solid #e5ecec !important;
@@ -9381,7 +9392,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-chart-content .data-table tbody td,
-.ehr-chart-content table tbody td {
+.ehr-chart-content table:not(.omrs-table) tbody td {
   border-bottom: 1px solid var(--ehr-border-soft) !important;
   color: var(--ehr-text);
 }
@@ -16022,6 +16033,13 @@ textarea.ehr-handoff-input {
 }
 
 .ehr-chart-content .data-table thead th,
+/* Legacy chart tables keep the tinted pill-row look; the OpenMRS chart
+   tables (`.omrs-table` — medications, results, activity) opt out via
+   :not() and use their own flat styling in openmrs-chart.css. Without the
+   exemption this `table tbody td` selector painted every one of them with
+   the blue --overlay-subtle fill. */
+/* thead is NOT exempted: this rule is what keeps the column labels flat, and
+   scoping it out let a tinted header fill through on the omrs tables. */
 .ehr-chart-content table thead th {
   height: 30px;
   border-bottom: 0 !important;
@@ -16034,24 +16052,24 @@ textarea.ehr-handoff-input {
 }
 
 .ehr-chart-content .data-table tbody td,
-.ehr-chart-content table tbody td {
+.ehr-chart-content table:not(.omrs-table) tbody td {
   border-bottom: 0 !important;
   background: var(--overlay-subtle, #F2F6FB);
   padding: 11px 14px !important;
 }
 
 .ehr-chart-content .data-table tbody td:first-child,
-.ehr-chart-content table tbody td:first-child {
+.ehr-chart-content table:not(.omrs-table) tbody td:first-child {
   border-radius: 10px 0 0 10px;
 }
 
 .ehr-chart-content .data-table tbody td:last-child,
-.ehr-chart-content table tbody td:last-child {
+.ehr-chart-content table:not(.omrs-table) tbody td:last-child {
   border-radius: 0 10px 10px 0;
 }
 
 .ehr-chart-content .data-table tbody tr:hover td,
-.ehr-chart-content table tbody tr:hover td {
+.ehr-chart-content table:not(.omrs-table) tbody tr:hover td {
   background: var(--ehr-blue-light) !important;
 }
 
@@ -17006,6 +17024,15 @@ textarea.ehr-handoff-input {
   color: #B55E13;
 }
 
+/* Over-target waits in the queue's Time column. The row used to spell it out
+   ("14m · over target"); now the colour is the whole signal, so the sub-line
+   has to carry it too — the existing `.is-soon` rules target
+   `.ehr-appointment-countdown` and `.ehr-queue-wait small`, neither of which
+   matches this span, so it was rendering muted grey under a red time. */
+.ehr-appointment-time span.is-soon {
+  color: #C24135;
+}
+
 .ehr-queue-wait small.is-past {
   color: #8395A8;
 }
@@ -17207,7 +17234,7 @@ textarea.ehr-handoff-input {
 }
 
 .ehr-assigned-worklist-list {
-  padding: 14px;
+  padding: 14px 1px;
   background: #fff;
   gap: 10px;
 }
@@ -18022,7 +18049,10 @@ textarea.ehr-handoff-input {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 10px;
+  /* Hairline inset only (was 6px): enough that a card's rounded corner clears
+     the panel's own rounded border instead of colliding with it, without the
+     strip of empty panel the old gutter left down both sides. */
+  padding: 10px 1px;
   overflow: auto;
   flex-direction: column;
   gap: 8px;
@@ -18046,7 +18076,9 @@ textarea.ehr-handoff-input {
   grid-template-columns: minmax(320px, 1.6fr) repeat(4, minmax(150px, 1fr));
   gap: 24px;
   align-items: center;
-  padding: 0 16px 6px;
+  /* Tracks the row's side padding so the column labels stay over their
+     values. */
+  padding: 0 4px 6px;
   background: #fff;
   color: var(--text-muted);
   font-size: 10px;
@@ -18061,11 +18093,14 @@ textarea.ehr-handoff-input {
   padding-right: 6px;
 }
 
+/* 4px side padding, down from 16px: with the list gutter cut to 1px, the
+   row's own inset was what still held the avatar and the status pill off the
+   panel edges. Vertical stays at 9px — only the sides tighten. */
 .appointment-card-row.ehr-appointment-row {
   grid-template-columns: minmax(320px, 1.6fr) repeat(4, minmax(150px, 1fr));
   gap: 24px;
   min-height: 64px;
-  padding: 9px 16px;
+  padding: 9px 4px;
   border-radius: 14px;
   box-shadow: none;
 }
@@ -18473,7 +18508,7 @@ textarea.ehr-handoff-input {
 
 @media (max-width: 640px) {
   .appointment-card-list {
-    padding: 6px;
+    padding: 6px 1px;
   }
 
   .appointment-card-row.ehr-appointment-row {
@@ -18509,9 +18544,11 @@ textarea.ehr-handoff-input {
 
 /* Flat design: appointment/worklist rows are bordered cards with clean
    corners — no ring or drop shadows (they read as smudged edges). */
+/* Hairline side inset (was 6px) — the cards nearly fill the panel but their
+   rounded corners still clear its border. */
 .ehr-center-panel .ehr-appointment-list:not(:has(.ehr-queue-scroll)),
 .appointment-card-list {
-  padding-inline: 6px;
+  padding-inline: 1px;
 }
 
 .ehr-center-panel .ehr-appointment-row,
@@ -18527,9 +18564,16 @@ textarea.ehr-handoff-input {
   box-shadow: none !important;
 }
 
-.ehr-center-panel .ehr-appointment-row:not(.ehr-care-row),
-.appointment-card-row.ehr-appointment-row {
+.ehr-center-panel .ehr-appointment-row:not(.ehr-care-row) {
   padding-left: 10px;
+}
+
+/* Must stay in lockstep with `.appointment-card-head`'s side padding (4px):
+   the header labels sit directly over their column's data, so any mismatch
+   here shifts every label off the values it names. Both were 16px before the
+   rows were tightened to the panel edges. */
+.appointment-card-row.ehr-appointment-row {
+  padding-left: 4px;
 }
 
 .ehr-center-panel .ehr-care-row {
@@ -22111,8 +22155,10 @@ textarea.ehr-handoff-input {
 }
 
 /* Doctor worklist body carries the same white appointments backdrop. */
+/* Matches .appointment-card-list: hairline side inset, vertical breathing
+   room. */
 .ehr-appointment-list.ehr-assigned-worklist-list {
-  padding: 10px;
+  padding: 10px 1px;
   background: #fff;
 }
 

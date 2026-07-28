@@ -429,7 +429,17 @@ export default function BloodBankPage() {
               No units match “{unitSearch}”.
             </div>
           ) : (
-            <table className="data-table" style={{ minWidth: 960 }}>
+            <table className="data-table" style={{ minWidth: 960, tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '10%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Unit ID</th>

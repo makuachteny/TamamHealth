@@ -12,9 +12,17 @@
 import { useMemo, useState } from 'react';
 import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
-import { formatDate } from '@/lib/format-utils';
+import { formatDate, formatRxSig } from '@/lib/format-utils';
 
 const PAGE_SIZE = 8;
+
+/** Clinician-facing labels — "pending" is pharmacy workflow state, not a
+ *  clinical status, so the list says what it means for the patient. */
+const RX_STATUS_LABEL: Record<string, string> = {
+  pending: 'Prescribed',
+  dispensed: 'Dispensed',
+  discontinued: 'Stopped',
+};
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'omrs-panel-badge omrs-panel-badge--pending',
@@ -29,7 +37,7 @@ interface MedicationsSectionProps {
 }
 
 export default function MedicationsSection({ patientId, canPrescribe, onAdd }: MedicationsSectionProps) {
-  const { prescriptions } = usePrescriptions();
+  const { prescriptions } = usePrescriptions(patientId);
   const [page, setPage] = useState(1);
 
   const patientRx = useMemo(
@@ -64,8 +72,8 @@ export default function MedicationsSection({ patientId, canPrescribe, onAdd }: M
             {pageRows.map(rx => (
               <tr key={rx._id}>
                 <td style={{ fontWeight: 600 }}>{rx.medication}</td>
-                <td>{rx.dose} · {rx.route} · {rx.frequency}{rx.duration ? ` · ${rx.duration}` : ''}</td>
-                <td><span className={STATUS_BADGE[rx.status] || 'omrs-panel-badge omrs-panel-badge--active'}>{rx.status}</span></td>
+                <td>{formatRxSig(rx)}</td>
+                <td><span className={STATUS_BADGE[rx.status] || 'omrs-panel-badge omrs-panel-badge--active'}>{RX_STATUS_LABEL[rx.status] || rx.status}</span></td>
                 <td>{formatDate(rx.createdAt)}</td>
               </tr>
             ))}

@@ -26,6 +26,25 @@ const UNITS = ['tablets', 'vials', 'bottles', 'sachets', 'tubes', 'ampoules', 's
 
 type PharmacyTab = 'queue' | 'inventory' | 'reorder' | 'expiry' | 'overview' | 'patients';
 
+/**
+ * The prescription sig for display.
+ *
+ * Seeded and clinician-entered `dose` values often already carry the whole sig
+ * ("1g QDS PRN x 5 days") while `frequency` and `duration` repeat those same
+ * parts as separate fields. Concatenating all three printed the tail twice —
+ * "1g QDS PRN x 5 days QDS PRN x 5 days" — which is both wrong and what made
+ * the Dosage column the widest one on the page. Only append a part the dose
+ * does not already state.
+ */
+function prescriptionSig(rx: { dose?: string; frequency?: string; duration?: string }): string {
+  const dose = (rx.dose || '').trim();
+  const stated = dose.toLowerCase();
+  const extras = [rx.frequency?.trim(), rx.duration?.trim() ? `x ${rx.duration.trim()}` : '']
+    .filter((part): part is string => !!part)
+    .filter(part => !stated.includes(part.replace(/^x /i, '').toLowerCase()));
+  return [dose, ...extras].filter(Boolean).join(' ');
+}
+
 export default function PharmacyPage() {
   const [activeTab, setActiveTab] = useState<PharmacyTab>('queue');
   // Per-column filters: queue table (q*) + inventory table (medication name).
@@ -400,7 +419,7 @@ export default function PharmacyPage() {
         <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Ordered</span><strong>{rx.medication}</strong></div>
-            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dose</span><strong>{rx.dose} {rx.frequency}{rx.duration ? ` x ${rx.duration}` : ''}</strong></div>
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dose</span><strong>{prescriptionSig(rx)}</strong></div>
             <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Payment</span><strong style={{ color: paymentClear ? 'var(--color-success)' : 'var(--color-warning)' }}>{paymentClear ? 'Clear' : formatMoney(balance)}</strong></div>
             <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Stage</span><strong>{pharmacyStageLabel(stage)}</strong></div>
           </div>
@@ -675,7 +694,7 @@ export default function PharmacyPage() {
         rows = filteredQueue.map(rx => [
           rx.patientName,
           rx.medication,
-          `${rx.dose} ${rx.frequency}${rx.duration ? ` x ${rx.duration}` : ''}`,
+          prescriptionSig(rx),
           rx.prescribedBy,
           rx.createdAt ? new Date(rx.createdAt).toLocaleString('en-GB') : '',
           pharmacyStageLabel(pharmacyStage(rx)),
@@ -880,8 +899,21 @@ export default function PharmacyPage() {
               <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table" style={{ minWidth: 840 }}>
+            // Padded to the card's own 16px gutter so the first column lines up
+            // with the search box above it, and given explicit column shares —
+            // on auto layout Dosage grew to nearly a third of the row while
+            // Time was squeezed onto two lines.
+            <div className="overflow-x-auto" style={{ padding: '0 16px' }}>
+              <table className="data-table" style={{ minWidth: 900, tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '21%' }} />
+                  <col style={{ width: '19%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '9%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>{t('pharmacy.patient')}</th>
@@ -919,7 +951,7 @@ export default function PharmacyPage() {
                           </div>
                         </td>
                         <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                          {rx.dose} {rx.frequency} {rx.duration ? `x ${rx.duration}` : ''}
+                          {prescriptionSig(rx)}
                         </td>
                         <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{rx.prescribedBy}</td>
                         <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
@@ -1210,7 +1242,7 @@ export default function PharmacyPage() {
                       return (
                         <tr key={rx._id}>
                           <td className="font-medium text-sm">{rx.medication}</td>
-                          <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>{rx.dose} {rx.frequency} {rx.duration ? `x ${rx.duration}` : ''}</td>
+                          <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>{prescriptionSig(rx)}</td>
                           <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{rx.prescribedBy}</td>
                           <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{rx.createdAt ? new Date(rx.createdAt).toLocaleDateString('en-GB') : '—'}</td>
                           <td>
@@ -1238,7 +1270,7 @@ export default function PharmacyPage() {
                   {workflowRx.patientName}
                 </h3>
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                  {workflowRx.medication} · {workflowRx.dose} {workflowRx.frequency}{workflowRx.duration ? ` x ${workflowRx.duration}` : ''}
+                  {workflowRx.medication} · {prescriptionSig(workflowRx)}
                 </p>
               </div>
               <button onClick={() => setWorkflowRxId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label={t('action.close')}>

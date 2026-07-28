@@ -268,12 +268,12 @@ export const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
 ];
 
 export const prescriptionQueue: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
-  { _id: 'rx-001', type: 'prescription', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', medication: 'Artemether-Lumefantrine (Coartem)', dose: '80/480mg BD x 3 days', route: 'Oral', frequency: 'BD', duration: '3 days', prescribedBy: 'Dr. James Wani Igga', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:15:00Z', updatedAt: '2026-02-09T09:15:00Z' },
-  { _id: 'rx-002', type: 'prescription', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg OD x 30 days', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Achol Mayen Deng', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:30:00Z', updatedAt: '2026-02-09T09:30:00Z' },
-  { _id: 'rx-003', type: 'prescription', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', medication: 'TDF/3TC/DTG', dose: '300/300/50mg OD x 90 days', route: 'Oral', frequency: 'OD', duration: '90 days', prescribedBy: 'Dr. Achol Mayen Deng', status: 'dispensed', dispensedAt: '2026-02-09T10:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:00:00Z', updatedAt: '2026-02-09T10:30:00Z' },
-  { _id: 'rx-004', type: 'prescription', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', medication: 'Metformin', dose: '500mg BD x 30 days', route: 'Oral', frequency: 'BD', duration: '30 days', prescribedBy: 'CO Deng Mabior Kuol', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:15:00Z', updatedAt: '2026-02-09T10:15:00Z' },
-  { _id: 'rx-005', type: 'prescription', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', medication: 'Paracetamol', dose: '1g QDS PRN x 5 days', route: 'Oral', frequency: 'QDS PRN', duration: '5 days', prescribedBy: 'Dr. James Wani Igga', status: 'dispensed', dispensedAt: '2026-02-09T11:00:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:45:00Z', updatedAt: '2026-02-09T11:00:00Z' },
-  { _id: 'rx-006', type: 'prescription', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', medication: 'Amoxicillin', dose: '500mg TDS x 7 days', route: 'Oral', frequency: 'TDS', duration: '7 days', prescribedBy: 'Dr. James Wani Igga', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T11:00:00Z', updatedAt: '2026-02-09T11:00:00Z' },
+  { _id: 'rx-001', type: 'prescription', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', medication: 'Artemether-Lumefantrine (Coartem)', dose: '80/480mg', route: 'Oral', frequency: 'BD', duration: '3 days', prescribedBy: 'Dr. James Wani Igga', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:15:00Z', updatedAt: '2026-02-09T09:15:00Z' },
+  { _id: 'rx-002', type: 'prescription', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Achol Mayen Deng', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:30:00Z', updatedAt: '2026-02-09T09:30:00Z' },
+  { _id: 'rx-003', type: 'prescription', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', medication: 'TDF/3TC/DTG', dose: '300/300/50mg', route: 'Oral', frequency: 'OD', duration: '90 days', prescribedBy: 'Dr. Achol Mayen Deng', status: 'dispensed', dispensedAt: '2026-02-09T10:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:00:00Z', updatedAt: '2026-02-09T10:30:00Z' },
+  { _id: 'rx-004', type: 'prescription', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', medication: 'Metformin', dose: '500mg', route: 'Oral', frequency: 'BD', duration: '30 days', prescribedBy: 'CO Deng Mabior Kuol', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:15:00Z', updatedAt: '2026-02-09T10:15:00Z' },
+  { _id: 'rx-005', type: 'prescription', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', medication: 'Paracetamol', dose: '1g', route: 'Oral', frequency: 'QDS PRN', duration: '5 days', prescribedBy: 'Dr. James Wani Igga', status: 'dispensed', dispensedAt: '2026-02-09T11:00:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:45:00Z', updatedAt: '2026-02-09T11:00:00Z' },
+  { _id: 'rx-006', type: 'prescription', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', medication: 'Amoxicillin', dose: '500mg', route: 'Oral', frequency: 'TDS', duration: '7 days', prescribedBy: 'Dr. James Wani Igga', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T11:00:00Z', updatedAt: '2026-02-09T11:00:00Z' },
 ];
 
 export const seedMessages: Omit<MessageDoc, '_rev' | 'createdBy'>[] = [
@@ -810,7 +810,7 @@ export const seedLedgerEntries: Omit<LedgerEntryDoc, '_rev' | 'createdBy'>[] = [
 // seeded patients and providers (user-<username>).
 export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-1', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(1), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Malaria treatment follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
-  { _id: 'appointment-2', type: 'appointment', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(2), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Obstetrics & Gynecology', reason: 'Antenatal check-up', status: 'scheduled', reminderSent: false, isRecurring: true, recurrencePattern: 'monthly', bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
+  { _id: 'appointment-2', type: 'appointment', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(28), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Obstetrics & Gynecology', reason: 'Antenatal check-up', status: 'scheduled', reminderSent: false, isRecurring: true, recurrencePattern: 'monthly', bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
   { _id: 'appointment-3', type: 'appointment', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(7), appointmentTime: '11:00', endTime: '11:30', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Internal Medicine', reason: 'HIV / CD4 review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(4) },
   { _id: 'appointment-4', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '08:45', endTime: '09:15', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Diabetes management', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(6), updatedAt: daysAgo(0) },
   { _id: 'appointment-5', type: 'appointment', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', patientPhone: '+211912555022', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '12:00', endTime: '12:45', duration: 45, appointmentType: 'general', priority: 'urgent', department: 'Internal Medicine', reason: 'Severe anaemia review', status: 'in_progress', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(7), updatedAt: daysAgo(0) },
@@ -1024,13 +1024,22 @@ const overflowProviders = [
   { id: 'user-dr.mercy', name: 'Dr. Grace Lado', department: 'Cardiology' },
 ];
 
-const overflowReasons = [
-  'Hypertension review', 'Diabetes check', 'Malaria follow-up', 'Chest pain assessment',
-  'Skin rash', 'Chronic cough', 'Back pain', 'Routine check-up',
+// Reason + provider chosen together so the pairing is always clinically
+// coherent (cardiology sees chest pain, not malaria follow-ups).
+const overflowVisits: Array<{ reason: string; providerIdx: 0 | 1 | 2 }> = [
+  { reason: 'Hypertension review',    providerIdx: 2 },  // Cardiology
+  { reason: 'Diabetes check',         providerIdx: 0 },  // Internal Medicine
+  { reason: 'Malaria follow-up',      providerIdx: 0 },  // Internal Medicine
+  { reason: 'Chest pain assessment',  providerIdx: 2 },  // Cardiology
+  { reason: 'Skin rash',              providerIdx: 1 },  // Outpatient
+  { reason: 'Chronic cough',          providerIdx: 0 },  // Internal Medicine
+  { reason: 'Back pain',              providerIdx: 1 },  // Outpatient
+  { reason: 'Routine check-up',       providerIdx: 1 },  // Outpatient
 ];
 
 const overflowAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = overflowRoster.map((p, i) => {
-  const provider = overflowProviders[i % overflowProviders.length];
+  const visit = overflowVisits[i % overflowVisits.length];
+  const provider = overflowProviders[visit.providerIdx];
   const hour = 8 + Math.floor(i / 2);
   const minute = i % 2 ? '30' : '00';
   const statuses = ['scheduled', 'confirmed', 'checked_in'] as const;
@@ -1048,7 +1057,7 @@ const overflowAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = overf
     appointmentType: 'general' as const,
     priority: (i % 4 === 0 ? 'urgent' : 'routine') as 'urgent' | 'routine',
     department: provider.department,
-    reason: overflowReasons[i % overflowReasons.length],
+    reason: visit.reason,
     status,
     ...(status === 'checked_in' ? { checkedInAt: minutesAgo(120 - i * 5) } : {}),
     reminderSent: false, isRecurring: false,
@@ -1075,7 +1084,7 @@ const overflowTriage: Omit<TriageDoc, '_rev' | 'createdBy'>[] = overflowRoster.m
     priority,
     temperature: '37.4', pulse: '92', respiratoryRate: '19',
     systolic: '120', diastolic: '78', oxygenSaturation: '97',
-    chiefComplaint: overflowReasons[(i + 3) % overflowReasons.length],
+    chiefComplaint: overflowVisits[(i + 3) % overflowVisits.length].reason,
     modeOfArrival: 'walk-in',
     triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi',
     triagedAt: at,
@@ -2080,11 +2089,11 @@ async function seedDatabaseExclusive(): Promise<void> {
   // Mercy General Hospital (hosp-mercy-001, private org) prescriptions —
   // prescriber dr.mercy, mix of pending/dispensed for the Mercy roster.
   const mercyRx: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
-    { _id: 'rx-mercy-1', type: 'prescription', patientId: 'pat-mercy-001', patientName: 'Elizabeth Nyandit Bul', medication: 'Amlodipine 5mg', dose: '5mg OD x 30 days', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(1), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(2), updatedAt: daysAgo(1) },
-    { _id: 'rx-mercy-2', type: 'prescription', patientId: 'pat-mercy-002', patientName: 'Emmanuel Kenyi Duku', medication: 'Metformin 500mg', dose: '500mg BD x 30 days', route: 'Oral', frequency: 'BD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'pending', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(1), updatedAt: daysAgo(1) },
-    { _id: 'rx-mercy-3', type: 'prescription', patientId: 'pat-mercy-005', patientName: 'Josephine Aciek Manyang', medication: 'Artemether-Lumefantrine (Coartem)', dose: '20/120mg BD x 3 days', route: 'Oral', frequency: 'BD', duration: '3 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(1), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(1), updatedAt: daysAgo(1) },
-    { _id: 'rx-mercy-4', type: 'prescription', patientId: 'pat-mercy-007', patientName: 'Margaret Nyanut Riek', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg OD x 30 days', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'pending', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(0), updatedAt: daysAgo(0) },
-    { _id: 'rx-mercy-5', type: 'prescription', patientId: 'pat-mercy-006', patientName: 'Simon Loro Baba', medication: 'Paracetamol 500mg', dose: '1g QDS PRN x 5 days', route: 'Oral', frequency: 'QDS PRN', duration: '5 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(2), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(2), updatedAt: daysAgo(2) },
+    { _id: 'rx-mercy-1', type: 'prescription', patientId: 'pat-mercy-001', patientName: 'Elizabeth Nyandit Bul', medication: 'Amlodipine 5mg', dose: '5mg', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(1), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(2), updatedAt: daysAgo(1) },
+    { _id: 'rx-mercy-2', type: 'prescription', patientId: 'pat-mercy-002', patientName: 'Emmanuel Kenyi Duku', medication: 'Metformin 500mg', dose: '500mg', route: 'Oral', frequency: 'BD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'pending', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+    { _id: 'rx-mercy-3', type: 'prescription', patientId: 'pat-mercy-005', patientName: 'Josephine Aciek Manyang', medication: 'Artemether-Lumefantrine (Coartem)', dose: '20/120mg', route: 'Oral', frequency: 'BD', duration: '3 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(1), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+    { _id: 'rx-mercy-4', type: 'prescription', patientId: 'pat-mercy-007', patientName: 'Margaret Nyanut Riek', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Grace Lado', status: 'pending', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+    { _id: 'rx-mercy-5', type: 'prescription', patientId: 'pat-mercy-006', patientName: 'Simon Loro Baba', medication: 'Paracetamol 500mg', dose: '1g', route: 'Oral', frequency: 'QDS PRN', duration: '5 days', prescribedBy: 'Dr. Grace Lado', status: 'dispensed', dispensedAt: daysAgo(2), hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', createdAt: daysAgo(2), updatedAt: daysAgo(2) },
   ];
   for (const rx of mercyRx) {
     await safePut(rxDB, { ...rx, orgId: PRIVATE_ORG_ID } as unknown as Record<string, unknown>);
@@ -2289,11 +2298,18 @@ async function seedDatabaseExclusive(): Promise<void> {
       return null;
     };
     const VIS_APPT_STATUS = ['confirmed', 'checked_in', 'scheduled', 'in_progress', 'checked_in', 'confirmed', 'scheduled', 'completed'];
-    const VIS_APPT_TYPE = ['general', 'follow_up', 'specialist', 'anc', 'general', 'lab'];
-    const VIS_DEPT = ['Outpatient', 'Internal Medicine', 'Obstetrics & Gynecology', 'Surgery', 'Paediatrics'];
-    const VIS_REASON = [
-      'Routine consultation', 'Follow-up review', 'Malaria follow-up', 'Antenatal check-up',
-      'Hypertension review', 'Diabetes review', 'Wound dressing follow-up', 'Fever assessment',
+    // Reason, department and visit type travel together so the generator can
+    // never produce "Hypertension review · Paediatrics". ANC is intentionally
+    // absent — curated seeds book ANC visits for the actually-pregnant patients.
+    const VIS_VISITS: Array<{ reason: string; dept: string; vtype: string }> = [
+      { reason: 'Routine consultation',     dept: 'Outpatient',        vtype: 'general' },
+      { reason: 'Follow-up review',         dept: 'Outpatient',        vtype: 'follow_up' },
+      { reason: 'Malaria follow-up',        dept: 'Internal Medicine', vtype: 'follow_up' },
+      { reason: 'Lab results review',       dept: 'Internal Medicine', vtype: 'lab' },
+      { reason: 'Hypertension review',      dept: 'Internal Medicine', vtype: 'follow_up' },
+      { reason: 'Diabetes review',          dept: 'Internal Medicine', vtype: 'follow_up' },
+      { reason: 'Wound dressing follow-up', dept: 'Surgery',           vtype: 'follow_up' },
+      { reason: 'Fever assessment',         dept: 'Outpatient',        vtype: 'general' },
     ];
     const VIS_TRI_PRI = ['GREEN', 'YELLOW', 'GREEN', 'RED', 'YELLOW', 'GREEN'];
     const VIS_TRI_STATUS = ['pending', 'seen', 'pending', 'pending', 'seen', 'pending'];
@@ -2341,9 +2357,9 @@ async function seedDatabaseExclusive(): Promise<void> {
           providerId: prov.id, providerName: prov.name,
           facilityId: fac.fid, facilityName: fac.fname, facilityLevel: fac.level,
           appointmentDate: dateAgo(0), appointmentTime: slot.t, endTime: slot.e, duration: 30,
-          appointmentType: VIS_APPT_TYPE[i % VIS_APPT_TYPE.length],
+          appointmentType: VIS_VISITS[i % VIS_VISITS.length].vtype,
           priority: i % 4 === 0 ? 'urgent' : 'routine',
-          department: VIS_DEPT[i % VIS_DEPT.length], reason: VIS_REASON[i % VIS_REASON.length],
+          department: VIS_VISITS[i % VIS_VISITS.length].dept, reason: VIS_VISITS[i % VIS_VISITS.length].reason,
           status: VIS_APPT_STATUS[i % VIS_APPT_STATUS.length],
           ...(VIS_APPT_STATUS[i % VIS_APPT_STATUS.length] === 'checked_in' || VIS_APPT_STATUS[i % VIS_APPT_STATUS.length] === 'in_progress'
             ? { checkedInAt: daysAgo(0) } : {}),
@@ -2396,9 +2412,9 @@ async function seedDatabaseExclusive(): Promise<void> {
             providerId: prov.id, providerName: prov.name,
             facilityId: fac.fid, facilityName: fac.fname, facilityLevel: fac.level,
             appointmentDate: dateAgo(0), appointmentTime: slot.t, endTime: slot.e, duration: 20,
-            appointmentType: VIS_APPT_TYPE[i % VIS_APPT_TYPE.length],
+            appointmentType: VIS_VISITS[i % VIS_VISITS.length].vtype,
             priority: i % 5 === 0 ? 'urgent' : 'routine',
-            department: VIS_DEPT[i % VIS_DEPT.length], reason: VIS_REASON[i % VIS_REASON.length],
+            department: VIS_VISITS[i % VIS_VISITS.length].dept, reason: VIS_VISITS[i % VIS_VISITS.length].reason,
             status: 'scheduled',
             reminderSent: i % 2 === 0, reminderChannel: 'sms', isRecurring: false,
             bookedBy: fac.desk.id, bookedByName: fac.desk.name,
@@ -2423,9 +2439,9 @@ async function seedDatabaseExclusive(): Promise<void> {
           providerId: prov.id, providerName: prov.name,
           facilityId: fac.fid, facilityName: fac.fname, facilityLevel: fac.level,
           appointmentDate: dateFromNow(i + 1), appointmentTime: slot.t, endTime: slot.e, duration: 30,
-          appointmentType: VIS_APPT_TYPE[(i + 2) % VIS_APPT_TYPE.length],
+          appointmentType: VIS_VISITS[(i + 2) % VIS_VISITS.length].vtype,
           priority: 'routine',
-          department: VIS_DEPT[(i + 1) % VIS_DEPT.length], reason: VIS_REASON[(i + 2) % VIS_REASON.length],
+          department: VIS_VISITS[(i + 2) % VIS_VISITS.length].dept, reason: VIS_VISITS[(i + 2) % VIS_VISITS.length].reason,
           status: i % 2 === 0 ? 'confirmed' : 'scheduled',
           reminderSent: i % 2 === 0, reminderChannel: 'sms', isRecurring: false,
           bookedBy: fac.desk.id, bookedByName: fac.desk.name,
@@ -2465,7 +2481,7 @@ async function seedDatabaseExclusive(): Promise<void> {
   // Seed some medical records for patients (all public org)
   const mrDB = medicalRecordsDB();
   for (const p of patients.slice(0, 15)) {
-    const records = generateMedicalRecords(p.id, 6);
+    const records = generateMedicalRecords(p.id, 6, p.registrationHospital);
     for (const r of records) {
       const doc: MedicalRecordDoc = {
         _id: r.id,
@@ -3310,12 +3326,12 @@ async function seedDatabaseExclusive(): Promise<void> {
     { name: 'Generalized anxiety disorder', icd11Code: '6B00', status: 'active', severity: 'mild', ageDays: 90, notes: 'Counselling referral made.' },
   ];
   const SAMPLE_MEDS: { medication: string; dose: string; frequency: string; duration: string }[] = [
-    { medication: 'Amlodipine', dose: '5mg OD', frequency: 'OD', duration: '30 days' },
-    { medication: 'Metformin', dose: '500mg BD', frequency: 'BD', duration: '30 days' },
-    { medication: 'Omeprazole', dose: '20mg OD', frequency: 'OD', duration: '14 days' },
-    { medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg OD', frequency: 'OD', duration: '30 days' },
-    { medication: 'Paracetamol', dose: '1g QDS PRN', frequency: 'QDS PRN', duration: '5 days' },
-    { medication: 'Amoxicillin', dose: '500mg TDS', frequency: 'TDS', duration: '7 days' },
+    { medication: 'Amlodipine', dose: '5mg', frequency: 'OD', duration: '30 days' },
+    { medication: 'Metformin', dose: '500mg', frequency: 'BD', duration: '30 days' },
+    { medication: 'Omeprazole', dose: '20mg', frequency: 'OD', duration: '14 days' },
+    { medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg', frequency: 'OD', duration: '30 days' },
+    { medication: 'Paracetamol', dose: '1g', frequency: 'QDS PRN', duration: '5 days' },
+    { medication: 'Amoxicillin', dose: '500mg', frequency: 'TDS', duration: '7 days' },
   ];
   const allChartPatients: { id: string; name: string; hosp?: string; hospName?: string }[] = [
     ...patients.map((p) => ({

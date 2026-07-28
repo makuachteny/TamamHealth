@@ -656,8 +656,20 @@ export default function ImmunizationsPage() {
                   )}
                 </div>
               </div>
-              <div className="overflow-x-auto">
-              <table className="data-table" style={{ minWidth: 1080 }}>
+              <div className="overflow-x-auto" style={{ padding: '0 16px' }}>
+                <table className="data-table" style={{ minWidth: 1080, tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '6%' }} />
+                    <col style={{ width: '7%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '7%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '9%' }} />
+                  </colgroup>
                 <thead>
                   <tr>
                     <th>{t('immun.colChild')}</th>

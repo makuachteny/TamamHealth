@@ -2307,10 +2307,14 @@ function generateLabResults(): LabResult[] {
   return allLabs.slice(0, count);
 }
 
-export function generateMedicalRecords(patientId: string, count: number): MedicalRecord[] {
+export function generateMedicalRecords(patientId: string, count: number, homeHospitalId?: string): MedicalRecord[] {
   // Generate a coherent chronological series so trend charts are meaningful.
   // Records are spaced roughly monthly going back from "now".
   const startMonth = 8; // months back
+  // All visits happen at the patient's home facility. The old per-visit
+  // `randomFrom(hospitals)` bounced each patient across six random facilities
+  // in eight months, which read as nonsense on the chart's vitals history.
+  const homeHospital = hospitals.find(h => h.id === homeHospitalId) || randomFrom(hospitals);
   const baseWeight = 55 + rand() * 25;
   const baseSystolic = 115 + rand() * 25;
   const baseTemp = 36.5 + rand() * 0.8;
@@ -2318,7 +2322,7 @@ export function generateMedicalRecords(patientId: string, count: number): Medica
   const baseGlucose = 85 + rand() * 25;
 
   return Array.from({ length: count }, (_, i) => {
-    const hospital = randomFrom(hospitals);
+    const hospital = homeHospital;
     // Older records have higher index (we'll reverse-chronologically sort anyway)
     const monthsAgo = startMonth - Math.floor((i / Math.max(1, count - 1)) * startMonth);
     const visitDateObj = new Date();

@@ -34,9 +34,13 @@ const MIN_PASSWORD_LENGTH = 8;
 import type { UserDoc, HospitalDoc, UserRole } from '@/lib/db-types';
 import type { DataScope } from '@/lib/services/data-scope';
 
-// Shared column template for the user list header + rows:
+// Column template for the user list header + rows:
 // User · Role · Facility · Status · Actions
-const USER_GRID = 'minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.9fr) 56px';
+// The first four tracks match .appointment-card-row's shared grid
+// (minmax(320px, 1.6fr) + minmax(150px, 1fr) columns) so this list lines up
+// with the clinical worklist and patient registry; only the trailing actions
+// gutter is narrower, since it holds a lone kebab instead of a data column.
+const USER_GRID = 'minmax(320px, 1.6fr) repeat(3, minmax(150px, 1fr)) 44px';
 
 export default function OrgUsersPage() {
   const { currentUser, globalSearch } = useApp();
@@ -380,7 +384,10 @@ export default function OrgUsersPage() {
                   <span>{t('orgUsers.colName')}</span>
                   <span>{t('orgUsers.colRole')}</span>
                   <span>{t('orgUsers.colHospital')}</span>
-                  <span>{t('orgUsers.colStatus')}</span>
+                  {/* Status values right-align (shared .appointment-card-status),
+                      so its label right-aligns too — the last-child rule only
+                      covers the empty actions gutter here. */}
+                  <span style={{ justifySelf: 'end', paddingRight: 6 }}>{t('orgUsers.colStatus')}</span>
                   <span />
                 </div>
                 {filteredUsers.map(user => (
@@ -389,14 +396,16 @@ export default function OrgUsersPage() {
                       className="ehr-appointment-row appointment-card-row"
                       style={{ gridTemplateColumns: USER_GRID, cursor: 'default' }}
                     >
-                      {/* User: square avatar + name/username */}
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      {/* User: square avatar + name/username, on the shared
+                          identity classes so type and spacing match the other
+                          card lists. */}
+                      <div className="ehr-appointment-identity">
                         <div className="ehr-patient-icon" style={avatarTint(user.name)}>
                           {user.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'}
                         </div>
-                        <div className="min-w-0">
-                          <span className="block text-[14px] truncate" style={{ color: 'var(--ehr-text, var(--text-primary))', fontWeight: 800 }}>{user.name}</span>
-                          <span className="block text-[13px] truncate" style={{ color: 'var(--ehr-muted, var(--text-muted))' }}>{user.username}</span>
+                        <div className="ehr-appointment-main appointment-card-patient">
+                          <strong>{user.name}</strong>
+                          <p>{user.username}</p>
                         </div>
                       </div>
 

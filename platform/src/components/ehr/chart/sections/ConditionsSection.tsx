@@ -18,7 +18,7 @@ import { useToast } from '@/components/Toast';
 import { useAuth } from '@/lib/context';
 import { useProblems } from '@/lib/hooks/useProblems';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
-import { formatDate } from '@/lib/format-utils';
+import { formatDate , humanizeStatus } from '@/lib/format-utils';
 import type { ProblemStatus } from '@/lib/db-types';
 
 type ShowFilter = 'active' | 'inactive' | 'all';
@@ -107,7 +107,7 @@ export default function ConditionsSection({ patientId, patientName, autoOpenAdd,
 
   return (
     <>
-      <ChartSection title="Conditions" addLabel="Add" onAdd={() => setAdding(true)} filterSlot={filterSlot}>
+      <ChartSection title="Problems" addLabel="Add" onAdd={() => setAdding(true)} filterSlot={filterSlot}>
         {filtered.length === 0 ? (
           <OmrsEmptyState itemLabel="conditions" actionLabel="Record conditions" onAction={() => setAdding(true)} />
         ) : (
@@ -124,7 +124,7 @@ export default function ConditionsSection({ patientId, patientName, autoOpenAdd,
                 <tr key={p._id}>
                   <td style={{ fontWeight: 600 }}>{p.name}{p.icd11Code ? <span style={{ color: 'var(--ehr-muted, #8395A8)', fontWeight: 400 }}> · {p.icd11Code}</span> : null}</td>
                   <td>{p.onsetDate ? formatDate(p.onsetDate) : '—'}</td>
-                  <td><span className={STATUS_BADGE[p.status]}>{p.status}</span></td>
+                  <td><span className={STATUS_BADGE[p.status]}>{humanizeStatus(p.status)}</span></td>
                 </tr>
               ))}
             </tbody>

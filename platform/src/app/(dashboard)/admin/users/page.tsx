@@ -12,6 +12,15 @@ import {
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import EhrListHeader from '@/components/ehr/EhrListHeader';
+import { avatarTint } from '@/lib/patient-utils';
+
+// Column template for the user list header + rows:
+// User · Role · Organization · Facility · Status · Actions
+// The first five tracks match .appointment-card-row's shared grid
+// (minmax(320px, 1.6fr) + minmax(150px, 1fr) columns) so this list lines up
+// with the clinical worklist and patient registry; only the trailing actions
+// gutter is narrower, since it holds a lone kebab instead of a data column.
+const USER_GRID = 'minmax(320px, 1.6fr) repeat(4, minmax(150px, 1fr)) 44px';
 
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super Admin',
@@ -252,88 +261,107 @@ export default function AdminUsersPage() {
               </>
             }
           />
-          <div style={{ overflowX: 'auto' }}>
-            <table className="w-full" style={{ minWidth: 840 }}>
-              <thead>
-                <tr>
-                  {[
-                    t('adminUsers.colName'), t('adminUsers.colUsername'), t('adminUsers.colRole'),
-                    t('adminUsers.colOrganization'), t('adminUsers.colHospital'), t('adminUsers.colStatus'),
-                    t('adminUsers.colActions'),
-                  ].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('adminUsers.loadingUsers')}</td></tr>
-                ) : filteredUsers.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('adminUsers.noUsersFound')}</td></tr>
-                ) : filteredUsers.map(u => {
-                  const roleColor = ROLE_COLORS[u.role] || '#6B7280';
+          {/* Same list anatomy as the clinical worklist and patient registry:
+              card-list wrapper, compact column head, card rows. */}
+          <div className="appointment-card-list">
+            {loading ? (
+              <div className="appointment-card-empty">{t('adminUsers.loadingUsers')}</div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="appointment-card-empty">{t('adminUsers.noUsersFound')}</div>
+            ) : (
+              <>
+                <div className="appointment-card-head" aria-hidden="true" style={{ gridTemplateColumns: USER_GRID }}>
+                  <span>{t('adminUsers.colName')}</span>
+                  <span>{t('adminUsers.colRole')}</span>
+                  <span>{t('adminUsers.colOrganization')}</span>
+                  <span>{t('adminUsers.colHospital')}</span>
+                  {/* Status values right-align (shared .appointment-card-status),
+                      so its label right-aligns too — the last-child rule only
+                      covers the empty actions gutter here. */}
+                  <span style={{ justifySelf: 'end', paddingRight: 6 }}>{t('adminUsers.colStatus')}</span>
+                  <span />
+                </div>
+                {filteredUsers.map(u => {
                   const isExpanded = expandedId === u._id;
                   return (
                     <Fragment key={u._id}>
-                    <tr
-                      onClick={() => setExpandedId(isExpanded ? null : u._id)}
-                      style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--border-light)' }}
-                      className="transition-colors cursor-pointer hover:bg-[var(--overlay-subtle)]"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: roleColor }}>
-                            {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      <div
+                        className="ehr-appointment-row appointment-card-row"
+                        style={{ gridTemplateColumns: USER_GRID }}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setExpandedId(isExpanded ? null : u._id)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setExpandedId(isExpanded ? null : u._id);
+                          }
+                        }}
+                      >
+                        {/* User: square avatar + name/username */}
+                        <div className="ehr-appointment-identity">
+                          <div className="ehr-patient-icon" style={avatarTint(u.name)}>
+                            {u.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'}
                           </div>
-                          <span className="text-sm font-medium" style={{ color: u.isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>{u.name}</span>
+                          <div className="ehr-appointment-main appointment-card-patient">
+                            <strong>{u.name}</strong>
+                            <p>{u.username}</p>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <code className="text-xs px-2 py-1 rounded" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>{u.username}</code>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                          background: `${roleColor}18`,
-                          color: roleColor,
-                        }}>{roleLabel(u.role)}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        {u.orgId ? (orgNameMap[u.orgId] || u.orgId) : '--'}
-                      </td>
-                      <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        {u.hospitalName || '--'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="flex items-center gap-1.5 text-xs font-semibold">
-                          <span className="w-2 h-2 rounded-full" style={{ background: u.isActive ? 'var(--color-success)' : 'var(--text-muted)' }} />
-                          <span style={{ color: u.isActive ? 'var(--color-success)' : 'var(--text-muted)' }}>{u.isActive ? t('adminUsers.statusActive') : t('adminUsers.statusInactive')}</span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <RowActionsMenu
-                          actions={[
-                            {
-                              key: 'change-role',
-                              label: 'Change Role',
-                              icon: <Shield className="w-4 h-4" />,
-                              onClick: () => { setChangeRoleUser(u); setNewRole(u.role); },
-                            },
-                            {
-                              key: 'toggle',
-                              label: u.isActive ? t('adminUsers.deactivate') : t('adminUsers.activate'),
-                              tone: u.isActive ? 'danger' : 'success',
-                              icon: u.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />,
-                              onClick: () => handleToggleActive(u._id, u.isActive),
-                            },
-                          ]}
-                        />
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--overlay-subtle)' }}>
-                        <td colSpan={7} className="px-4 py-3">
+
+                        {/* Role — value + scope, matching the shared row hierarchy. */}
+                        <div className="appointment-card-provider">
+                          <strong>{roleLabel(u.role)}</strong>
+                          <span>{u.department || u.specialty || 'Access role'}</span>
+                        </div>
+
+                        <div className="appointment-card-provider">
+                          <strong>{u.orgId ? (orgNameMap[u.orgId] || u.orgId) : 'Platform-level'}</strong>
+                          <span>{t('adminUsers.colOrganization')}</span>
+                        </div>
+
+                        <div className="appointment-card-provider">
+                          <strong>{u.hospitalName || 'Facility unassigned'}</strong>
+                          <span>{t('adminUsers.colHospital')}</span>
+                        </div>
+
+                        {/* Status pill — shared appointment pill metrics */}
+                        <div className="appointment-card-status">
+                          <span
+                            className="appointment-status-pill"
+                            style={u.isActive
+                              ? { borderColor: 'rgba(25,158,112,0.45)', background: 'rgba(25,158,112,0.10)', color: '#167755' }
+                              : { borderColor: 'rgba(227,73,72,0.45)', background: 'rgba(227,73,72,0.10)', color: '#C24135' }}
+                          >
+                            {u.isActive ? t('adminUsers.statusActive') : t('adminUsers.statusInactive')}
+                          </span>
+                          <small>{u.mustChangePassword ? 'Password reset required' : 'Credentials current'}</small>
+                        </div>
+
+                        {/* Row actions */}
+                        <div className="flex justify-end" onClick={e => e.stopPropagation()}>
+                          <RowActionsMenu
+                            ariaLabel={t('adminUsers.colActions')}
+                            actions={[
+                              {
+                                key: 'change-role',
+                                label: 'Change Role',
+                                icon: <Shield className="w-4 h-4" />,
+                                onClick: () => { setChangeRoleUser(u); setNewRole(u.role); },
+                              },
+                              {
+                                key: 'toggle',
+                                label: u.isActive ? t('adminUsers.deactivate') : t('adminUsers.activate'),
+                                tone: u.isActive ? 'danger' : 'success',
+                                icon: u.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />,
+                                onClick: () => handleToggleActive(u._id, u.isActive),
+                              },
+                            ]}
+                          />
+                        </div>
+                      </div>
+                      {isExpanded && (
+                        <div className="px-4 py-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs">
                             <div><span style={{ color: 'var(--text-muted)' }}>{t('adminUsers.colRole')}: </span><span style={{ color: 'var(--text-primary)' }}>{roleLabel(u.role)}</span></div>
                             <div><span style={{ color: 'var(--text-muted)' }}>Department: </span><span style={{ color: 'var(--text-primary)' }}>{u.department || '--'}</span></div>
@@ -344,14 +372,13 @@ export default function AdminUsersPage() {
                             <div><span style={{ color: 'var(--text-muted)' }}>Created: </span><span style={{ color: 'var(--text-primary)' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '--'}</span></div>
                             <div><span style={{ color: 'var(--text-muted)' }}>User ID: </span><code style={{ color: 'var(--text-secondary)' }}>{u._id}</code></div>
                           </div>
-                        </td>
-                      </tr>
-                    )}
+                        </div>
+                      )}
                     </Fragment>
                   );
                 })}
-              </tbody>
-            </table>
+              </>
+            )}
           </div>
         </div>
 

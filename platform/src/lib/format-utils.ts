@@ -152,3 +152,47 @@ export function timeOfDay(date: Date = new Date()): 'morning' | 'afternoon' | 'e
   return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
 }
 
+
+/**
+ * Human-readable status label from a raw enum value: "checked_in" → "Checked in".
+ * Use for every status chip so raw enum casing/underscores never reach the UI.
+ */
+export function humanizeStatus(status?: string | null): string {
+  if (!status) return '—';
+  const s = String(status).replace(/_/g, ' ').trim();
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * One canonical prescription sig line: "500mg · Oral · BD · 30 days".
+ *
+ * Historical prescription docs (and some seeds) stored the whole sig in `dose`
+ * ("500mg BD x 30 days") *while also* carrying separate `frequency`/`duration`
+ * fields, so naive `dose · frequency · duration` concatenation printed the
+ * frequency and duration twice. This helper appends each part only when the
+ * dose string doesn't already contain it (word-boundary match, so a "20mg"
+ * dose still gets an "OD" frequency appended), making it safe for both old
+ * and new documents. Every surface that shows a sig should use this.
+ */
+export function formatRxSig(rx: {
+  dose?: string | null;
+  route?: string | null;
+  frequency?: string | null;
+  duration?: string | null;
+}): string {
+  const dose = (rx.dose || '').trim();
+  const doseLower = dose.toLowerCase();
+  const parts: string[] = dose ? [dose] : [];
+  for (const raw of [rx.route, rx.frequency, rx.duration]) {
+    const v = (raw || '').trim();
+    if (!v) continue;
+    const embedded = dose
+      && new RegExp(`(^|[^a-z0-9])${escapeRegExp(v.toLowerCase())}($|[^a-z0-9])`).test(doseLower);
+    if (embedded) continue;
+    if (parts.some(p => p.toLowerCase() === v.toLowerCase())) continue;
+    parts.push(v);
+  }
+  return parts.join(' · ');
+}

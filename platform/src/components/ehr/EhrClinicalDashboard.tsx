@@ -1324,11 +1324,18 @@ export default function EhrClinicalDashboard({
                           </div>
                         </div>
 
-                        <div className="ehr-appointment-time">
+                        {/* Over-target waits are carried by colour alone — the
+                            "· over target" suffix that used to follow the time
+                            was removed. `title` keeps the meaning reachable for
+                            anyone the red doesn't reach. */}
+                        <div
+                          className="ehr-appointment-time"
+                          title={columns.overTarget ? 'Wait is over target' : undefined}
+                        >
                           <strong style={columns.overTarget ? { color: '#C24135' } : undefined}>{columns.waitText}</strong>
                           {columns.waitSubtext && (
                             <span className={columns.overTarget ? 'is-soon' : ''}>
-                              {columns.waitSubtext}{columns.overTarget ? ' · over target' : ''}
+                              {columns.waitSubtext}
                             </span>
                           )}
                         </div>

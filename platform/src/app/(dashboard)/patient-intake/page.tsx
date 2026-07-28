@@ -341,7 +341,13 @@ export default function PatientIntakePage() {
                   No forms in this view.
                 </p>
               ) : (
-                <table className="data-table" style={{ width: '100%' }}>
+                <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '18%' }} />
+                    <col style={{ width: '30%' }} />
+                    <col style={{ width: '30%' }} />
+                    <col style={{ width: '22%' }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>Received</th>

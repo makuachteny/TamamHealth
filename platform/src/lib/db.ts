@@ -313,7 +313,7 @@ export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 // pharmacy inventory/prescriptions, blood bank stock and today's appointments
 // — instead of borrowed hosp-001 public data, so org.admin's dashboards show
 // a coherent Mercy-only dataset.
-export const SEED_VERSION = 55;
+export const SEED_VERSION = 57;
 
 export async function isSeeded(): Promise<boolean> {
   try {

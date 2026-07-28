@@ -1,6 +1,7 @@
 'use client';
 
 import { Loader2 } from '@/components/icons/lucide';
+import { formatRxSig } from '@/lib/format-utils';
 import Badge, { toneForStatus } from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
@@ -27,7 +28,7 @@ export default function MobileMedicationsTab({ patientId }: { patientId: string 
         <div key={rx._id} className="mobile-chart-card mobile-chart-row-card">
           <div>
             <strong>{rx.medication}</strong>
-            <small>{rx.dose} · {rx.frequency} · {rx.duration}</small>
+            <small>{formatRxSig(rx)}</small>
           </div>
           <Badge tone={toneForStatus(rx.status)} size="sm">{rx.status}</Badge>
         </div>

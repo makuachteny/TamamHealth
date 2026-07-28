@@ -16,6 +16,7 @@
  */
 
 import { useState, useMemo } from 'react';
+import { formatRxSig } from '@/lib/format-utils';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Pill, CheckCircle2, X, AlertTriangle, ShieldAlert, Printer, BedDouble,
@@ -435,7 +436,7 @@ export default function MARPage() {
                               {rx.medication}
                             </div>
                             <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                              {rx.dose} · {rx.route} · {rx.frequency}
+                              {formatRxSig({ ...rx, duration: undefined })}
                               {rx.duration && <> · {rx.duration}</>}
                             </div>
                             <div className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>

@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { formatRxSig } from '@/lib/format-utils';
 import { Plus, ChevronDown, Pill, FlaskConical } from '@/components/icons/lucide';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useLabResults } from '@/lib/hooks/useLabResults';
@@ -66,7 +67,7 @@ export default function OrderBasketPanel({
                 <div className="omrs-panel-row" key={rx._id}>
                   <div>
                     <div className="omrs-panel-row-main">{rx.medication}</div>
-                    <div className="omrs-panel-row-sub">{rx.dose} · {rx.frequency}{rx.route ? ` · ${rx.route}` : ''}</div>
+                    <div className="omrs-panel-row-sub">{formatRxSig(rx)}</div>
                   </div>
                   <span className={`omrs-panel-badge ${rx.status === 'pending' ? 'omrs-panel-badge--pending' : rx.status === 'discontinued' ? 'omrs-panel-badge--muted' : 'omrs-panel-badge--active'}`}>
                     {rx.status}

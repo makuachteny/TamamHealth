@@ -358,8 +358,20 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
   }
 
   return (
-    <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-      <table className="data-table" style={{ minWidth: 700 }}>
+    <div style={{ padding: '0 16px', overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+      <table className="data-table" style={{ minWidth: 940, tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '4%' }} />
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '11%' }} />
+          <col style={{ width: '8%' }} />
+        </colgroup>
         <thead>
           <tr>
             <th style={{ width: '4%', textAlign: 'center' }}>#</th>
