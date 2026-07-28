@@ -373,21 +373,22 @@ export default function PatientsPage() {
             {/* Same compact card-row list as the appointments page — identical
                 grid template, spacing, and type scale. Five columns:
                 Patient / Registered / Care team / Location / Status. */}
-            <div className="appointment-card-list">
-              {visible.length === 0 ? (
-                <div className="appointment-card-empty">
-                  {t('patients.patientsFound', { count: 0 })}
-                </div>
-              ) : (
-                <>
-                  <div className="appointment-card-head" aria-hidden="true">
+            <div className="appointment-card-surface patients-list-surface">
+              <div className="appointment-card-flow">
+                {visible.length === 0 ? (
+                  <div className="appointment-card-empty">
+                    {t('patients.patientsFound', { count: 0 })}
+                  </div>
+                ) : (
+                  <>
+                    <div className="appointment-card-head" aria-hidden="true">
                     <span>Patient</span>
                     <span>Registered</span>
                     <span>Care team</span>
                     <span>Location</span>
                     <span>Status</span>
-                  </div>
-                  {visible.map(patient => (
+                    </div>
+                    {visible.map(patient => (
                     <div
                       key={patient._id}
                       className="ehr-appointment-row appointment-card-row"
@@ -430,9 +431,10 @@ export default function PatientsPage() {
                         </small>
                       </div>
                     </div>
-                  ))}
-                </>
-              )}
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
             {hasMore && (
               <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>

@@ -4386,7 +4386,7 @@ const en: TranslationMap = {
   'pharmacy.pending': 'Pending',
   'pharmacy.pendingBadge': '{{count}} PENDING',
   'pharmacy.pharmacistOnly': 'Pharmacist only',
-  'pharmacy.prescribedBy': 'Prescribed By',
+  'pharmacy.prescribedBy': 'Prescribed by',
   'pharmacy.prescriber': 'Prescriber',
   'pharmacy.prescriptionQueue': 'Prescription Queue',
   'pharmacy.prescriptionsOnRecord': '{{count}} prescription(s) on record',

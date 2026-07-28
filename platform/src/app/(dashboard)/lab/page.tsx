@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
@@ -104,6 +104,7 @@ export default function LabPage() {
   const { globalSearch, currentUser } = useApp();
   const { results: labResults, update: updateLabResult, advance: advanceLabOrder, loading: labLoading, reload: reloadLabs } = useLabResults();
   const { patients } = usePatients();
+  const patientById = useMemo(() => new Map(patients.map(patient => [patient._id, patient])), [patients]);
   const { canEnterLabResults, canOrderLabs } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
@@ -776,7 +777,7 @@ export default function LabPage() {
                   <col key={c.key} style={{ width: `${(c.width / labColTotal * 100).toFixed(2)}%` }} />
                 ))}
               </colgroup>
-              <thead>
+              <thead className="appointment-table-head">
                 <tr>
                   {labCols.map(c => (
                     <th key={c.key}>
@@ -796,8 +797,15 @@ export default function LabPage() {
                     onClick={() => { if (order.patientId) router.push(`/patients/${order.patientId}?tab=labs&focus=${order._id}`); }}
                   >
                     <td style={overdue ? { boxShadow: 'inset 3px 0 0 var(--color-danger)' } : undefined}>
-                      <PatientName patientId={order.patientId} name={order.patientName} nameClassName="font-medium text-sm" />
-                      <p className="text-xs font-mono" style={{ color: 'var(--accent-primary)' }}>{order.hospitalNumber}</p>
+                      <PatientName
+                        patient={patientById.get(order.patientId)}
+                        patientId={order.patientId}
+                        name={order.patientName}
+                        showAvatar
+                        size={40}
+                        secondaryText={order.hospitalNumber || 'ID not recorded'}
+                        nameClassName="font-medium text-sm"
+                      />
                       {overdue && (
                         <p className="text-[10px] font-semibold flex items-center gap-1 mt-0.5" style={{ color: 'var(--color-danger)' }}>
                           <AlertTriangle className="w-3 h-3 flex-shrink-0" />

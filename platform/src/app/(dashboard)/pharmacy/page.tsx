@@ -81,6 +81,7 @@ export default function PharmacyPage() {
   const { prescriptions: rxQueue, loading: rxLoading, dispense, advance } = usePrescriptions();
   const { items: rawInventory, create: createInventory, update: updateInventory } = usePharmacyInventory();
   const { patients } = usePatients();
+  const patientById = useMemo(() => new Map(patients.map(patient => [patient._id, patient])), [patients]);
   const { users } = useUsers();
   const [balanceByPatient, setBalanceByPatient] = useState<Map<string, number>>(new Map());
   const [workflowRxId, setWorkflowRxId] = useState<string | null>(null);
@@ -914,7 +915,7 @@ export default function PharmacyPage() {
                   <col style={{ width: '11%' }} />
                   <col style={{ width: '9%' }} />
                 </colgroup>
-                <thead>
+                <thead className="appointment-table-head">
                   <tr>
                     <th>{t('pharmacy.patient')}</th>
                     <th>{t('pharmacy.medication')}</th>
@@ -938,7 +939,17 @@ export default function PharmacyPage() {
                     const paymentClear = isFinanciallyCleared(balance);
                     return (
                       <tr key={rx._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setWorkflowRxId(rx._id)}>
-                        <td><PatientName patientId={rx.patientId} name={rx.patientName} nameClassName="text-sm font-medium" /></td>
+                        <td>
+                          <PatientName
+                            patient={patientById.get(rx.patientId)}
+                            patientId={rx.patientId}
+                            name={rx.patientName}
+                            showAvatar
+                            size={40}
+                            secondaryText={patientById.get(rx.patientId)?.hospitalNumber || 'ID not recorded'}
+                            nameClassName="text-sm font-medium"
+                          />
+                        </td>
                         <td className="text-sm">
                           {/* No per-row pill glyph: it was identical on every
                               row, so it carried no information and just pushed
@@ -1227,7 +1238,7 @@ export default function PharmacyPage() {
             ) : (
               <div className="overflow-auto" style={{ maxHeight: 'min(62vh, 520px)' }}>
                 <table className="data-table" style={{ minWidth: 640 }}>
-                  <thead>
+                  <thead className="appointment-table-head">
                     <tr>
                       <th>{t('pharmacy.medication')}</th>
                       <th>{t('pharmacy.dosage')}</th>

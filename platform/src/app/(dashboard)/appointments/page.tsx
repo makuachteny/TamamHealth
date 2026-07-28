@@ -575,7 +575,7 @@ export default function AppointmentsPage() {
                 }
               />
 
-              <div className="appointment-card-list">
+              <div className="appointment-card-list appointments-list-surface">
                 {tableRows.length === 0 ? (
                   <div className="appointment-card-empty">
                     No appointments for {dayLabel.toLowerCase()}.

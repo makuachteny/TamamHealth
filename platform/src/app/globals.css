@@ -661,7 +661,7 @@
   font-size: 12px;
   font-weight: 800;
   line-height: 1.2;
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 
 .ti-selected-patient span {
@@ -2005,6 +2005,23 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 /* Light mode: stronger separators for readability */
 .data-table tbody td { border-bottom: 1px solid var(--border-light); }
 .data-table thead th { border-bottom: 1px solid var(--border-light); }
+
+/* Lab and prescription headers use the same column language as the
+   appointments worklist: compact uppercase labels with a quiet sticky band. */
+.appointment-table-head th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-card-solid) !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+}
 
 /* Dashboard/card tables that predate `.data-table`.
    Scoped to operational card containers so print documents and clinical
@@ -4272,7 +4289,7 @@ thead th {
   color: var(--ehr-muted);
   font-size: 10px;
   font-weight: 700;
-  text-transform: capitalize;
+  text-transform: uppercase;
 }
 
 .ehr-module-menu-scroll {
@@ -10500,7 +10517,9 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 .tamam-ehr-app .data-table thead th,
 .tamam-ehr-app table thead th {
-  background: var(--ehr-table-head) !important;
+  /* Flat header — no tinted band. Solid (not transparent) because these
+     headers are sticky and rows scroll underneath them. */
+  background: var(--bg-card-solid) !important;
   color: var(--ehr-text) !important;
   font-size: 11px !important;
   font-weight: 800 !important;
@@ -10511,6 +10530,18 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .tamam-ehr-app .data-table tbody td,
 .tamam-ehr-app table tbody td {
   border-bottom: 1px solid var(--ehr-border) !important;
+}
+
+/* Final role-wide override: the EHR theme normalizes table headings to
+   sentence case, but lab and prescription worklists must match the
+   appointments column treatment for every user. */
+.tamam-ehr-app .appointment-table-head th,
+.ehr-chart-content .appointment-table-head th {
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: capitalize !important;
 }
 
 @media (max-width: 1180px) {
@@ -18084,9 +18115,10 @@ textarea.ehr-handoff-input {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
 }
+
 
 .appointment-card-head span:last-child {
   justify-self: end;
@@ -22152,6 +22184,25 @@ textarea.ehr-handoff-input {
   border-radius: 12px;
   background: #fff;
   overflow: auto;
+}
+
+/* Inset the standalone appointments list like the laboratory and prescription
+   tables, without changing the full-width dashboard worklists. */
+.appointments-list-surface {
+  width: calc(100% - 32px);
+  margin-inline: auto;
+}
+
+.patients-list-surface {
+  width: calc(100% - 32px);
+  margin-inline: auto;
+}
+
+@media (max-width: 720px) {
+  .appointments-list-surface,
+  .patients-list-surface {
+    width: 100%;
+  }
 }
 
 /* Doctor worklist body carries the same white appointments backdrop. */

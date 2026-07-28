@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { usePatients } from '@/lib/hooks/usePatients';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import Modal from '@/components/Modal';
@@ -184,7 +185,9 @@ function diseasesForCompletedLab(lab: LabResultDoc): Omit<CompletedDiseaseRow, '
 
 interface CriticalAlert {
   id: string;
+  patientId: string;
   patientName: string;
+  hospitalNumber?: string;
   testName: string;
   value: string;
   unit: string;
@@ -197,6 +200,7 @@ interface BatchEntry {
   orderId: string;
   patientId: string;
   patientName: string;
+  hospitalNumber?: string;
   specimen: string;
   resultValue: string;
   flag: 'NORMAL' | 'ABNORMAL' | 'CRITICAL' | '';
@@ -206,6 +210,17 @@ export default function LabDashboardPage() {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const { results: allResults, loading, update } = useLabResults();
+  const { patients } = usePatients();
+  const patientById = useMemo(() => new Map(patients.map(patient => [patient._id, patient])), [patients]);
+  const patientByName = useMemo(() => new Map(
+    patients.map(patient => [
+      `${patient.firstName} ${patient.middleName || ''} ${patient.surname}`.replace(/\s+/g, ' ').trim().toLowerCase(),
+      patient,
+    ]),
+  ), [patients]);
+  const patientForLab = (patientId?: string, patientName?: string) =>
+    (patientId ? patientById.get(patientId) : undefined)
+    || (patientName ? patientByName.get(patientName.trim().toLowerCase()) : undefined);
   // Imaging orders (specimen 'Imaging') belong to the radiology work queue —
   // keep the lab bench focused on specimen-based investigations.
   const results = useMemo(() => allResults.filter(r => !isImagingStudy(r)), [allResults]);
@@ -345,7 +360,9 @@ export default function LabDashboardPage() {
         .filter(r => !existingIds.has(r._id))
         .map(r => ({
           id: r._id,
+          patientId: r.patientId,
           patientName: r.patientName,
+          hospitalNumber: r.hospitalNumber,
           testName: r.testName,
           value: r.result,
           unit: r.unit,
@@ -422,6 +439,7 @@ export default function LabDashboardPage() {
         orderId: o._id,
         patientId: o.patientId,
         patientName: o.patientName,
+        hospitalNumber: o.hospitalNumber,
         specimen: o.specimen,
         resultValue: '',
         flag: '',
@@ -466,7 +484,9 @@ export default function LabDashboardPage() {
       if (flags.critical) {
         setCriticalAlerts(prev => [{
           id: selectedOrder._id,
+          patientId: selectedOrder.patientId,
           patientName: selectedOrder.patientName,
+          hospitalNumber: selectedOrder.hospitalNumber,
           testName: selectedOrder.testName,
           value: resultValue,
           unit: ref?.unit || selectedOrder.unit,
@@ -509,7 +529,9 @@ export default function LabDashboardPage() {
         if (flags.critical) {
           newCriticals.push({
             id: order._id,
+            patientId: order.patientId,
             patientName: order.patientName,
+            hospitalNumber: order.hospitalNumber,
             testName: order.testName,
             value: entry.resultValue,
             unit: ref?.unit || order.unit,
@@ -662,8 +684,9 @@ export default function LabDashboardPage() {
             const time = lab.completedAt ? new Date(lab.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined;
             return {
               id: row.id,
-              title: row.disease,
-              subtitle: `${lab.patientName} · ${row.detail}`,
+              photoUrl: patientForLab(lab.patientId, lab.patientName)?.photoUrl,
+              title: lab.patientName,
+              subtitle: lab.hospitalNumber || 'ID not recorded',
               meta: `${lab.hospitalNumber || ''}${lab.orderedBy ? ` · ${t('lab.orderedBy', { name: lab.orderedBy })}` : ''}`.replace(/^ · /, ''),
               careTeam: lab.orderedBy,
               careTeamLabel: 'Ordered by',
@@ -674,8 +697,8 @@ export default function LabDashboardPage() {
               statusLabel: 'Complete',
               statusSecondary: row.severity === 'critical' ? 'Critical' : row.severity === 'abnormal' ? 'Abnormal' : 'Normal',
               statusTone: row.severity === 'critical' ? 'danger' : row.severity === 'abnormal' ? 'warning' : 'done',
-              location: lab.specimen || lab.testName || row.disease,
-              locationSecondary: 'Specimen',
+              location: row.disease || lab.testName,
+              locationSecondary: `${row.detail} · ${lab.specimen}`,
               chartSeries: 1,
               // A critical result is a true acuity — same RED pill the rest
               // of the app uses for "needs attention now", not free text.
@@ -688,8 +711,9 @@ export default function LabDashboardPage() {
               : (order.orderedAt ? new Date(order.orderedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined);
             return {
               id: order._id,
+              photoUrl: patientForLab(order.patientId, order.patientName)?.photoUrl,
               title: order.patientName,
-              subtitle: `${order.testName} · ${order.specimen}`,
+              subtitle: order.hospitalNumber || 'ID not recorded',
               meta: order.orderedBy ? t('lab.orderedBy', { name: order.orderedBy }) : undefined,
               careTeam: order.orderedBy,
               careTeamLabel: 'Ordered by',
@@ -702,8 +726,8 @@ export default function LabDashboardPage() {
               statusLabel: labStatusLabel(order.status),
               statusSecondary: order.critical ? 'Critical' : order.abnormal ? 'Abnormal' : order.specimen,
               statusTone: order.critical ? 'danger' : order.abnormal ? 'warning' : order.status === 'completed' ? 'done' : order.status === 'in_progress' ? 'active' : 'scheduled',
-              location: order.specimen,
-              locationSecondary: order.testName,
+              location: order.testName,
+              locationSecondary: order.specimen,
               chartSeries: order.status === 'completed' ? 1 : 0,
               // A critical result is a true acuity — same RED pill the rest
               // of the app uses for "needs attention now", not free text.
@@ -736,7 +760,16 @@ export default function LabDashboardPage() {
                     <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-danger)' }}>{t('lab.criticalResult')}</span>
                   </div>
                   <p className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {alert.patientName} &mdash; {alert.testName}: <span style={{ color: 'var(--color-danger)' }}>{alert.value} {alert.unit}</span>
+                    <PatientName
+                      patient={patientForLab(alert.patientId, alert.patientName)}
+                      patientId={alert.patientId}
+                      name={alert.patientName}
+                      showAvatar
+                      size={32}
+                      secondaryText={alert.hospitalNumber || 'ID not recorded'}
+                      nameClassName="text-[12px] font-semibold"
+                    />
+                    <span> &mdash; {alert.testName}: <span style={{ color: 'var(--color-danger)' }}>{alert.value} {alert.unit}</span></span>
                   </p>
                   <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                     {t('lab.orderedBy', { name: alert.orderedBy })} &middot; {new Date(alert.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
@@ -944,7 +977,15 @@ export default function LabDashboardPage() {
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</p>
-                            <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{selectedOrder.patientName}</p>
+                            <PatientName
+                              patient={patientForLab(selectedOrder.patientId, selectedOrder.patientName)}
+                              patientId={selectedOrder.patientId}
+                              name={selectedOrder.patientName}
+                              showAvatar
+                              size={32}
+                              secondaryText={selectedOrder.hospitalNumber || 'ID not recorded'}
+                              nameClassName="text-[12px] font-medium"
+                            />
                           </div>
                           <div>
                             <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.testName')}</p>
@@ -1102,7 +1143,7 @@ export default function LabDashboardPage() {
                     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
                       <div className="overflow-x-auto">
                       <table className="w-full" style={{ minWidth: 520 }}>
-                        <thead>
+                        <thead className="appointment-table-head">
                           <tr style={{ background: 'var(--overlay-subtle)' }}>
                             <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</th>
                             <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.specimen')}</th>
@@ -1117,7 +1158,15 @@ export default function LabDashboardPage() {
                             return (
                               <tr key={entry.orderId} style={{ borderTop: '1px solid var(--border-light)' }}>
                                 <td className="px-3 py-2">
-                                  <PatientName patientId={entry.patientId} name={entry.patientName} size={24} nameClassName="text-[11px] font-medium" />
+                                  <PatientName
+                                    patient={patientForLab(entry.patientId, entry.patientName)}
+                                    patientId={entry.patientId}
+                                    name={entry.patientName}
+                                    showAvatar
+                                    size={40}
+                                    secondaryText={entry.hospitalNumber || 'ID not recorded'}
+                                    nameClassName="text-[11px] font-medium"
+                                  />
                                 </td>
                                 <td className="px-3 py-2">
                                   <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{entry.specimen}</span>

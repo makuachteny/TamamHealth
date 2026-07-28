@@ -1249,7 +1249,7 @@ export default function EhrClinicalDashboard({
 	            </div>
 	          </div>
 
-	          <div className="ehr-appointment-list ehr-assigned-worklist-list">
+          <div className="ehr-appointment-list ehr-care-list ehr-care-list--no-actions">
             {visiblePatientRows.length === 0 && (
               <div className="ehr-empty-state">
                 <ClipboardList className="w-8 h-8" />

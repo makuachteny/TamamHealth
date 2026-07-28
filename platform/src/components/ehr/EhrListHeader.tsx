@@ -55,7 +55,7 @@ export default function EhrListHeader({
 }) {
   const hasSecondRow = Boolean(search || actions);
   return (
-    <div className={`px-4 pt-4 pb-3 flex-shrink-0 ${className}`} style={{ borderBottom: '1px solid var(--border-light)' }}>
+    <div className={`px-4 pt-4 pb-3 flex-shrink-0 ${className}`}>
       <div className={`flex items-end justify-between gap-3 flex-wrap ${hasSecondRow ? 'mb-3' : ''}`}>
         <span style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: 'var(--text-primary)' }}>
           {title}
