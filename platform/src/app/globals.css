@@ -2007,7 +2007,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 .data-table thead th { border-bottom: 1px solid var(--border-light); }
 
 /* Lab and prescription headers use the same column language as the
-   appointments worklist: compact uppercase labels with a quiet sticky band. */
+   appointments worklist: compact title-case labels with a quiet sticky band. */
 .appointment-table-head th {
   position: sticky;
   top: 0;
@@ -2018,7 +2018,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   font-weight: 800 !important;
   letter-spacing: 0.06em !important;
   line-height: 1.2;
-  text-transform: uppercase;
+  text-transform: capitalize;
   white-space: nowrap;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
 }
