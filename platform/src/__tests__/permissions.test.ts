@@ -77,6 +77,16 @@ describe('permissions', () => {
       }
     });
 
+    // /notifications is a universal route (see UNIVERSAL_ROUTES in
+    // role-routes.ts): every role has the bell, so every role must be able to
+    // open the full feed behind it — including roles whose module allow-list
+    // never lists it.
+    test('all roles can access /notifications', () => {
+      for (const role of ALL_ROLES) {
+        expect(isRouteAllowed(role, '/notifications')).toBe(true);
+      }
+    });
+
     test('all roles can access /messages', () => {
       for (const role of ALL_ROLES) {
         if (role === 'government') return; // government doesn't have messages

@@ -79,11 +79,21 @@ export function useTasks() {
     await load();
   }, [load]);
 
+  const update = useCallback(async (
+    id: string,
+    patch: Partial<Pick<ClinicianTaskDoc, 'title' | 'description' | 'dueDate' | 'priority'>>,
+  ) => {
+    const { updateTask } = await import('../services/clinician-task-service');
+    const doc = await updateTask(id, patch);
+    await load();
+    return doc;
+  }, [load]);
+
   const remove = useCallback(async (id: string) => {
     const { deleteTask } = await import('../services/clinician-task-service');
     await deleteTask(id);
     await load();
   }, [load]);
 
-  return { tasks, open, completed, loading, add, complete, reopen, reschedule, remove, reload: load };
+  return { tasks, open, completed, loading, add, complete, reopen, reschedule, update, remove, reload: load };
 }

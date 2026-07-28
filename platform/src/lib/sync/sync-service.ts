@@ -79,12 +79,21 @@ export interface SyncStatus {
   error: string | null;
 }
 
+import { replicationSelector, type FacilityEntitlement } from './facility-entitlements';
+
 export interface SyncServiceOptions {
   localDB: PouchDB.Database;
   remoteUrl: string;
   direction: SyncDirection;
   /** If provided, only replicate docs where doc.orgId matches */
   orgId?: string;
+  /**
+   * What the signed-in user may replicate (KAN-95). When present, this becomes
+   * a CouchDB selector evaluated SERVER-SIDE, so non-entitled documents never
+   * reach the device — unlike the client-side filter function it replaces,
+   * which only decided what to keep after the server had already sent it.
+   */
+  entitlement?: FacilityEntitlement;
   /** Callback when status changes */
   onChange?: (status: SyncStatus) => void;
 }
@@ -99,6 +108,7 @@ export class SyncService {
   private onChange?: (status: SyncStatus) => void;
 
   private replication: PouchDB.Replication.Sync<object> | PouchDB.Replication.Replication<object> | null = null;
+  private readonly selector: Record<string, unknown> | undefined;
   private retryCount = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private _status: SyncStatus = {
@@ -127,6 +137,12 @@ export class SyncService {
     this.direction = opts.direction;
     this.orgId = opts.orgId;
     this.onChange = opts.onChange;
+    // Built once: the entitlement cannot change without a new session, and
+    // rebuilding it per replication restart would risk the two directions of a
+    // bidirectional sync disagreeing about scope.
+    this.selector = replicationSelector(
+      opts.entitlement ?? { orgId: opts.orgId, facilityIds: [], allFacilities: true },
+    );
   }
 
   get status(): SyncStatus {
@@ -143,15 +159,13 @@ export class SyncService {
       retry: true,
       batch_size: 100,
       batches_limit: 5,
-      // Filter by orgId when org-scoped
-      ...(this.orgId ? {
-        filter: (doc: Record<string, unknown>) => {
-          // Allow design docs & docs without orgId (global)
-          if ((doc._id as string)?.startsWith('_design/')) return true;
-          if (!doc.orgId) return true;
-          return doc.orgId === this.orgId;
-        },
-      } : {}),
+      // Org AND facility scoping, as a server-evaluated selector (KAN-95).
+      //
+      // This replaced a client-side `filter` function that (a) ran in the
+      // browser, so the server sent every document regardless, and (b)
+      // constrained `orgId` only — there was no facility condition at all, so
+      // every user in an org replicated every facility's PHI onto their device.
+      ...(this.selector ? { selector: this.selector } : {}),
     };
 
     if (this.direction === 'both') {

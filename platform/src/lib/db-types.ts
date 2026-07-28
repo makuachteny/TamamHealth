@@ -1,4 +1,4 @@
-import type { Hospital, Patient, Referral, DiseaseAlert, VitalSigns, Diagnosis, Prescription, LabResult, MedicalRecord, Attachment, TransferPackage } from '@/data/mock';
+import type { Hospital, Patient, Referral, DiseaseAlert, VitalSigns, Diagnosis, Prescription, LabResult, MedicalRecord, Attachment, TransferPackage, CareTeamMember } from '@/data/mock';
 import type { EncounterStatus, EncounterStageKey } from './clinical-flow/encounter-journey';
 import type { LabOrderStatus, PrescriptionStatus } from './clinical-flow/order-lifecycles';
 
@@ -580,6 +580,27 @@ export interface AuditLogDoc extends BaseDoc {
   ip?: string;
   success: boolean;
   orgId?: string;
+  // ── Structured PHI-read fields (KAN-97) ──────────────────────────────
+  // Previously every audit entry was a free-text `details` string, which is
+  // fine for a human reading the log and useless for answering "who accessed
+  // this patient's record?" — the question an access review actually asks.
+  // Optional because write-audit entries and older rows don't carry them.
+  /** Acting user's role at the time of access. */
+  role?: string;
+  /** Facility the actor was working at. */
+  hospitalId?: string;
+  /** Patient whose PHI was read — the field an access review pivots on. */
+  patientId?: string;
+  /** Document type read (e.g. 'lab_result', 'prescription'). */
+  resourceType?: string;
+  /** Specific document id, when the read was of one record. */
+  resourceId?: string;
+  /** API route or UI page the read came through. */
+  route?: string;
+  /** For search reads: the query string that produced the results. */
+  query?: string;
+  /** For search/list reads: how many records were returned. */
+  resultCount?: number;
 }
 
 /**
@@ -931,7 +952,14 @@ export interface NutritionScreeningDoc extends BaseDoc {
 }
 
 export type ReminderChannel = 'sms' | 'whatsapp' | 'call' | 'in_person';
-export type ReminderStatus = 'queued' | 'sent' | 'cancelled';
+/**
+ * `failed` is terminal (KAN-104): the gateway rejected this reminder on every
+ * permitted attempt. Kept distinct from `queued` so staff can see the patient
+ * was NOT reached — a delivery failure that leaves the reminder looking queued
+ * is indistinguishable from one still waiting its turn, and a clinical recall
+ * nobody chased is exactly the thing this queue exists to prevent.
+ */
+export type ReminderStatus = 'queued' | 'sent' | 'cancelled' | 'failed';
 
 /**
  * A patient reminder queued to go out on a future date — e.g. "Come fasted in 3
@@ -954,6 +982,12 @@ export interface PatientReminderDoc extends BaseDoc {
   createdById?: string;
   createdByName?: string;
   sentAt?: string;
+  /** Gateway dispatch attempts so far (KAN-104). Absent means none. */
+  attempts?: number;
+  /** ISO timestamp of the most recent attempt — drives retry backoff. */
+  lastAttemptAt?: string;
+  /** Why the last attempt failed, surfaced to staff working the queue. */
+  lastError?: string;
   hospitalId?: string;
   orgId?: string;
 }
@@ -1040,6 +1074,91 @@ export interface EncounterDoc extends BaseDoc {
    * existed. Previously computed and discarded by check-in-service.ts.
    */
   appointmentId?: string;
+  /**
+   * Exam room the patient was placed in during rooming (KAN-99).
+   *
+   * Typed on the encounter rather than buried in `snapshot` because it is
+   * operational state the rooming and clinician worklists both read — a value
+   * inside the free-form snapshot cannot be queried or relied on to exist.
+   */
+  roomNumber?: string;
+  /** Clinic/department the patient was routed to for this visit. */
+  destinationClinic?: string;
+  /** Who completed rooming, and when — the handoff to the clinician. */
+  roomedByName?: string;
+  roomedAt?: string;
+}
+
+export type ConsultationProgressStage =
+  | 'new'
+  | 'triage'
+  | 'waiting_for_provider'
+  | 'in_progress'
+  | 'orders_pending'
+  | 'follow_up_required'
+  | 'completed'
+  | 'cancelled';
+
+export type ConsultationProgressTaskStatus = 'open' | 'in_progress' | 'blocked' | 'completed';
+
+export interface ConsultationProgressTask {
+  id: string;
+  title: string;
+  status: ConsultationProgressTaskStatus;
+  ownerId?: string;
+  ownerName?: string;
+  ownerRole?: UserRole;
+  dueAt?: string;
+  priority: 'routine' | 'high' | 'urgent';
+  blockedReason?: string;
+  createdBy?: string;
+  createdAt: string;
+  completedAt?: string;
+  completedBy?: string;
+}
+
+export interface ConsultationProgressMilestone {
+  key: string;
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'blocked';
+  completedBy?: string;
+  completedAt?: string;
+  note?: string;
+}
+
+export interface ConsultationProgressEvent {
+  id: string;
+  kind: 'stage' | 'task' | 'milestone' | 'assignment' | 'note';
+  message: string;
+  actorId?: string;
+  actorName?: string;
+  actorRole?: UserRole;
+  createdAt: string;
+}
+
+/** Shared operational progress state for a consultation. Clinical content
+ * remains in MedicalRecordDoc; this document answers who owns the next step
+ * and keeps the care team synchronized across stations and shifts. */
+export interface ConsultationProgressDoc extends BaseDoc {
+  type: 'consultation_progress';
+  patientId: string;
+  patientName: string;
+  hospitalId: string;
+  hospitalName?: string;
+  orgId?: string;
+  encounterId?: string;
+  appointmentId?: string;
+  currentStage: ConsultationProgressStage;
+  ownerId?: string;
+  ownerName?: string;
+  ownerRole?: UserRole;
+  priority: 'routine' | 'high' | 'urgent';
+  nextAction?: string;
+  dueAt?: string;
+  blockedReason?: string;
+  milestones: ConsultationProgressMilestone[];
+  tasks: ConsultationProgressTask[];
+  events: ConsultationProgressEvent[];
 }
 
 /**
@@ -1498,6 +1617,15 @@ export interface OrganizationDoc extends BaseDoc {
 }
 
 export interface PlatformConfigDoc extends BaseDoc {
+  /**
+   * When a backup was last reported as completed (KAN-117).
+   *
+   * Written by the backup job through `recordBackupCompleted`, never by the
+   * UI. Absent means no backup has been reported — which the status service
+   * reports as `unknown`, NOT as overdue or healthy.
+   */
+  lastBackupAt?: string;
+
   type: 'platform_config';
   platformName: string;
   maintenanceMode: boolean;
@@ -1700,6 +1828,14 @@ export interface AppointmentDoc extends BaseDoc {
 // ===== Telehealth Services (Private Sector) =====
 export type TelehealthStatus = 'scheduled' | 'waiting_room' | 'in_session' | 'completed' | 'cancelled' | 'failed' | 'no_show';
 export type TelehealthType = 'video' | 'audio' | 'chat';
+/** Why a telehealth session reached a terminal state (KAN-127). */
+export type TelehealthTerminationReason =
+  | 'provider_ended'
+  | 'patient_left'
+  | 'connection_failed'
+  | 'abandoned'
+  | 'no_show'
+  | 'cancelled';
 export type SessionQuality = 'excellent' | 'good' | 'fair' | 'poor' | 'failed';
 
 export interface TelehealthSessionDoc extends BaseDoc {
@@ -1722,8 +1858,40 @@ export interface TelehealthSessionDoc extends BaseDoc {
   scheduledTime: string;
   actualStartTime?: string;
   actualEndTime?: string;
-  duration?: number;          // actual minutes
+  duration?: number;          // actual minutes — DERIVED server-side from the
+                              // timestamps above, never taken from a client's
+                              // elapsed timer (KAN-127)
   status: TelehealthStatus;
+  /**
+   * Why the session ended. Recorded on every terminal transition so a short or
+   * missing visit can be told apart from a clean one after the fact — a
+   * completed session and one the patient dropped out of otherwise look
+   * identical in the record.
+   */
+  terminationReason?: TelehealthTerminationReason;
+  /**
+   * Waiting room (KAN-128). The patient's arrival and the clinician's decision
+   * on it, recorded rather than inferred.
+   *
+   * `waitingSince` is what makes an honest wait time possible — before it, the
+   * patient's screen could only count from when their own page loaded, which
+   * resets on every reconnect and understates the wait exactly when it is
+   * longest.
+   *
+   * It also separates two situations the `status` field alone conflates: a
+   * patient who never arrived, and one who waited and was never let in. Those
+   * are the same `no_show` without it, and only one of them is the patient's
+   * doing.
+   */
+  waitingSince?: string;
+  admittedAt?: string;
+  admittedBy?: string;
+  admittedByName?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectedByName?: string;
+  /** Why the clinician turned the patient away. Shown to the patient. */
+  rejectionReason?: string;
   // Connection
   roomId: string;             // Unique room identifier for joining
   joinUrl?: string;           // URL for patient to join
@@ -1766,13 +1934,49 @@ export interface TelehealthSessionDoc extends BaseDoc {
   consentAttestedBy?: string;
   /** Display name of that clinician, denormalised for audit readability. */
   consentAttestedByName?: string;
+  /**
+   * Patient portal user id, when the patient consented themselves. The
+   * counterpart to `consentAttestedBy` — between them, every consent record
+   * names the person who performed the act rather than only its method.
+   */
+  consentedBy?: string;
+  /**
+   * Version of the consent policy the patient was actually shown.
+   *
+   * Without this a consent record proves someone ticked a box but not what
+   * they agreed to, and an audit cannot reproduce the text — which is the
+   * whole evidentiary value of the record. Recorded from the server's current
+   * policy, never from a client-supplied string.
+   */
+  consentPolicyVersion?: string;
+  /**
+   * Withdrawal is recorded, not erased. Clearing `patientConsentGiven` alone
+   * would make a withdrawn consent indistinguishable from one never given,
+   * losing the fact that the patient made a decision and when.
+   */
+  consentWithdrawnAt?: string;
+  consentWithdrawnReason?: string;
   // Recording & documentation
   sessionRecorded: boolean;
   recordingUrl?: string;
   attachments?: { name: string; type: string; url: string }[];
   // Patient satisfaction
-  patientRating?: number;     // 1-5
+  patientRating?: number;     // 1-5 — the patient's SATISFACTION with the visit
   patientFeedback?: string;
+  /**
+   * The provider's rating of technical quality — "was the connection usable?"
+   *
+   * Deliberately a separate field from `patientRating` (KAN-132). They answer
+   * different questions: a clinically excellent visit over a terrible line
+   * should score high on one and low on the other, and averaging them together
+   * would hide exactly the operational problem the technical score exists to
+   * surface.
+   */
+  providerTechnicalRating?: number;  // 1-5
+  providerFeedback?: string;
+  /** When each rating was captured, so response rate can be reported. */
+  patientRatedAt?: string;
+  providerRatedAt?: string;
   // Billing (private sector)
   consultationFee?: number;
   currency?: string;
@@ -1832,5 +2036,315 @@ export interface EmergencyPlanDoc extends BaseDoc {
   orgId?: string;
 }
 
+// ── Internal patient transfer (care-ownership hand-off) ──────────────────
+//
+// NAMING — "transfer" is overloaded in this codebase; keep the two apart:
+//   * `ReferralDoc` + `transfer-service.assembleTransferPackage` move a patient
+//     BETWEEN FACILITIES and ship a copy of the chart with them.
+//   * `PatientTransferDoc` (below) moves CARE OWNERSHIP inside the org — from
+//     one provider/department/facility to another. Nothing is copied; the
+//     patient's assignment changes and a durable record of who owned the
+//     patient when, and why it moved, is kept.
+//
+// A transfer is modelled as its own workflow entity rather than an edit to
+// `patient.assignedDoctor`, because an edit answers "who owns this patient
+// now?" and nothing else. The questions that actually get asked after the fact
+// — who was responsible on 3 March, who approved the move, why did it happen,
+// was the hand-off acknowledged — are only answerable if the request, the
+// decision, and the ownership window are all persisted. `assignedDoctor` is
+// the derived cache; these docs are the ledger.
+
+/**
+ * Transfer lifecycle.
+ *
+ * `draft`      — composed but not yet sent; only the author sees it.
+ * `requested`  — awaiting a decision from the receiving side.
+ * `accepted`   — receiver took responsibility. For an immediate transfer the
+ *                assignment has already moved and the doc goes straight to
+ *                `completed`; a future-dated one waits in `accepted` (see
+ *                `effectiveAt`) until its effective date arrives.
+ * `rejected`   — receiver declined; ownership never moved.
+ * `cancelled`  — sender (or an admin) withdrew it before a decision.
+ * `completed`  — ownership has moved and the hand-off is closed.
+ * `expired`    — a temporary/shared-care grant whose `expiresAt` has passed;
+ *                the receiving side's access has lapsed back to the owner.
+ */
+export type PatientTransferStatus =
+  | 'draft'
+  | 'requested'
+  | 'accepted'
+  | 'rejected'
+  | 'cancelled'
+  | 'completed'
+  | 'expired';
+
+/**
+ * What the transfer does to ownership.
+ *
+ * `permanent`   — the receiving side becomes the owner; the sender's primary
+ *                 ownership ends.
+ * `temporary`   — the receiver holds ownership for a bounded window
+ *                 (`expiresAt`), after which it returns to the sender. Used for
+ *                 covering providers and short facility moves.
+ * `shared_care` — ownership does NOT move at all. The receiver gains care-team
+ *                 access alongside the existing owner. Specialist consults and
+ *                 co-management.
+ */
+export type PatientTransferType = 'permanent' | 'temporary' | 'shared_care';
+
+/** Urgency, driving inbox ordering and the acknowledgement SLA. */
+export type PatientTransferUrgency = 'routine' | 'urgent' | 'emergency';
+
+/** Physical movement is separate from care ownership. Older records may not
+ * have this field; those records continue to use their legacy status. */
+export type PatientTransferPhysicalStatus =
+  | 'not_scheduled'
+  | 'bed_reserved'
+  | 'ready_for_transport'
+  | 'departed'
+  | 'in_transit'
+  | 'arrived'
+  | 'receiving_assessment'
+  | 'closed';
+
+export interface PatientTransferLocation {
+  wardId?: string;
+  wardName?: string;
+  bedId?: string;
+  bedNumber?: string;
+  facilityId?: string;
+  facilityName?: string;
+}
+
+export interface PatientTransferTransport {
+  status: 'not_requested' | 'requested' | 'assigned' | 'ready' | 'departed' | 'arrived' | 'cancelled';
+  teamId?: string;
+  teamName?: string;
+  equipment?: string[];
+  escortRequired?: boolean;
+  requestedAt?: string;
+  departedAt?: string;
+  arrivedAt?: string;
+  notes?: string;
+}
+
+export interface PatientTransferClinicalReadiness {
+  vitalsReviewed?: boolean;
+  medicationsReconciled?: boolean;
+  linesTubesDrainsReviewed?: boolean;
+  oxygenAndMonitoringReviewed?: boolean;
+  precautionsReviewed?: boolean;
+  codeStatusReviewed?: boolean;
+  pendingResultsReviewed?: boolean;
+  equipmentReady?: boolean;
+  senderSignedAt?: string;
+  senderSignedById?: string;
+  receiverAssessedAt?: string;
+  receiverAssessedById?: string;
+  receiverAssessmentNotes?: string;
+}
+
+export interface PatientTransferCommunication {
+  patientInformedAt?: string;
+  patientInformedById?: string;
+  familyContactedAt?: string;
+  familyContactedById?: string;
+  familyContactMethod?: 'phone' | 'in_person' | 'portal' | 'not_available';
+  concerns?: string;
+  acknowledgement?: 'accepted' | 'declined' | 'unable_to_obtain';
+}
+
+/**
+ * Audit events. Every state change appends one — the array is never rewritten,
+ * so the event log is the authoritative history even if the summary fields on
+ * the doc are later corrected.
+ */
+export type PatientTransferEventKind =
+  | 'TRANSFER_DRAFTED'
+  | 'TRANSFER_REQUESTED'
+  | 'TRANSFER_ACCEPTED'
+  | 'TRANSFER_REJECTED'
+  | 'TRANSFER_CANCELLED'
+  | 'TRANSFER_COMPLETED'
+  | 'TRANSFER_EXPIRED'
+  | 'TRANSFER_REASSIGNED'
+  | 'TRANSFER_NOTE_ADDED'
+  | 'TRANSFER_CHECKLIST_UPDATED'
+  | 'TRANSFER_TASKS_REASSIGNED'
+  | 'TRANSFER_LOGISTICS_UPDATED'
+  | 'TRANSFER_RECEIVING_ASSESSMENT';
+
+/** One immutable entry in a transfer's history. */
+export interface PatientTransferEvent {
+  id: string;
+  kind: PatientTransferEventKind;
+  /** Human-readable summary shown in the history tab. */
+  message: string;
+  actorId?: string;
+  actorName?: string;
+  actorRole?: UserRole;
+  /** Status before/after, when this event changed status. */
+  fromStatus?: PatientTransferStatus;
+  toStatus?: PatientTransferStatus;
+  /** Assignment snapshot either side of the event, for "who owned them when". */
+  fromAssignment?: PatientTransferAssignment;
+  toAssignment?: PatientTransferAssignment;
+  reason?: string;
+  notes?: string;
+  /** Free-form extras (e.g. counts of reassigned tasks). Never PHI values. */
+  metadata?: Record<string, string | number | boolean>;
+  createdAt: string;
+}
+
+/**
+ * One end of a transfer. Every field is optional because a transfer may move
+ * only one axis — a patient can change provider without changing department,
+ * or change department without changing facility.
+ */
+export interface PatientTransferAssignment {
+  providerId?: string;
+  providerName?: string;
+  department?: string;
+  facilityId?: string;
+  facilityName?: string;
+  orgId?: string;
+}
+
+/**
+ * The safety checklist the sender works through before a transfer can be sent.
+ * Items are recorded individually (not as one "I confirm" tick) so the record
+ * shows exactly what was reviewed. `required` items block sending.
+ */
+export interface PatientTransferChecklistItem {
+  key: string;
+  label: string;
+  required: boolean;
+  done: boolean;
+  completedAt?: string;
+  completedById?: string;
+}
+
+/**
+ * A snapshot of the clinical picture at the moment the transfer was raised,
+ * so the receiving clinician can make an accept/reject decision without first
+ * having to go digging through the chart — and so the history shows what they
+ * were actually shown when they accepted.
+ *
+ * Counts and short labels only. The full chart stays where it is; this is a
+ * hand-off summary, not a copy of the record.
+ */
+export interface PatientTransferSummary {
+  activeProblems?: string[];
+  activeMedications?: string[];
+  allergies?: string[];
+  riskFlags?: string[];
+  openTaskCount?: number;
+  lastEncounterDate?: string;
+  lastEncounterSummary?: string;
+  carePlan?: string;
+}
+
+/**
+ * An internal transfer of care ownership. Org-scoped operational PHI.
+ *
+ * Cross-facility and cross-org moves are represented here too (the `to`
+ * assignment simply names a different facility/org); they are gated behind a
+ * stronger capability rather than a different document type, so one history
+ * answers "where has this patient been owned" regardless of how far they moved.
+ */
+export interface PatientTransferDoc extends BaseDoc {
+  type: 'patient_transfer';
+  patientId: string;
+  patientName?: string;
+  hospitalNumber?: string;
+
+  transferType: PatientTransferType;
+  status: PatientTransferStatus;
+  urgency: PatientTransferUrgency;
+
+  from: PatientTransferAssignment;
+  to: PatientTransferAssignment;
+
+  /** Why the patient is moving. Required to send. */
+  reason: string;
+  /** Narrative hand-off note from sender to receiver. */
+  handoffNotes?: string;
+  /** Clinical snapshot captured at request time (see PatientTransferSummary). */
+  summary?: PatientTransferSummary;
+  checklist?: PatientTransferChecklistItem[];
+
+  // ── Actors ──
+  requestedById?: string;
+  requestedByName?: string;
+  requestedByRole?: UserRole;
+  requestedAt?: string;
+  decidedById?: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  /** Receiver's reason when `status === 'rejected'`. */
+  decisionNotes?: string;
+  cancelledById?: string;
+  cancelledByName?: string;
+  cancelledAt?: string;
+  completedAt?: string;
+
+  /**
+   * When ownership should actually move. Absent (or in the past) means "as soon
+   * as it is accepted". A future value parks an accepted transfer until the
+   * date arrives — see `autoCompleteOnEffectiveDate`.
+   */
+  effectiveAt?: string;
+  /** End of a `temporary` / `shared_care` grant. */
+  expiresAt?: string;
+  /**
+   * Whether a future-dated accepted transfer completes by itself when
+   * `effectiveAt` passes, or waits for someone to confirm the patient actually
+   * arrived. Defaults to true.
+   */
+  autoCompleteOnEffectiveDate?: boolean;
+
+  /** Physical movement and destination logistics. */
+  physicalStatus?: PatientTransferPhysicalStatus;
+  destination?: PatientTransferLocation;
+  transport?: PatientTransferTransport;
+  clinicalReadiness?: PatientTransferClinicalReadiness;
+  communication?: PatientTransferCommunication;
+  /** Set when the receiving nurse/provider confirms bedside arrival. */
+  arrivedAt?: string;
+  arrivedById?: string;
+  closedAt?: string;
+  closedById?: string;
+
+  /**
+   * Set on a `permanent`/`temporary` transfer that was force-applied by an
+   * admin without the receiver accepting (the Option-1 direct path). Kept as a
+   * flag rather than a separate status so these are auditable as a class.
+   */
+  forced?: boolean;
+
+  /** Open tasks moved to the receiving provider when the transfer completed. */
+  reassignedTaskIds?: string[];
+
+  /** Append-only audit trail. */
+  events: PatientTransferEvent[];
+
+  /**
+   * Scoping. `hospitalId` / `orgId` are the SENDING facility and org.
+   *
+   * `toHospitalId` and `toOrgId` mirror `ReferralDoc`'s field NAMES on purpose:
+   * `filterByScope` matches those exact top-level keys, so a transfer addressed
+   * to another facility (or another tenant) is visible to the receiving side.
+   * They must stay top-level and flat — the facilities also live inside
+   * `from`/`to`, but the scope filter cannot see nested fields, so a transfer
+   * carrying only `to.facilityId` is invisible to the very people who have to
+   * answer it: their inbox stays empty, no notification fires, and the request
+   * times out unacknowledged.
+   */
+  hospitalId?: string;
+  toHospitalId?: string;
+  orgId?: string;
+  toOrgId?: string;
+}
+
 // Re-export mock types for convenience
-export type { Hospital, Patient, Referral, DiseaseAlert, VitalSigns, Diagnosis, Prescription, LabResult, MedicalRecord, Attachment, TransferPackage };
+export type { Hospital, Patient, Referral, DiseaseAlert, VitalSigns, Diagnosis, Prescription, LabResult, MedicalRecord, Attachment, TransferPackage, CareTeamMember };

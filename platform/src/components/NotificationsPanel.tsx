@@ -3,36 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/Modal';
-import { Bell, BellOff, AlertTriangle, ArrowRightLeft, FlaskConical, Calendar, ClipboardCheck, Pill, X } from '@/components/icons/lucide';
-import { useNotifications, getNotificationAlertPref, setNotificationAlertPref, type NotificationItem } from '@/lib/hooks/useNotifications';
+import { Bell, BellOff, Check, ChevronRight, X } from '@/components/icons/lucide';
+import { useNotifications, getNotificationAlertPref, setNotificationAlertPref } from '@/lib/hooks/useNotifications';
+import { NOTIFICATION_META, relativeNotificationTime } from '@/lib/notification-meta';
 
-// Per-source colour + icon + label so a glance tells you where each
-// notification comes from. Every source gets a distinct hue (appointments
-// use the deep-accent blue so they don't read the same as referrals).
-const META: Record<NotificationItem['type'], { icon: typeof Bell; color: string; bg: string; label: string }> = {
-  alert: { icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(196, 69, 54, 0.12)', label: 'Surveillance' },
-  referral: { icon: ArrowRightLeft, color: 'var(--tb-blue-700)', bg: 'rgba(33, 145, 208, 0.12)', label: 'Referrals' },
-  lab: { icon: FlaskConical, color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.10)', label: 'Lab' },
-  appointment: { icon: Calendar, color: 'var(--tb-blue-800)', bg: 'rgba(1, 86, 151, 0.10)', label: 'Schedule' },
-  intake: { icon: ClipboardCheck, color: 'var(--color-success)', bg: 'rgba(5, 150, 105, 0.10)', label: 'Intake' },
-  prescription: { icon: Pill, color: 'var(--color-warning)', bg: 'rgba(217, 119, 6, 0.12)', label: 'Pharmacy' },
-};
-
-function relTime(iso: string): string {
-  if (!iso) return '';
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return '';
-  const mins = Math.round((Date.now() - t) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
+/**
+ * The bell panel — a glance surface over the most recent notifications.
+ * Deliberately capped: the full, filterable feed lives at /notifications,
+ * which this panel links to at the foot of the list.
+ */
+const PANEL_LIMIT = 12;
 
 export default function NotificationsPanel({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { items, loading } = useNotifications();
+  const { items, unreadCount, loading, markRead, markAllRead } = useNotifications();
   // Sound-alert preference: 'sound' chimes when new notifications arrive,
   // 'muted' keeps the badge silent. Persisted per device.
   const [alertPref, setAlertPref] = useState(getNotificationAlertPref);
@@ -42,6 +26,10 @@ export default function NotificationsPanel({ onClose }: { onClose: () => void })
     setNotificationAlertPref(next);
   };
 
+  const visible = items.slice(0, PANEL_LIMIT);
+
+  const openAll = () => { onClose(); router.push('/notifications'); };
+
   return (
     <Modal onClose={onClose} width={520} align="top">
       <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 60px)', overflow: 'hidden' }}>
@@ -49,11 +37,22 @@ export default function NotificationsPanel({ onClose }: { onClose: () => void })
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Notifications</h2>
-            {items.length > 0 && (
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-text)' }}>{items.length}</span>
+            {unreadCount > 0 && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-text)' }}>{unreadCount} new</span>
             )}
           </div>
           <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllRead}
+                title="Mark everything as read"
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-semibold"
+                style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}
+              >
+                <Check className="w-4 h-4" style={{ stroke: 'currentColor' }} />
+                Mark all read
+              </button>
+            )}
             <button
               onClick={toggleAlertPref}
               aria-label={alertPref === 'sound' ? 'Mute notification sounds' : 'Enable notification sounds'}
@@ -83,15 +82,15 @@ export default function NotificationsPanel({ onClose }: { onClose: () => void })
             </div>
           ) : (
             <div>
-              {items.map(n => {
-                const m = META[n.type];
+              {visible.map(n => {
+                const m = NOTIFICATION_META[n.type];
                 const Icon = m.icon;
                 return (
                   <button
                     key={n.id}
-                    onClick={() => { onClose(); router.push(n.href); }}
+                    onClick={() => { markRead(n.id); onClose(); router.push(n.href); }}
                     className="w-full text-left flex items-start gap-3 px-5 py-3 border-b transition-colors hover:bg-[var(--overlay-subtle)]"
-                    style={{ borderColor: 'var(--border-light)' }}
+                    style={{ borderColor: 'var(--border-light)', opacity: n.read ? 0.62 : 1 }}
                   >
                     <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.bg, color: m.color }}>
                       {/* The icon set hardcodes a stroke attribute, so the colour
@@ -99,12 +98,12 @@ export default function NotificationsPanel({ onClose }: { onClose: () => void })
                       <Icon className="w-4 h-4" style={{ stroke: m.color, color: m.color }} />
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{n.title}</div>
+                      <div className="text-[13px] truncate" style={{ color: 'var(--text-primary)', fontWeight: n.read ? 500 : 700 }}>{n.title}</div>
                       <div className="text-[12px] truncate" style={{ color: 'var(--text-muted)' }}>{n.subtitle}</div>
                     </div>
                     <span className="flex flex-col items-end gap-1 flex-shrink-0">
                       <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: m.bg, color: m.color }}>{m.label}</span>
-                      <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{relTime(n.time)}</span>
+                      <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{relativeNotificationTime(n.time)}</span>
                     </span>
                   </button>
                 );
@@ -112,6 +111,17 @@ export default function NotificationsPanel({ onClose }: { onClose: () => void })
             </div>
           )}
         </div>
+
+        {/* Always offered, not just on overflow: the page carries filters,
+            search, and the full history the panel deliberately truncates. */}
+        <button
+          onClick={openAll}
+          className="flex items-center justify-center gap-1 px-5 py-3 border-t text-[12px] font-bold"
+          style={{ borderColor: 'var(--border-light)', color: 'var(--accent-primary)', background: 'var(--bg-card-solid)' }}
+        >
+          {items.length > visible.length ? `View all ${items.length} notifications` : 'View all notifications'}
+          <ChevronRight className="w-3.5 h-3.5" style={{ stroke: 'currentColor' }} />
+        </button>
       </div>
     </Modal>
   );

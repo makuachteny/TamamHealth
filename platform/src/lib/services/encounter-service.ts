@@ -12,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { encountersDB } from '../db';
 import type { EncounterDoc } from '../db-types';
 import {
-  canTransition, stageOf, isTerminal, type EncounterStatus,
+  canTransition, stageOf, isTerminal, TERMINAL_STATUSES, type EncounterStatus,
 } from '../clinical-flow/encounter-journey';
 import { findByType } from './db-query';
 import { logAuditSafe } from './audit-service';
@@ -172,7 +172,20 @@ export async function transitionEncounter(
     throw new Error(`Illegal encounter transition: ${existing.status} → ${to}`);
   }
   const now = new Date().toISOString();
-  const closed = ['ready_for_clinic_checkout', 'referred_out', 'admitted', 'deceased'].includes(to);
+  // Derived from TERMINAL_STATUSES rather than hand-listed (KAN-100 audit).
+  // The old literal list named 'admitted' and 'deceased' but omitted
+  // 'discharged', 'discharged_with_referral', 'discharged_with_pending_items',
+  // 'dismissed_without_formal_checkout' and 'lwbs' — so a normally-discharged
+  // encounter never got a closedAt. That matters because payments/page.tsx
+  // groups by `closedAt || startedAt`, which silently dated a multi-day visit's
+  // billing to the ARRIVAL day. Deriving it means a new terminal status is
+  // covered automatically instead of needing this line edited too.
+  //
+  // The two non-terminal statuses kept from the original list still stamp it:
+  // they close the CLINIC portion of the visit, which is what the front-desk
+  // and payment views are grouping on.
+  const CLOSES_CLINIC_PORTION: EncounterStatus[] = ['ready_for_clinic_checkout', 'referred_out'];
+  const closed = TERMINAL_STATUSES.includes(to) || CLOSES_CLINIC_PORTION.includes(to);
   const updated: EncounterDoc = {
     ...existing,
     status: to,
@@ -472,4 +485,60 @@ export async function dischargeEncounter(
   }
   current = await transitionEncounter(id, finalStatus, { actorId: opts.actorId });
   return current;
+}
+
+
+/**
+ * Record that a patient left before being seen (KAN-100).
+ *
+ * `lwbs` and `escalated_to_emergency` are legal transitions out of every
+ * pre-clinician triage state, but **nothing in the UI could reach either of
+ * them**. So a patient who walked out of the waiting room stayed "waiting"
+ * indefinitely: they sat in the triage queue forever, inflated the waiting
+ * count every dashboard reports, and — because `findOpenEncounterForPatient`
+ * reuses a non-terminal encounter within 24h — their abandoned visit could
+ * absorb a genuine re-attendance later the same day, writing the second
+ * visit's triage and consultation onto the first visit's record.
+ *
+ * Recording LWBS is also a real clinical-governance signal in its own right:
+ * the rate at which patients leave untreated is a facility quality measure, and
+ * it cannot be measured if the event has no representation.
+ */
+export async function recordLeftWithoutBeingSeen(
+  encounterId: string,
+  opts?: { actorId?: string; reason?: string },
+): Promise<EncounterDoc> {
+  const updated = await transitionEncounter(encounterId, 'lwbs', { actorId: opts?.actorId });
+  await logAuditSafe(
+    'ENCOUNTER_LWBS',
+    opts?.actorId,
+    undefined,
+    `Patient ${updated.patientName || updated.patientId} left without being seen` +
+    (opts?.reason ? ` — ${opts.reason}` : ''),
+  );
+  return updated;
+}
+
+/**
+ * Escalate a waiting or in-triage patient straight to emergency care (KAN-100).
+ *
+ * Unlike LWBS this is NOT terminal — `escalated_to_emergency` still leads on to
+ * admitted / discharged / deceased / referred_out, so the visit continues under
+ * emergency care rather than being closed here.
+ */
+export async function escalateEncounterToEmergency(
+  encounterId: string,
+  opts?: { actorId?: string; reason?: string },
+): Promise<EncounterDoc> {
+  const updated = await transitionEncounter(encounterId, 'escalated_to_emergency', {
+    actorId: opts?.actorId,
+  });
+  await logAuditSafe(
+    'ENCOUNTER_ESCALATED_TO_EMERGENCY',
+    opts?.actorId,
+    undefined,
+    `Patient ${updated.patientName || updated.patientId} escalated to emergency` +
+    (opts?.reason ? ` — ${opts.reason}` : ''),
+  );
+  return updated;
 }

@@ -40,6 +40,39 @@ resource "digitalocean_firewall" "staging" {
     port_range       = "443"
     source_addresses = ["0.0.0.0/0", "::/0"]
   }
+
+  # ---- LiveKit (telehealth video) -------------------------------------------
+  # Gated on enable_telehealth_video — an open UDP range serving nothing is
+  # attack surface for free.
+  #
+  # WebRTC needs real UDP; media will NOT flow over 443 alone. TCP 7881 is the
+  # fallback for clients behind UDP-blocking networks, which is common on
+  # institutional and some satellite links here, so it is worth keeping.
+  dynamic "inbound_rule" {
+    for_each = var.enable_telehealth_video ? [1] : []
+    content {
+      protocol         = "udp"
+      port_range       = "50000-60000" # RTC media
+      source_addresses = ["0.0.0.0/0", "::/0"]
+    }
+  }
+  dynamic "inbound_rule" {
+    for_each = var.enable_telehealth_video ? [1] : []
+    content {
+      protocol         = "tcp"
+      port_range       = "7881" # RTC over TCP fallback
+      source_addresses = ["0.0.0.0/0", "::/0"]
+    }
+  }
+  dynamic "inbound_rule" {
+    for_each = var.enable_telehealth_video ? [1] : []
+    content {
+      protocol         = "udp"
+      port_range       = "3478" # TURN / STUN
+      source_addresses = ["0.0.0.0/0", "::/0"]
+    }
+  }
+
   outbound_rule {
     protocol              = "tcp"
     port_range            = "1-65535"
@@ -104,6 +137,39 @@ resource "digitalocean_firewall" "production" {
     port_range       = "443"
     source_addresses = ["0.0.0.0/0", "::/0"]
   }
+
+  # ---- LiveKit (telehealth video) -------------------------------------------
+  # Gated on enable_telehealth_video — an open UDP range serving nothing is
+  # attack surface for free.
+  #
+  # WebRTC needs real UDP; media will NOT flow over 443 alone. TCP 7881 is the
+  # fallback for clients behind UDP-blocking networks, which is common on
+  # institutional and some satellite links here, so it is worth keeping.
+  dynamic "inbound_rule" {
+    for_each = var.enable_telehealth_video ? [1] : []
+    content {
+      protocol         = "udp"
+      port_range       = "50000-60000" # RTC media
+      source_addresses = ["0.0.0.0/0", "::/0"]
+    }
+  }
+  dynamic "inbound_rule" {
+    for_each = var.enable_telehealth_video ? [1] : []
+    content {
+      protocol         = "tcp"
+      port_range       = "7881" # RTC over TCP fallback
+      source_addresses = ["0.0.0.0/0", "::/0"]
+    }
+  }
+  dynamic "inbound_rule" {
+    for_each = var.enable_telehealth_video ? [1] : []
+    content {
+      protocol         = "udp"
+      port_range       = "3478" # TURN / STUN
+      source_addresses = ["0.0.0.0/0", "::/0"]
+    }
+  }
+
   outbound_rule {
     protocol              = "tcp"
     port_range            = "1-65535"

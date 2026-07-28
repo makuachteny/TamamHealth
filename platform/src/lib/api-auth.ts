@@ -103,10 +103,50 @@ export function forbidden(message = 'Forbidden') {
 }
 
 /**
+ * Clinical-flow station roles → the legacy role they stand in for.
+ *
+ * WHY THIS EXISTS: the six clinical-flow station roles (EHR Clinical Flow §4)
+ * are real `UserRole`s with routing configs, dashboards and seeded accounts —
+ * but they were never added to the hand-maintained `UserRole[]` allow-lists on
+ * API routes. The measured result was that five of the six matched **zero** of
+ * the 40 role-guarded routes: a `triage_nurse` could sign in, land on
+ * `/dashboard/nurse`, and then be refused by `/api/triage` itself.
+ *
+ * Each mapping is the FIRST non-self entry of that station's `mapsToUserRoles`
+ * in `lib/clinical-flow/roles.ts` — i.e. taken from the declared migration
+ * mapping, not invented here. It is deliberately the narrowest equivalent:
+ * `triage_nurse` also maps to `clinical_officer`, but honouring that would
+ * hand a triage nurse prescribing rights, which the station's declared
+ * capabilities (`triage`, `vitals_capture`, `patient_routing`) plainly exclude.
+ *
+ * THIS IS A COMPATIBILITY SHIM, NOT THE DESTINATION. `lib/clinical-flow/roles.ts`
+ * already defines a full capability model (`hasCapability`, `Capability`) that
+ * no API route uses. Guarding routes by capability is the correct fix, but it
+ * requires deciding which capability each of the 40 routes demands — a clinical
+ * policy decision, not a mechanical one. Until that happens this keeps the
+ * stations usable without granting anything their legacy equivalent lacks.
+ */
+const STATION_ROLE_EQUIVALENT: Readonly<Partial<Record<UserRole, UserRole>>> = {
+  central_registration_clerk: 'front_desk',
+  clinic_clerk: 'front_desk',
+  triage_nurse: 'nurse',
+  rooming_nurse: 'nurse',
+  clinician: 'doctor',
+  records_hmis_officer: 'hrio',
+};
+
+/**
  * Check whether the authenticated user has one of the required roles.
+ *
+ * A clinical-flow station role also satisfies an allow-list that names its
+ * legacy equivalent — see `STATION_ROLE_EQUIVALENT` above. Exact matches are
+ * always preferred, so a route that lists a station role explicitly keeps
+ * working unchanged.
  */
 export function hasRole(auth: AuthPayload, allowed: UserRole[]): boolean {
-  return allowed.includes(auth.role);
+  if (allowed.includes(auth.role)) return true;
+  const equivalent = STATION_ROLE_EQUIVALENT[auth.role];
+  return equivalent ? allowed.includes(equivalent) : false;
 }
 
 /**

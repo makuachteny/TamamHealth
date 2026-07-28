@@ -11,6 +11,20 @@ import { findByType } from './db-query';
 import { withPendingOfflineSync } from '../sync/offline-metadata';
 
 /* istanbul ignore next -- private utility: org ID inference from hospital IDs */
+/**
+ * Organization that owns a facility. Used to resolve both ends of a referral
+ * so a cross-org hand-off is visible to the receiving side (KAN-101).
+ */
+async function orgIdOfHospital(hospitalId?: string): Promise<string | undefined> {
+  if (!hospitalId) return undefined;
+  try {
+    const hosp = await hospitalsDB().get(hospitalId) as HospitalDoc;
+    return hosp?.orgId;
+  } catch {
+    return undefined;
+  }
+}
+
 async function inferOrgId(fromHospitalId?: string, toHospitalId?: string): Promise<string | undefined> {
   try {
     const hdb = hospitalsDB();
@@ -145,6 +159,7 @@ export async function createReferral(
   const db = referralsDB();
   const now = new Date().toISOString();
   const orgId = data.orgId || await inferOrgId(data.fromHospitalId, data.toHospitalId);
+  const toOrgId = data.toOrgId ?? await resolveDestinationOrg(orgId, data.toHospitalId);
   const doc: ReferralDoc = withPendingOfflineSync({
     _id: `ref-${uuidv4().slice(0, 8)}`,
     type: 'referral',
@@ -152,6 +167,7 @@ export async function createReferral(
     // Stamp the acknowledgement deadline unless the caller supplied one.
     expectedAt: data.expectedAt || computeExpectedAt(data.urgency, now),
     orgId,
+    ...(toOrgId ? { toOrgId } : {}),
     createdAt: now,
     updatedAt: now,
   } as ReferralDoc, now);
@@ -191,6 +207,7 @@ export async function createReferralWithTransfer(
   const db = referralsDB();
   const now = new Date().toISOString();
   const orgId = data.orgId || await inferOrgId(data.fromHospitalId, data.toHospitalId);
+  const transferToOrgId = data.toOrgId ?? await resolveDestinationOrg(orgId, data.toHospitalId);
   const doc: ReferralDoc = withPendingOfflineSync({
     _id: `ref-${uuidv4().slice(0, 8)}`,
     type: 'referral',
@@ -199,6 +216,7 @@ export async function createReferralWithTransfer(
     // referral carrying a transfer package is if anything more urgent.
     expectedAt: data.expectedAt || computeExpectedAt(data.urgency, now),
     orgId,
+    ...(transferToOrgId ? { toOrgId: transferToOrgId } : {}),
     transferPackage,
     referralAttachments: referralAttachments.length > 0 ? referralAttachments : undefined,
     createdAt: now,
@@ -477,4 +495,31 @@ export async function acceptReferral(referralId: string): Promise<ReferralDoc | 
   } catch {
     return null;
   }
+}
+
+
+/**
+ * Destination org for a referral, or undefined when the hand-off stays inside
+ * one organization (KAN-101).
+ *
+ * Only set when it actually differs from the sending org. A same-org referral
+ * needs nothing extra — `orgId` already grants both facilities access — and
+ * stamping it anyway would make every referral look like a boundary crossing
+ * in the audit trail, which is the opposite of what we want to be able to spot.
+ */
+async function resolveDestinationOrg(
+  sendingOrgId: string | undefined,
+  toHospitalId: string | undefined,
+): Promise<string | undefined> {
+  const destOrg = await orgIdOfHospital(toHospitalId);
+  if (!destOrg || destOrg === sendingOrgId) return undefined;
+  // A referral leaving its organization is a PHI boundary crossing and is
+  // recorded as one, separately from the ordinary CREATE_REFERRAL entry.
+  await logAuditSafe(
+    'CROSS_ORG_REFERRAL',
+    undefined,
+    undefined,
+    `Referral crossing org boundary: ${sendingOrgId || 'unknown'} → ${destOrg} (facility ${toHospitalId}).`,
+  );
+  return destOrg;
 }

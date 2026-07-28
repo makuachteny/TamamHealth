@@ -64,6 +64,15 @@ export async function GET(request: NextRequest) {
     const patientId = url.searchParams.get('patientId');
     if (status) docs = docs.filter(d => d.status === status);
     if (patientId) docs = docs.filter(d => d.patientId === patientId);
+    // PHI read audit (KAN-97). Fire-and-forget: a failed audit write
+    // must never turn a clinician's list view into an error.
+    import('@/lib/services/audit-service').then(({ logPhiSearch }) =>
+      logPhiSearch(
+        { userId: auth.sub, username: auth.name, role: auth.role, orgId: auth.orgId, hospitalId: auth.hospitalId, route: '/api/triage' },
+        'triage',
+        { query: new URL(request.url).searchParams.get('q') || undefined, resultCount: Array.isArray(docs) ? docs.length : 0 },
+      ),
+    ).catch(() => {});
     return NextResponse.json({ triageRecords: docs, total: docs.length });
   } catch (err) {
     logApiError('[API /triage GET]', err);

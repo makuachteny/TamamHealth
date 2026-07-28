@@ -1,5 +1,7 @@
 'use client';
 
+import { useBackupStatus } from '@/lib/hooks/useBackupStatus';
+
 /**
  * Super-admin → Risk Center.
  * Unifies open risk signals from every subsystem into a single queue: no
@@ -99,13 +101,12 @@ export default function RiskCenterPage() {
     return () => { mounted = false; };
   }, []);
 
-  const backupAgeHours = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    const last = localStorage.getItem('safeguard_last_backup');
-    if (!last) return null;
-    const ms = Date.now() - new Date(last).getTime();
-    return Number.isFinite(ms) ? ms / 3600000 : null;
-  }, []);
+  // Single source (KAN-117). This read a localStorage key nothing ever wrote
+  // and returned null on absence, which dropped the backup risk row entirely —
+  // so missing data produced a clean bill of health, while /admin reported the
+  // same absence as a definite overdue backup.
+  const backupStatus = useBackupStatus();
+  const backupAgeHours = backupStatus?.ageHours ?? null;
 
   const rows: RiskRow[] = useMemo(() => {
     const out: RiskRow[] = [];

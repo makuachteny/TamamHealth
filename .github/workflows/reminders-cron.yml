@@ -1,0 +1,89 @@
+name: patient-reminders-dispatch
+
+# Daily dispatch of due patient reminders (KAN-104).
+#
+# The dispatch logic and the /api/patient-reminders/dispatch route already
+# existed, but nothing ever called them on a schedule — so no patient had
+# received a reminder. The feature was present in code and absent in reality.
+# This is the missing caller.
+#
+# Runs at 07:00 Africa/Juba (UTC+2) = 05:00 UTC. Deliberately morning-local:
+# a recall SMS that lands at 3am is worse than useless, and GitHub cron is
+# UTC-only so the offset is applied here rather than in the app.
+#
+# Required secrets (production environment):
+#   PLATFORM_BASE_URL          e.g. https://app.tamamhealth.org
+#   REMINDER_DISPATCH_SECRET   must match the platform's env var of the same name
+#
+# The platform ALSO requires PATIENT_REMINDER_SMS_ENABLED=true and a configured
+# SMS_PROVIDER before anything is actually sent — without them this run reports
+# gatewayEnabled:false (HTTP 202) and sends nothing, which is the intended
+# behaviour for a deployment that has not wired a gateway yet.
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never let two dispatch runs overlap. Dispatch is idempotent at the record
+  # level (a reminder flips to 'sent' before the next read sees it), but
+  # serialising runs keeps the SMS gateway's rate limits predictable.
+  group: patient-reminders-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: dispatch due reminders
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Check configuration
+        id: gate
+        env:
+          BASE_URL: ${{ secrets.PLATFORM_BASE_URL }}
+          DISPATCH_SECRET: ${{ secrets.REMINDER_DISPATCH_SECRET }}
+        run: |
+          if [ -n "$BASE_URL" ] && [ -n "$DISPATCH_SECRET" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Reminder dispatch not configured::Set PLATFORM_BASE_URL and REMINDER_DISPATCH_SECRET in the production environment to enable daily reminder dispatch."
+          fi
+
+      - name: Dispatch
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          BASE_URL: ${{ secrets.PLATFORM_BASE_URL }}
+          DISPATCH_SECRET: ${{ secrets.REMINDER_DISPATCH_SECRET }}
+        run: |
+          set -euo pipefail
+          # --fail-with-body so a non-2xx exits non-zero AND still shows the
+          # response, which is what makes a broken gateway visible here rather
+          # than silently succeeding.
+          RESPONSE=$(curl -sS --fail-with-body \
+            --max-time 300 \
+            -X POST \
+            -H "x-reminder-dispatch-secret: $DISPATCH_SECRET" \
+            -H 'content-type: application/json' \
+            "$BASE_URL/api/patient-reminders/dispatch")
+          echo "$RESPONSE"
+
+          # Surface the counts in the run summary so an operator can see
+          # delivery health without opening the app.
+          echo "### Reminder dispatch" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          echo "$RESPONSE" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          # A permanently-failed reminder means a patient was NOT reached and
+          # nothing else will retry it. Fail the run so it is noticed.
+          PERM=$(echo "$RESPONSE" | grep -o '"permanentlyFailed":[0-9]*' | grep -o '[0-9]*$' || echo 0)
+          if [ "${PERM:-0}" -gt 0 ]; then
+            echo "::error title=Reminders permanently failed::$PERM reminder(s) exhausted their retries and were not delivered. Staff must follow these up manually."
+            exit 1
+          fi

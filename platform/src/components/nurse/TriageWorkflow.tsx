@@ -279,7 +279,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
   return (
     <div className="flex flex-col lg:flex-row gap-4" style={{ flex: 1, minHeight: 0 }}>
       {/* Left column: ETAT Assessment Form (2/3 width) */}
-      <div className="lg:flex-[2] dash-card overflow-hidden flex flex-col" style={{ padding: '0', minHeight: 0 }}>
+      <div data-tour="triage-form" className="lg:flex-[2] dash-card overflow-hidden flex flex-col" style={{ padding: '0', minHeight: 0 }}>
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" style={{ color: '#FB923C' }} />
@@ -659,7 +659,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
         </div>
       </div>
 
-      <div className="lg:flex-[1] card-elevated overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
+      <div data-tour="triage-recent" className="lg:flex-[1] card-elevated overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4" style={{ color: ACCENT }} />

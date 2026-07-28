@@ -15,7 +15,6 @@ import { formatMoney } from '@/lib/format-utils';
 import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel, pharmacyStageTone } from '@/lib/pharmacy-workflow';
 import type { PrescriptionDoc, PharmacyInventoryDoc, UserDoc } from '@/lib/db-types';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import EhrCareDashboard, {
   type EhrCareDashboardRow,
   type EhrCareDashboardAction,
@@ -642,9 +641,7 @@ export default function PharmacyDashboardPage() {
     logAudit('DISPENSE_PRESCRIPTION', currentUser?._id, currentUser?.username,
       `Dispensed ${qty} ${inv.unit} ${rx.medication} to ${rx.patientName} (${rx._id})`).catch(() => {});
     showToast(t('pharmacy.dispensedToast', { medication: rx.medication, patient: rx.patientName }), 'success');
-    markCapability('pharmacy.dispense');
     // requiresWitness (not just controlledSchedule) matches the witness gate above.
-    if (requiresWitness) markCapability('pharmacy.controlled');
     setDispensing(false);
     setDispenseTarget(null);
   };
@@ -681,7 +678,6 @@ export default function PharmacyDashboardPage() {
         });
       }
       showToast(t('pharmacy.stockedMedication', { medication: name }), 'success');
-      markCapability('pharmacy.receive-stock');
       setShowReceiveStock(false);
     } catch (err) {
       console.error(err);
@@ -808,20 +804,6 @@ export default function PharmacyDashboardPage() {
   headerActions.push({ label: t('pharmacy.stockAlerts'), icon: AlertTriangle, onClick: () => setCenterPanel(p => (p === 'stock' ? null : 'stock')), active: centerPanel === 'stock', tone: centerPanel === 'stock' ? 'primary' : 'neutral' });
   headerActions.push({ label: 'Analytics', icon: BarChart3, onClick: () => setCenterPanel(p => (p === 'charts' ? null : 'charts')), active: centerPanel === 'charts', tone: centerPanel === 'charts' ? 'primary' : 'neutral' });
 
-  // Capabilities card — each item latches checked forever the first time this
-  // pharmacist does it (see useCapabilities), never un-checked by later state.
-  // None of these have a cheap per-user "already done" signal from
-  // already-loaded data, so every item is marked at its action's own success
-  // point (see confirmDispense / handleReceiveStock below, and
-  // handlePrintReorder on the full /pharmacy page for the reorder item).
-  const capabilityItems = useMemo(() => (canDispense ? [
-    { key: 'pharmacy.dispense', label: 'Dispense a prescription', onClick: () => setQueueFilter('ready') },
-    { key: 'pharmacy.controlled', label: 'Dispense a controlled medicine with witness', onClick: () => setQueueFilter('controlled') },
-    { key: 'pharmacy.receive-stock', label: 'Receive stock', onClick: () => setShowReceiveStock(true) },
-    { key: 'pharmacy.reorder', label: 'Generate a reorder list', href: '/pharmacy' },
-  ] : []), [canDispense]);
-  const { checklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
-
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -901,8 +883,6 @@ export default function PharmacyDashboardPage() {
             { label: 'Critical Stock', value: criticalCount + expiredCount, tone: 'danger' },
           ]}
           metricsTitle={t('pharmacy.operations')}
-          checklist={checklist}
-          checklistTitle="Capabilities"
           emptyTitle={rxLoading ? '' : t('pharmacy.noPrescriptionsFound')}
         >
           {/* Stat panels — opened from the header toggles; the active one

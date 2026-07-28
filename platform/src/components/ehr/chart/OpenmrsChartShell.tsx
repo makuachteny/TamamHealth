@@ -19,7 +19,7 @@
 import { useEffect, useState } from 'react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import {
-  ShoppingCart, Edit3, ClipboardCheck, FileText, Users, X, Maximize2,
+  ShoppingCart, Stethoscope, ClipboardCheck, FileText, Users, X, Maximize2,
 } from '@/components/icons/lucide';
 import type { PatientDoc } from '@/lib/db-types';
 import OrderBasketPanel from './panels/OrderBasketPanel';
@@ -46,7 +46,9 @@ interface DrawerPanelDef {
 // resolved per-id in renderPanelBody() below.
 const DRAWER_PANELS: DrawerPanelDef[] = [
   { id: 'order-basket', title: 'Order basket', icon: ShoppingCart },
-  { id: 'visit-note', title: 'Visit note', icon: Edit3 },
+  // Stethoscope, not a pencil: this panel's primary action starts a
+  // consultation, so it should read as clinical work rather than note-taking.
+  { id: 'visit-note', title: 'Visit note', icon: Stethoscope },
   { id: 'task-list', title: 'Task list', icon: ClipboardCheck },
   { id: 'clinical-forms', title: 'Clinical forms', icon: FileText },
   { id: 'patient-lists', title: 'Patient lists', icon: Users },
@@ -129,6 +131,7 @@ export default function OpenmrsChartShell({
           <VisitNotePanel
             patient={patient}
             currentUser={currentUser}
+            router={router}
             canConsult={canConsult}
             onClose={closeDrawer}
             onSaved={onNoteSaved}

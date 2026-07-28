@@ -44,6 +44,9 @@
  *   - tamamhealth_encounters          In-progress consultation workflow state.
  *                                     Facility-operational; not a national
  *                                     analytics target.
+ *   - tamamhealth_consultation_progress Shared consultation tracker state.
+ *                                     Facility-operational; not a national
+ *                                     analytics target.
  *   - tamamhealth_biometric_templates Fingerprint minutiae templates. Highly
  *                                     sensitive biometric identifiers used
  *                                     only for in-org patient identification;
@@ -80,6 +83,17 @@
  *                                     a patient. Facility-operational clinical
  *                                     detail (like patient_notes/phone_notes);
  *                                     not a national/DHIS2 indicator today.
+ *   - tamamhealth_patient_transfers   Internal transfers of care ownership
+ *                                     (provider/department/facility). Who is
+ *                                     accountable for a patient inside a
+ *                                     facility is operational staffing detail,
+ *                                     not a national health indicator — and the
+ *                                     records name individual clinicians, so
+ *                                     projecting them nationally would export a
+ *                                     staff-activity trail nobody asked for.
+ *                                     (Cross-FACILITY patient movement that IS
+ *                                     nationally meaningful already flows via
+ *                                     tamamhealth_referrals.)
  *
  * (tamamhealth_nutrition_screenings now HAS a national projection —
  * SAM/MAM is a DHIS2 MCH indicator — via DB_TABLE_MAP + FIELD_MAPPER +

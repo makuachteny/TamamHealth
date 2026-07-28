@@ -14,6 +14,7 @@ import {
   Wallet, Package, Receipt, BarChart3, ChevronRight,
 } from '@/components/icons/lucide';
 import type { ClaimDoc } from '@/lib/db-types-payments';
+import TransferInboxCard from '@/components/patients/TransferInboxCard';
 
 /** Local-calendar-day ISO string (YYYY-MM-DD) — matches how appointmentDate
  *  is entered/stored (a calendar day, not a UTC instant). */
@@ -404,6 +405,14 @@ export default function OrgAdminDashboard() {
               </div>
             );
           })}
+        </div>
+
+        {/* ═══ TRANSFERS AWAITING A DECISION ═══
+            Org admins hold accept + force, so facility-addressed transfers with
+            no named receiver escalate to them. Renders an empty state when there
+            is nothing outstanding. */}
+        <div className="mb-4">
+          <TransferInboxCard />
         </div>
 
         {/* ═══ Operational status strip ═══ */}

@@ -21,7 +21,6 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { getRoleConfig } from '@/lib/permissions';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMetric, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
   Calendar, ClipboardCheck, ArrowRightLeft,
@@ -157,25 +156,6 @@ export default function FrontDeskDashboardPage() {
   const [roomDraft, setRoomDraft] = useState('');
   const [savingRoom, setSavingRoom] = useState(false);
 
-  // Capabilities card — each item latches checked forever the first time this
-  // receptionist does it (see useCapabilities). None of these have a cheap
-  // per-user "already done" signal from already-loaded data (the queue/roster
-  // don't record who registered/checked-in/roomed/assigned/checked-out a given
-  // patient), so every item is marked at its own action's success point below.
-  // Declared early (before the handlers below) since useCallback dependency
-  // arrays reference `markCapability` eagerly, unlike a lazy closure body.
-  const capabilityItems = useMemo(() => ([
-    { key: 'front-desk.register', label: 'Register a patient', onClick: () => setRegisterOpen(true) },
-    { key: 'front-desk.check-in', label: 'Check in an arrival', onClick: () => setCheckInOpen(true) },
-    { key: 'front-desk.room', label: 'Room a walk-in', onClick: () => { setQueueFilter('walk-in'); setPanelView('queue'); } },
-    { key: 'front-desk.assign-provider', label: 'Assign a provider', onClick: () => { setQueueFilter('walk-in'); setPanelView('queue'); } },
-    { key: 'front-desk.checkout', label: 'Check out a visit', onClick: () => { setQueueFilter('all'); setPanelView('queue'); } },
-  ]), []);
-  const { checklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
-  // Wall-clock sampled once for the initial render, then refreshed once a
-  // minute from the interval's own callback (render itself stays pure) so
-  // the queue's 24h triage cutoff and wait-time scores keep aging on screen
-  // — same pattern as EhrClinicalDashboard's live queue.
   const [queueNowMs, setQueueNowMs] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setQueueNowMs(Date.now()), 60_000);
@@ -492,13 +472,12 @@ export default function FrontDeskDashboardPage() {
       await updateTriage(triageId, { assignedRoom: room || undefined });
       showToast(room ? `Room set to ${room}` : 'Room cleared', 'success');
       // Only assigning a room (not clearing one) counts as "roomed a walk-in".
-      if (room) markCapability('front-desk.room');
     } catch {
       showToast('Failed to set room', 'error');
     } finally {
       setSavingRoom(false);
     }
-  }, [updateTriage, showToast, markCapability]);
+  }, [updateTriage, showToast]);
 
   // ── Final checkout: close out a completed visit ──
   const handleCompleteCheckout = useCallback(async (target: CheckoutTarget) => {
@@ -553,12 +532,11 @@ export default function FrontDeskDashboardPage() {
         await updateTriage(target.triageId, { status: 'discharged' });
       }
       showToast(`${target.patientName} checked out${gateNote}`, 'success');
-      markCapability('front-desk.checkout');
       setCheckoutTarget(null);
     } catch {
       showToast('Failed to complete checkout', 'error');
     }
-  }, [updateAppointmentStatus, updateTriage, showToast, currentUser, markCapability]);
+  }, [updateAppointmentStatus, updateTriage, showToast, currentUser]);
 
   // ── Appointment check-in: mark the patient as arrived → joins the queue ──
   // Also creates/joins the visit encounter (arrivalChannel: 'appointment',
@@ -589,9 +567,8 @@ export default function FrontDeskDashboardPage() {
       // encounter creation is best-effort; the appointment check-in itself still succeeded
     }
     showToast(`${appt.patientName} checked in — added to queue`, 'success');
-    markCapability('front-desk.check-in');
     setCheckInTarget(null);
-  }, [updateAppointmentStatus, showToast, markCapability, currentUser]);
+  }, [updateAppointmentStatus, showToast, currentUser]);
 
   // ── Mark an appointment a no-show. Confirmed first: a mistaken no-show
   //    hides the patient from the arrivals list, so reception gets one beat to
@@ -1022,13 +999,10 @@ export default function FrontDeskDashboardPage() {
           chartSeriesNames={['Active', 'Completed']}
           rows={frontDeskRows}
           metrics={metrics}
-          checklist={checklist}
           calendarEventDates={appointments.map(appointment => appointment.appointmentDate)}
           metricsTitle="Reception today"
           centerTitle={centerCopy.title}
           centerSubtitle={centerCopy.subtitle}
-          checklistTitle="Capabilities"
-          checklistDescription="Registration, arrivals, routing, and checkout."
           missionTitle="Keep the desk moving"
           missionDescription="Show the next action clearly so reception can register, check in, route, and close visits."
           showMissionCard
@@ -1133,7 +1107,6 @@ export default function FrontDeskDashboardPage() {
           <AssignDoctorModal
             target={assignTarget}
             onClose={() => setAssignTarget(null)}
-            onAssigned={() => markCapability('front-desk.assign-provider')}
           />
         )}
 
@@ -1173,7 +1146,6 @@ export default function FrontDeskDashboardPage() {
                   onRegistered={() => {
                     setRegisterOpen(false);
                     setPanelView('registered');
-                    markCapability('front-desk.register');
                     router.refresh();
                   }}
                 />
@@ -1202,7 +1174,6 @@ export default function FrontDeskDashboardPage() {
                     setCheckInOpen(false);
                     setQueueFilter('all');
                     setPanelView('queue');
-                    markCapability('front-desk.check-in');
                   }}
                   onRegisterPatient={() => {
                     setCheckInOpen(false);

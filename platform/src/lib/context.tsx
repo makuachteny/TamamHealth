@@ -32,6 +32,10 @@ interface AppUser {
   hospitalId?: string;
   hospitalName?: string;
   hospital?: HospitalDoc;
+  /** Staff-directory department. Used to route department-addressed patient
+   *  transfers to the right inbox — a transfer sent to "Paediatrics" with no
+   *  named provider has nowhere to land without it. */
+  department?: string;
   orgId?: string;
   organization?: OrganizationDoc;
   /** Geographic scope claims propagated from JWT/UserDoc for tier-aware
@@ -339,6 +343,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const manager = createSyncManager({
         orgId: currentUser.orgId,
+        // Facility entitlement drives a server-side replication selector, so
+        // a facility-scoped user's device never receives other facilities' PHI
+        // (KAN-95). Previously every user in an org replicated all of it.
+        user: {
+          role: currentUser.role,
+          orgId: currentUser.orgId,
+          hospitalId: currentUser.hospitalId,
+          // No `facilityIds` yet: there is no per-user multi-facility grant
+          // field on the user record, so cross-facility access is currently
+          // role-derived only (see MULTI_FACILITY_ROLES). Adding explicit
+          // grants needs a field on UserDoc and a screen to manage it.
+        },
         onChange: (status) => {
           setSyncStatus(status);
           // Update lastSync from real data
@@ -407,7 +423,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Only if the request itself fails (offline / network error) do we fall
       // back to the PouchDB-local path so previously-logged-in users can still
       // sign in without connectivity.
-      let user: Pick<UserDoc, '_id' | 'username' | 'name' | 'role' | 'hospitalId' | 'hospitalName' | 'orgId' | 'isActive' | 'passwordHash' | 'mustChangePassword'> | null = null;
+      let user: Pick<UserDoc, '_id' | 'username' | 'name' | 'role' | 'hospitalId' | 'hospitalName' | 'orgId' | 'isActive' | 'passwordHash' | 'mustChangePassword' | 'department'> | null = null;
       let usedApi = false;
 
       try {
@@ -558,6 +574,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         hospitalId: user.hospitalId,
         hospitalName: user.hospitalName,
         hospital,
+        department: user.department,
         orgId: user.orgId,
         organization,
         payam: geo.payam,

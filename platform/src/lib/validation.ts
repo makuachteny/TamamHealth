@@ -39,7 +39,7 @@ export class ValidationError extends Error {
  * also sanitize at the data layer to prevent stored XSS if raw
  * values are ever rendered outside React.
  */
-function sanitizeString(val: unknown): string {
+export function sanitizeString(val: unknown): string {
   if (typeof val !== 'string') return '';
   return val
     .replace(/[\x00-\x1F\x7F]/g, '')     // Control chars
@@ -50,8 +50,14 @@ function sanitizeString(val: unknown): string {
 }
 
 /**
- * Deep-sanitize all string values in a flat object.
- * Used by API routes to clean incoming JSON payloads.
+ * Sanitize the string values at the TOP LEVEL of an object.
+ *
+ * NOT recursive, despite what this was previously documented as. Nested objects
+ * and arrays pass through untouched, so a route accepting structured input
+ * (e.g. `{ to: { providerName } }`) must sanitize those fields itself with
+ * `sanitizeString`. Left non-recursive on purpose: every existing caller was
+ * written against this behaviour, and quietly deep-walking arbitrary payloads
+ * would change what they store.
  */
 export function sanitizePayload<T extends Record<string, unknown>>(data: T): T {
   const cleaned = { ...data } as Record<string, unknown>;

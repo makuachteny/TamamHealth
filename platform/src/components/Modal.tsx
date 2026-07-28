@@ -99,6 +99,25 @@ export default function Modal({
           display: 'flex',
           flexDirection: 'column',
           outline: 'none',
+          // Opaque panel, supplied HERE rather than trusted to every caller.
+          //
+          // This component previously styled only the backdrop and left the
+          // dialog surface to whatever the caller passed as children. 33 of 50
+          // call sites supplied one (`modal-panel` / `card-elevated`); the
+          // other 17 did not, and rendered fully transparent — the dimmed page
+          // showed straight through the form. The transfer dialog was the
+          // reported case; allergies, photo capture, and several chart
+          // sections had the same defect.
+          //
+          // Callers that already provide their own surface are unaffected:
+          // `--bg-card-solid` is the same token their classes resolve to, so
+          // it sits invisibly behind them. The 6px radius matches the
+          // `.modal-portal-backdrop > div > *` rule in globals.css that forces
+          // every child to 6px, so the two edges align exactly instead of
+          // leaving square corners poking out behind a rounded child.
+          background: 'var(--bg-card-solid)',
+          // A drawer is flush to the screen edge, so it stays square.
+          borderRadius: isDrawer ? 0 : 6,
           margin: isDrawer ? 0 : align === 'top' ? '24px 0' : 0,
           animation: isDrawer ? 'modalSlideInRight 0.28s ease-out' : 'modalSlideUp 0.25s ease-out',
         }}

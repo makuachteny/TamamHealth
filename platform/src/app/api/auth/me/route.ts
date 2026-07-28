@@ -33,6 +33,10 @@ export async function GET(request: NextRequest) {
   let fresh: {
     name?: string; role?: string; hospitalId?: string; hospitalName?: string;
     orgId?: string; mustChangePassword?: boolean;
+    /** Staff department — routes department-addressed patient transfers to the
+     *  right inbox. Not a JWT claim, so it is only populated from the live user
+     *  record; a JWT-only fallback leaves it undefined rather than stale. */
+    department?: string;
   } = {
     name: payload.name,
     role: payload.role,
@@ -56,6 +60,7 @@ export async function GET(request: NextRequest) {
         hospitalName: user.hospitalName,
         orgId: user.orgId,
         mustChangePassword: user.mustChangePassword,
+        department: user.department,
       };
     } else if (isProduction && payload.sub !== 'admin') {
       // Account no longer exists in production → deny.
@@ -75,6 +80,7 @@ export async function GET(request: NextRequest) {
       hospitalName: fresh.hospitalName,
       orgId: fresh.orgId,
       mustChangePassword: fresh.mustChangePassword,
+      department: fresh.department,
     },
   });
 

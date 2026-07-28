@@ -1,0 +1,115 @@
+name: patient-transfers-sweep
+
+# Hourly sweep of due internal patient transfers.
+#
+# `effectiveAt` and `expiresAt` on a patient transfer are promises made to
+# clinicians: "this takes effect Monday", "this cover ends on the 14th". Nothing
+# in an offline-first client can keep them — the browser that raised the transfer
+# may be closed, offline, or belong to someone on leave. Without this caller a
+# scheduled transfer never lands and a temporary grant never lapses, so the wrong
+# clinician keeps both the patient and their chart access.
+#
+# Hourly, not daily: these are datetime-precision promises. A cover window that
+# ends at 14:00 must not keep its access until the next morning, and an unmet
+# expiry is a live access-control gap, not a cosmetic delay.
+#
+# Required secrets (production environment):
+#   PLATFORM_BASE_URL       e.g. https://app.tamamhealth.org
+#   TRANSFER_SWEEP_SECRET   must match the platform's env var of the same name
+#
+# The sweep is idempotent — it only acts on transfers whose clock has already
+# run out, and each one flips status before the next run sees it. A missed run
+# is therefore caught up by the next one rather than needing a manual replay.
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+    inputs:
+      asOf:
+        description: 'Optional ISO timestamp to sweep as of (for reconciling a missed run)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Two overlapping sweeps could both read the same accepted transfer before
+  # either writes. The service is guarded (completeTransfer rejects anything not
+  # in `accepted`, and PouchDB would raise a revision conflict), so the worst
+  # case is a wasted write and a logged failure — but serialising keeps the run
+  # log readable and the failure count meaningful.
+  group: patient-transfers-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: apply due transfers
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Check configuration
+        id: gate
+        env:
+          BASE_URL: ${{ secrets.PLATFORM_BASE_URL }}
+          SWEEP_SECRET: ${{ secrets.TRANSFER_SWEEP_SECRET }}
+        run: |
+          if [ -n "$BASE_URL" ] && [ -n "$SWEEP_SECRET" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Transfer sweep not configured::Set PLATFORM_BASE_URL and TRANSFER_SWEEP_SECRET in the production environment to enable the hourly transfer sweep. Until then, scheduled transfers will NOT take effect on their own and temporary grants will NOT lapse."
+          fi
+
+      - name: Sweep
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          BASE_URL: ${{ secrets.PLATFORM_BASE_URL }}
+          SWEEP_SECRET: ${{ secrets.TRANSFER_SWEEP_SECRET }}
+          AS_OF: ${{ inputs.asOf }}
+        run: |
+          set -euo pipefail
+          URL="$BASE_URL/api/patient-transfers/sweep"
+          if [ -n "${AS_OF:-}" ]; then
+            URL="$URL?asOf=$(printf '%s' "$AS_OF" | jq -sRr @uri)"
+          fi
+
+          # --fail-with-body so a non-2xx exits non-zero AND still shows the
+          # response, which is what makes a broken sweep visible here rather
+          # than silently "succeeding".
+          RESPONSE=$(curl -sS --fail-with-body \
+            --max-time 300 \
+            -X POST \
+            -H "x-transfer-sweep-secret: $SWEEP_SECRET" \
+            -H 'content-type: application/json' \
+            "$URL")
+          echo "$RESPONSE"
+
+          COMPLETED=$(echo "$RESPONSE" | jq -r '.completedCount // 0')
+          EXPIRED=$(echo "$RESPONSE" | jq -r '.expiredCount // 0')
+          FAILED=$(echo "$RESPONSE" | jq -r '.failedCount // 0')
+
+          # Only write a run summary when something actually happened — an
+          # hourly job that reports "0 0 0" 24 times a day trains operators to
+          # ignore it, which is precisely when the one real failure gets missed.
+          if [ "$COMPLETED" -gt 0 ] || [ "$EXPIRED" -gt 0 ] || [ "$FAILED" -gt 0 ]; then
+            {
+              echo "### Transfer sweep"
+              echo ""
+              echo "| Outcome | Count |"
+              echo "| --- | --- |"
+              echo "| Completed (took effect) | $COMPLETED |"
+              echo "| Expired (access lapsed) | $EXPIRED |"
+              echo "| Failed | $FAILED |"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # A failed sweep entry means a transfer did NOT take effect, or a
+          # lapsed grant still holds chart access. Both are clinical-safety
+          # issues, so fail the run rather than leaving it in a log nobody reads.
+          if [ "$FAILED" -gt 0 ]; then
+            echo "$RESPONSE" | jq -r '.failed[] | "::error title=Transfer sweep failed::\(.id): \(.error)"'
+            exit 1
+          fi

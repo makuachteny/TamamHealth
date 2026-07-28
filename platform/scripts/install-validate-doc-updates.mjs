@@ -85,36 +85,74 @@ const ORG_SCOPED_DATABASES = [
 // Keep these byte-for-byte identical.
 // ---------------------------------------------------------------------------
 const ORG_SCOPED_VALIDATE_FN = `function (newDoc, oldDoc, userCtx, secObj) {
-  // Replication brings in _deleted tombstones; allow them through so deletes propagate.
+  // Replication brings in _deleted tombstones; allow them so deletes propagate.
   if (newDoc._deleted) return;
 
   // Design docs are admin-only; the CouchDB security object handles that.
   if (newDoc._id && newDoc._id.indexOf('_design/') === 0) return;
 
-  // Admin role bypasses tenant enforcement (server-side service writes use this).
   var roles = (userCtx && userCtx.roles) || [];
-  if (roles.indexOf('_admin') !== -1) return;
 
-  // Require orgId on every non-design, non-deleted document.
+  function hasRole(r) {
+    for (var i = 0; i < roles.length; i++) { if (roles[i] === r) return true; }
+    return false;
+  }
+
+  // Server-side service writes (sync-worker, migrations) run as _admin.
+  if (hasRole('_admin')) return;
+
+  // ── Tenant boundary ────────────────────────────────────────────────────
   if (!newDoc.orgId || typeof newDoc.orgId !== 'string') {
     throw({ forbidden: 'orgId is required on this database' });
   }
 
-  // If the user's CouchDB roles include 'org:<orgId>', enforce it matches.
-  // Otherwise (e.g., service account writing on behalf of any org) allow.
   for (var i = 0; i < roles.length; i++) {
     if (roles[i].indexOf('org:') === 0) {
       var allowedOrg = roles[i].substring(4);
       if (newDoc.orgId !== allowedOrg) {
         throw({ forbidden: 'orgId mismatch: doc=' + newDoc.orgId + ' user=' + allowedOrg });
       }
-      // On update, the orgId must not change.
-      if (oldDoc && oldDoc.orgId && oldDoc.orgId !== newDoc.orgId) {
-        throw({ forbidden: 'orgId is immutable' });
-      }
-      return;
     }
   }
+
+  // ── Immutable fields ───────────────────────────────────────────────────
+  // Rewriting orgId/hospitalId would move a record into another tenant's data;
+  // rewriting type would move it between permission rows.
+  if (oldDoc) {
+    var immutable = ["orgId","hospitalId","type"];
+    for (var j = 0; j < immutable.length; j++) {
+      var f = immutable[j];
+      if (oldDoc[f] !== undefined && newDoc[f] !== oldDoc[f]) {
+        throw({ forbidden: f + ' is immutable (was ' + oldDoc[f] + ', got ' + newDoc[f] + ')' });
+      }
+    }
+  }
+
+  // ── Role-based write permission, by document type ──────────────────────
+  var WRITE_ROLES = {"patient":["super_admin","org_admin","doctor","clinical_officer","clinician","nurse","midwife","front_desk","medical_superintendent","hrio","data_entry_clerk"],"medical_record":["super_admin","doctor","clinical_officer","clinician","medical_superintendent"],"lab_result":["super_admin","doctor","clinical_officer","clinician","nurse","lab_tech","medical_superintendent"],"prescription":["super_admin","doctor","clinical_officer","clinician","medical_superintendent"],"triage":["super_admin","doctor","clinical_officer","clinician","nurse","front_desk","medical_superintendent"],"referral":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent"],"birth":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"death":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"anc_visit":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"immunization":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"telehealth_session":["super_admin","org_admin","doctor","clinical_officer","clinician","nurse"],"patient_transfer":["super_admin","org_admin","medical_superintendent","hospital_manager","doctor","clinician","clinical_officer","nurse","midwife","triage_nurse","rooming_nurse","nutritionist"]};
+  var allowed = WRITE_ROLES[newDoc.type];
+
+  // Unknown type: no rule to apply. See the note in write-permissions.ts.
+  if (!allowed) return;
+
+  // The acting role comes from the authenticated CouchDB user context, never
+  // from the document body — the client controls the body.
+  var actingRole = null;
+  for (var k = 0; k < roles.length; k++) {
+    if (roles[k].indexOf('role:') === 0) { actingRole = roles[k].substring(5); break; }
+  }
+
+  // No role claim at all: reject rather than assume. A user whose CouchDB
+  // account predates role provisioning must be re-provisioned, not trusted.
+  if (!actingRole) {
+    throw({ forbidden: 'no role claim on the CouchDB user; cannot write ' + newDoc.type });
+  }
+
+  for (var m = 0; m < allowed.length; m++) {
+    if (allowed[m] === actingRole) return;
+  }
+
+  throw({ forbidden: 'role ' + actingRole + ' may not write documents of type ' + newDoc.type });
 }`;
 
 const DESIGN_DOC_ID = '_design/tamamhealth-org-scope';

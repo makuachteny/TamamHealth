@@ -10,7 +10,6 @@ import { useToast } from '@/components/Toast';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 import type { StaffScheduleDoc } from '@/lib/db-types';
@@ -143,7 +142,6 @@ export default function HRDashboardPage() {
         ? { ...l, status, decidedAt, decidedBy: currentUser._id, decidedByName: currentUser.name }
         : l));
       showToast(status === 'approved' ? t('hr.leaveApproved') : t('hr.leaveRejected'), 'success');
-      markCapability('hr.leave-decision');
     } catch (err) {
       console.error('Failed to decide leave request', err);
       showToast(status === 'approved' ? t('hr.leaveApproveFailed') : t('hr.leaveRejectFailed'), 'error');
@@ -175,20 +173,6 @@ export default function HRDashboardPage() {
       )}
     </div>
   );
-
-  // Capabilities card — `hr.leave-decision` latches from a real decision made
-  // in decideLeaveAction above, plus a live signal (this user's id already on
-  // a decided request) so a decision made in an earlier session still counts.
-  // `hr.schedule` / `hr.payroll` have no in-page completion action on this
-  // dashboard (schedule publishing and payroll runs happen on the full HR
-  // page) — they stay unchecked-until-done, linked to the same routes the
-  // metrics-rail shortcuts below already use.
-  const capabilityItems = useMemo(() => ([
-    { key: 'hr.leave-decision', label: 'Decide a leave request', signal: leave.some(l => l.decidedBy === currentUser?._id) },
-    { key: 'hr.schedule', label: 'Publish a staff schedule', href: '/hr?tab=schedule' },
-    { key: 'hr.payroll', label: 'Run a payroll register', href: '/hr?tab=payroll' },
-  ]), [leave, currentUser?._id]);
-  const { checklist: capabilitiesChecklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
   if (loading) {
     return (
@@ -261,8 +245,6 @@ export default function HRDashboardPage() {
           { label: t('hr.scheduleShifts'), icon: Calendar, onClick: () => router.push('/hr?tab=schedule') },
           { label: t('hr.payrollRegister'), icon: Wallet, onClick: () => router.push('/hr?tab=payroll') },
         ]}
-        checklist={capabilitiesChecklist}
-        checklistTitle="Capabilities"
         emptyTitle={t('hr.noPendingLeave')}
         emptyActionLabel={t('hr.viewAll')}
         onEmptyAction={() => router.push('/hr?tab=leave')}

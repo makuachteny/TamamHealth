@@ -204,6 +204,7 @@ export const orderSetsDB = () => getDB('tamamhealth_order_sets');
 export const handoffsDB = () => getDB('tamamhealth_handoffs');
 // In-progress / paused clinical encounters (consultation workflow state machine).
 export const encountersDB = () => getDB('tamamhealth_encounters');
+export const consultationProgressDB = () => getDB('tamamhealth_consultation_progress');
 // Fingerprint minutiae templates (no raw images) — see db-types-biometrics.ts
 export const biometricTemplatesDB = () => getDB('tamamhealth_biometric_templates');
 
@@ -247,6 +248,12 @@ export const ledgerDB = () => getDB('tamamhealth_ledger');
 // Patient-submitted intake forms awaiting front-desk review and merge into
 // the matching patient's chart.
 export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
+
+// Internal transfers of care ownership (provider/department/facility), with
+// their request → accept → complete workflow and append-only audit trail.
+// Distinct from `tamamhealth_referrals`, which moves a patient between
+// facilities and ships a copy of the chart.
+export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 
 // Bump this version to force a re-seed (destroys all data and re-creates).
 // Bumped to 34: v2 demo deployment flipped to demo mode — force browsers that
@@ -404,6 +411,7 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_clinician_tasks', 'tamamhealth_patient_documents',
     'tamamhealth_patient_reminders', 'tamamhealth_intake_forms',
     'tamamhealth_nutrition_screenings', 'tamamhealth_nutrition_supplies',
+    'tamamhealth_patient_transfers',
     // NOTE: 'tamamhealth_controlled_substance_log' is deliberately NOT reset
     // here — it is an append-only regulatory audit trail and resetAllDatabases()
     // runs on production seed-version bumps (see seedProduction).

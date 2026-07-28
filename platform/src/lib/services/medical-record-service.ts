@@ -515,6 +515,7 @@ export interface NursingVitalsInput {
     pulse?: string;
     spo2?: string;
     weight?: string;
+    height?: string;
     respiratoryRate?: string;
     painScore?: string;
     bloodGlucose?: string;
@@ -543,9 +544,21 @@ function numOrUndef(v?: string): number | undefined {
   return isNaN(n) ? undefined : n;
 }
 
+/**
+ * BMI from weight (kg) and height (cm), or 0 when either is missing.
+ *
+ * Returns 0 rather than undefined because `VitalSigns.bmi` is a required
+ * number; unlike weight/height it is not range-validated, so the placeholder
+ * cannot fail a write.
+ */
+function bmiFrom(weightKg?: number, heightCm?: number): number {
+  if (!weightKg || !heightCm) return 0;
+  const m = heightCm / 100;
+  return Math.round((weightKg / (m * m)) * 10) / 10;
+}
+
 export async function recordNursingVitals(input: NursingVitalsInput): Promise<MedicalRecordDoc> {
   const now = new Date().toISOString();
-  const weight = numOrZero(input.vitals.weight);
   const record = {
     patientId: input.patientId,
     hospitalId: input.hospitalId,
@@ -564,15 +577,26 @@ export async function recordNursingVitals(input: NursingVitalsInput): Promise<Me
     recordKind: 'nursing_vitals' as const,
     historyOfPresentIllness: input.vitals.notes?.trim() || '',
     vitalSigns: {
-      temperature: numOrZero(input.vitals.temperature),
-      systolic: parseInt(input.vitals.systolic || '') || 0,
-      diastolic: parseInt(input.vitals.diastolic || '') || 0,
-      pulse: parseInt(input.vitals.pulse || '') || 0,
-      respiratoryRate: parseInt(input.vitals.respiratoryRate || '') || 0,
-      oxygenSaturation: parseInt(input.vitals.spo2 || '') || 0,
-      weight,
-      height: 0,
-      bmi: 0,
+      temperature: numOrUndef(input.vitals.temperature),
+      systolic: numOrUndef(input.vitals.systolic),
+      diastolic: numOrUndef(input.vitals.diastolic),
+      pulse: numOrUndef(input.vitals.pulse),
+      // Absent measurements are left UNDEFINED, not zeroed.
+      //
+      // `validateMedicalRecord` skips undefined/empty but range-checks 0, and
+      // 0 kg / 0 cm / 0 breaths-per-minute are outside every bound — so
+      // hardcoding `height: 0` made EVERY call to this function throw
+      // ValidationError, which silently killed nursing vitals capture
+      // entirely. Zero is an absence marker here, never an observation.
+      respiratoryRate: numOrUndef(input.vitals.respiratoryRate),
+      oxygenSaturation: numOrUndef(input.vitals.spo2),
+      weight: numOrUndef(input.vitals.weight),
+      height: numOrUndef(input.vitals.height),
+      // Derived when both measurements are present. `bmi` is not range-checked
+      // by the validator, so 0 here is inert rather than fatal — but a real
+      // value is better than a placeholder the chart would plot as a data
+      // point.
+      bmi: bmiFrom(numOrUndef(input.vitals.weight), numOrUndef(input.vitals.height)),
       muac: numOrUndef(input.vitals.muac),
       painScore: numOrUndef(input.vitals.painScore),
       bloodGlucose: numOrUndef(input.vitals.bloodGlucose),

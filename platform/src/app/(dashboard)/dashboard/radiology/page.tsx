@@ -11,7 +11,6 @@ import {
 } from '@/components/icons/lucide';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
 
 const ACCENT = 'var(--accent-primary)';
 
@@ -221,7 +220,6 @@ export default function RadiologyDashboard() {
     setFindings('');
     setSubmitToast(t('radiology.reportSubmittedFor', { id: studyId }));
     window.setTimeout(() => setSubmitToast(null), 3000);
-    markCapability('radiology.report');
   };
 
   const handleStartStudy = async (studyId: string) => {
@@ -231,7 +229,6 @@ export default function RadiologyDashboard() {
     } else {
       setStudyStatusOverrides(prev => ({ ...prev, [studyId]: 'in_progress' }));
     }
-    markCapability('radiology.start');
   };
 
   // Undo a report submitted in this session: drop the in-memory override so the
@@ -413,17 +410,6 @@ export default function RadiologyDashboard() {
     );
   };
 
-  // Capabilities card — each item latches checked forever the first time this
-  // radiographer/radiologist does it (see useCapabilities), never un-checked
-  // by later state. No cheap per-user "already done" signal exists in the
-  // loaded study data, so both items are marked at their action's own
-  // success point (handleStartStudy / handleSubmitReport above).
-  const capabilityItems = useMemo(() => ([
-    { key: 'radiology.start', label: 'Start a study', onClick: () => setFilterStatus('pending') },
-    { key: 'radiology.report', label: 'Submit a report', onClick: () => setFilterStatus('in_progress') },
-  ]), []);
-  const { checklist: capabilitiesChecklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
-
   if (!currentUser) return null;
 
   return (
@@ -512,8 +498,6 @@ export default function RadiologyDashboard() {
           { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound },
         ]}
         metricsTitle={t('radiology.title')}
-        checklist={capabilitiesChecklist}
-        checklistTitle="Capabilities"
         emptyTitle={t('radiology.noStudies')}
       >
         {/* Stat panels — opened from the header toggles; the active one

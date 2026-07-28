@@ -6,7 +6,7 @@ import type { ImmunizationDoc } from '../db-types';
 import { immunizationsDB } from '../db';
 import { useDataScope } from './useDataScope';
 
-export function useImmunizations() {
+export function useImmunizations(patientId?: string) {
   const [immunizations, setImmunizations] = useState<ImmunizationDoc[]>([]);
   const [stats, setStats] = useState<Awaited<ReturnType<typeof import('../services/immunization-service').getImmunizationStats>> | null>(null);
   const [coverage, setCoverage] = useState<Awaited<ReturnType<typeof import('../services/immunization-service').getVaccineCoverage>> | null>(null);
@@ -17,8 +17,10 @@ export function useImmunizations() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const { getAllImmunizations, getImmunizationStats, getVaccineCoverage } = await import('../services/immunization-service');
-      const [data, s, c] = await Promise.all([getAllImmunizations(scope), getImmunizationStats(scope), getVaccineCoverage(scope)]);
+      const { getAllImmunizations, getImmunizationStats, getVaccineCoverage, getByPatient } = await import('../services/immunization-service');
+      const [data, s, c] = patientId
+        ? [await getByPatient(patientId), null, null]
+        : await Promise.all([getAllImmunizations(scope), getImmunizationStats(scope), getVaccineCoverage(scope)]);
       setImmunizations(data);
       setStats(s);
       setCoverage(c);
@@ -28,7 +30,7 @@ export function useImmunizations() {
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, [scope, patientId]);
 
   useEffect(() => { load(); }, [load]);
 

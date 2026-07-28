@@ -6,7 +6,7 @@ import { prescriptionsDB } from '../db';
 import { makeCoalescer } from './live-reload';
 import { useDataScope } from './useDataScope';
 
-export function usePrescriptions() {
+export function usePrescriptions(patientId?: string) {
   const [prescriptions, setPrescriptions] = useState<PrescriptionDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,8 +15,8 @@ export function usePrescriptions() {
   const loadPrescriptions = useCallback(async () => {
     try {
       setError(null);
-      const { getAllPrescriptions } = await import('../services/prescription-service');
-      const data = await getAllPrescriptions(scope);
+      const { getAllPrescriptions, getPrescriptionsByPatient } = await import('../services/prescription-service');
+      const data = patientId ? await getPrescriptionsByPatient(patientId, scope) : await getAllPrescriptions(scope);
       setPrescriptions(data);
     } catch (err) {
       console.error(err);
@@ -24,7 +24,7 @@ export function usePrescriptions() {
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, [scope, patientId]);
 
   useEffect(() => {
     loadPrescriptions();

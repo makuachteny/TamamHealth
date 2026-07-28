@@ -11,15 +11,22 @@ import { Megaphone, Bell, ClipboardCheck } from '@/components/icons/lucide';
 import AnnouncementsPanel from '@/components/AnnouncementsPanel';
 import NotificationsPanel from '@/components/NotificationsPanel';
 import TasksPanel from '@/components/TasksPanel';
-import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useTasks } from '@/lib/hooks/useTasks';
 
-export default function QuickActions() {
+export default function QuickActions({ notificationCount }: {
+  /** Unread bell count. Supplied by the rail, which already loads the feed for
+   *  the module shortcut badges — loading it here too would run every source
+   *  query twice on each mount. */
+  notificationCount: number;
+}) {
   const [announceOpen, setAnnounceOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [unread, setUnread] = useState(0);
-  const { count: notifCount } = useNotifications();
+  // The badge counts what the user has NOT opened yet — read state is kept per
+  // device in lib/notification-reads.ts, so the bell stops nagging about items
+  // already actioned from the panel or /notifications.
+  const notifCount = notificationCount;
   const { open: openTasks } = useTasks();
 
   const announceRef = useRef<HTMLDivElement>(null);

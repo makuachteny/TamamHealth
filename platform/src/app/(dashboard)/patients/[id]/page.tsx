@@ -33,6 +33,10 @@ const VitalsTrends = dynamic(() => import('@/components/VitalsTrends'), {
   loading: () => <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading charts…</div>,
 });
 import PatientTimeline from '@/components/PatientTimeline';
+import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
+// Canonical geography — the same lists patient registration writes from, so an
+// edit here can't introduce a state/county spelling the geo rollups don't know.
+import { states as SOUTH_SUDAN_STATES, statesAndCounties } from '@/data/mock';
 import { formatDateTime, formatDate, formatClockTime } from '@/lib/format-utils';
 import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
@@ -50,6 +54,7 @@ import PhoneNotes from '@/components/patients/PhoneNotes';
 import AssessmentsPanel from '@/components/patients/AssessmentsPanel';
 import ScreeningsPanel from '@/components/patients/ScreeningsPanel';
 import RemindersPanel from '@/components/patients/RemindersPanel';
+import TransferHistoryPanel, { TransferBanner } from '@/components/patients/TransferHistoryPanel';
 import DocumentsPanel from '@/components/patients/DocumentsPanel';
 import SuperbillPanel from '@/components/patients/SuperbillPanel';
 import { useProblems } from '@/lib/hooks/useProblems';
@@ -84,7 +89,12 @@ import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignD
 // Receptionist) may see — the "minimum necessary" rule: contact details,
 // referral follow-up, and billing/scheduling, but NOT clinical notes, test
 // results, diagnoses, vitals, or medications.
-const ADMIN_TAB_IDS = ['overview', 'appointments', 'demographics', 'billing', 'documents', 'recall'];
+// 'transfers' is admin-visible because "who is responsible for this patient?"
+// is a question the front desk fields constantly. The panel redacts the
+// clinical detail (reason, hand-off notes, problem/medication snapshot) for
+// these roles — see TransferHistoryPanel's canViewClinical prop — so the tab
+// answers accountability without exposing the chart.
+const ADMIN_TAB_IDS = ['overview', 'appointments', 'demographics', 'billing', 'documents', 'recall', 'referrals'];
 type FacesheetPanelId = 'medications' | 'problems' | 'allergies' | 'vitals' | 'history' | 'labs' | 'recommendations' | 'demographics';
 
 const FACESHEET_PANEL_OPTIONS: Array<{ id: FacesheetPanelId; label: string }> = [
@@ -115,9 +125,9 @@ type FacesheetActions = Partial<Record<FacesheetPanelId, {
 // Clinical-permission gating still runs in the effect below, so a non-clinical
 // user deep-linked to a clinical tab is bounced back to overview.
 const DEEP_LINK_TAB_IDS = new Set([
-  'overview', 'appointments', 'history', 'problems', 'prescriptions', 'immunizations',
+    'overview', 'appointments', 'history', 'problems', 'prescriptions', 'immunizations',
   'allergies', 'vitals', 'notes', 'labs', 'demographics', 'billing', 'careChecklist',
-  'documents', 'recall', 'referrals', 'sbar',
+    'documents', 'recall', 'referrals', 'sbar', 'transfers',
 ]);
 
 export default function PatientDetailPage() {
@@ -132,7 +142,7 @@ export default function PatientDetailPage() {
   const initialTab = searchParams.get('tab');
   const focusId = searchParams.get('focus') || undefined;
   const [activeTab, setActiveTab] = useState(
-    initialTab && DEEP_LINK_TAB_IDS.has(initialTab) ? initialTab : 'overview',
+    initialTab === 'transfers' ? 'referrals' : initialTab && DEEP_LINK_TAB_IDS.has(initialTab) ? initialTab : 'overview',
   );
   const [demographicsTab, setDemographicsTab] = useState('profile');
   const [vitalsView, setVitalsView] = useState<'table' | 'flowsheet'>('table');
@@ -230,11 +240,11 @@ export default function PatientDetailPage() {
   const patient = scopedPatient ?? (fallbackPatient?._id === id ? fallbackPatient : undefined);
   const { records } = useMedicalRecords(patient?._id);
   const { referrals: patientReferrals } = usePatientReferrals(patient?._id);
-  const { results: allLabResults } = useLabResults();
-  const { immunizations: allImmunizations } = useImmunizations();
+  const { results: allLabResults } = useLabResults(patient?._id);
+  const { immunizations: allImmunizations } = useImmunizations(patient?._id);
   const { visits: allANCVisits } = useANC();
   const { appointments: patientAppointments } = usePatientAppointments(patient?._id);
-  const { prescriptions: allPrescriptions } = usePrescriptions();
+  const { prescriptions: allPrescriptions } = usePrescriptions(patient?._id);
   const { triages: patientTriages } = useTriage(patient?._id);
   const { canConsult, canViewClinical, canOrderLabs, canPrescribe, canBookAppointments, canManageReferrals } = usePermissions();
   const canAssignPatients = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
@@ -302,6 +312,11 @@ export default function PatientDetailPage() {
   });
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  /** Counties for the state currently picked in the edit form. */
+  const editCounties = useMemo(
+    () => (editForm.state ? statesAndCounties[editForm.state] || [] : []),
+    [editForm.state],
+  );
 
   const openEditModal = () => {
     if (!patient) return;
@@ -474,7 +489,7 @@ export default function PatientDetailPage() {
   const allTabs = [
     { id: 'overview', label: 'Facesheet', icon: Heart },
     { id: 'appointments', label: 'Appointments', icon: Calendar },
-    { id: 'history', label: 'History', icon: FileText },
+    { id: 'history', label: 'Activity', icon: FileText },
     { id: 'problems', label: 'Problems', icon: AlertTriangle },
     { id: 'prescriptions', label: 'Medications', icon: Pill },
     { id: 'immunizations', label: 'Immunizations', icon: Syringe },
@@ -484,9 +499,10 @@ export default function PatientDetailPage() {
     { id: 'labs', label: 'Labs/Studies', icon: FlaskConical },
     { id: 'demographics', label: 'Demographics', icon: UserIcon },
     { id: 'billing', label: 'Account', icon: Wallet },
-    { id: 'careChecklist', label: 'Care Checklist', icon: ClipboardList },
+    { id: 'careChecklist', label: 'Care Plan', icon: ClipboardList },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'recall', label: 'Recall', icon: CalendarClock },
+    { id: 'referrals', label: 'Care coordination', icon: ArrowRightLeft },
   ];
   const tabs = canViewClinical ? allTabs : allTabs.filter(tb => ADMIN_TAB_IDS.includes(tb.id));
 
@@ -513,7 +529,7 @@ export default function PatientDetailPage() {
     { id: 'prescriptions', label: 'Medications', icon: Pill },
     { id: 'orders', label: 'Orders', icon: ClipboardList, clinicalOnly: true },
     { id: 'labs', label: 'Results', icon: FlaskConical },
-    { id: 'history', label: 'Visits', icon: History },
+    { id: 'history', label: 'Activity', icon: History },
     { id: 'allergies', label: 'Allergies', icon: ShieldAlert },
     { id: 'problems', label: 'Conditions', icon: AlertTriangle },
     { id: 'immunizations', label: 'Immunizations', icon: Syringe },
@@ -521,7 +537,8 @@ export default function PatientDetailPage() {
     { id: 'documents', label: 'Attachments', icon: FileText },
     { id: 'programs', label: 'Programs', icon: Layers, clinicalOnly: true },
     { id: 'appointments', label: 'Appointments', icon: Calendar },
-    { id: 'billing', label: 'Billing history', icon: Wallet },
+    // Billing remains available under More so it does not compete with
+    // clinical work in the primary rail.
   ];
   const omrsRailIds = new Set(OMRS_RAIL_DEFS.map(d => d.id));
   const omrsRailItems = OMRS_RAIL_DEFS.filter(item => (item.clinicalOnly ? canViewClinical : tabs.some(t => t.id === item.id)));
@@ -1217,6 +1234,14 @@ export default function PatientDetailPage() {
           >
           <section className="ehr-chart-content">
 
+
+          {/* Care ownership is in flight (or time-boxed) — shown on every tab,
+              because a clinician who doesn't know a transfer is pending can
+              start work the receiving team is about to take over. */}
+          {patient && (
+            <TransferBanner patient={patient} onOpenHistory={() => setActiveTab('referrals')} />
+          )}
+
           {activeTab === 'overview' && (
             <PatientFacesheetView
               patient={patient}
@@ -1807,6 +1832,10 @@ export default function PatientDetailPage() {
             </div>
           )}
 
+          {activeTab === 'transfers' && patient && (
+            <TransferHistoryPanel patient={patient} canViewClinical={canViewClinical} />
+          )}
+
           {activeTab === 'recall' && patient && (
             <div className="space-y-4">
               <RemindersPanel patient={patient} />
@@ -1871,7 +1900,7 @@ export default function PatientDetailPage() {
           )}
 
           {/* Medical History Tab */}
-          {activeTab === 'history' && (
+          {activeTab === '__legacy_history' && (
             <ChartSection
               title="Visits"
               filterSlot={records.length > 0 ? (
@@ -2202,6 +2231,22 @@ export default function PatientDetailPage() {
             </ChartSection>
           )}
 
+          {/* Unified longitudinal activity. The old visit table remains below
+              as a compatibility implementation, but the chart's active
+              History/Activity destination is this cross-care timeline. */}
+          {activeTab === 'history' && patient && (
+            <PatientTimeline
+              medicalRecords={records}
+              labResults={allLabResults || []}
+              prescriptions={allPrescriptions || []}
+              immunizations={allImmunizations || []}
+              referrals={patientReferrals}
+              ancVisits={patientANC}
+              appointments={patientAppointments}
+              triages={patientTriages}
+            />
+          )}
+
           {/* Labs Tab */}
           {activeTab === 'labs' && (
             <ResultsSection
@@ -2382,6 +2427,7 @@ export default function PatientDetailPage() {
           {/* Referrals Tab */}
           {activeTab === 'referrals' && (
             <div className="space-y-3">
+              <TransferHistoryPanel patient={patient} canViewClinical={canViewClinical} />
               <div className="flex items-center justify-between px-1 mb-1">
                 <div className="flex items-center gap-2">
                   <div className="icon-box-sm">
@@ -2589,7 +2635,10 @@ export default function PatientDetailPage() {
       {/* Edit Demographics Modal */}
       {showEditModal && patient && (
         <Modal onClose={() => !editSubmitting && setShowEditModal(false)}>
-          <div className="modal-content card-elevated p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
+          {/* No max-width here: Modal already sizes the dialog panel (600px) and
+              paints it opaque, so a narrower child left ~90px of empty panel
+              showing past the form's right edge. Matches the message modal above. */}
+          <div className="modal-content card-elevated p-5 w-full" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold">Edit Patient Demographics</h3>
               <button onClick={() => setShowEditModal(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
@@ -2599,51 +2648,80 @@ export default function PatientDetailPage() {
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>First Name</label>
-                  <input type="text" value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} />
+                  <label htmlFor="edit-first-name" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>First Name</label>
+                  <input id="edit-first-name" type="text" value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Middle Name</label>
-                  <input type="text" value={editForm.middleName} onChange={e => setEditForm({ ...editForm, middleName: e.target.value })} />
+                  <label htmlFor="edit-middle-name" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Middle Name</label>
+                  <input id="edit-middle-name" type="text" value={editForm.middleName} onChange={e => setEditForm({ ...editForm, middleName: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Surname</label>
-                  <input type="text" value={editForm.surname} onChange={e => setEditForm({ ...editForm, surname: e.target.value })} />
+                  <label htmlFor="edit-surname" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Surname</label>
+                  <input id="edit-surname" type="text" value={editForm.surname} onChange={e => setEditForm({ ...editForm, surname: e.target.value })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Date of Birth</label>
-                  <input type="date" value={editForm.dateOfBirth} onChange={e => setEditForm({ ...editForm, dateOfBirth: e.target.value })} />
+                  {/* Capped at today — registration already does this, and a
+                      future date of birth is never a correction. */}
+                  <label htmlFor="edit-dob" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Date of Birth</label>
+                  <input id="edit-dob" type="date" max={toIsoDate(new Date())} value={editForm.dateOfBirth} onChange={e => setEditForm({ ...editForm, dateOfBirth: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Gender</label>
-                  <select value={editForm.gender} onChange={e => setEditForm({ ...editForm, gender: e.target.value as 'Male' | 'Female' })}>
+                  <label htmlFor="edit-gender" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Gender</label>
+                  <select id="edit-gender" value={editForm.gender} onChange={e => setEditForm({ ...editForm, gender: e.target.value as 'Male' | 'Female' })}>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Phone</label>
-                <input type="tel" value={editForm.phone} onChange={e => { setEditForm({ ...editForm, phone: e.target.value }); if (editErrors.phone) setEditErrors({}); }} aria-invalid={!!editErrors.phone} style={editErrors.phone ? { borderColor: 'var(--color-danger)' } : {}} />
+                <label htmlFor="edit-phone" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Phone</label>
+                <input id="edit-phone" type="tel" value={editForm.phone} onChange={e => { setEditForm({ ...editForm, phone: e.target.value }); if (editErrors.phone) setEditErrors({}); }} aria-invalid={!!editErrors.phone} style={editErrors.phone ? { borderColor: 'var(--color-danger)' } : {}} />
                 {editErrors.phone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{editErrors.phone}</p>}
               </div>
+              {/* State/county are pick-lists, not free text: registration writes
+                  from these same lists, and every geographic rollup (surveillance,
+                  vital statistics, the ADM1 maps) joins on the exact name. A typo
+                  typed here would quietly drop the patient out of their county.
+                  A value already on the record that isn't in the list is kept as
+                  an option so editing a phone number can't silently rewrite it. */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>State</label>
-                  <input type="text" value={editForm.state} onChange={e => setEditForm({ ...editForm, state: e.target.value })} />
+                  <label htmlFor="edit-state" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>State</label>
+                  <select
+                    id="edit-state"
+                    value={editForm.state}
+                    onChange={e => setEditForm({ ...editForm, state: e.target.value, county: '' })}
+                  >
+                    <option value="">Select state…</option>
+                    {editForm.state && !SOUTH_SUDAN_STATES.includes(editForm.state) && (
+                      <option value={editForm.state}>{editForm.state} (on record)</option>
+                    )}
+                    {SOUTH_SUDAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>County</label>
-                  <input type="text" value={editForm.county} onChange={e => setEditForm({ ...editForm, county: e.target.value })} />
+                  <label htmlFor="edit-county" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>County</label>
+                  <select
+                    id="edit-county"
+                    value={editForm.county}
+                    onChange={e => setEditForm({ ...editForm, county: e.target.value })}
+                    disabled={!editForm.state}
+                  >
+                    <option value="">{editForm.state ? 'Select county…' : 'Select a state first'}</option>
+                    {editForm.county && !editCounties.includes(editForm.county) && (
+                      <option value={editForm.county}>{editForm.county} (on record)</option>
+                    )}
+                    {editCounties.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowEditModal(false)} className="btn btn-secondary flex-1" disabled={editSubmitting}>Cancel</button>
-              <button onClick={handleEditSubmit} className="btn btn-primary flex-1" disabled={editSubmitting}>
-                {editSubmitting ? 'Saving…' : 'Save Changes'}
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button onClick={() => setShowEditModal(false)} className="btn btn-sm btn-secondary" disabled={editSubmitting}>Cancel</button>
+              <button onClick={handleEditSubmit} className="btn btn-sm btn-primary" disabled={editSubmitting}>
+                {editSubmitting ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </div>

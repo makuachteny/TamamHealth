@@ -20,8 +20,9 @@ import { BRAND_PRIMARY } from '@/lib/theme-colors';
 import type { ConversationDoc, UserRole, StaffPresence } from '@/lib/db-types';
 import {
   MessageSquare, Minus, Plus, Search, Send, ArrowLeft, Users as UsersIcon,
-  Paperclip, X, AlertTriangle,
+  Paperclip, X, AlertTriangle, ArrowRightLeft, Check, UserPlus, Clock,
 } from '@/components/icons/lucide';
+import type { PatientTransferDoc, PatientTransferUrgency } from '@/lib/db-types';
 
 type Attachment = { name: string; mimeType: string; base64Data: string; sizeBytes: number };
 
@@ -46,6 +47,19 @@ const AVAILABILITY_COLORS: Record<StaffPresence, string> = {
 };
 
 const NON_MESSAGEABLE_ROLES: UserRole[] = ['super_admin', 'government'];
+
+/**
+ * Ward-colour accent per transfer urgency. Used as a 3px rail on the card, not
+ * a fill — a queue of six emergency transfers should read as urgent without the
+ * panel becoming a wall of red, which is how alarm fatigue starts.
+ */
+const URGENCY_TINT: Record<PatientTransferUrgency, { rail: string; label: string; text: string }> = {
+  emergency: { rail: 'var(--color-danger)',  label: 'Emergency', text: 'var(--color-danger)' },
+  urgent:    { rail: 'var(--color-warning)', label: 'Urgent',    text: 'var(--color-warning)' },
+  routine:   { rail: 'var(--accent-primary)', label: 'Routine',  text: 'var(--text-muted)' },
+};
+
+type DockTab = 'chats' | 'teams' | 'transfers';
 
 function relTime(iso?: string): string {
   if (!iso) return '';
@@ -82,7 +96,16 @@ export default function MessagingDock() {
   } = chat;
 
   const { open, openDock, closeDock, pendingDM, clearPendingDM } = useMessagingDock();
-  const [view, setView] = useState<'list' | 'new'>('list');
+  const [view, setView] = useState<'list' | 'new' | 'newTeam'>('list');
+  const [tab, setTab] = useState<DockTab>('chats');
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
+  // Transfers of care. Loaded here rather than through a hook because the dock
+  // is the only consumer and the list is short-lived — a full hook would add a
+  // subscription for a panel that is closed most of the time.
+  const [transfers, setTransfers] = useState<{ incoming: PatientTransferDoc[]; outgoing: PatientTransferDoc[] }>({ incoming: [], outgoing: [] });
+  const [transferBusy, setTransferBusy] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState('');
   const [staffSearch, setStaffSearch] = useState('');
   const [draft, setDraft] = useState('');
@@ -159,6 +182,59 @@ export default function MessagingDock() {
     openDock();
   };
 
+  // Load transfers whenever the dock opens on the Transfers tab. Scoped to the
+  // signed-in user: incoming = awaiting THEIR decision, outgoing = ones they
+  // raised that are still open.
+  useEffect(() => {
+    let cancelled = false;
+    if (!open || tab !== 'transfers' || !currentUser?._id) return;
+    (async () => {
+      try {
+        const svc = await import('@/lib/services/patient-transfer-service');
+        const scope = { role: currentUser.role, orgId: currentUser.orgId, hospitalId: currentUser.hospitalId };
+        const [incoming, outgoing] = await Promise.all([
+          svc.getIncomingTransfers(
+            { id: currentUser._id, department: currentUser.department, hospitalId: currentUser.hospitalId, role: currentUser.role },
+            scope,
+          ),
+          svc.getOutgoingTransfers(currentUser._id, scope),
+        ]);
+        if (!cancelled) setTransfers({ incoming, outgoing });
+      } catch (err) {
+        // A transfer list that fails to load must not take the chat panel with
+        // it — the dock's primary job is messaging.
+        console.warn('[dock] could not load transfers', err);
+        if (!cancelled) setTransfers({ incoming: [], outgoing: [] });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, tab, currentUser?._id, currentUser?.role, currentUser?.orgId, currentUser?.hospitalId, currentUser?.department, transferBusy]);
+
+  const decideTransfer = async (id: string, decision: 'accept' | 'reject') => {
+    if (!currentUser) return;
+    setTransferBusy(id);
+    try {
+      const notes = decision === 'reject'
+        ? window.prompt('Reason for rejecting this transfer')?.trim()
+        : undefined;
+      if (decision === 'reject' && !notes) return;
+      const response = await fetch('/api/patient-transfers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: decision, transferId: id, notes }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Transfer decision failed');
+    } catch (err) {
+      console.warn('[dock] transfer decision failed', err);
+    } finally {
+      // Clearing this also re-runs the loader above, so the list reflects the
+      // decision without a manual refresh.
+      setTransferBusy(null);
+    }
+  };
+
   const meId = currentUser?._id || '';
   const meName = currentUser?.name || '';
 
@@ -184,6 +260,16 @@ export default function MessagingDock() {
     return [...list].sort((a, b) => (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations, convSearch, meId]);
+
+  /** Conversations for the active tab. Teams = group chats, Chats = 1:1. */
+  const tabbedConvs = useMemo(() => {
+    if (tab === 'teams') return filteredConvs.filter(c => c.kind === 'group');
+    if (tab === 'chats') return filteredConvs.filter(c => c.kind !== 'group');
+    return filteredConvs;
+  }, [filteredConvs, tab]);
+
+  const teamCount = useMemo(() => conversations.filter(c => c.kind === 'group').length, [conversations]);
+  const transferCount = transfers.incoming.length;
 
   const unreadCount = useMemo(() => conversations.filter(isUnread).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -266,6 +352,7 @@ export default function MessagingDock() {
         onPointerUp={handleLauncherPointerUp}
         onPointerCancel={handleLauncherPointerUp}
         aria-label="Open messages"
+        data-tour="messaging-dock"
         className="fixed z-[60] flex items-center justify-center rounded-full text-white shadow-lg"
         style={{
           right: 20, bottom: 20, width: 56, height: 56, background: 'var(--accent-primary)', boxShadow: 'var(--card-shadow-lg)',
@@ -293,16 +380,21 @@ export default function MessagingDock() {
       className="fixed z-[60] flex flex-col overflow-hidden"
       style={{
         right: 20, bottom: 20, width: 372, height: 540, maxHeight: 'calc(100vh - 40px)', maxWidth: 'calc(100vw - 40px)',
-        borderRadius: 'var(--card-radius)', border: '1px solid var(--glass-border)',
-        background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
-        boxShadow: 'var(--panel-shadow), var(--glass-highlight)',
+        // Flat, opaque clinical surface. The dock previously used a blurred
+        // glass panel, which put whatever was behind it — often a patient
+        // chart — dimly through the conversation list. Opaque is both the
+        // platform's design direction and the right call for a panel that
+        // floats over PHI.
+        borderRadius: 'var(--card-radius)', border: '1px solid var(--border-light)',
+        background: 'var(--bg-card-solid)',
+        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.16)',
         // Opens from wherever the launcher was last dragged to, instead of
         // snapping back to the default corner.
         transform: `translate3d(${dockOffset.x}px, ${dockOffset.y}px, 0)`,
       }}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
+      <div className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
         {inThread ? (
           <>
             <button onClick={() => setActiveId(null)} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-[var(--overlay-subtle)]" style={{ color: 'var(--text-muted)' }} aria-label="Back">
@@ -316,25 +408,28 @@ export default function MessagingDock() {
               </p>
             </div>
           </>
-        ) : view === 'new' ? (
+        ) : view === 'new' || view === 'newTeam' ? (
           <>
             <button onClick={() => { setView('list'); setStaffSearch(''); }} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-[var(--overlay-subtle)]" style={{ color: 'var(--text-muted)' }} aria-label="Back">
               <ArrowLeft className="w-[18px] h-[18px]" />
             </button>
-            <h2 className="text-[14px] font-bold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>New message</h2>
+            <h2 className="text-[15px] font-bold flex-1 truncate tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              {view === 'newTeam' ? 'New team conversation' : 'New message'}
+            </h2>
           </>
         ) : (
           <>
             <MessageSquare className="w-[18px] h-[18px] flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-            <h2 className="text-[14px] font-bold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>Messages</h2>
+            <h2 className="text-[15px] font-bold flex-1 truncate tracking-tight" style={{ color: 'var(--text-primary)' }}>Messages</h2>
             {/* Availability status dot + picker */}
             <div className="relative">
               <button
                 onClick={() => setShowAvailability(v => !v)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-[var(--overlay-subtle)]"
+                className="h-8 px-2 rounded-lg flex items-center gap-1.5 flex-shrink-0 hover:bg-[var(--overlay-subtle)]"
                 title={`Status: ${AVAILABILITY_LABELS[availability]}`}
               >
-                <span className="w-3 h-3 rounded-full" style={{ background: AVAILABILITY_COLORS[availability] || 'var(--color-success-600)' }} />
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: AVAILABILITY_COLORS[availability] || 'var(--color-success-600)' }} />
+                <span className="text-[11px] font-semibold hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>{AVAILABILITY_LABELS[availability]}</span>
               </button>
               {showAvailability && (
                 <div className="absolute right-0 top-full mt-1 z-50 py-1 rounded-xl shadow-xl min-w-[160px]" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)' }}>
@@ -351,9 +446,54 @@ export default function MessagingDock() {
                 </div>
               )}
             </div>
-            <button onClick={() => { setView('new'); }} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }} aria-label="New message" title="New message">
-              <Plus className="w-4 h-4" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setComposeOpen(o => !o)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}
+                aria-label="Start something new"
+                aria-expanded={composeOpen}
+                title="Start something new"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              {composeOpen && (
+                <>
+                  {/* Click-away. Sits behind the menu so a click anywhere else
+                      closes it without also triggering what's underneath. */}
+                  <div className="fixed inset-0 z-40" onClick={() => setComposeOpen(false)} />
+                  <div
+                    className="absolute right-0 top-full mt-1.5 z-50 py-1 rounded-xl overflow-hidden min-w-[196px]"
+                    style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', boxShadow: '0 8px 24px rgba(15,23,42,0.14)' }}
+                    role="menu"
+                  >
+                    {[
+                      { key: 'dm',       icon: <UserPlus className="w-4 h-4" />,        label: 'Direct message', hint: 'One colleague' },
+                      { key: 'team',     icon: <UsersIcon className="w-4 h-4" />,       label: 'Team conversation', hint: 'Ward, shift or unit' },
+                      { key: 'transfer', icon: <ArrowRightLeft className="w-4 h-4" />,  label: 'Transfers of care', hint: 'Review hand-overs' },
+                    ].map(item => (
+                      <button
+                        key={item.key}
+                        role="menuitem"
+                        onClick={() => {
+                          setComposeOpen(false);
+                          if (item.key === 'dm') { setView('new'); setStaffSearch(''); }
+                          else if (item.key === 'team') { setView('newTeam'); setTeamName(''); setTeamMembers([]); setStaffSearch(''); }
+                          else { setTab('transfers'); }
+                        }}
+                        className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-[var(--overlay-subtle)]"
+                      >
+                        <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }}>{item.icon}</span>
+                        <span className="min-w-0">
+                          <span className="block text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{item.label}</span>
+                          <span className="block text-[11px]" style={{ color: 'var(--text-muted)' }}>{item.hint}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </>
         )}
         <button onClick={closeDock} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-[var(--overlay-subtle)]" style={{ color: 'var(--text-muted)' }} aria-label="Minimize" title="Minimize">
@@ -433,7 +573,7 @@ export default function MessagingDock() {
             })}
           </div>
           {/* Composer */}
-          <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--glass-border)' }}>
+          <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--border-light)' }}>
             {/* PHI Warning */}
             {phiWarning && (
               <div className="mx-2.5 mt-2.5 p-2.5 rounded-lg" style={{ background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.3)' }}>
@@ -500,6 +640,84 @@ export default function MessagingDock() {
             </div>
           </div>
         </>
+      ) : view === 'newTeam' ? (
+        // ── Team conversation builder ──
+        // createGroupChat() existed in useStaffChat from the start but nothing
+        // in the dock ever called it, so group conversations could be read but
+        // never started from here.
+        <>
+          <div className="px-3 pt-2.5 pb-2 flex-shrink-0 space-y-2">
+            <input
+              value={teamName}
+              onChange={e => setTeamName(e.target.value)}
+              placeholder="Team name — e.g. Ward 3 night shift"
+              className="w-full text-[13px] px-3 py-2 rounded-xl"
+              style={{ background: 'var(--bg-app)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontFamily: 'var(--font-platform)', outline: 'none' }}
+            />
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+              <input
+                value={staffSearch}
+                onChange={e => setStaffSearch(e.target.value)}
+                placeholder="Add colleagues…"
+                className="w-full text-[13px] pr-3 py-2 rounded-xl"
+                style={{ paddingLeft: 34, background: 'var(--bg-app)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontFamily: 'var(--font-platform)', outline: 'none' }}
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-2 pb-2" style={{ minHeight: 0 }}>
+            {messageableStaff.map(u => {
+              const picked = teamMembers.includes(u._id);
+              return (
+                <button
+                  key={u._id}
+                  onClick={() => setTeamMembers(prev => picked ? prev.filter(id => id !== u._id) : [...prev, u._id])}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors hover:bg-[var(--overlay-subtle)] text-left"
+                  aria-pressed={picked}
+                >
+                  <Avatar name={u.name} size={34} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{u.name}</p>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>{ROLE_LABEL[u.role] || ''}</p>
+                  </div>
+                  <span
+                    className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: picked ? 'var(--accent-primary)' : 'transparent',
+                      border: picked ? 'none' : '1.5px solid var(--border-medium)',
+                    }}
+                  >
+                    {picked && <Check className="w-3.5 h-3.5" style={{ color: '#fff' }} />}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex-shrink-0 p-2.5" style={{ borderTop: '1px solid var(--border-light)' }}>
+            <button
+              disabled={!teamName.trim() || teamMembers.length === 0}
+              onClick={async () => {
+                const picked = users
+                  .filter(u => teamMembers.includes(u._id))
+                  .map(u => ({ id: u._id, name: u.name }));
+                await chat.createGroupChat(teamName.trim(), picked);
+                setView('list');
+                setTab('teams');
+                setTeamName('');
+                setTeamMembers([]);
+                setStaffSearch('');
+              }}
+              className="w-full py-2 rounded-xl text-[13px] font-semibold text-white disabled:opacity-40"
+              style={{ background: 'var(--accent-primary)' }}
+            >
+              {teamMembers.length === 0
+                ? 'Select colleagues to add'
+                : `Create team · ${teamMembers.length + 1} member${teamMembers.length === 0 ? '' : 's'}`}
+            </button>
+          </div>
+        </>
       ) : view === 'new' ? (
         // ── New-message staff picker ──
         <>
@@ -536,25 +754,107 @@ export default function MessagingDock() {
       ) : (
         // ── Conversation list ──
         <>
-          <div className="px-3 pt-2.5 pb-2 flex-shrink-0">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-              <input
-                value={convSearch}
-                onChange={e => setConvSearch(e.target.value)}
-                placeholder="Search conversations…"
-                className="w-full text-[13px] pl-9 pr-3 py-2 rounded-xl"
-                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontFamily: "var(--font-platform)", outline: 'none' }}
-              />
-            </div>
+          {/* Tabs. Teams and Transfers are separate destinations rather than
+              filters in a dropdown because both are things staff come here to
+              DO, not ways to narrow a list they are already reading. */}
+          <div data-tour="dock-tabs" className="flex items-center gap-1 px-2 pt-2 flex-shrink-0" role="tablist">
+            {([
+              { key: 'chats',     label: 'Chats',     count: 0 },
+              { key: 'teams',     label: 'Teams',     count: teamCount },
+              { key: 'transfers', label: 'Transfers', count: transferCount },
+            ] as { key: DockTab; label: string; count: number }[]).map(t => {
+              const active = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(t.key)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                  style={{
+                    background: active ? 'var(--accent-light)' : 'transparent',
+                    color: active ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  }}
+                >
+                  {t.label}
+                  {t.count > 0 && (
+                    <span
+                      className="inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-bold"
+                      style={{
+                        // Pending transfers are someone waiting on a decision,
+                        // so they carry the alert tint; a team count is neutral.
+                        background: t.key === 'transfers' ? 'var(--color-danger)' : 'var(--overlay-medium)',
+                        color: t.key === 'transfers' ? '#fff' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          <div className="flex-1 overflow-y-auto px-2 pb-2" style={{ minHeight: 0 }}>
-            {filteredConvs.length === 0 ? (
-              <div className="text-center px-4 py-10">
-                <p className="text-[12px] mb-2" style={{ color: 'var(--text-muted)' }}>No conversations yet.</p>
-                <button onClick={() => setView('new')} className="text-[12px] font-semibold" style={{ color: 'var(--accent-primary)' }}>Start a new message</button>
+
+          {tab !== 'transfers' && (
+            <div className="px-3 pt-2 pb-2 flex-shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                <input
+                  value={convSearch}
+                  onChange={e => setConvSearch(e.target.value)}
+                  placeholder={tab === 'teams' ? 'Search teams…' : 'Search conversations…'}
+                  className="w-full text-[13px] pr-3 py-2 rounded-xl"
+                  // paddingLeft set inline, not via a utility class: a global
+                  // input rule was overriding the Tailwind padding and the
+                  // placeholder rendered underneath the search icon.
+                  style={{ paddingLeft: 34, background: 'var(--bg-app)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontFamily: 'var(--font-platform)', outline: 'none' }}
+                />
               </div>
-            ) : filteredConvs.map(c => {
+            </div>
+          )}
+          <div className="flex-1 overflow-y-auto px-2 pb-2" style={{ minHeight: 0 }}>
+            {tab === 'transfers' ? (
+              <TransfersPanel
+                incoming={transfers.incoming}
+                outgoing={transfers.outgoing}
+                busyId={transferBusy}
+                onDecide={decideTransfer}
+              />
+            ) : tabbedConvs.length === 0 ? (
+              /* An empty screen is an invitation to act, not a dead end. */
+              <div className="px-5 py-12 text-center">
+                <div
+                  className="mx-auto mb-3 flex items-center justify-center rounded-2xl"
+                  style={{ width: 44, height: 44, background: 'var(--accent-light)', color: 'var(--accent-primary)' }}
+                >
+                  {tab === 'teams' ? <UsersIcon className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
+                </div>
+                <p className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  {convSearch.trim()
+                    ? 'Nothing matches that search'
+                    : tab === 'teams' ? 'No team conversations yet' : 'No conversations yet'}
+                </p>
+                <p className="text-[11.5px] mb-3 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  {convSearch.trim()
+                    ? 'Try a colleague’s name or a word from the message.'
+                    : tab === 'teams'
+                      ? 'Create one for a ward, a shift or an on-call group so hand-overs stay in one thread.'
+                      : 'Start a direct message with a colleague on your team.'}
+                </p>
+                {!convSearch.trim() && (
+                  <button
+                    onClick={() => {
+                      if (tab === 'teams') { setView('newTeam'); setTeamName(''); setTeamMembers([]); setStaffSearch(''); }
+                      else { setView('new'); setStaffSearch(''); }
+                    }}
+                    className="text-[12px] font-semibold px-3 py-1.5 rounded-lg"
+                    style={{ background: 'var(--accent-primary)', color: '#fff' }}
+                  >
+                    {tab === 'teams' ? 'Create a team conversation' : 'New message'}
+                  </button>
+                )}
+              </div>
+            ) : tabbedConvs.map(c => {
               const unread = isUnread(c);
               return (
                 <button
@@ -579,6 +879,122 @@ export default function MessagingDock() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Transfers of care awaiting or issued by this user.
+ *
+ * This is the one place in the dock that is deliberately not chat-shaped. A
+ * transfer is a decision someone is waiting on, so the row leads with the
+ * patient, states who it is coming from, and puts Accept/Decline in reach —
+ * rather than burying it in a thread the receiver has to open and read.
+ *
+ * The urgency colour is a 3px rail, not a background fill: a queue of six
+ * emergency transfers has to read as urgent without turning the panel into a
+ * wall of red, which is how people learn to ignore it.
+ */
+function TransfersPanel({
+  incoming, outgoing, busyId, onDecide,
+}: {
+  incoming: PatientTransferDoc[];
+  outgoing: PatientTransferDoc[];
+  busyId: string | null;
+  onDecide: (id: string, decision: 'accept' | 'reject') => void;
+}) {
+  if (incoming.length === 0 && outgoing.length === 0) {
+    return (
+      <div className="px-5 py-12 text-center">
+        <div
+          className="mx-auto mb-3 flex items-center justify-center rounded-2xl"
+          style={{ width: 44, height: 44, background: 'var(--accent-light)', color: 'var(--accent-primary)' }}
+        >
+          <ArrowRightLeft className="w-5 h-5" />
+        </div>
+        <p className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No transfers of care</p>
+        <p className="text-[11.5px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          Hand-overs you send or receive appear here until they are accepted.
+        </p>
+      </div>
+    );
+  }
+
+  const section = (title: string, rows: PatientTransferDoc[], actionable: boolean) => {
+    if (rows.length === 0) return null;
+    return (
+      <div className="mb-1">
+        <p className="px-2.5 pt-2 pb-1 text-[10.5px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          {title}
+        </p>
+        {rows.map(t => {
+          const tint = URGENCY_TINT[t.urgency] ?? URGENCY_TINT.routine;
+          const busy = busyId === t._id;
+          return (
+            <div
+              key={t._id}
+              className="mb-1.5 rounded-xl overflow-hidden"
+              style={{ background: 'var(--bg-app)', border: '1px solid var(--border-light)' }}
+            >
+              <div className="flex">
+                <span aria-hidden style={{ width: 3, background: tint.rail, flexShrink: 0 }} />
+                <div className="min-w-0 flex-1 px-2.5 py-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                      {t.patientName || 'Patient'}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide flex-shrink-0" style={{ color: tint.text }}>
+                      {tint.label}
+                    </span>
+                  </div>
+                  {t.hospitalNumber && (
+                    <p className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{t.hospitalNumber}</p>
+                  )}
+                  <p className="text-[11.5px] mt-1 flex items-center gap-1 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="truncate">{t.from?.providerName || t.from?.department || 'Unassigned'}</span>
+                    <ArrowRightLeft className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+                    <span className="truncate">{t.to?.providerName || t.to?.department || 'Unassigned'}</span>
+                  </p>
+                  {t.reason && (
+                    <p className="text-[11.5px] mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>{t.reason}</p>
+                  )}
+                  {actionable ? (
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <button
+                        onClick={() => onDecide(t._id, 'accept')}
+                        disabled={busy}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11.5px] font-semibold text-white disabled:opacity-50"
+                        style={{ background: 'var(--accent-primary)' }}
+                      >
+                        <Check className="w-3.5 h-3.5" /> Accept
+                      </button>
+                      <button
+                        onClick={() => onDecide(t._id, 'reject')}
+                        disabled={busy}
+                        className="px-2.5 py-1 rounded-lg text-[11.5px] font-semibold disabled:opacity-50"
+                        style={{ background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-secondary)' }}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="flex items-center gap-1 text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                      <Clock className="w-3 h-3" /> Awaiting a decision
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  return (
+    <div className="pt-1">
+      {section('Awaiting your decision', incoming, true)}
+      {section('You sent', outgoing, false)}
     </div>
   );
 }

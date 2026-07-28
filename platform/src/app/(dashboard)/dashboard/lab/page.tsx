@@ -5,7 +5,6 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import Modal from '@/components/Modal';
 import ChartCard, { tooltipStyle, axisTick } from '@/components/ChartCard';
 import EmptyState from '@/components/EmptyState';
@@ -477,7 +476,6 @@ export default function LabDashboardPage() {
         }, ...prev]);
       }
 
-      markCapability('lab.result');
       setShowResultModal(false);
       setSelectedOrderId('');
       setResultValue('');
@@ -524,7 +522,6 @@ export default function LabDashboardPage() {
       if (newCriticals.length > 0) {
         setCriticalAlerts(prev => [...newCriticals, ...prev]);
       }
-      markCapability('lab.result');
       setBatchTestType('');
       setBatchEntries([]);
     } catch (err) {
@@ -536,7 +533,6 @@ export default function LabDashboardPage() {
 
   const handleAcknowledgeAlert = (alertId: string) => {
     setCriticalAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
-    markCapability('lab.critical');
   };
 
   // Drop a patient row from the current batch-entry draft before saving. Only
@@ -553,19 +549,6 @@ export default function LabDashboardPage() {
       return { ...e, resultValue: value, flag: flagRes ? flagRes.flag : '' };
     }));
   };
-
-  // Capabilities card — each item latches checked forever the first time this
-  // lab tech does it (see useCapabilities), never un-checked by later state.
-  // No cheap per-user "already done" signal exists in the loaded lab-result
-  // data (specimens/results aren't attributed to the tech who processed
-  // them), so every item is marked at its own action's success point below.
-  // Declared before the loading-guard return since hooks must run unconditionally.
-  const capabilityItems = useMemo(() => ([
-    { key: 'lab.receive', label: 'Receive a specimen', onClick: () => setQueueFilter('pending') },
-    { key: 'lab.result', label: 'Enter a result', onClick: () => setShowResultModal(true) },
-    { key: 'lab.critical', label: 'Escalate a critical result', onClick: () => setQueueFilter('completed') },
-  ]), []);
-  const { checklist: capabilitiesChecklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
   if (loading) {
     return (
@@ -587,7 +570,6 @@ export default function LabDashboardPage() {
 
   const startProcessingOrder = async (orderId: string) => {
     await update(orderId, { status: 'in_progress' as const });
-    markCapability('lab.receive');
   };
 
   const renderLabWorkflowPopup = (order: typeof visibleQueue[number]) => {
@@ -732,14 +714,9 @@ export default function LabDashboardPage() {
           metrics={[
             { label: t('lab.abnormalBadge'), value: completedDiseaseRows.filter(row => row.severity === 'abnormal').length, tone: 'warning' },
             { label: t('lab.critical'), value: completedDiseaseRows.filter(row => row.severity === 'critical').length, tone: 'danger' },
-            // Daily warning surface — the checklist item below is now a
-            // latch-once capability, so this metric keeps the "unacknowledged
-            // critical" alert visible day to day.
             { label: t('lab.criticalResult'), value: kpis.unacknowledgedCritical, tone: kpis.unacknowledgedCritical > 0 ? 'danger' : 'neutral', onClick: () => setQueueFilter('completed') },
           ]}
           metricsTitle={t('lab.laboratory')}
-          checklist={capabilitiesChecklist}
-          checklistTitle="Capabilities"
           emptyTitle={t('lab.noPendingOrders')}
         >
         {/* --- Feature 2: Critical Result Alert Banner --- */}

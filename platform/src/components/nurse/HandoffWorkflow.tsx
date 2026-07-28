@@ -469,7 +469,7 @@ export default function HandoffWorkflow({
 
   // variant === 'page'
   return (
-    <div className="ehr-handoff-modal" style={{ flex: 1, minHeight: 0, maxHeight: 'none', border: '1px solid var(--ehr-border)' }}>
+    <div data-tour="handoff-sbar" className="ehr-handoff-modal" style={{ flex: 1, minHeight: 0, maxHeight: 'none', border: '1px solid var(--ehr-border)' }}>
       {header}
       {body}
     </div>

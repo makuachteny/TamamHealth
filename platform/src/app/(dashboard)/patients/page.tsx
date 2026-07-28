@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { comparePatients, patientFullName, patientAgeLabel, patientAge } from '@/lib/patient-utils';
 import PatientAvatar from '@/components/patients/PatientAvatar';
-import { UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope, Filter, ChevronRight, Download } from '@/components/icons/lucide';
+import { ScanLine, Hash, X, ArrowRight, Filter, Download } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -13,13 +14,10 @@ import dynamic from 'next/dynamic';
 // Lazy-loaded: html5-qrcode is heavy and only needed when the scanner opens,
 // so it stays out of the patients-route bundle until used.
 const QRScanner = dynamic(() => import('@/components/QRScanner'), { ssr: false });
-import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
-import RowActionsMenu from '@/components/RowActionsMenu';
 import { formatMoney } from '@/lib/format-utils';
 import FingerprintIdentifyModal from '@/components/FingerprintIdentifyModal';
 import { isFingerprintEnabled } from '@/lib/services/fingerprint-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import EmptyState from '@/components/EmptyState';
 import PageInstructionCard from '@/components/PageInstructionCard';
 
 // Pagination cap — capped to keep DOM-node count manageable on low-end devices.
@@ -59,11 +57,6 @@ export default function PatientsPage() {
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
   }, [showFilters]);
-  // Reception roles can assign a patient to a care provider straight from the
-  // registry. The AssignDoctorModal picks doctor vs. nurse from the facility tier.
-  const canAssignPatients = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
-  const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
-
   // Outstanding balance per patient — loaded only for billing-desk roles, so the
   // registry shows a "Balance" column instead of clinical conditions. Aggregated
   // from open bills (same rule the billing dashboard uses) in one pass.
@@ -227,89 +220,12 @@ export default function PatientsPage() {
     return named.registrationHospitalName || named.lastVisitHospitalName || p.registrationHospital || p.lastVisitHospital || 'Facility unknown';
   };
 
-  // ── Shared patient-list columns ─────────────────────────────────────────
-  // Same five-column hierarchy as the care dashboards:
-  // Patient / Registered / Care team / Location / Status.
-  // Care team always stacks doctor first and nurse/routing staff below.
-  type PatientCol = { key: string; label: string; width: number; align?: 'right'; render: (p: typeof patients[number]) => React.ReactNode };
-  const columns: PatientCol[] = [
-    {
-      key: 'patient', label: 'Patient', width: 30,
-      render: (p) => (
-        <div className="flex items-center gap-2.5 min-w-0">
-          <PatientAvatar patient={p} size={40} />
-          <span className="patient-data-main">
-            <b>{patientFullName(p)}</b>
-            <small>{p.hospitalNumber || 'No hospital number'} · {patientAgeLabel(p)} · {p.gender || 'Not recorded'}</small>
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'registered', label: 'Registered', width: 15,
-      render: (p) => (
-        <span className="patient-data-main">
-          <b>{formatRegistryDate(p.registeredAt || p.registrationDate)}</b>
-          <small>{p.lastConsultedAt ? `Last visit ${formatRegistryDate(p.lastConsultedAt)}` : 'No recent visit'}</small>
-        </span>
-      ),
-    },
-    {
-      key: 'careTeam', label: 'Care team', width: 22,
-      render: (p) => (
-        <span className="patient-data-main">
-          <b>{p.assignedDoctorName || 'Doctor unassigned'}</b>
-          <small>{p.assignedByName || 'Nurse unassigned'}</small>
-        </span>
-      ),
-    },
-    {
-      key: 'location', label: 'Location', width: 18,
-      render: (p) => (
-        <span className="patient-data-main">
-          <b>{[p.county, p.state].filter(Boolean).join(', ') || 'Location unknown'}</b>
-          <small>{facilityNameOf(p)}</small>
-        </span>
-      ),
-    },
-    {
-      key: 'status', label: 'Status', width: 15, align: 'right',
-      render: (p) => (
-        <div className="patient-data-status">
-          <span className={`appointment-status-pill ${p.isActive ? 'status-confirmed' : 'status-no-show'}`.trim()}>
-            {p.isActive ? 'Active' : 'Archived'}
-          </span>
-          <small>
-            {isBilling
-              ? ((balanceByPatient.get(p._id) || 0) > 0 ? formatMoney(balanceByPatient.get(p._id) || 0) : t('billing.paidInFull'))
-              : p.assignedDoctor ? 'Assigned' : 'Needs care team'}
-          </small>
-          {canAssignPatients && (
-            <RowActionsMenu
-              ariaLabel={t('frontDesk.colAction')}
-              actions={[
-                {
-                  key: 'assign',
-                  label: p.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign'),
-                  icon: <Stethoscope className="w-4 h-4" />,
-                  onClick: () => setAssignTarget({ patientId: p._id, patientName: patientFullName(p), hospitalNumber: p.hospitalNumber, currentDoctorId: p.assignedDoctor }),
-                },
-              ]}
-            />
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  const totalColWidth = columns.reduce((s, c) => s + c.width, 0);
-
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <PageInstructionCard />
 
-          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
             {/* ── Card toolbar ── */}
             <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
               {/* Title + patient stats (inline, right-aligned — mirrors the wards
@@ -454,65 +370,69 @@ export default function PatientsPage() {
                 </button>
               </div>
             </div>
-            <div className="show-scrollbar patient-data-scroll">
-              <table className="patient-data-table w-full">
-                <colgroup>
-                  {columns.map(c => (
-                    <col key={c.key} style={{ width: `${(c.width / totalColWidth * 100).toFixed(2)}%` }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr>
-                    {columns.map(c => (
-                      <th
-                        key={c.key}
-                        className={`${c.align === 'right' ? 'text-right' : 'text-left'} patient-data-head-cell`}
-                      >
-                        <div className={`flex items-center gap-1.5 ${c.align === 'right' ? 'justify-end' : ''}`}>
-                          <span>{c.label}</span>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.length === 0 && (
-                    <tr>
-                      <td colSpan={columns.length}>
-                        <EmptyState
-                          icon={Users}
-                          title={t('patients.registryTitle')}
-                          message={t('patients.patientsFound', { count: 0 })}
-                        />
-                      </td>
-                    </tr>
-                  )}
+            {/* Same compact card-row list as the appointments page — identical
+                grid template, spacing, and type scale. Five columns:
+                Patient / Registered / Care team / Location / Status. */}
+            <div className="appointment-card-list">
+              {visible.length === 0 ? (
+                <div className="appointment-card-empty">
+                  {t('patients.patientsFound', { count: 0 })}
+                </div>
+              ) : (
+                <>
+                  <div className="appointment-card-head" aria-hidden="true">
+                    <span>Patient</span>
+                    <span>Registered</span>
+                    <span>Care team</span>
+                    <span>Location</span>
+                    <span>Status</span>
+                  </div>
                   {visible.map(patient => (
-                    <tr
+                    <div
                       key={patient._id}
+                      className="ehr-appointment-row appointment-card-row"
                       role="button"
                       tabIndex={0}
-                      className="patient-data-row group"
                       onClick={() => router.push(`/patients/${patient._id}`)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
                     >
-                      {columns.map((col, ci) => {
-                        const isLast = ci === columns.length - 1;
-                        return (
-                          <td key={col.key} className={`patient-data-cell ${col.align === 'right' ? 'is-right' : ''} ${isLast ? 'relative' : ''}`}>
-                            {col.render(patient)}
-                            {/* Subtle hover affordance: the whole row is clickable, so for roles
-                                without an explicit action button we fade in a chevron on hover. */}
-                            {isLast && !canAssignPatients && (
-                              <ChevronRight className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
+                      <div className="ehr-appointment-identity">
+                        <PatientAvatar patient={patient} size={40} />
+                        <div className="ehr-appointment-main appointment-card-patient">
+                          <Link href={`/patients/${patient._id}`} onClick={e => e.stopPropagation()}>{patientFullName(patient)}</Link>
+                          <p>{patient.hospitalNumber || 'No hospital number'} · {patientAgeLabel(patient)} · {patient.gender || 'Not recorded'}</p>
+                        </div>
+                      </div>
+
+                      <div className="ehr-appointment-time">
+                        <strong>{formatRegistryDate(patient.registeredAt || patient.registrationDate)}</strong>
+                        <span>{patient.lastConsultedAt ? `Last visit ${formatRegistryDate(patient.lastConsultedAt)}` : 'No recent visit'}</span>
+                      </div>
+
+                      <div className="appointment-card-provider">
+                        <strong>{patient.assignedDoctorName || 'Doctor unassigned'}</strong>
+                        <span>{patient.assignedByName || 'Nurse unassigned'}</span>
+                      </div>
+
+                      <div className="appointment-card-provider">
+                        <strong>{[patient.county, patient.state].filter(Boolean).join(', ') || 'Location unknown'}</strong>
+                        <span>{facilityNameOf(patient)}</span>
+                      </div>
+
+                      <div className="appointment-card-status">
+                        <span className={`appointment-status-pill ${patient.isActive ? 'status-confirmed' : 'status-no-show'}`}>
+                          {patient.isActive ? 'Active' : 'Archived'}
+                        </span>
+                        <small>
+                          {isBilling
+                            ? ((balanceByPatient.get(patient._id) || 0) > 0 ? formatMoney(balanceByPatient.get(patient._id) || 0) : t('billing.paidInFull'))
+                            : patient.assignedDoctor ? 'Assigned' : 'Needs care team'}
+                        </small>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </>
+              )}
             </div>
             {hasMore && (
               <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
@@ -638,12 +558,6 @@ export default function PatientsPage() {
         />
       )}
 
-      {assignTarget && (
-        <AssignDoctorModal
-          target={assignTarget}
-          onClose={() => setAssignTarget(null)}
-        />
-      )}
     </>
   );
 }

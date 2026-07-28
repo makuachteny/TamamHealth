@@ -50,8 +50,21 @@ export function filterByScope<T extends Record<string, any>>(
   // Everyone else is filtered by orgId
   let filtered = docs;
   if (scope.orgId) {
-    // Require orgId match — reject docs without orgId for data isolation
-    filtered = filtered.filter(d => d.orgId === scope.orgId);
+    // Require orgId match — reject docs without orgId for data isolation.
+    //
+    // `toOrgId` is the one deliberate exception (KAN-101). A referral's `orgId`
+    // is the SENDING org, and this filter runs before the hospital filter
+    // below — so a referral sent across an organisational boundary was
+    // invisible to the receiving org entirely. The referring clinician saw a
+    // sent referral that the receiver would never get.
+    //
+    // Narrow by construction: `toOrgId` is only set by `createReferral` when
+    // the destination org genuinely differs, so no other document type can
+    // widen its own visibility through this branch. The receiving org still
+    // has to pass the facility filter below, which already matches on
+    // `toHospitalId` — so this grants sight of referrals addressed to that
+    // org's facilities, not of the sending org's data in general.
+    filtered = filtered.filter(d => d.orgId === scope.orgId || d.toOrgId === scope.orgId);
   }
 
   // Non-admin roles that have a hospitalId are further scoped

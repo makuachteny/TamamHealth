@@ -1,5 +1,7 @@
 'use client';
 
+import { useBackupStatus } from '@/lib/hooks/useBackupStatus';
+
 /**
  * IT operations console — health tiles, runnable jobs, console links, data
  * stores, integrations, and workflow controls. Shared by the standalone
@@ -77,13 +79,13 @@ export default function ItOperationsPanel({ embedded = false }: {
     return () => { cancelled = true; };
   }, []);
 
-  const backupIso = typeof window !== 'undefined' ? window.localStorage.getItem('safeguard_last_backup') : null;
-  const backupAgeHours = useMemo(() => {
-    if (!backupIso) return null;
-    const at = new Date(backupIso).getTime();
-    if (Number.isNaN(at)) return null;
-    return Math.floor((Date.now() - at) / 3600000);
-  }, [backupIso]);
+  // Single source (KAN-117) — was a localStorage key nothing ever wrote. This
+  // panel already handled absence honestly as 'unknown'; it now gets that
+  // answer from the same service as every other admin surface, so the four of
+  // them can no longer disagree about identical data.
+  const backupInfo = useBackupStatus();
+  const backupIso = backupInfo?.lastBackupAt ?? null;
+  const backupAgeHours = backupInfo?.ageHours == null ? null : Math.floor(backupInfo.ageHours);
   const backupStatus = backupAgeHours === null
     ? 'unknown'
     : backupAgeHours <= settings.itOperations.backupFrequencyHours

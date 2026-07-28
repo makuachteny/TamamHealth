@@ -16,6 +16,7 @@ import {
   ChevronRight, ArrowRight,
 } from '@/components/icons/lucide';
 import { useAuth } from '@/lib/context';
+import TransferInboxCard from '@/components/patients/TransferInboxCard';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useReferrals } from '@/lib/hooks/useReferrals';
@@ -107,6 +108,12 @@ export default function SuperintendentDashboard() {
         </div>
 
         <div className="grid gap-4">
+          {/* ═══ TRANSFERS AWAITING A DECISION ═══
+              The superintendent can both accept and force transfers, so an
+              unanswered request stops with them when the addressed clinician is
+              unavailable. */}
+          <TransferInboxCard />
+
           {/* ═══ SURVEILLANCE / ALERTS ═══ */}
           <div className="dash-card overflow-hidden">
             <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>

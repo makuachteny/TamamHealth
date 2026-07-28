@@ -28,6 +28,18 @@ const searchStep = (route: string): TourStep => ({
   placement: 'bottom',
 });
 
+const messagingStep = (route: string): TourStep => ({
+  id: 'messaging',
+  route,
+  // The launcher, not the dock's own tabs: the tour cannot open the dock, and a
+  // target that only exists while it is open would silently fall back to a
+  // centred card. The launcher is rendered on every screen for every role.
+  target: '[data-tour="messaging-dock"]',
+  title: 'Message your team, hand over a patient',
+  body: 'Direct messages, plus Teams for a whole ward or department in one thread. The Transfers tab is where a handover of care lands for you to accept or decline — urgency is colour-coded down the left edge.',
+  placement: 'left',
+});
+
 const finishStep = (route: string): TourStep => ({
   id: 'finish',
   route,
@@ -50,35 +62,40 @@ const NURSE_STEPS: TourStep[] = [
   {
     id: 'station-tabs',
     route: '/dashboard/nurse',
-    target: '',
+    target: '[data-tour="station-tabs"]',
+    placement: 'bottom',
     title: 'One station, four jobs',
     body: 'Ward, MAR, Triage, and Handoff live as tabs of this station — everything a shift needs without leaving the page.',
   },
   {
     id: 'triage',
     route: '/dashboard/nurse/triage',
-    target: '',
+    target: '[data-tour="triage-form"]',
+    placement: 'right',
     title: 'Triage — ETAT assessment',
     body: 'Walk-ins arrive here as pending from check-in. Record the chief complaint, ETAT ABCC (Airway, Breathing, Circulation, Consciousness), and full vitals — the RED / YELLOW / GREEN priority derives automatically from the danger signs.',
   },
   {
     id: 'triage-disposition',
     route: '/dashboard/nurse/triage',
-    target: '',
+    target: '[data-tour="triage-recent"]',
+    placement: 'left',
     title: 'Disposition from Recent Triages',
     body: 'From the recent list, move each patient along: pending → seen, admitted, referred, or discharged. Edits reuse the same record so the audit trail stays intact.',
   },
   {
     id: 'ward-board',
     route: '/dashboard/nurse/ward',
-    target: '',
+    target: '[data-tour="ward-board"]',
+    placement: 'top',
     title: 'The ward board',
     body: 'Your acuity-sorted roster — critical patients first, with location and status chips. Row actions: quick Vitals (persists a real vitals record visible on chart trends), re-Triage, and Assign doctor.',
   },
   {
     id: 'mar',
     route: '/dashboard/nurse/mar',
-    target: '',
+    target: '[data-tour="mar-board"]',
+    placement: 'top',
     title: 'Medication rounds (MAR)',
     body: 'Every scheduled dose across your patients, flagged overdue / due / upcoming / given (overdue = more than 1 hour past). Quick-mark “Given”, or open the detail modal for dose, route, witness, and notes — Undo voids append-only.',
   },
@@ -90,9 +107,18 @@ const NURSE_STEPS: TourStep[] = [
     body: 'Each admission also has a printable meds × dose-times grid (Wards → admission → MAR): record GIVEN / MISSED / REFUSED / HELD per cell — non-given needs a reason, controlled drugs need a witness.',
   },
   {
+    id: 'rooming',
+    route: '/dashboard/nurse',
+    target: '[data-tour="station-tabs"]',
+    placement: 'bottom',
+    title: 'Rooming',
+    body: 'The step between triage and the clinician. Acknowledge the patient reached the clinic, put them in a room, take rooming vitals, then mark them ready — each action moves the encounter, so the clinician\u2019s worklist updates on its own. Longest wait sits at the top.',
+  },
+  {
     id: 'handoff',
     route: '/dashboard/nurse/handoff',
-    target: '',
+    target: '[data-tour="handoff-sbar"]',
+    placement: 'top',
     title: 'Shift handoff',
     body: 'The shift auto-detects (day/evening/night). Write a per-patient SBAR for your critical patients, check the shift KPIs, then Sign off — the oncoming nurse acknowledges your handoff.',
   },
@@ -111,6 +137,7 @@ const NURSE_STEPS: TourStep[] = [
     body: 'Record doses against each child’s schedule, and work the Defaulters tab — overdue doses can be recalled by SMS to the caregiver, per row or in bulk.',
   },
   searchStep('/dashboard/nurse'),
+  messagingStep('/dashboard/nurse'),
   finishStep('/dashboard/nurse'),
 ];
 
@@ -127,14 +154,16 @@ const LAB_STEPS: TourStep[] = [
   {
     id: 'lifecycle',
     route: '/dashboard/lab',
-    target: '',
+    target: '[data-tour="station-tabs"]',
+    placement: 'bottom',
     title: 'The order lifecycle',
     body: 'Every order is a state machine: ordered → specimen collected → received at lab → in process → resulted → reviewed by clinician. Rejected specimens loop back for re-collection. STAT orders arrive already in-process and flagged.',
   },
   {
     id: 'work-queue',
     route: '/dashboard/lab',
-    target: '',
+    target: '[data-tour="station-queue"]',
+    placement: 'right',
     title: 'Work the queue row by row',
     body: 'Collect specimen → Receive at lab (or Reject with a reason) → Start processing → Enter result with value, unit, reference range, and abnormal/critical flags.',
   },
@@ -148,7 +177,8 @@ const LAB_STEPS: TourStep[] = [
   {
     id: 'batch',
     route: '/dashboard/lab',
-    target: '',
+    target: '[data-tour="station-body"]',
+    placement: 'top',
     title: 'Batch entry & analyzer import',
     body: 'Enter results in batches by test type, or import LIS-2A/HL7 analyzer payloads for review — imports are never auto-saved.',
   },
@@ -167,6 +197,7 @@ const LAB_STEPS: TourStep[] = [
     body: 'Availability by blood group (scarcity color-coded), expiry warnings, and donated-unit registration with auto-suggested unit IDs. Each unit’s row menu walks the transfusion lifecycle: Reserve for a patient (with compatibility check) → Record crossmatch → Record transfusion — or Discard with a reason.',
   },
   searchStep('/dashboard/lab'),
+  messagingStep('/dashboard/lab'),
   finishStep('/dashboard/lab'),
 ];
 
@@ -183,14 +214,16 @@ const PHARMACY_STEPS: TourStep[] = [
   {
     id: 'queue',
     route: '/dashboard/pharmacy',
-    target: '',
+    target: '[data-tour="station-queue"]',
+    placement: 'right',
     title: 'The prescription queue',
     body: 'Prescriptions arrive from consultations in priority order — life-sustaining tiers first, immediate-urgency floats up.',
   },
   {
     id: 'dispense-gates',
     route: '/dashboard/pharmacy',
-    target: '',
+    target: '[data-tour="station-body"]',
+    placement: 'top',
     title: 'Dispensing safety gates',
     body: 'Each dispense checks, in order: enough stock for the full course, drug interactions against the patient’s other active meds, and — for controlled drugs — a witness picker that writes the two-signature register entry before stock moves.',
   },
@@ -209,6 +242,7 @@ const PHARMACY_STEPS: TourStep[] = [
     body: 'An append-only, two-signature register: intake, dispense, waste, reconciliation, transfer. Entries can never be edited or deleted — dispensing scheduled drugs writes here automatically.',
   },
   searchStep('/dashboard/pharmacy'),
+  messagingStep('/dashboard/pharmacy'),
   finishStep('/dashboard/pharmacy'),
 ];
 
@@ -225,18 +259,21 @@ const RADIOLOGY_STEPS: TourStep[] = [
   {
     id: 'study',
     route: '/dashboard/radiology',
-    target: '',
+    target: '[data-tour="station-queue"]',
+    placement: 'right',
     title: 'Work a study',
     body: 'Open a study → attach images or DICOM files (they save to the patient’s documents, so the ordering clinician sees them) → enter findings → Submit report. Completing returns the findings to the chart.',
   },
   {
     id: 'panels',
     route: '/dashboard/radiology',
-    target: '',
+    target: '[data-tour="station-body"]',
+    placement: 'top',
     title: 'Your analytics',
     body: 'Modality breakdown, body regions, completion rate, and average turnaround time — at a glance.',
   },
   searchStep('/dashboard/radiology'),
+  messagingStep('/dashboard/radiology'),
   finishStep('/dashboard/radiology'),
 ];
 
@@ -253,18 +290,21 @@ const NUTRITION_STEPS: TourStep[] = [
   {
     id: 'screening',
     route: '/dashboard/nutrition',
-    target: '',
+    target: '[data-tour="station-queue"]',
+    placement: 'right',
     title: 'Screen a child',
     body: 'Name, age, sex, MUAC, weight/height, edema — the classification derives live: SAM, MAM, At Risk, Underweight, or Normal. The worklist filters by classification.',
   },
   {
     id: 'supplies',
     route: '/dashboard/nutrition',
-    target: '',
+    target: '[data-tour="station-body"]',
+    placement: 'top',
     title: 'Therapeutic supplies',
     body: 'Track RUTF, F-75/F-100, ReSoMal, Vitamin A and MUAC tapes with reorder-level statuses; +/− adjustments persist and survive reload.',
   },
   searchStep('/dashboard/nutrition'),
+  messagingStep('/dashboard/nutrition'),
   finishStep('/dashboard/nutrition'),
 ];
 
@@ -281,7 +321,8 @@ const FRONT_DESK_STEPS: TourStep[] = [
   {
     id: 'queue',
     route: '/dashboard/front-desk',
-    target: '',
+    target: '[data-tour="station-queue"]',
+    placement: 'right',
     title: 'The live queue',
     body: 'One queue merges triaged walk-ins, arrived appointments, and open checkouts — sorted RED → YELLOW → GREEN with status chips (WAITING / IN CONSULT / ADMITTED / REFERRED / DONE).',
   },
@@ -302,7 +343,8 @@ const FRONT_DESK_STEPS: TourStep[] = [
   {
     id: 'assign',
     route: '/dashboard/front-desk',
-    target: '',
+    target: '[data-tour="station-queue"]',
+    placement: 'right',
     title: 'Room & assign',
     body: 'On queue rows: assign an exam room, and assign the provider — that’s the reception → clinical handoff; the patient appears in that clinician’s worklist.',
   },
@@ -330,11 +372,13 @@ const FRONT_DESK_STEPS: TourStep[] = [
   {
     id: 'checkout',
     route: '/dashboard/front-desk',
-    target: '',
+    target: '[data-tour="station-queue"]',
+    placement: 'right',
     title: 'Close the visit',
     body: 'Checkout on DONE rows runs the facility gate — prescriptions dispensed? critical labs reviewed? payment determined? — then discharges the encounter. Undo is supported.',
   },
   searchStep('/dashboard/front-desk'),
+  messagingStep('/dashboard/front-desk'),
   finishStep('/dashboard/front-desk'),
 ];
 
@@ -376,6 +420,7 @@ const CASHIER_STEPS: TourStep[] = [
     body: 'Record installments on payment plans, void or refund posted payments (with confirmation), and waive bills through the exemption path — reason required.',
   },
   searchStep('/payments'),
+  messagingStep('/payments'),
   finishStep('/payments'),
 ];
 
@@ -423,6 +468,7 @@ const BILLER_STEPS: TourStep[] = [
     title: 'Appeal & resubmit',
     body: 'Denied claims carry row actions: Appeal (with a note for the payer) and Resubmit — the resubmission count is tracked on the claim.',
   },
+  messagingStep('/payments'),
   finishStep('/payments'),
 ];
 
@@ -438,7 +484,8 @@ const RECORDS_STEPS: TourStep[] = [
   {
     id: 'census',
     route: '/dashboard/data-entry',
-    target: '',
+    target: '[data-tour="station-queue"]',
+    placement: 'right',
     title: 'Daily census entry',
     body: 'OPD attendance, admissions, deliveries, immunizations given, bed occupancy, and disease counts — entered here daily.',
   },
@@ -484,6 +531,7 @@ const RECORDS_STEPS: TourStep[] = [
     title: 'Monthly reports',
     body: 'Downloadable facility reports; MCH analytics has the maternal/child indicator dashboards.',
   },
+  messagingStep('/dashboard/data-entry'),
   finishStep('/dashboard/data-entry'),
 ];
 
@@ -524,6 +572,7 @@ const MANAGER_STEPS: TourStep[] = [
     title: 'Assets & equipment',
     body: 'Register assets with service intervals, log services and repairs, and watch the “service due soon” 30-day lookahead.',
   },
+  messagingStep('/facility-management'),
   finishStep('/facility-management'),
 ];
 
@@ -564,6 +613,7 @@ const ORG_ADMIN_STEPS: TourStep[] = [
     title: 'Branding',
     body: 'Your logo and theme, applied across every facility in the organization.',
   },
+  messagingStep('/facility-management'),
   finishStep('/facility-management'),
 ];
 
@@ -590,6 +640,7 @@ const COUNTY_STEPS: TourStep[] = [
     title: 'Facility assessments',
     body: 'Supervisor scorecards for the facilities in your jurisdiction; facilities also self-submit via My Facility.',
   },
+  messagingStep('/dashboard/state'),
   finishStep('/dashboard/state'),
 ];
 
@@ -623,6 +674,7 @@ const GOVERNMENT_STEPS: TourStep[] = [
     title: 'DHIS2',
     body: 'National-level exports and sync into the HMIS — with a persisted, honest sync log.',
   },
+  messagingStep('/government'),
   finishStep('/government'),
 ];
 
@@ -670,6 +722,7 @@ const SUPER_ADMIN_STEPS: TourStep[] = [
     title: 'Sync conflicts',
     body: 'Resolve or dismiss offline-sync conflicts — the safety valve of an offline-first system.',
   },
+  messagingStep('/admin'),
   finishStep('/admin'),
 ];
 
@@ -690,6 +743,7 @@ const SUPERINTENDENT_STEPS: TourStep[] = [
     title: 'People',
     body: 'Shifts, leave, and payroll for the clinical teams you run.',
   },
+  messagingStep('/dashboard'),
   finishStep('/dashboard'),
 ];
 
@@ -731,6 +785,16 @@ const JOURNEY_STEPS: Partial<Record<UserRole, TourStep[]>> = {
 function isRouteAllowed(route: string, allowedRoutes: readonly string[]): boolean {
   return allowedRoutes.some(r => route === r || route.startsWith(r + '/'));
 }
+
+/**
+ * Roles that have a bespoke journey tour.
+ *
+ * Exported so a test can assert every one of them actually SURVIVES route
+ * filtering. A role can be listed here and still fall through to the generic
+ * shell tour if `journeyTourForRole` filters it below the minimum — a silent
+ * regression that is invisible from reading the table above.
+ */
+export const JOURNEY_TOUR_ROLES = Object.keys(JOURNEY_STEPS) as UserRole[];
 
 /**
  * The journey tour for a role, with any steps whose route falls outside the

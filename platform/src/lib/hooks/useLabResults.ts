@@ -6,7 +6,7 @@ import { labResultsDB } from '../db';
 import { makeCoalescer } from './live-reload';
 import { useApp } from '../context';
 
-export function useLabResults() {
+export function useLabResults(patientId?: string) {
   const [results, setResults] = useState<LabResultDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +19,8 @@ export function useLabResults() {
   const loadResults = useCallback(async () => {
     try {
       setError(null);
-      const { getAllLabResults } = await import('../services/lab-service');
-      const data = await getAllLabResults(scope);
+      const { getAllLabResults, getLabResultsByPatient } = await import('../services/lab-service');
+      const data = patientId ? await getLabResultsByPatient(patientId) : await getAllLabResults(scope);
       setResults(data);
     } catch (err) {
       console.error(err);
@@ -28,7 +28,7 @@ export function useLabResults() {
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, [scope, patientId]);
 
   useEffect(() => {
     loadResults();

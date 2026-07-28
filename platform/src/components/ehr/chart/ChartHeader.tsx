@@ -12,6 +12,7 @@ import type { ReactNode } from 'react';
 import { Icon as DuotoneIcon } from '@/components/icons';
 import { Stethoscope } from '@/components/icons/lucide';
 import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useApp } from '@/lib/context';
 import { patientFullName, patientInitials, patientAgeLabel, avatarTint } from '@/lib/patient-utils';
 import type { PatientDoc } from '@/lib/db-types';
 
@@ -58,6 +59,9 @@ export default function ChartHeader({
     canSendMessages, canViewClinical, canPrescribe, canDispense,
     canOrderLabs, canEnterLabResults, canManageReferrals, canRegisterPatients,
   } = usePermissions();
+  const { isOnline, syncPaused, syncStatus, lastSync } = useApp();
+  const syncLabel = syncPaused ? 'Sync paused' : !isOnline ? 'Offline' : syncStatus?.state === 'error' ? 'Sync error' : syncStatus?.state === 'syncing' ? 'Syncing' : 'Synced';
+  const syncColor = syncPaused || !isOnline || syncStatus?.state === 'error' ? 'var(--color-warning)' : syncStatus?.state === 'syncing' ? 'var(--accent-primary)' : 'var(--color-success)';
 
   const initials = patientInitials(patient);
   const photoUrl = (patient as { photoUrl?: string }).photoUrl;
@@ -94,7 +98,10 @@ export default function ChartHeader({
           )}
         </div>
         <div className="omrs-header-meta">
-          {patientAgeLabel(patient)} &middot; {formatDobOmrs(patient.dateOfBirth)} &middot; TamamHealth ID: {patientIdDisplay}
+          {patientAgeLabel(patient)} &middot; {formatDobOmrs(patient.dateOfBirth)} &middot; Facility ID: {patientIdDisplay}
+          <span className="omrs-sync-chip" title={lastSync ? `Last sync ${new Date(lastSync).toLocaleString()}` : 'No completed sync recorded'} style={{ color: syncColor }}>
+            <span className="omrs-sync-dot" style={{ background: syncColor }} /> {syncLabel}
+          </span>
         </div>
 
         {showMore && (

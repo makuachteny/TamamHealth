@@ -11,6 +11,11 @@ jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
 // ES module exports are non-configurable so jest.spyOn cannot redefine them.
 jest.mock('@/lib/services/appointment-service', () => ({
   updateAppointmentStatus: jest.fn().mockResolvedValue(null),
+  // The status sync reads the appointment before mapping onto it, to refuse
+  // reopening a cancelled visit (KAN-127). Defaults to "no such appointment",
+  // which the sync treats as nothing to guard against; tests that care
+  // override it per case.
+  getAppointmentById: jest.fn().mockResolvedValue(null),
 }));
 
 import { teardownTestDBs } from '../helpers/test-db';
@@ -28,6 +33,11 @@ import {
   rateSession,
   recordConsent,
   getTelehealthStats,
+  getSessionByAppointmentId,
+  sessionIdForAppointment,
+  rateSessionTechnical,
+  aggregateRatings,
+  AlreadyRatedError,
 } from '@/lib/services/telehealth-service';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
@@ -70,8 +80,26 @@ describe('Telehealth Service', () => {
     expect(session.type).toBe('telehealth_session');
     expect(session.patientName).toBe('John Doe');
     expect(session.status).toBe('scheduled');
-    expect(session.roomId).toMatch(/^tamamhealth-/);
+    // roomId is DERIVED from the session id rather than randomly generated, so
+    // the room name can never drift from the record it belongs to — two people
+    // "in the same visit" who cannot see each other is the worst class of bug
+    // to diagnose remotely.
+    expect(session.roomId).toBe(`th-${session._id}`);
     expect(session.createdAt).toBeTruthy();
+  });
+
+  test('issues join links that carry no token', async () => {
+    const session = await createSession(validSession());
+
+    // A join link that leaks — forwarded SMS, screenshot, shoulder-surfed —
+    // must grant nothing on its own. Credentials are minted per request at
+    // /api/telehealth/token after the caller authenticates and is checked
+    // against the session's participants.
+    expect(session.joinUrl).toContain(`/telehealth/join/${session._id}`);
+    expect(session.providerJoinUrl).toContain(`/telehealth/visit/${session._id}`);
+    for (const url of [session.joinUrl, session.providerJoinUrl]) {
+      expect(url).not.toMatch(/token|jwt|secret|key=/i);
+    }
   });
 
   test('retrieves all sessions', async () => {
@@ -405,14 +433,34 @@ describe('Telehealth Service', () => {
       ).rejects.toThrow(/attestedBy/);
     });
 
-    test('patient-portal consent needs no attester', async () => {
+    test('patient-portal consent records the patient, not an attester', async () => {
       const created = await createSession(validSession({ patientConsentGiven: false }));
 
-      const updated = await recordConsent(created._id, { method: 'patient_portal' });
+      const updated = await recordConsent(created._id, {
+        method: 'patient_portal',
+        consentedBy: 'pat-001',
+        policyVersion: '2026-07-01',
+      });
 
       expect(updated?.patientConsentGiven).toBe(true);
       expect(updated?.consentMethod).toBe('patient_portal');
+      // No clinician is involved in a first-party consent.
       expect(updated?.consentAttestedBy).toBeUndefined();
+      // The patient IS named, and so is the text they agreed to.
+      expect(updated?.consentedBy).toBe('pat-001');
+      expect(updated?.consentPolicyVersion).toBe('2026-07-01');
+    });
+
+    test('refuses patient-portal consent with no patient id', async () => {
+      const created = await createSession(validSession({ patientConsentGiven: false }));
+
+      // The mirror of the attestation rule. "The patient consented" with
+      // nobody named is an unsourced claim wearing a first-party label —
+      // worse than an honest attestation, because it looks like better
+      // evidence than it is.
+      await expect(
+        recordConsent(created._id, { method: 'patient_portal' }),
+      ).rejects.toThrow(/consentedBy/);
     });
   });
 
@@ -442,6 +490,183 @@ describe('Telehealth Service', () => {
       const created = await createSession(validSession());
       await updateSessionStatus(created._id, 'in_session');
       expect(updateAppointmentStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── KAN-126 / KAN-127 / KAN-141 ─────────────────────────────────────────
+  describe('one session per appointment (KAN-126)', () => {
+    it('returns the SAME session when called twice for one appointment', async () => {
+      const first = await createSession(validSession({ appointmentId: 'appt-77' }));
+      const second = await createSession(validSession({ appointmentId: 'appt-77' }));
+
+      // The defect this pins: every call used to mint a fresh `tele-<uuid>` id
+      // and a fresh room, so a refresh put the clinician in a different room
+      // from the patient.
+      expect(second._id).toBe(first._id);
+      expect(second.roomId).toBe(first.roomId);
+      expect((await getAllSessions()).filter(x => x.appointmentId === 'appt-77')).toHaveLength(1);
+    });
+
+    it('derives the id from the appointment so CouchDB enforces uniqueness', async () => {
+      const s = await createSession(validSession({ appointmentId: 'appt-88' }));
+      expect(s._id).toBe(sessionIdForAppointment('appt-88'));
+      expect(await getSessionByAppointmentId('appt-88')).toMatchObject({ _id: s._id });
+    });
+
+    it('still mints independent ids for walk-ins with no appointment', async () => {
+      // Walk-ins are deliberately exempt: each one genuinely is a new
+      // encounter, and there is no key to converge on.
+      const a = await createSession(validSession({ appointmentId: undefined }));
+      const b = await createSession(validSession({ appointmentId: undefined }));
+      expect(a._id).not.toBe(b._id);
+    });
+
+    it('does not resurrect a completed session for the same appointment', async () => {
+      const first = await createSession(validSession({ appointmentId: 'appt-99' }));
+      await updateSessionStatus(first._id, 'completed');
+      // A follow-up visit must not reopen closed history. The deterministic id
+      // means this create collides — it must surface, not silently return the
+      // completed record as if it were live.
+      await expect(createSession(validSession({ appointmentId: 'appt-99' }))).rejects.toBeDefined();
+    });
+  });
+
+  describe('appointment status guard (KAN-127)', () => {
+    it('refuses to move a cancelled appointment to completed', async () => {
+      const appointmentService = require('@/lib/services/appointment-service');
+      appointmentService.getAppointmentById.mockResolvedValueOnce({ _id: 'appt-x', status: 'cancelled' });
+      appointmentService.updateAppointmentStatus.mockClear();
+
+      const s = await createSession(validSession({ appointmentId: 'appt-x' }));
+      await updateSessionStatus(s._id, 'completed');
+
+      // Without the guard a stale completion from an abandoned room would
+      // reopen a cancelled visit as attended, and it would then bill and
+      // report as real activity.
+      expect(appointmentService.updateAppointmentStatus).not.toHaveBeenCalled();
+    });
+
+    it('still syncs a normal appointment', async () => {
+      const appointmentService = require('@/lib/services/appointment-service');
+      appointmentService.getAppointmentById.mockResolvedValue({ _id: 'appt-y', status: 'scheduled' });
+      appointmentService.updateAppointmentStatus.mockClear();
+
+      const s = await createSession(validSession({ appointmentId: 'appt-y' }));
+      await updateSessionStatus(s._id, 'in_session');
+
+      expect(appointmentService.updateAppointmentStatus).toHaveBeenCalledWith('appt-y', 'in_progress');
+    });
+  });
+
+  describe('statistics byType (KAN-141)', () => {
+    it('counts sessions by modality instead of reporting zeros', async () => {
+      await createSession(validSession({ sessionType: 'video' }));
+      await createSession(validSession({ sessionType: 'video' }));
+      await createSession(validSession({ sessionType: 'audio' }));
+
+      const stats = await getTelehealthStats();
+
+      expect(stats.byType).toEqual({ video: 2, audio: 1, chat: 0 });
+      // The breakdown must account for every session, or it misleads.
+      const summed = Object.values(stats.byType).reduce((a, b) => a + b, 0);
+      expect(summed).toBe(stats.total);
+    });
+  });
+
+  describe('session timeline (KAN-127)', () => {
+    it('derives duration from stored timestamps and records why it ended', async () => {
+      const s = await createSession(validSession({ appointmentId: 'appt-t1' }));
+      await updateSessionStatus(s._id, 'in_session');
+      const done = await updateSessionStatus(s._id, 'completed');
+
+      expect(done?.actualStartTime).toBeTruthy();
+      expect(done?.actualEndTime).toBeTruthy();
+      expect(typeof done?.duration).toBe('number');
+      expect(done?.terminationReason).toBe('provider_ended');
+    });
+
+    it('records a reason and an end time for non-completed terminal states', async () => {
+      // An abandoned or failed visit used to leave no end time and no duration
+      // at all, so it silently averaged in as a zero-minute session.
+      const s = await createSession(validSession({ appointmentId: 'appt-t2' }));
+      await updateSessionStatus(s._id, 'in_session');
+      const failed = await updateSessionStatus(s._id, 'failed');
+
+      expect(failed?.terminationReason).toBe('connection_failed');
+      expect(failed?.actualEndTime).toBeTruthy();
+      expect(typeof failed?.duration).toBe('number');
+    });
+
+    it('does not restart the clock when a session re-enters in_session', async () => {
+      const s = await createSession(validSession({ appointmentId: 'appt-t3' }));
+      const first = await updateSessionStatus(s._id, 'in_session');
+      const startedAt = first?.actualStartTime;
+      // A reconnect re-enters in_session; the visit did not start over.
+      const again = await updateSessionStatus(s._id, 'in_session');
+      expect(again?.actualStartTime).toBe(startedAt);
+    });
+
+    it('lets an explicit termination reason override the implied one', async () => {
+      const s = await createSession(validSession({ appointmentId: 'appt-t4' }));
+      await updateSessionStatus(s._id, 'in_session');
+      const done = await updateSessionStatus(s._id, 'completed', { terminationReason: 'patient_left' });
+      expect(done?.terminationReason).toBe('patient_left');
+    });
+  });
+
+  describe('ratings (KAN-132)', () => {
+    it('refuses a second patient rating on the write path', async () => {
+      const s = await createSession(validSession({ appointmentId: 'appt-r1' }));
+      await rateSession(s._id, 5, 'Great');
+      // Enforced server-side, not by hiding the button — the form is on a
+      // patient-facing screen, so this is the only place the rule can hold.
+      await expect(rateSession(s._id, 1, 'Changed my mind')).rejects.toThrow(AlreadyRatedError);
+    });
+
+    it('keeps the provider technical rating separate from patient satisfaction', async () => {
+      const s = await createSession(validSession({ appointmentId: 'appt-r2' }));
+      await rateSession(s._id, 5, 'Doctor was kind');
+      const rated = await rateSessionTechnical(s._id, 2, 'Audio kept dropping');
+
+      // A clinically excellent visit over a terrible line: averaging these
+      // together would hide the operational problem entirely.
+      expect(rated?.patientRating).toBe(5);
+      expect(rated?.providerTechnicalRating).toBe(2);
+    });
+
+    it('rejects out-of-range ratings', async () => {
+      const s = await createSession(validSession({ appointmentId: 'appt-r3' }));
+      await expect(rateSession(s._id, 0)).rejects.toThrow();
+      await expect(rateSession(s._id, 6)).rejects.toThrow();
+    });
+
+    it('suppresses an average built from too few ratings', async () => {
+      const few = [
+        { status: 'completed', patientRating: 5 },
+        { status: 'completed', patientRating: 1 },
+      ] as never[];
+      const agg = aggregateRatings(few);
+
+      // Two ratings is one identifiable patient's view of one identifiable
+      // clinician. `null` means suppressed, which is not the same as 0.
+      expect(agg.suppressed).toBe(true);
+      expect(agg.avgPatientRating).toBeNull();
+      expect(agg.patientResponses).toBe(2);
+    });
+
+    it('reports an average and response rate once the group is large enough', async () => {
+      const many = [
+        ...Array.from({ length: 5 }, () => ({ status: 'completed', patientRating: 4 })),
+        { status: 'completed' },            // completed but unrated
+        { status: 'cancelled', patientRating: 1 },  // not eligible
+      ] as never[];
+      const agg = aggregateRatings(many);
+
+      expect(agg.avgPatientRating).toBe(4);
+      expect(agg.suppressed).toBe(false);
+      // Denominator is completed visits only — 5 of 6 responded.
+      expect(agg.eligible).toBe(6);
+      expect(agg.patientResponseRate).toBe(83);
     });
   });
 });

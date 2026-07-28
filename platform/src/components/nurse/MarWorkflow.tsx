@@ -156,7 +156,7 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
   return (
     // No card chrome of its own — like the ward board, the MAR sits directly
     // on the centre panel's white body; the rows are the only cards.
-    <div className="overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+    <div data-tour="mar-board" className="overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
       {/* No extra side padding — the centre panel already insets its body, so
           the title/search share the queue cards' left edge. */}
       <div className="pt-2 pb-3 flex-shrink-0">

@@ -32,6 +32,15 @@ export async function GET(request: NextRequest) {
     } else {
       prescriptions = await getAllPrescriptions(scope);
     }
+    // PHI read audit (KAN-97). Fire-and-forget: a failed audit write
+    // must never turn a clinician's list view into an error.
+    import('@/lib/services/audit-service').then(({ logPhiSearch }) =>
+      logPhiSearch(
+        { userId: auth.sub, username: auth.name, role: auth.role, orgId: auth.orgId, hospitalId: auth.hospitalId, route: '/api/prescriptions' },
+        'prescription',
+        { query: new URL(request.url).searchParams.get('q') || undefined, resultCount: Array.isArray(prescriptions) ? prescriptions.length : 0 },
+      ),
+    ).catch(() => {});
     return NextResponse.json({ prescriptions, total: prescriptions.length });
   } catch (err) {
     logApiError('[API /prescriptions GET]', err);

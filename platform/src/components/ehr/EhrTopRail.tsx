@@ -22,6 +22,8 @@ import { getRoleConfig } from '@/lib/permissions';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { NavItem } from '@/lib/permissions';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import { moduleBadgeCounts } from '@/lib/module-badges';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { patientFullName, patientGenderAge, initials } from '@/lib/patient-utils';
 import { formatPhoneDisplay } from '@/lib/field-formats';
@@ -55,6 +57,10 @@ export default function EhrTopRail() {
   const { canRegisterPatients } = usePermissions();
   const { available: tourAvailable, start: startTour } = useTourContext();
   const { patients } = usePatients();
+  // One feed for the whole rail: the bell's unread count and the "something is
+  // waiting in here" numbers on the module shortcuts come from the same load.
+  const { items: notifications, unreadCount } = useNotifications();
+  const moduleBadges = useMemo(() => moduleBadgeCounts(notifications), [notifications]);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -228,7 +234,7 @@ export default function EhrTopRail() {
           />
         )}
 
-        <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} />
+        <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} badges={moduleBadges} />
       </nav>
 
       {/* Overlaid on the rail's true center (not a grid cell), so it never
@@ -316,7 +322,7 @@ export default function EhrTopRail() {
             <UserPlus className="w-4 h-4" />
           </button>
         )}
-        <QuickActions />
+        <QuickActions notificationCount={unreadCount} />
         <div className="ehr-user-menu-wrap" ref={userRef}>
           {/* Design: a plain 40px circle avatar — the role label lives in the
               menu below, not on the rail. */}

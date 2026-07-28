@@ -122,6 +122,75 @@ describe('validateProductionConfig', () => {
     ]));
   });
 
+  // --- Telehealth video (LiveKit) ---
+  // Video is optional; a partial configuration is not. The failure it prevents
+  // is a 503 the first time a clinician opens a consultation.
+  const LIVEKIT_OK = {
+    LIVEKIT_URL: 'wss://livekit.internal',
+    LIVEKIT_API_KEY: 'APIkey',
+    LIVEKIT_API_SECRET: 'a-real-livekit-secret',
+  };
+
+  test('accepts a deployment with no LiveKit configured at all', () => {
+    expect(validateProductionConfig(validEnv())).toEqual([]);
+  });
+
+  test('accepts a fully-configured LiveKit', () => {
+    expect(validateProductionConfig(validEnv(LIVEKIT_OK))).toEqual([]);
+  });
+
+  test.each([
+    ['LIVEKIT_URL', { ...LIVEKIT_OK, LIVEKIT_URL: undefined }],
+    ['LIVEKIT_API_KEY', { ...LIVEKIT_OK, LIVEKIT_API_KEY: undefined }],
+    ['LIVEKIT_API_SECRET', { ...LIVEKIT_OK, LIVEKIT_API_SECRET: undefined }],
+  ])('flags a partial LiveKit config naming the missing %s', (missing, env) => {
+    const errs = validateProductionConfig(validEnv(env));
+    expect(errs).toEqual(expect.arrayContaining([
+      expect.stringContaining('partially configured'),
+    ]));
+    expect(errs.join(' ')).toContain(missing);
+  });
+
+  test('NEXT_PUBLIC_LIVEKIT_URL alone satisfies the URL requirement', () => {
+    expect(validateProductionConfig(validEnv({
+      LIVEKIT_URL: undefined,
+      NEXT_PUBLIC_LIVEKIT_URL: 'wss://livekit.internal',
+      LIVEKIT_API_KEY: 'APIkey',
+      LIVEKIT_API_SECRET: 'a-real-livekit-secret',
+    }))).toEqual([]);
+  });
+
+  test('flags a placeholder LiveKit secret', () => {
+    expect(validateProductionConfig(validEnv({
+      ...LIVEKIT_OK,
+      LIVEKIT_API_SECRET: 'REPLACE_ME',
+    }))[0]).toMatch(/placeholder/i);
+  });
+
+  test.each(['NEXT_PUBLIC_LIVEKIT_API_KEY', 'NEXT_PUBLIC_LIVEKIT_API_SECRET'])(
+    'flags %s as a client-bundle leak',
+    (key) => {
+      const errs = validateProductionConfig(validEnv({ ...LIVEKIT_OK, [key]: 'leaked' }));
+      expect(errs).toEqual(expect.arrayContaining([
+        expect.stringContaining(key),
+      ]));
+    },
+  );
+
+  test('flags an unencrypted ws:// LiveKit URL in production', () => {
+    expect(validateProductionConfig(validEnv({
+      ...LIVEKIT_OK,
+      LIVEKIT_URL: 'ws://livekit.internal',
+    }))[0]).toMatch(/wss:\/\//);
+  });
+
+  test('allows ws://localhost for local development', () => {
+    expect(validateProductionConfig(validEnv({
+      ...LIVEKIT_OK,
+      LIVEKIT_URL: 'ws://localhost:7880',
+    }))).toEqual([]);
+  });
+
   // --- Payment webhooks ---
   test('flags unsigned Airtel and M-Pesa webhooks', () => {
     const errs = validateProductionConfig(validEnv({

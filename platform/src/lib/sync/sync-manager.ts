@@ -64,8 +64,18 @@ function getLockManager(): WebLockManagerLike | null {
   return nav.locks ?? null;
 }
 
+import { entitlementFor } from './facility-entitlements';
+import type { UserRole } from '../db-types';
+
 export interface SyncManagerOptions {
   orgId?: string;
+  /**
+   * The signed-in user, used to derive which facilities may be replicated
+   * (KAN-95). Omitted means org-wide, which preserves the previous behaviour
+   * for callers that have not been updated — those callers are the remaining
+   * exposure, not a safe default.
+   */
+  user?: { role?: UserRole; orgId?: string; hospitalId?: string; facilityIds?: string[] };
   onChange?: (status: AggregateStatus) => void;
 }
 
@@ -73,6 +83,7 @@ export class SyncManager {
   private services: Map<string, SyncService> = new Map();
   private statuses: Map<string, SyncStatus> = new Map();
   private orgId?: string;
+  private user?: SyncManagerOptions['user'];
   private onChange?: (status: AggregateStatus) => void;
   private _started = false;
   /**
@@ -88,6 +99,7 @@ export class SyncManager {
 
   constructor(opts: SyncManagerOptions = {}) {
     this.orgId = opts.orgId;
+    this.user = opts.user;
     this.onChange = opts.onChange;
   }
 
@@ -123,7 +135,7 @@ export class SyncManager {
       // This regresses to the previous double-replication behaviour but
       // keeps the app functional. Surface a console warning so it's
       // visible during development.
-      // eslint-disable-next-line no-console
+       
       console.warn(
         '[sync] navigator.locks unavailable; multi-tab leader election disabled. ' +
         'Multiple open tabs will all replicate (more bandwidth, more conflicts).'
@@ -155,7 +167,7 @@ export class SyncManager {
       // In the page-closing case we don't care; otherwise log and surrender
       // leader state.
       if (this._started) {
-        // eslint-disable-next-line no-console
+         
         console.warn('[sync] leader-lock request failed:', err);
       }
       this._leader = false;
@@ -177,6 +189,11 @@ export class SyncManager {
         remoteUrl,
         direction: config.direction,
         orgId: config.orgScoped ? this.orgId : undefined,
+        // Facility scoping applies only to org-scoped databases; the shared
+        // reference databases carry no facility PHI.
+        entitlement: config.orgScoped
+          ? entitlementFor({ ...this.user, orgId: this.orgId })
+          : undefined,
         onChange: (status) => {
           this.statuses.set(config.localName, status);
           this.notifyChange();

@@ -36,6 +36,7 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_conversations',         // internal staff chat — facility-operational PHI, not national analytics
   'tamamhealth_patient_notes',         // internal clinical notes — facility-operational PHI, not national analytics
   'tamamhealth_encounters',            // in-progress consultation workflow state — facility-operational, not national analytics
+  'tamamhealth_consultation_progress', // shared consultation tracker — facility-operational, not national analytics
   'tamamhealth_handoffs',              // nurse shift handoffs (SBAR) — facility-operational PHI, not national analytics
   'tamamhealth_biometric_templates',   // biometric identifiers — in-org identification only, never national
   'tamamhealth_order_sets',            // clinical protocol templates — org-scoped reference data, not national analytics
@@ -49,6 +50,7 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_intake_forms',          // patient-submitted intake forms awaiting review/merge — facility-operational workflow, not national analytics
   'tamamhealth_procedures',            // bedside/theatre procedures — facility-operational clinical detail, not a national/DHIS2 indicator today
   'tamamhealth_nutrition_supplies',    // facility supply stock levels (RUTF/F-75/…) — facility-operational logistics, not national analytics
+  'tamamhealth_patient_transfers',     // internal care-ownership transfers — facility-operational staffing detail naming individual clinicians; cross-facility movement flows via tamamhealth_referrals
   // (tamamhealth_nutrition_screenings is NOT excluded — SAM/MAM now writes back
   //  to the `nutrition_screenings` national table via DB_TABLE_MAP + mapper.
   //  tamamhealth_program_enrollments is NOT excluded either — ART/TB/PMTCT/

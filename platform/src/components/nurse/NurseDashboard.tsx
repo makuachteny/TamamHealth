@@ -15,15 +15,15 @@ import { useWards } from '@/lib/hooks/useWards';
 import { patientFullName, patientGenderAge, patientRegisteredAt } from '@/lib/patient-utils';
 import { getRoleConfig } from '@/lib/permissions';
 import { DEMO_WARD_PATIENTS, IS_DEMO } from '@/components/nurse/shared';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { tooltipStyle } from '@/components/ChartCard';
 import WardWorkflow from './WardWorkflow';
 import MarWorkflow from './MarWorkflow';
 import TriageWorkflow from './TriageWorkflow';
+import RoomingWorkflow from './RoomingWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
 
-type StationTab = 'ward' | 'mar' | 'triage';
+type StationTab = 'ward' | 'mar' | 'triage' | 'rooming';
 
 // Chart palette per design spec: flat clinical look, matched to triage colors.
 const CHART_GREEN = '#199e70';
@@ -81,6 +81,7 @@ export default function NurseDashboard() {
     ward: t('nurse.tabWard'),
     mar: t('nurse.tabMar'),
     triage: t('nurse.tabTriage'),
+    rooming: 'Rooming',
   }), [t]);
 
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
@@ -100,7 +101,11 @@ export default function NurseDashboard() {
     // wrong one.
     { key: 'mar' as const, label: stationLabel.mar },
     { key: 'triage' as const, label: stationLabel.triage, count: triageToday.length },
-  ]), [wardBoardCount, stationLabel.mar, stationLabel.triage, stationLabel.ward, triageToday.length]);
+    // Rooming carries no count here: its queue is built from encounters inside
+    // RoomingWorkflow, and any number derived at this level would disagree
+    // with the board whenever an encounter moved. Same reasoning as MAR.
+    { key: 'rooming' as const, label: stationLabel.rooming },
+  ]), [wardBoardCount, stationLabel.mar, stationLabel.rooming, stationLabel.triage, stationLabel.ward, triageToday.length]);
 
   // Ward/MAR/Triage switch via the daybar tabs (design 02); Handoff is a popup.
   const daybarTabs = stationTabs;
@@ -256,26 +261,6 @@ export default function NurseDashboard() {
     { label: 'In consult', value: inConsultTriage },
   ]), [criticalTriage, urgentTriage, waitingTriage, inConsultTriage]);
 
-  // Capabilities card — each item latches checked forever the first time this
-  // nurse does it (see useCapabilities), never un-checked by later state.
-  const capabilityItems = useMemo(() => ([
-    {
-      key: 'nurse.triage',
-      label: 'Complete a triage assessment',
-      // Scoped to assessments THIS nurse performed, not the whole facility's queue.
-      signal: triageToday.some(tr => tr.triagedBy === currentUser?._id),
-      onClick: () => setActiveTab('triage'),
-    },
-    // WardWorkflow's rows only navigate to the patient chart's Vitals tab —
-    // recording itself happens on that page, outside this dashboard's reach,
-    // so there's no completion point to latch on here. Stays unchecked until
-    // the nurse actually records a vital sign in the chart.
-    { key: 'nurse.vitals', label: 'Record ward vitals', onClick: () => setActiveTab('ward') },
-    { key: 'nurse.mar', label: 'Administer medications (MAR)', onClick: () => setActiveTab('mar') },
-    { key: 'nurse.handoff', label: 'Hand off a shift', onClick: () => setHandoffOpen(true) },
-  ]), [triageToday, currentUser?._id]);
-  const { checklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
-
   if (!currentUser) return null;
 
   return (
@@ -361,21 +346,19 @@ export default function NurseDashboard() {
           centerTitle="Nursing station"
           centerSubtitle=""
           metrics={metrics}
-          checklist={checklist}
           calendarEventDates={[
             ...triageToday.map(triage => (triage.triagedAt || today).slice(0, 10)),
             ...activeAdmissions.map(admission => (admission.admissionDate || today).slice(0, 10)),
           ]}
           metricsTitle="Today's triage"
-          checklistTitle="Capabilities"
-          checklistDescription="Ward care, triage, medications, and handoff."
           emptyTitle="No patients in this station"
           hideRowList
         >
           <div className="flex flex-col" style={{ minHeight: 0 }}>
             {activeTab === 'ward' && <WardWorkflow search={railSearch} showHeader={false} />}
-            {activeTab === 'mar' && <MarWorkflow onAdminister={() => markCapability('nurse.mar')} />}
+            {activeTab === 'mar' && <MarWorkflow />}
             {activeTab === 'triage' && <TriageWorkflow />}
+            {activeTab === 'rooming' && <RoomingWorkflow />}
           </div>
         </EhrCareDashboard>
 
@@ -383,7 +366,6 @@ export default function NurseDashboard() {
           <HandoffWorkflow
             variant="modal"
             onClose={() => setHandoffOpen(false)}
-            onSigned={() => markCapability('nurse.handoff')}
           />
         )}
       </main>

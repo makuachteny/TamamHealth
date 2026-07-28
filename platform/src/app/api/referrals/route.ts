@@ -39,6 +39,15 @@ export async function GET(request: NextRequest) {
       const scope = buildScopeFromAuth(auth);
       referrals = await getAllReferrals(scope);
     }
+    // PHI read audit (KAN-97). Fire-and-forget: a failed audit write
+    // must never turn a clinician's list view into an error.
+    import('@/lib/services/audit-service').then(({ logPhiSearch }) =>
+      logPhiSearch(
+        { userId: auth.sub, username: auth.name, role: auth.role, orgId: auth.orgId, hospitalId: auth.hospitalId, route: '/api/referrals' },
+        'referral',
+        { query: new URL(request.url).searchParams.get('q') || undefined, resultCount: Array.isArray(referrals) ? referrals.length : 0 },
+      ),
+    ).catch(() => {});
     return NextResponse.json({ referrals, total: referrals.length });
   } catch (err) {
     logApiError('[API /referrals GET]', err);

@@ -1,5 +1,7 @@
 'use client';
 
+import { useBackupStatus } from '@/lib/hooks/useBackupStatus';
+
 /**
  * Super-admin → Security & Compliance.
  * Edits config.superAdminPolicies (same merge pattern as the retired
@@ -92,7 +94,10 @@ function NumberRow({ label, description, value, onChange, min, max }: {
   );
 }
 
-function KvRow({ label, tone, value }: { label: string; tone: 'ok' | 'warn'; value: string }) {
+// `muted` is included because some facts are genuinely UNKNOWN rather than
+// good or bad — forcing those into ok/warn is what made this screen report
+// "At risk" for a backup it had simply never heard about (KAN-117).
+function KvRow({ label, tone, value }: { label: string; tone: 'ok' | 'warn' | 'muted'; value: string }) {
   return (
     <div className="sa-kv-row">
       <span>{label}</span>
@@ -110,12 +115,12 @@ export default function SecurityCompliancePage() {
   // bundles six genuinely separate policy topics rather than one list.
   const [activeSection, setActiveSection] = useState<SectionId>('access');
 
+  // Single source (KAN-117) — this read a localStorage key nothing wrote, so
+  // `backupWithinRpo` below was permanently false and reported as if measured.
+  const backupStatus = useBackupStatus();
   useEffect(() => {
-    const last = typeof window !== 'undefined' ? localStorage.getItem('safeguard_last_backup') : null;
-    if (!last) return;
-    const ms = Date.now() - new Date(last).getTime();
-    if (Number.isFinite(ms)) setBackupAgeHours(ms / 3600000);
-  }, []);
+    if (backupStatus?.ageHours != null) setBackupAgeHours(backupStatus.ageHours);
+  }, [backupStatus]);
 
   const policies: Policy = { ...DEFAULT_POLICIES, ...(config?.superAdminPolicies || {}) };
 
@@ -124,7 +129,9 @@ export default function SecurityCompliancePage() {
     update({ superAdminPolicies: { ...policies, [key]: value } }, currentUser._id, currentUser.username);
   };
 
-  const backupWithinRpo = backupAgeHours !== null && backupAgeHours <= policies.backupRpoHours;
+  // Three-way, not boolean: "unknown" must not read as "not within RPO".
+  const backupWithinRpo = backupStatus?.state === 'ok';
+  const backupUnknown = backupStatus == null || backupStatus.state === 'unknown';
 
   const sections: { id: SectionId; label: string; icon: typeof Lock; count: number }[] = [
     { id: 'access', label: 'Access & Auth', icon: Lock, count: 4 },
@@ -287,8 +294,8 @@ export default function SecurityCompliancePage() {
               <div className="sa-kv">
                 <KvRow
                   label="Current backup age"
-                  tone={backupWithinRpo ? 'ok' : 'warn'}
-                  value={backupAgeHours === null ? 'No backup on record' : `${Math.round(backupAgeHours)}h ago`}
+                  tone={backupUnknown ? 'muted' : backupWithinRpo ? 'ok' : 'warn'}
+                  value={backupUnknown ? 'Unknown — nothing reported' : `${Math.round(backupAgeHours ?? 0)}h ago`}
                 />
               </div>
             </SaCard>
@@ -302,7 +309,13 @@ export default function SecurityCompliancePage() {
                   <KvRow label="Audit retention ≥ 6 years" tone={policies.auditRetentionYears >= 6 ? 'ok' : 'warn'} value={`${policies.auditRetentionYears}y`} />
                   <KvRow label="PHI export control" tone={policies.phiExportRequiresReason ? 'ok' : 'warn'} value={policies.phiExportRequiresReason ? 'On' : 'Off'} />
                   <KvRow label="Deletion approval" tone={policies.dataDeletionRequiresApproval ? 'ok' : 'warn'} value={policies.dataDeletionRequiresApproval ? 'On' : 'Off'} />
-                  <KvRow label="Backup within RPO" tone={backupWithinRpo ? 'ok' : 'warn'} value={backupWithinRpo ? 'Within RPO' : 'At risk'} />
+                  {/* Three states, not two: "unknown" claimed "At risk" before,
+                      which is a finding the screen had not established. */}
+                  <KvRow
+                    label="Backup within RPO"
+                    tone={backupUnknown ? 'muted' : backupWithinRpo ? 'ok' : 'warn'}
+                    value={backupUnknown ? 'Unknown' : backupWithinRpo ? 'Within RPO' : 'At risk'}
+                  />
                   <KvRow label="Break-glass review window set" tone={policies.emergencyAccessReviewHours > 0 ? 'ok' : 'warn'} value={policies.emergencyAccessReviewHours > 0 ? `${policies.emergencyAccessReviewHours}h` : 'Not set'} />
                 </div>
               </SaCard>

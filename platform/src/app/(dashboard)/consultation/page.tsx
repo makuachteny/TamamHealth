@@ -973,6 +973,7 @@ export default function ConsultationPage() {
     const enc = await import('@/lib/services/encounter-service');
     if (encounterId) {
       try { await enc.updateEncounter(encounterId, { snapshot: buildEncounterSnapshot() }); } catch { /* non-fatal */ }
+      await syncProgress('in_progress', 'Complete the consultation assessment');
       return encounterId;
     }
     const patientData = patients.find(p => p._id === selectedPatient);
@@ -1005,6 +1006,7 @@ export default function ConsultationPage() {
           orgId: currentUser?.orgId,
         });
     setEncounterId(created._id);
+    await syncProgress('in_progress', 'Complete the consultation assessment', created._id);
     return created._id;
   };
 
@@ -1022,6 +1024,34 @@ export default function ConsultationPage() {
     } catch {
       await transitionEncounter(encId, 'with_clinician');
       await transitionEncounter(encId, to, opts);
+    }
+  };
+
+  // Keep the shared care-team tracker aligned with the canonical encounter
+  // whenever a consultation crosses an operational boundary.
+  const syncProgress = async (
+    stage: import('@/lib/db-types').ConsultationProgressStage,
+    nextAction: string,
+    linkedEncounterId?: string,
+    milestone?: string,
+  ): Promise<void> => {
+    if (!selectedPatient) return;
+    try {
+      const patientData = patients.find(p => p._id === selectedPatient);
+      const { ensureConsultationProgress, updateProgressStage, updateProgressMilestone } = await import('@/lib/services/consultation-progress-service');
+      const tracker = await ensureConsultationProgress({
+        patientId: selectedPatient,
+        patientName: patientData ? patientFullName(patientData) : '',
+        hospitalId: currentUser?.hospitalId || '',
+        hospitalName: currentUser?.hospital?.name || currentUser?.hospitalName || '',
+        orgId: currentUser?.orgId,
+        encounterId: linkedEncounterId || encounterId || undefined,
+        actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
+      });
+      await updateProgressStage(tracker._id, stage, { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role }, nextAction);
+      if (milestone) await updateProgressMilestone(tracker._id, milestone, 'completed', { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role });
+    } catch {
+      // Progress is operational support; never prevent the clinical save/order.
     }
   };
 
@@ -1079,6 +1109,7 @@ export default function ConsultationPage() {
           actorId: currentUser?._id,
         });
       }
+      await syncProgress('orders_pending', 'Review and act on the laboratory result', activeEncounterId || undefined, 'orders_placed');
 
       // Bill the ordered investigations now (best-effort — pricing optional).
       try {
@@ -1172,6 +1203,7 @@ export default function ConsultationPage() {
           actorId: currentUser?._id,
         });
       }
+      await syncProgress('orders_pending', 'Confirm prescription dispensing', activeEncounterId || undefined, 'orders_placed');
       showToast(t('consultation.toastSentToPharmacy', { count: pending.length }), 'success');
     } catch (err) {
       console.error('Send to pharmacy failed', err);
@@ -1645,6 +1677,19 @@ export default function ConsultationPage() {
           postWarnings.push('the visit could not be closed to the selected disposition');
         }
       }
+
+      await syncProgress(
+        visitDisposition === 'checkout' ? 'completed' : 'follow_up_required',
+        visitDisposition === 'checkout' ? 'Consultation complete' : 'Complete the next care transition',
+        activeEncounterId || undefined,
+        'diagnosis_documented',
+      );
+      await syncProgress(
+        visitDisposition === 'checkout' ? 'completed' : 'follow_up_required',
+        visitDisposition === 'checkout' ? 'Consultation complete' : 'Complete the next care transition',
+        activeEncounterId || undefined,
+        'consultation_signed',
+      );
 
       // Successful save → clear the encrypted draft so we don't re-prompt on next visit
       try {
@@ -2157,6 +2202,7 @@ export default function ConsultationPage() {
           </div>
 
           <div className="flex gap-3 flex-1 min-h-0 ehr-consult-workspace">
+
           {/* AI Clinical Scribe Panel — a stretched flex sibling of the form
               column, so its top and bottom track the step cards and nav
               exactly (the old sticky + calc(100vh - 180px) guessed the chrome

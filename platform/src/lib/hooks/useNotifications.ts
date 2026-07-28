@@ -1,24 +1,41 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useApp } from '../context';
 import { makeCoalescer } from './live-reload';
-import { referralsDB, appointmentsDB, labResultsDB, prescriptionsDB, intakeFormsDB } from '../db';
+import { referralsDB, appointmentsDB, labResultsDB, prescriptionsDB, intakeFormsDB, consultationProgressDB, patientTransfersDB, triageDB } from '../db';
+import {
+  NOTIFICATION_READS_EVENT,
+  getReadNotificationIds,
+  markNotificationsRead,
+} from '../notification-reads';
+
+export type NotificationType = 'alert' | 'triage' | 'referral' | 'lab' | 'appointment' | 'intake' | 'prescription' | 'progress' | 'transfer';
+/** How hard the item pushes: an outbreak or a breached critical result is not
+ *  the same class of thing as "a prescription is waiting". Drives the filter
+ *  tabs and row treatment on /notifications. */
+export type NotificationSeverity = 'critical' | 'warning' | 'info';
 
 export type NotificationItem = {
   id: string;
-  type: 'alert' | 'referral' | 'lab' | 'appointment' | 'intake' | 'prescription';
+  type: NotificationType;
+  severity: NotificationSeverity;
   title: string;
   subtitle: string;
   time: string;
   href: string;
+  /** Set from per-device read state — see lib/notification-reads.ts. */
+  read?: boolean;
 };
 
 /**
  * Aggregates every facility-level event a user should be notified about into
  * one list for the TopBar notification bell:
  *   - incoming/updated referrals
+ *   - internal patient transfers awaiting this user's acceptance, and
+ *     decisions on transfers this user sent
  *   - active disease-outbreak alerts
+ *   - triaged patients still waiting to be seen (acuity drives severity)
  *   - lab results (critical + newly ready to review)
  *   - appointments awaiting approval + patients checked in and waiting
  *   - patient intake forms awaiting review
@@ -71,14 +88,35 @@ function playAlertChime() {
   } catch { /* audio blocked — stay silent */ }
 }
 
-export function useNotifications() {
+/**
+ * Maximum items kept per source. High enough that the badge, the bell panel,
+ * and /notifications all report the same total — a bell reading "105" over a
+ * page listing 480 is just a lying badge — and bounded so a pathological
+ * dataset can't build an unbounded array. Every source already reads its full
+ * document set to decide what qualifies, so the cap only trims the output.
+ */
+const DEFAULT_PER_SOURCE_LIMIT = 500;
+
+export interface UseNotificationsOptions {
+  /** Override the per-source cap. Callers that only render a handful of rows
+   *  can lower it; nothing that shows a count should. */
+  perSourceLimit?: number;
+}
+
+export function useNotifications(options: UseNotificationsOptions = {}) {
+  const perSourceLimit = options.perSourceLimit ?? DEFAULT_PER_SOURCE_LIMIT;
   const { currentUser } = useApp();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const userId = currentUser?._id ?? '';
   // Known notification ids — lets us chime only for genuinely new arrivals
   // (never on the first load of a session).
   const seenIds = useRef<Set<string> | null>(null);
-  const scopeKey = `${currentUser?.orgId ?? ''}|${currentUser?.hospitalId ?? ''}|${currentUser?.role ?? ''}`;
+  // Includes the user id + department: the transfer feed is per-user, so a
+  // scope-only key would keep serving one user's inbox after a re-login in the
+  // same tab.
+  const scopeKey = `${currentUser?._id ?? ''}|${currentUser?.orgId ?? ''}|${currentUser?.hospitalId ?? ''}|${currentUser?.role ?? ''}|${currentUser?.department ?? ''}`;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,7 +140,7 @@ export function useNotifications() {
         // Incoming referral awaiting THIS facility's triage/acceptance. Admin
         // roles without a hospitalId keep the old behaviour (see everything).
         if ((isIncoming || !myHospitalId) && (x.status === 'sent' || x.status === 'received')) {
-          out.push({ id: `ref-${x._id}`, type: 'referral', title: `Referral · ${x.patientName}`, subtitle: `${x.fromHospital} → ${x.toHospital}`, time: x.referralDate || x.createdAt, href: '/referrals' });
+          out.push({ id: `ref-${x._id}`, type: 'referral', severity: 'warning', title: `Referral · ${x.patientName}`, subtitle: `${x.fromHospital} → ${x.toHospital}`, time: x.referralDate || x.createdAt, href: '/referrals' });
         }
         // Outgoing referral the receiving facility just accepted — close the
         // loop by telling the sender their patient was received on the other end.
@@ -110,7 +148,7 @@ export function useNotifications() {
           const acceptedAt = x.updatedAt || x.referralDate || x.createdAt;
           const acceptedMs = Date.parse(acceptedAt || '');
           if (Number.isNaN(acceptedMs) || nowMs - acceptedMs <= ACK_WINDOW_MS) {
-            out.push({ id: `ref-ack-${x._id}`, type: 'referral', title: `Patient received · ${x.patientName}`, subtitle: `${x.toHospital} accepted the referral`, time: acceptedAt, href: '/referrals' });
+            out.push({ id: `ref-ack-${x._id}`, type: 'referral', severity: 'info', title: `Patient received · ${x.patientName}`, subtitle: `${x.toHospital} accepted the referral`, time: acceptedAt, href: '/referrals' });
           }
         }
         // Outgoing referral the receiving facility closed out with a structured
@@ -120,8 +158,65 @@ export function useNotifications() {
           const closedMs = Date.parse(closedAt || '');
           if (Number.isNaN(closedMs) || nowMs - closedMs <= ACK_WINDOW_MS) {
             const disposition = x.outcome.disposition.replace(/_/g, ' ');
-            out.push({ id: `ref-out-${x._id}`, type: 'referral', title: `Referral outcome · ${x.patientName}`, subtitle: `${x.toHospital}: ${disposition}`, time: closedAt, href: '/referrals' });
+            out.push({ id: `ref-out-${x._id}`, type: 'referral', severity: 'info', title: `Referral outcome · ${x.patientName}`, subtitle: `${x.toHospital}: ${disposition}`, time: closedAt, href: '/referrals' });
           }
+        }
+      }
+    } catch { /* offline */ }
+
+    // Internal transfers of care ownership. Both directions matter: the
+    // receiving clinician must know a patient is waiting on their decision, and
+    // the sender must learn the answer — a transfer accepted or rejected in
+    // silence leaves one of the two teams believing they own the patient.
+    try {
+      const svc = await import('../services/patient-transfer-service');
+      const myId = currentUser?._id;
+      if (myId) {
+        // One read serves both directions. The decision feed needs `rejected` /
+        // `completed`, which the open-transfer queries deliberately exclude.
+        const all = await svc.getAllTransfers(scope, myId);
+        const incoming = await svc.getIncomingTransfers({
+          id: myId,
+          department: currentUser?.department,
+          hospitalId: currentUser?.hospitalId,
+          role: currentUser?.role,
+        }, scope);
+
+        for (const t of incoming.slice(0, perSourceLimit)) {
+          const overdue = svc.isTransferOverdue(t);
+          out.push({
+            id: `xfer-in-${t._id}`,
+            type: 'transfer',
+            severity: overdue ? 'critical' : 'warning',
+            title: `${overdue ? 'OVERDUE · ' : ''}Transfer to accept · ${t.patientName || 'patient'}`,
+            subtitle: `${svc.describeAssignment(t.from)} → you · ${t.reason}`,
+            time: t.requestedAt || t.createdAt,
+            href: `/patients/${t.patientId}?tab=referrals`,
+          });
+        }
+
+        // Decisions on transfers this user sent. Bounded to a recent window so
+        // a resolved hand-off stops nagging once it has been seen.
+        const DECISION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+        for (const t of all) {
+          if (t.requestedById !== myId) continue;
+          if (t.status !== 'rejected' && t.status !== 'completed') continue;
+          const at = t.decidedAt || t.completedAt || t.updatedAt;
+          const ms = Date.parse(at || '');
+          if (!Number.isNaN(ms) && Date.now() - ms > DECISION_WINDOW_MS) continue;
+          out.push({
+            id: `xfer-dec-${t._id}`,
+            type: 'transfer',
+            severity: t.status === 'rejected' ? 'warning' : 'info',
+            title: t.status === 'rejected'
+              ? `Transfer rejected · ${t.patientName || 'patient'}`
+              : `Transfer completed · ${t.patientName || 'patient'}`,
+            subtitle: t.status === 'rejected'
+              ? `${t.decidedByName || 'Receiving team'}: ${t.decisionNotes || 'no reason given'}`
+              : `Care moved to ${svc.describeAssignment(t.to)}`,
+            time: at,
+            href: `/patients/${t.patientId}?tab=referrals`,
+          });
         }
       }
     } catch { /* offline */ }
@@ -129,8 +224,39 @@ export function useNotifications() {
     try {
       const { getActiveAlerts } = await import('../services/surveillance-service');
       const alerts = await getActiveAlerts();
-      for (const a of alerts.slice(0, 20)) {
-        out.push({ id: `alert-${a._id}`, type: 'alert', title: `${a.disease} outbreak alert`, subtitle: `${a.cases} cases · ${a.county}, ${a.state}`, time: a.reportDate || a.createdAt, href: '/surveillance' });
+      for (const a of alerts.slice(0, perSourceLimit)) {
+        out.push({ id: `alert-${a._id}`, type: 'alert', severity: 'critical', title: `${a.disease} outbreak alert`, subtitle: `${a.cases} cases · ${a.county}, ${a.state}`, time: a.reportDate || a.createdAt, href: '/surveillance' });
+      }
+    } catch { /* offline */ }
+
+    // Triaged patients still waiting for a provider. Its own source (and its
+    // own colour) rather than folding into `progress`: an ETAT RED patient
+    // waiting is a different class of thing from a care-progress update, and
+    // the acuity is what makes it actionable. `seen` triages are excluded —
+    // someone already picked the patient up.
+    try {
+      const { getActiveTriage } = await import('../services/triage-service');
+      const triages = await getActiveTriage(scope);
+      const waiting = triages.filter(x => x.status === 'pending');
+      // Most acute first, then longest-waiting, so the per-source cap drops
+      // routine cases rather than an emergency.
+      const acuityRank = { RED: 0, YELLOW: 1, GREEN: 2 } as const;
+      waiting.sort((a, b) =>
+        acuityRank[a.priority] - acuityRank[b.priority]
+        || (a.triagedAt || '').localeCompare(b.triagedAt || ''));
+      for (const x of waiting.slice(0, perSourceLimit)) {
+        const acuity = x.priority === 'RED' ? 'Emergency'
+          : x.priority === 'YELLOW' ? 'Urgent'
+          : 'Routine';
+        out.push({
+          id: `triage-${x._id}`,
+          type: 'triage',
+          severity: x.priority === 'RED' ? 'critical' : x.priority === 'YELLOW' ? 'warning' : 'info',
+          title: `${acuity} triage · ${x.patientName}`,
+          subtitle: [x.chiefComplaint, x.assignedRoom || 'awaiting provider'].filter(Boolean).join(' · '),
+          time: x.triagedAt || x.updatedAt || x.createdAt,
+          href: `/patients/${encodeURIComponent(x.patientId)}`,
+        });
       }
     } catch { /* offline */ }
 
@@ -139,22 +265,61 @@ export function useNotifications() {
     const nowMsLocal = Date.now();
 
     try {
-      const { getAllLabResults } = await import('../services/lab-service');
+      const { getAllLabResults, effectiveOrderStatus } = await import('../services/lab-service');
+      const { getResultReviewSLA } = await import('../clinical-flow/order-lifecycles');
       const labs = await getAllLabResults(scope);
-      // Critical results first, then non-critical results that just came back
-      // (ready for the clinician to review) within a recent window.
-      for (const l of labs.filter(x => x.critical && x.status === 'completed')) {
-        out.push({ id: `lab-${l._id}`, type: 'lab', title: `Critical result · ${l.testName}`, subtitle: l.patientName, time: l.completedAt || l.orderedAt || l.createdAt, href: l.patientName ? `/lab?patient=${encodeURIComponent(l.patientName)}` : '/lab' });
+
+      // Results this clinician ordered that are back but still unreviewed past
+      // their SLA (24h critical / 7d routine). This is the same feed the
+      // clinical dashboard's "Awaiting review" card renders, so
+      // its "View all" lands on a list that actually contains those rows.
+      // Scoped by ordering clinician — LabResultDoc.orderedBy is a free-text
+      // name, matched the same way the dashboard matches it.
+      const sla = getResultReviewSLA();
+      const overdueIds = new Set<string>();
+      if (currentUser?.name) {
+        const overdue = labs
+          .filter(x => x.orderedBy === currentUser.name && effectiveOrderStatus(x) === 'resulted')
+          .map(x => {
+            const resultedAt = Date.parse(x.updatedAt || x.createdAt || '');
+            return { doc: x, hoursOverdue: (nowMsLocal - resultedAt) / 3_600_000, resultedAt };
+          })
+          .filter(x => Number.isFinite(x.resultedAt) && x.hoursOverdue > (x.doc.critical ? sla.criticalHours : sla.routineHours))
+          .sort((a, b) => b.hoursOverdue - a.hoursOverdue)
+          .slice(0, perSourceLimit);
+        for (const { doc, hoursOverdue } of overdue) {
+          overdueIds.add(doc._id);
+          const age = hoursOverdue >= 48
+            ? `${Math.floor(hoursOverdue / 24)}d overdue`
+            : `${Math.round(hoursOverdue)}h overdue`;
+          out.push({
+            id: `lab-overdue-${doc._id}`,
+            type: 'lab',
+            severity: doc.critical ? 'critical' : 'warning',
+            title: `${doc.critical ? 'Critical result unreviewed' : 'Result awaiting review'} · ${doc.testName}`,
+            subtitle: `${doc.patientName} · ${age}`,
+            time: doc.updatedAt || doc.completedAt || doc.createdAt,
+            href: `/patients/${doc.patientId}?tab=labs&focus=${encodeURIComponent(doc._id)}`,
+          });
+        }
+      }
+
+      // Critical results, then non-critical results that just came back (ready
+      // for the clinician to review) within a recent window. Anything already
+      // raised above as overdue is skipped — the overdue row says strictly
+      // more about the same result.
+      for (const l of labs.filter(x => x.critical && x.status === 'completed' && !overdueIds.has(x._id))) {
+        out.push({ id: `lab-${l._id}`, type: 'lab', severity: 'critical', title: `Critical result · ${l.testName}`, subtitle: l.patientName, time: l.completedAt || l.orderedAt || l.createdAt, href: l.patientName ? `/lab?patient=${encodeURIComponent(l.patientName)}` : '/lab' });
       }
       const readyLabs = labs
-        .filter(x => !x.critical && x.status === 'completed')
+        .filter(x => !x.critical && x.status === 'completed' && !overdueIds.has(x._id))
         .filter(x => {
           const ms = Date.parse(x.completedAt || x.updatedAt || x.createdAt || '');
           return Number.isNaN(ms) || nowMsLocal - ms <= RECENT_MS;
         })
-        .slice(0, 20);
+        .slice(0, perSourceLimit);
       for (const l of readyLabs) {
-        out.push({ id: `lab-ready-${l._id}`, type: 'lab', title: `Result ready · ${l.testName}`, subtitle: `${l.patientName} · ready to review`, time: l.completedAt || l.updatedAt || l.createdAt, href: l.patientName ? `/lab?patient=${encodeURIComponent(l.patientName)}` : '/lab' });
+        out.push({ id: `lab-ready-${l._id}`, type: 'lab', severity: 'info', title: `Result ready · ${l.testName}`, subtitle: `${l.patientName} · ready to review`, time: l.completedAt || l.updatedAt || l.createdAt, href: l.patientName ? `/lab?patient=${encodeURIComponent(l.patientName)}` : '/lab' });
       }
     } catch { /* offline */ }
 
@@ -167,13 +332,13 @@ export function useNotifications() {
       const pending = appts
         .filter(a => a.status === 'requested' || (a.status === 'scheduled' && a.appointmentDate >= todayIso))
         .sort((a, b) => (a.appointmentDate + (a.appointmentTime || '')).localeCompare(b.appointmentDate + (b.appointmentTime || '')))
-        .slice(0, 20);
+        .slice(0, perSourceLimit);
       for (const a of pending) {
-        out.push({ id: `appt-appr-${a._id}`, type: 'appointment', title: `Appointment to confirm · ${a.patientName}`, subtitle: `${a.appointmentDate}${a.appointmentTime ? ` ${a.appointmentTime}` : ''} · ${a.providerName || a.department || 'awaiting approval'}`, time: a.updatedAt || a.createdAt || a.appointmentDate, href: '/appointments' });
+        out.push({ id: `appt-appr-${a._id}`, type: 'appointment', severity: 'info', title: `Appointment to confirm · ${a.patientName}`, subtitle: `${a.appointmentDate}${a.appointmentTime ? ` ${a.appointmentTime}` : ''} · ${a.providerName || a.department || 'awaiting approval'}`, time: a.updatedAt || a.createdAt || a.appointmentDate, href: '/appointments' });
       }
       // Checked in today, waiting to be seen.
-      for (const a of appts.filter(a => a.status === 'checked_in' && a.appointmentDate === todayIso).slice(0, 20)) {
-        out.push({ id: `appt-ci-${a._id}`, type: 'appointment', title: `Checked in · ${a.patientName}`, subtitle: `${a.appointmentTime ? `${a.appointmentTime} · ` : ''}${a.department || a.reason || 'waiting to be seen'}`, time: a.checkedInAt || a.updatedAt || a.appointmentDate, href: '/appointments' });
+      for (const a of appts.filter(a => a.status === 'checked_in' && a.appointmentDate === todayIso).slice(0, perSourceLimit)) {
+        out.push({ id: `appt-ci-${a._id}`, type: 'appointment', severity: 'warning', title: `Checked in · ${a.patientName}`, subtitle: `${a.appointmentTime ? `${a.appointmentTime} · ` : ''}${a.department || a.reason || 'waiting to be seen'}`, time: a.checkedInAt || a.updatedAt || a.appointmentDate, href: '/appointments' });
       }
     } catch { /* offline */ }
 
@@ -181,8 +346,36 @@ export function useNotifications() {
     try {
       const { getAllIntakeForms } = await import('../services/intake-form-service');
       const forms = await getAllIntakeForms(scope);
-      for (const f of forms.filter(x => x.status === 'pending_review').slice(0, 20)) {
-        out.push({ id: `intake-${f._id}`, type: 'intake', title: `Intake form · ${f.patientName}`, subtitle: `${f.fields?.length ? `${f.fields.length} fields` : 'Submitted'} · ready to review`, time: f.receivedAt || f.requestedAt || f.createdAt, href: '/patient-intake' });
+      for (const f of forms.filter(x => x.status === 'pending_review').slice(0, perSourceLimit)) {
+        out.push({ id: `intake-${f._id}`, type: 'intake', severity: 'info', title: `Intake form · ${f.patientName}`, subtitle: `${f.fields?.length ? `${f.fields.length} fields` : 'Submitted'} · ready to review`, time: f.receivedAt || f.requestedAt || f.createdAt, href: '/patient-intake' });
+      }
+    } catch { /* offline */ }
+
+    // Shared consultation progress. Only actionable items are raised here:
+    // work assigned to the signed-in user, unassigned urgent work, blocked
+    // tasks, and patients waiting for the next team member.
+    try {
+      const { getAllConsultationProgress } = await import('../services/consultation-progress-service');
+      const progress = await getAllConsultationProgress(scope);
+      for (const p of progress) {
+        const href = `/patients/${encodeURIComponent(p.patientId)}`;
+        const assignedToMe = !!currentUser?._id && p.ownerId === currentUser._id;
+        const openTasks = p.tasks.filter(t => t.status !== 'completed');
+        const relevantTasks = openTasks.filter(t =>
+          t.status === 'blocked' || t.priority === 'urgent' || t.ownerId === currentUser?._id || (!t.ownerId && t.priority === 'high'),
+        );
+        if (assignedToMe || relevantTasks.length > 0 || p.currentStage === 'waiting_for_provider') {
+          const task = relevantTasks[0];
+          out.push({
+            id: `progress-${p._id}-${task?.id || p.currentStage}`,
+            type: 'progress',
+            severity: task?.status === 'blocked' || task?.priority === 'urgent' ? 'warning' : 'info',
+            title: task?.status === 'blocked' ? `Blocked task · ${p.patientName}` : `Patient progress · ${p.patientName}`,
+            subtitle: task?.title || `${p.currentStage.replace(/_/g, ' ')} · ${p.nextAction || 'review next step'}`,
+            time: p.updatedAt || p.createdAt,
+            href,
+          });
+        }
       }
     } catch { /* offline */ }
 
@@ -190,8 +383,8 @@ export function useNotifications() {
     try {
       const { getAllPrescriptions } = await import('../services/prescription-service');
       const rxs = await getAllPrescriptions(scope);
-      for (const rx of rxs.filter(x => x.status === 'pending').slice(0, 20)) {
-        out.push({ id: `rx-${rx._id}`, type: 'prescription', title: `Prescription · ${rx.patientName}`, subtitle: `${rx.medication} · awaiting dispensing`, time: rx.updatedAt || rx.createdAt, href: '/pharmacy' });
+      for (const rx of rxs.filter(x => x.status === 'pending').slice(0, perSourceLimit)) {
+        out.push({ id: `rx-${rx._id}`, type: 'prescription', severity: 'info', title: `Prescription · ${rx.patientName}`, subtitle: `${rx.medication} · awaiting dispensing`, time: rx.updatedAt || rx.createdAt, href: '/pharmacy' });
       }
     } catch { /* offline */ }
 
@@ -206,9 +399,23 @@ export function useNotifications() {
     setItems(out);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeKey]);
+  }, [scopeKey, perSourceLimit]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Read-state lives in localStorage, so a mark made in the bell panel has to
+  // reach the page (and vice versa) — both mount their own copy of this hook.
+  useEffect(() => {
+    setReadIds(getReadNotificationIds(userId));
+    const sync = () => setReadIds(getReadNotificationIds(userId));
+    window.addEventListener(NOTIFICATION_READS_EVENT, sync);
+    // Another tab writing the same key.
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(NOTIFICATION_READS_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, [userId]);
 
   // Live-refresh on referral writes so the bell badge reflects acceptance the
   // moment the receiving facility's `seen` update replicates in — otherwise the
@@ -235,6 +442,16 @@ export function useNotifications() {
     const intakeChanges = intakeFormsDB().changes({ since: 'now', live: true, include_docs: false })
       .on('change', () => reload.trigger())
       .on('error', () => { /* swallow — offline */ });
+    const transferChanges = patientTransfersDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger())
+      .on('error', () => { /* swallow — offline */ });
+    const progressChanges = consultationProgressDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger())
+      .on('error', () => { /* swallow — offline */ });
+    // A patient triaged RED must badge the bell now, not on the next reopen.
+    const triageChanges = triageDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger())
+      .on('error', () => { /* swallow — offline */ });
     return () => {
       cancelled = true;
       reload.cancel();
@@ -243,8 +460,37 @@ export function useNotifications() {
       try { labChanges.cancel(); } catch { /* noop */ }
       try { rxChanges.cancel(); } catch { /* noop */ }
       try { intakeChanges.cancel(); } catch { /* noop */ }
+      try { progressChanges.cancel(); } catch { /* noop */ }
+      try { transferChanges.cancel(); } catch { /* noop */ }
+      try { triageChanges.cancel(); } catch { /* noop */ }
     };
   }, [load]);
 
-  return { items, count: items.length, loading, reload: load };
+  const decorated = useMemo(
+    () => items.map(n => (readIds.has(n.id) ? { ...n, read: true } : n)),
+    [items, readIds],
+  );
+  const unreadCount = useMemo(
+    () => decorated.reduce((n, item) => (item.read ? n : n + 1), 0),
+    [decorated],
+  );
+
+  const markRead = useCallback((ids: string | string[]) => {
+    setReadIds(markNotificationsRead(userId, Array.isArray(ids) ? ids : [ids]));
+  }, [userId]);
+  const markAllRead = useCallback(() => {
+    setReadIds(markNotificationsRead(userId, items.map(n => n.id)));
+  }, [userId, items]);
+
+  return {
+    items: decorated,
+    /** Everything in the feed. */
+    count: decorated.length,
+    /** What the bell badge counts — items the user has not opened yet. */
+    unreadCount,
+    loading,
+    reload: load,
+    markRead,
+    markAllRead,
+  };
 }

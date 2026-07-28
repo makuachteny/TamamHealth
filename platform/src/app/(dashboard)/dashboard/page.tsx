@@ -15,7 +15,8 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { patientFullName, patientAge } from '@/lib/patient-utils';
 import { getDefaultDashboard } from '@/lib/permissions';
 import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
+import { useTransferQueue } from '@/lib/hooks/usePatientTransfers';
+import { describeAssignment, isTransferOverdue } from '@/lib/services/patient-transfer-service';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
 
@@ -39,6 +40,11 @@ export default function DashboardPage() {
   // Appointments — drives the schedule board + check-in action.
   const { appointments, updateStatus: updateApptStatus } = useAppointments();
   const { triages } = useTriage();
+  // Internal transfers waiting on THIS clinician to accept or reject. Surfaced
+  // here because a transfer request only ever shown on the patient's chart is
+  // invisible to the person who has to answer it — they have no reason to open
+  // a chart that isn't theirs yet.
+  const { incoming: incomingTransfers } = useTransferQueue();
 
   // Resolve a patient display name for the signing inbox from the loaded roster.
   const signingPatientName = useCallback(
@@ -70,28 +76,6 @@ export default function DashboardPage() {
     [patients, currentUser?._id],
   );
 
-  // Right-rail "Capabilities" card — each item latches checked forever the
-  // first time this clinician does it (see useCapabilities). Signals here are
-  // scoped to documents/referrals/visits this user authored or ran, never
-  // facility-wide state.
-  const capabilityItems = useMemo(() => {
-    const userId = currentUser?._id;
-    const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length;
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const telehealthToday = (appointments || []).filter(
-      a => a.providerId === userId && a.appointmentType === 'telehealth' && a.appointmentDate === todayIso,
-    );
-    return [
-      { key: 'doctor.consultation', label: 'Complete a consultation', signal: signCount > 0, href: '/consultation' },
-      { key: 'doctor.lab-order', label: 'Order lab tests', signal: resumableEncounters.length > 0, href: '/consultation' },
-      { key: 'doctor.referral', label: 'Refer a patient', signal: referrals.some(r => r.createdBy === userId), href: '/referrals' },
-      { key: 'doctor.telehealth', label: 'Run a telehealth visit', signal: telehealthToday.length > 0, href: '/appointments' },
-      // No cheap per-user "closed by me" signal in the loaded phone-notes data —
-      // stays unchecked until the clinician actually closes one from /messages.
-      { key: 'doctor.phone-note', label: 'Close a phone note', href: '/messages' },
-    ];
-  }, [currentUser?._id, unsignedDrafts, awaitingCosign, heldAssessments, resumableEncounters, referrals, appointments]);
-  const { checklist: capabilitiesChecklist } = useCapabilities(currentUser?._id, capabilityItems);
 
   // `/dashboard` is shared. Doctors / clinical officers / clinicians get the
   // clinical view; the medical superintendent gets its own admin view (rendered
@@ -220,7 +204,30 @@ export default function DashboardPage() {
     href: e.allResultsBack ? `/consultation?encounter=${e._id}` : '/lab',
   }));
 
+  const transferEntries = incomingTransfers.map(t => {
+    const overdue = isTransferOverdue(t);
+    return {
+      id: t._id,
+      title: t.patientName || 'Patient',
+      subtitle: `${describeAssignment(t.from)} → you · ${t.reason}`,
+      meta: overdue ? 'Overdue' : shortDate(t.requestedAt || t.createdAt),
+      // An unanswered transfer past its acknowledgement window is a patient
+      // nobody has taken responsibility for, so it outranks ordinary warnings.
+      tone: overdue ? ('danger' as const) : ('warning' as const),
+      href: `/patients/${t.patientId}?tab=referrals`,
+    };
+  });
+
   const outstandingItems = [
+    {
+      label: 'Transfers to accept',
+      count: incomingTransfers.length,
+      tone: incomingTransfers.some(t => isTransferOverdue(t))
+        ? ('danger' as const)
+        : incomingTransfers.length > 0 ? ('warning' as const) : ('neutral' as const),
+      href: '/patients',
+      entries: transferEntries,
+    },
     { label: 'Documents to sign', count: signCount, tone: signCount > 0 ? 'warning' as const : 'neutral' as const, href: '/consultation', entries: documentEntries },
     { label: 'Phone notes', count: phoneNotesInbox.length, tone: phoneNotesInbox.length > 0 ? 'warning' as const : 'neutral' as const, href: '/messages', entries: phoneNoteEntries },
     { label: 'Open referrals', count: myOpenReferrals.length, href: '/referrals', entries: referralEntries },
@@ -236,7 +243,6 @@ export default function DashboardPage() {
         patients={assignedRows}
         appointments={myUpcomingAppts}
         outstanding={outstandingItems}
-        capabilities={capabilitiesChecklist}
         onUpdateAppointmentStatus={updateApptStatus}
       />
     </main>

@@ -14,7 +14,6 @@ import {
 } from '@/components/icons/lucide';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
 
 // Use the platform accent token so this dashboard matches the reference
 // Clinical Officer design instead of a one-off hardcoded hex.
@@ -150,7 +149,6 @@ export default function NutritionDashboard() {
 
   const adjustSupply = (id: string, delta: number) => {
     adjustSupplyLevel(id, delta, { id: currentUser?._id, name: currentUser?.name })
-      .then(() => markCapability('nutrition.supply'))
       .catch(err => {
         console.error('Failed to adjust supply level', err);
       });
@@ -180,7 +178,6 @@ export default function NutritionDashboard() {
       setSupplyForm(EMPTY_SUPPLY_FORM);
       setSupplyFormError('');
       setShowSupplyForm(false);
-      markCapability('nutrition.supply');
     } catch (err) {
       setSupplyFormError(err instanceof Error ? err.message : String(err));
     }
@@ -210,7 +207,6 @@ export default function NutritionDashboard() {
       setForm(EMPTY_FORM);
       setFormError('');
       setShowForm(false);
-      markCapability('nutrition.screening');
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err));
     }
@@ -295,35 +291,6 @@ export default function NutritionDashboard() {
     </div>
   );
 
-  // Capabilities card — latches checked forever the first time this user does
-  // each task (see useCapabilities). `nutrition.screening` and
-  // `nutrition.supply` also carry an authorship signal from the loaded docs
-  // (screenedById / createdBy / updatedBy) so a screening or stock entry
-  // saved in a previous session still latches on load, not just live saves.
-  // No treatment-plan/enrollment action exists anywhere on this page, so
-  // `nutrition.plan` has no handler to mark from — it stays unchecked until
-  // that workflow exists, pointed at the SAM queue where it would start.
-  const capabilityItems = useMemo(() => ([
-    {
-      key: 'nutrition.screening',
-      label: 'Record a nutrition screening',
-      onClick: () => setShowForm(true),
-      signal: savedScreenings.some(s => s.screenedById === currentUser?._id),
-    },
-    {
-      key: 'nutrition.plan',
-      label: 'Start a treatment plan (SAM/MAM)',
-      onClick: () => setFilterStatus('sam'),
-    },
-    {
-      key: 'nutrition.supply',
-      label: 'Log therapeutic supply stock',
-      onClick: () => togglePanel('supplies'),
-      signal: supplyDocs.some(item => item.createdBy === currentUser?._id || item.updatedBy === currentUser?._id),
-    },
-  ]), [savedScreenings, supplyDocs, currentUser?._id]);
-  const { checklist: capabilitiesChecklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
-
   if (!currentUser) return null;
 
   return (
@@ -391,15 +358,10 @@ export default function NutritionDashboard() {
         metrics={[
           { label: t('nutrition.kpiChildrenUnder5'), value: stats.children },
           { label: t('nutrition.kpiAncMothers'), value: stats.anc },
-          // Daily alert surfaces — kept as metrics (not checklist items) so
-          // active SAM cases / critical supply stay visible day to day
-          // instead of being replaced by the one-time capability checklist.
           { label: t('nutrition.kpiSamCases'), value: stats.sam, tone: stats.sam > 0 ? 'danger' : 'success', onClick: () => setFilterStatus('sam') },
           { label: t('nutrition.kpiSupplyAlerts'), value: stats.criticalSupply, tone: stats.criticalSupply > 0 ? 'danger' : 'success' },
         ]}
         metricsTitle={t('nutrition.title')}
-        checklist={capabilitiesChecklist}
-        checklistTitle="Capabilities"
         emptyTitle={t('nutrition.noScreenings')}
       >
           {/* ── New screening entry form ── */}

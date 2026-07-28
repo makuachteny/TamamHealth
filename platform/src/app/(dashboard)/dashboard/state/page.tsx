@@ -13,7 +13,6 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { formatDateTitle, toIsoDate, parseIsoDate, addDays } from '@/components/ehr/EhrMiniCalendar';
-import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import { Download, Activity, TrendingUp, Table as TableIcon } from '@/components/icons/lucide';
 import { tooltipStyle, axisTick } from '@/components/ChartCard';
 import {
@@ -161,14 +160,8 @@ export default function StateDashboardPage() {
       'ANC Total': c.ancTotal,
     }));
     downloadCSV(rows, `${(stateName || 'state').toLowerCase().replace(/\s+/g, '_')}_county_data`);
-    markCapability('state.export');
   };
 
-  const capabilityItems = useMemo(() => ([
-    { key: 'state.export', label: 'Export county data', onClick: exportCountyData },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- exportCountyData closes over counties/stateName, both recomputed every render
-  ]), [counties, stateName]);
-  const { checklist: capabilitiesChecklist, mark: markCapability } = useCapabilities(currentUser?._id, capabilityItems);
 
   // Day statistics rail: counties are aggregates with no dated per-item work,
   // so row-derived bucketing (the shared shell's default) is meaningless here.
@@ -348,8 +341,6 @@ export default function StateDashboardPage() {
             { label: t('state.immunizationsYtd'), value: immunizationsYtd },
           ]}
           metricsTitle={t('state.title')}
-          checklist={capabilitiesChecklist}
-          checklistTitle="Capabilities"
           missionTitle={t('state.title')}
           // Counties count already lives on the tab label above — the mission
           // card only adds the facilities figure so the two don't repeat.

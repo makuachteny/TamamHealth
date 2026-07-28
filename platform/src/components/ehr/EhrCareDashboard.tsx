@@ -2,7 +2,8 @@
 
 import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
@@ -35,13 +36,6 @@ export type EhrCareDashboardMetric = {
   value: number | string;
   tone?: 'neutral' | 'warning' | 'danger' | 'success';
   active?: boolean;
-  href?: string;
-  onClick?: () => void;
-};
-
-export type EhrCareDashboardChecklistItem = {
-  label: string;
-  done?: boolean;
   href?: string;
   onClick?: () => void;
 };
@@ -118,6 +112,18 @@ function detailPair(primary?: string, secondary?: string) {
   return [primary, secondary].filter(Boolean).join(' · ') || undefined;
 }
 
+/**
+ * Stable `data-tour` anchors
+ * -------------------------
+ * The regions below carry `data-tour` attributes that the guided tour targets
+ * (`src/lib/tour/journey-tours.ts`). They are NOT styling hooks — they exist so
+ * a tour step can spotlight the thing it is describing instead of falling back
+ * to a centred card floating over the page.
+ *
+ * Because this shell backs every role dashboard, one anchor here serves every
+ * role. Renaming or removing one silently degrades those tours to floating
+ * cards, so `journey-tours.test.ts` asserts each anchor still has a match here.
+ */
 export default function EhrCareDashboard({
   title,
   greetingName,
@@ -134,7 +140,6 @@ export default function EhrCareDashboard({
   rows,
   metrics,
   metricsActions,
-  checklist,
   showCalendar = true,
   railContent,
   chart,
@@ -143,8 +148,6 @@ export default function EhrCareDashboard({
   showChart = true,
   calendarEventDates,
   metricsTitle = 'Today',
-  checklistTitle = 'Workflow',
-  checklistDescription,
   missionTitle,
   missionDescription,
   footerContent,
@@ -182,7 +185,6 @@ export default function EhrCareDashboard({
    *  card — e.g. "View Referrals", "Appointments". Same shape as `actions`,
    *  just placed in the sidebar instead of the header/rail. */
   metricsActions?: EhrCareDashboardAction[];
-  checklist: EhrCareDashboardChecklistItem[];
   showCalendar?: boolean;
   /** Extra left-rail card(s) rendered between the day chart and the filter
    *  group — e.g. the nurse dashboard's ward-occupancy card. */
@@ -198,8 +200,6 @@ export default function EhrCareDashboard({
   showChart?: boolean;
   calendarEventDates?: string[];
   metricsTitle?: string;
-  checklistTitle?: string;
-  checklistDescription?: string;
   missionTitle?: string;
   missionDescription?: string;
   footerContent?: ReactNode;
@@ -315,7 +315,7 @@ export default function EhrCareDashboard({
           </div>
         </div>
 
-        <div className="ehr-schedule-actions">
+        <div className="ehr-schedule-actions" data-tour="station-actions">
           {headerActions.map(action => (
             <button key={action.label} type="button" className={action.tone === 'primary' || action.active ? 'primary' : ''} onClick={action.onClick}>
               <action.icon className="w-4 h-4" />{action.label}
@@ -339,7 +339,7 @@ export default function EhrCareDashboard({
           {/* Same markup and classes as the Clinical Officer rail search, so
               every role gets one search field of one design and width. */}
           {onSearchChange && (
-            <div className="ehr-rail-search">
+            <div className="ehr-rail-search" data-tour="rail-search">
               <Search className="ehr-rail-search-icon w-4 h-4" />
               <input
                 type="search"
@@ -391,7 +391,7 @@ export default function EhrCareDashboard({
           )}
         </aside>
 
-        <section className="ehr-center-panel">
+        <section className="ehr-center-panel" data-tour="station-queue">
           <div className="ehr-daybar">
             <div>
               <h2>{centerTitle || selectedDateLabel}</h2>
@@ -403,7 +403,7 @@ export default function EhrCareDashboard({
                 </p>
               )}
             </div>
-            <div className="ehr-day-tabs">
+            <div className="ehr-day-tabs" data-tour="station-tabs">
               {tabs.map(tab => (
                 <button
                   key={tab.key}
@@ -537,14 +537,14 @@ export default function EhrCareDashboard({
           {/* Children.toArray drops null/false conditionals, so a dashboard
               whose panels are all closed doesn't render an empty card. */}
           {Children.toArray(children).length > 0 && (
-            <div className={`ehr-worklist-panel ehr-care-workflow ${hideRowList ? 'ehr-care-workflow--bare' : ''} ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
+            <div data-tour="station-body" className={`ehr-worklist-panel ehr-care-workflow ${hideRowList ? 'ehr-care-workflow--bare' : ''} ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
               {children}
             </div>
           )}
         </section>
 
         {effectiveView === 'dashboard' && (
-        <aside className="ehr-right-rail">
+        <aside className="ehr-right-rail" data-tour="side-cards">
           <div className="ehr-side-card">
             <div className="ehr-side-card-head">
               <ClipboardList className="w-5 h-5" />
@@ -575,19 +575,15 @@ export default function EhrCareDashboard({
               </button>
             ))}
           </div>
-          <div className="ehr-side-card ehr-capabilities-card">
-            <div className="ehr-side-card-head">
-              <ClipboardCheck className="w-5 h-5" />
-              <h2>{checklistTitle}</h2>
-            </div>
-            {checklistDescription && <p>{checklistDescription}</p>}
-            {checklist.map(item => (
-              <label key={item.label} onClick={item.onClick || (item.href ? () => router.push(item.href as string) : undefined)}>
-                <input type="checkbox" checked={!!item.done} readOnly />
-                {item.label}
-              </label>
-            ))}
-          </div>
+          {/* "Who moved where, just now" — the station equivalent of the
+              clinician's "Awaiting review". Rendered here so every dashboard
+              built on this shell gets it without wiring it seven times; the
+              card picks its own title and slice from the signed-in role and
+              renders nothing for roles that have no feed configured. Sits
+              BELOW the metrics: counts are the anchor a station reads first,
+              the feed is what it scans afterwards. */}
+          <ProgressFeedCard />
+
           {showMissionCard && missionTitle && missionDescription && (
             <div className="ehr-side-card ehr-mission-card">
               <div className="ehr-side-card-head ehr-mission-head">

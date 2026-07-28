@@ -120,10 +120,39 @@ export async function cancelReminder(id: string): Promise<PatientReminderDoc | n
 export interface ReminderDispatchOutcome {
   attempted: number;
   sent: number;
+  /** Attempts that failed this run but will be retried. */
   failed: number;
+  /** Reminders that exhausted MAX_DISPATCH_ATTEMPTS and are now terminal. */
+  permanentlyFailed: number;
+  /** Due but still inside their backoff window — retried on a later run. */
+  skippedBackoff: number;
   skippedNoPhone: number;
   skippedChannel: number;
   gatewayEnabled: boolean;
+}
+
+/**
+ * Retry policy (KAN-104).
+ *
+ * Transient gateway failures — a timeout, a 5xx, a network drop on a facility
+ * with intermittent connectivity — must not consume the reminder. Equally, a
+ * permanently bad number must not be retried forever and must become visible
+ * to staff rather than sitting in the queue looking like it is still coming.
+ *
+ * Backoff is measured in hours because dispatch runs daily; the escalating
+ * delay keeps a single bad number from occupying every run.
+ */
+export const MAX_DISPATCH_ATTEMPTS = 4;
+const BACKOFF_HOURS = [0, 1, 6, 24];
+
+/** True when this reminder's backoff window has elapsed and it may be retried. */
+export function isRetryDue(reminder: PatientReminderDoc, now: Date = new Date()): boolean {
+  const attempts = reminder.attempts ?? 0;
+  if (attempts === 0) return true;
+  if (!reminder.lastAttemptAt) return true;
+  const waitHours = BACKOFF_HOURS[Math.min(attempts, BACKOFF_HOURS.length - 1)];
+  const elapsedMs = now.getTime() - new Date(reminder.lastAttemptAt).getTime();
+  return elapsedMs >= waitHours * 3_600_000;
 }
 
 /**
@@ -140,7 +169,8 @@ export interface ReminderDispatchOutcome {
 export async function dispatchDueReminders(asOf: string = todayISO()): Promise<ReminderDispatchOutcome> {
   const gatewayEnabled = process.env.PATIENT_REMINDER_SMS_ENABLED === 'true';
   const outcome: ReminderDispatchOutcome = {
-    attempted: 0, sent: 0, failed: 0, skippedNoPhone: 0, skippedChannel: 0, gatewayEnabled,
+    attempted: 0, sent: 0, failed: 0, permanentlyFailed: 0,
+    skippedBackoff: 0, skippedNoPhone: 0, skippedChannel: 0, gatewayEnabled,
   };
   if (!gatewayEnabled) return outcome;
 
@@ -168,17 +198,32 @@ export async function dispatchDueReminders(asOf: string = todayISO()): Promise<R
       outcome.skippedNoPhone++;
       continue;
     }
+    // Respect the backoff window so a run that fires while a reminder is still
+    // cooling off doesn't burn one of its attempts.
+    if (!isRetryDue(reminder)) {
+      outcome.skippedBackoff++;
+      continue;
+    }
+
     outcome.attempted++;
+    const attempts = (reminder.attempts ?? 0) + 1;
+    const attemptedAt = new Date().toISOString();
     try {
       const result = await sendSms({ to: phone, body: reminder.message });
       if (result.ok) {
-        await setStatus(reminder._id, 'sent', { sentAt: new Date().toISOString() }, 'DISPATCH_REMINDER_SMS');
+        // Status flips to 'sent' immediately, which is also what makes dispatch
+        // idempotent: getDueReminders only returns 'queued', so a second run —
+        // or two runs overlapping — cannot re-send the same reminder.
+        await setStatus(reminder._id, 'sent',
+          { sentAt: attemptedAt, attempts, lastAttemptAt: attemptedAt },
+          'DISPATCH_REMINDER_SMS');
         outcome.sent++;
       } else {
-        outcome.failed++;
+        await recordFailure(reminder, attempts, attemptedAt, result.error || 'gateway rejected the message', outcome);
       }
-    } catch {
-      outcome.failed++;
+    } catch (err) {
+      await recordFailure(reminder, attempts, attemptedAt,
+        err instanceof Error ? err.message : String(err), outcome);
     }
   }
 
@@ -186,7 +231,33 @@ export async function dispatchDueReminders(asOf: string = todayISO()): Promise<R
     'DISPATCH_PATIENT_REMINDERS',
     undefined,
     undefined,
-    `SMS dispatch: ${outcome.sent} sent, ${outcome.failed} failed, ${outcome.skippedNoPhone} no phone, ${outcome.skippedChannel} non-SMS`,
+    `SMS dispatch: ${outcome.sent} sent, ${outcome.failed} retryable failures, ` +
+    `${outcome.permanentlyFailed} permanently failed, ${outcome.skippedBackoff} in backoff, ` +
+    `${outcome.skippedNoPhone} no phone, ${outcome.skippedChannel} non-SMS`,
   );
   return outcome;
+}
+
+/**
+ * Record a failed dispatch attempt. Stays `queued` (and therefore retryable)
+ * until MAX_DISPATCH_ATTEMPTS is exhausted, then becomes terminal `failed` so
+ * staff can see the patient was not reached rather than assuming it is still
+ * on its way.
+ */
+async function recordFailure(
+  reminder: PatientReminderDoc,
+  attempts: number,
+  attemptedAt: string,
+  error: string,
+  outcome: ReminderDispatchOutcome,
+): Promise<void> {
+  const terminal = attempts >= MAX_DISPATCH_ATTEMPTS;
+  await setStatus(
+    reminder._id,
+    terminal ? 'failed' : 'queued',
+    { attempts, lastAttemptAt: attemptedAt, lastError: error.slice(0, 300) },
+    terminal ? 'DISPATCH_REMINDER_FAILED' : 'DISPATCH_REMINDER_RETRY',
+  );
+  if (terminal) outcome.permanentlyFailed++;
+  else outcome.failed++;
 }

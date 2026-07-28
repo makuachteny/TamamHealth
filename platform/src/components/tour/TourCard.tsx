@@ -95,7 +95,7 @@ export default function TourCard({
           }}
         />
       ) : (
-        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.50)', pointerEvents: 'none', zIndex: 9998 }} />
+        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.62)', pointerEvents: 'none', zIndex: 9998 }} />
       )}
       <div
         ref={cardRef}
@@ -135,9 +135,11 @@ export default function TourCard({
           />
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', fontFamily: 'var(--font-platform-mono)' }}>
-            {index + 1}/{total}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          {/* "Step 3 of 10" rather than "3/10": the tour is read once, by
+              someone learning the product, and a ratio makes them decode it. */}
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent-primary)', letterSpacing: '0.02em' }}>
+            Step {index + 1} of {total}
           </span>
           <button
             type="button"
@@ -147,6 +149,23 @@ export default function TourCard({
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Progress. Tells someone mid-tour how much is left — the difference
+            between "I'll finish this" and "I'll skip it". */}
+        <div
+          aria-hidden
+          style={{ height: 3, borderRadius: 2, background: 'var(--overlay-subtle)', overflow: 'hidden', marginBottom: 12 }}
+        >
+          <div
+            style={{
+              height: '100%',
+              width: `${((index + 1) / Math.max(total, 1)) * 100}%`,
+              background: 'var(--accent-primary)',
+              borderRadius: 2,
+              transition: 'width .25s ease',
+            }}
+          />
         </div>
 
         <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px' }}>{step.title}</h3>

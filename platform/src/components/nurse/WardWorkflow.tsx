@@ -132,7 +132,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
           (the child of .ehr-care-workflow shrinks to content width instead
           of stretching, since the inline flex:1 needs to be on THIS element
           directly to win over `.ehr-care-workflow > *`). */}
-      <section className={`ehr-worklist-panel ward-workflow-panel ${showHeader ? '' : 'ward-workflow-panel--merged'}`.trim()} style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+      <section data-tour="ward-board" className={`ehr-worklist-panel ward-workflow-panel ${showHeader ? '' : 'ward-workflow-panel--merged'}`.trim()} style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
           {showHeader && (
             <div className="ward-header-row">
               <h3 className="flex-shrink-0">Ward patients</h3>
@@ -271,11 +271,9 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                       </div>
 
                       <div className="ehr-appointment-time">
-                        <strong style={overTarget ? { color: '#C24135' } : undefined}>{waitText}</strong>
+                        <strong style={overTarget ? { color: 'var(--color-danger)' } : undefined}>{waitText}</strong>
                         {waitSubtext && (
-                          <span className={overTarget ? 'is-soon' : ''}>
-                            {waitSubtext}{overTarget ? ' · over target' : ''}
-                          </span>
+                          <span className={overTarget ? 'is-soon' : ''}>{waitSubtext}</span>
                         )}
                       </div>
 

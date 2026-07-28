@@ -39,6 +39,36 @@ const CSRF_EXEMPT_API_PATHS = new Set<string>([
   '/api/demo-credentials',
 ]);
 
+/**
+ * Scheduled-job endpoints, and the request header each uses to authenticate.
+ *
+ * These routes accept TWO kinds of caller: a staff user with a session (manual
+ * trigger from the UI), and a scheduled job holding a shared secret. A cron
+ * `curl` has no session cookie, no CSRF token, and — crucially — no `Origin`
+ * header, so it is rejected twice over by the gates below before the route's
+ * own secret check ever runs. Without this exemption the jobs 403 silently in
+ * production and the features they drive simply never happen: reminders are
+ * never sent, and scheduled transfers never take effect.
+ *
+ * The exemption is deliberately keyed on the PRESENCE of the secret header,
+ * not just the path:
+ *   - A cross-site attacker cannot set a custom header on a form/img request,
+ *     and a fetch that tries triggers a CORS preflight the browser will block.
+ *   - So the session-authenticated path keeps full CSRF protection; only a
+ *     request already claiming to be a machine caller skips it.
+ *   - The header's VALUE is still verified in the route with a constant-time
+ *     compare, so presence alone authorises nothing.
+ */
+const MACHINE_CALLER_ROUTES: Record<string, string> = {
+  '/api/patient-reminders/dispatch': 'x-reminder-dispatch-secret',
+  '/api/patient-transfers/sweep': 'x-transfer-sweep-secret',
+};
+
+function isMachineCallerRequest(pathname: string, request: NextRequest): boolean {
+  const header = MACHINE_CALLER_ROUTES[pathname];
+  return Boolean(header && request.headers.get(header));
+}
+
 // The public pay-by-link checkout helper. No staff session exists (a payer
 // opens the link), so the cookie+header CSRF gate can't apply; the Origin
 // check above still guards it against cross-site abuse.
@@ -161,7 +191,7 @@ export async function proxy(request: NextRequest) {
   // Runs BEFORE the patient-portal early-return so the patient portal still
   // gets cross-site protection — only the cookie+header CSRF gate is skipped
   // for that path (it uses Bearer auth instead, see below).
-  if (pathname.startsWith('/api/')) {
+  if (pathname.startsWith('/api/') && !isMachineCallerRequest(pathname, request)) {
     const method = request.method.toUpperCase();
     if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
       const origin = request.headers.get('origin');
@@ -241,6 +271,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Scheduled-job endpoints presenting their secret header. These have no
+  // session cookie, so the gate below would 401 them before the route ever ran
+  // — the job would fail every time and the work it drives would silently never
+  // happen. Handing off here is safe because the route does NOT trust the
+  // header's presence: it compares the value in constant time and, failing
+  // that, falls back to `getAuthPayload` and returns 401 itself. A wrong or
+  // guessed secret therefore gets exactly as far as a missing one.
+  if (isMachineCallerRequest(pathname, request)) {
+    return NextResponse.next();
+  }
+
   // All other routes require authentication
   const token = request.cookies.get('tamamhealth-token')?.value;
 
@@ -277,7 +318,9 @@ export async function proxy(request: NextRequest) {
   // The Origin check above stops the simple cross-site form attack; this
   // layer holds even if a future change weakens SameSite cookies or a same-
   // site sub-resource gets compromised.
-  if (pathname.startsWith('/api/') && !isCsrfExemptApiPath(pathname)) {
+  if (pathname.startsWith('/api/')
+      && !isCsrfExemptApiPath(pathname)
+      && !isMachineCallerRequest(pathname, request)) {
     const method = request.method.toUpperCase();
     if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
       const cookieToken = request.cookies.get(CSRF_COOKIE_NAME)?.value || '';

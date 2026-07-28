@@ -334,6 +334,14 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
 const DEFAULT_DASHBOARD_FALLBACK = '/dashboard';
 
+/**
+ * Routes every signed-in role can reach, whatever their module allow-list says.
+ * These are personal surfaces rather than clinical modules — the notification
+ * feed only ever contains items derived from data the user can already see, so
+ * gating it per role would just break the bell for some roles.
+ */
+const UNIVERSAL_ROUTES: readonly string[] = ['/notifications'];
+
 function getConfig(role: UserRole | string): RoleRouteConfig | undefined {
   return (ROLE_ROUTE_TABLE as Record<string, RoleRouteConfig>)[role];
 }
@@ -363,9 +371,8 @@ export function isPathAllowed(role: UserRole | string, pathname: string): boolea
   // query string or hash (e.g. "/data-quality?view=completeness"). Those
   // target the same route, and a real pathname never contains ? or #.
   const path = pathname.split(/[?#]/)[0];
-  return config.allowed.some(
-    route => path === route || path.startsWith(route + '/'),
-  );
+  const matches = (route: string) => path === route || path.startsWith(route + '/');
+  return UNIVERSAL_ROUTES.some(matches) || config.allowed.some(matches);
 }
 
 /**

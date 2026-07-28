@@ -21,7 +21,6 @@ import { formatMoney } from '@/lib/format-utils';
 import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 import { prescription as rxLifecycle } from '@/lib/clinical-flow/order-lifecycles';
-import { markCapability } from '@/lib/capability-storage';
 
 const UNITS = ['tablets', 'vials', 'bottles', 'sachets', 'tubes', 'ampoules', 'sachet', 'ml'];
 
@@ -643,13 +642,9 @@ export default function PharmacyPage() {
   const activeRxs = activePatient ? rxFor(activePatient) : [];
 
   // Print a reorder / purchase order from the items currently needing restock.
-  // Also latches the pharmacy.reorder capability mark shown on the pharmacy
-  // dashboard's Capabilities card (dashboard/pharmacy/page.tsx) — the reorder
-  // flow itself lives only here, on the full pharmacy page.
   const handlePrintReorder = () => {
     const w = window.open('', '_blank');
     if (!w) return;
-    if (currentUser?._id) markCapability('pharmacy.reorder', currentUser._id);
     const rows = reorderList.map(i =>
       `<tr><td>${i.medicationName}</td><td>${i.category}</td><td>${i.stockLevel} ${i.unit}</td><td>${i.reorderLevel}</td><td>${orderQtyFor(i)}</td></tr>`
     ).join('');
@@ -777,6 +772,31 @@ export default function PharmacyPage() {
           search={!(activeTab === 'patients' && activePatient) ? { value: tableSearch, onChange: setTableSearch, placeholder: 'Filter table', ariaLabel: 'Filter table' } : undefined}
           actions={
             <>
+              {/* View switcher. Was a six-tab strip under the header, which ran
+                  ~1400px wide and scrolled horizontally on anything narrower;
+                  as a select it sits beside the search and the card title
+                  already names the current view. Counts stay on the options. */}
+              <select
+                value={activeTab}
+                onChange={e => setActiveTab(e.target.value as PharmacyTab)}
+                aria-label="Choose which pharmacy view to display"
+                title="Choose which pharmacy view to display"
+                style={{
+                  height: 38,
+                  width: 'auto',
+                  maxWidth: 320,
+                  flexShrink: 0,
+                  borderRadius: 999,
+                  padding: '0 14px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--accent-primary)',
+                }}
+              >
+                {tabsConfig.map(tab => (
+                  <option key={tab.key} value={tab.key}>{tab.label}</option>
+                ))}
+              </select>
               <div className="relative" ref={headerFilterRef}>
                 <EhrListHeaderButton
                   onClick={() => setShowHeaderFilters(s => !s)}
@@ -854,16 +874,6 @@ export default function PharmacyPage() {
             </>
           }
         />
-        <div className="flex gap-0 border-b overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
-          {tabsConfig.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === tab.key ? 'tab-active' : ''}`}
-              style={{ color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
         {activeTab === 'queue' && (
           rxLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -898,10 +908,10 @@ export default function PharmacyPage() {
                       <tr key={rx._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setWorkflowRxId(rx._id)}>
                         <td><PatientName patientId={rx.patientId} name={rx.patientName} nameClassName="text-sm font-medium" /></td>
                         <td className="text-sm">
+                          {/* No per-row pill glyph: it was identical on every
+                              row, so it carried no information and just pushed
+                              the drug name off the column edge. */}
                           <div className="flex items-center gap-2">
-                            <div className="icon-box-sm">
-                              <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
-                            </div>
                             {rx.medication}
                             {rx.urgency === 'immediate' && (
                               <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(217,119,6,0.12)', color: 'var(--color-warning)' }}>Immediate</span>
@@ -966,17 +976,9 @@ export default function PharmacyPage() {
                   </tr>
                 ) : filteredInventory.map(item => (
                   <tr key={item._id}>
-                    <td className="font-medium text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="icon-box-sm">
-                          {item.status === 'expired' || item.status === 'critical'
-                            ? <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
-                            : <Pill className="w-3.5 h-3.5" style={{ color: item.status === 'low' ? '#F59E0B' : '#2191D0' }} />
-                          }
-                        </div>
-                        {item.medicationName}
-                      </div>
-                    </td>
+                    {/* Icon dropped: stock state is already its own Status
+                        column, so the glyph was a second, weaker copy of it. */}
+                    <td className="font-medium text-sm">{item.medicationName}</td>
                     <td><span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--overlay-medium)', color: 'var(--text-secondary)' }}>{item.category}</span></td>
                     <td>
                       <div className="flex items-center gap-2">
@@ -1082,14 +1084,10 @@ export default function PharmacyPage() {
                   const { days, expired, soon } = expiryStatusFor(item);
                   return (
                     <tr key={item._id}>
-                      <td className="font-medium text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="icon-box-sm">
-                            <Calendar className="w-3.5 h-3.5" style={{ color: expired ? 'var(--color-danger)' : soon ? '#F59E0B' : '#2191D0' }} />
-                          </div>
-                          {item.medicationName}
-                        </div>
-                      </td>
+                      {/* Icon dropped: the same calendar on every row said
+                          nothing the Expiry and Status columns don't already
+                          say, in colour, further right. */}
+                      <td className="font-medium text-sm">{item.medicationName}</td>
                       <td className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{item.batchNumber}</td>
                       <td className="text-sm">{item.stockLevel} <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.unit}</span></td>
                       <td className="text-xs" style={{ color: expired ? 'var(--color-danger)' : 'var(--text-muted)' }}>{item.expiryDate}</td>
@@ -1211,14 +1209,7 @@ export default function PharmacyPage() {
                       const stage = pharmacyStage(rx);
                       return (
                         <tr key={rx._id}>
-                          <td className="font-medium text-sm">
-                            <div className="flex items-center gap-2">
-                              <div className="icon-box-sm">
-                                <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
-                              </div>
-                              {rx.medication}
-                            </div>
-                          </td>
+                          <td className="font-medium text-sm">{rx.medication}</td>
                           <td className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>{rx.dose} {rx.frequency} {rx.duration ? `x ${rx.duration}` : ''}</td>
                           <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{rx.prescribedBy}</td>
                           <td className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{rx.createdAt ? new Date(rx.createdAt).toLocaleDateString('en-GB') : '—'}</td>

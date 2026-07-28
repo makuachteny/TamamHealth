@@ -24,6 +24,7 @@ import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHea
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import ChartCard, { tooltipStyle, axisTick } from '@/components/ChartCard';
 import { classifyAuditRisk, formatWhen, type SaSeverity } from '@/components/admin/sa-ui';
+import { useBackupStatus } from '@/lib/hooks/useBackupStatus';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Legend,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -245,10 +246,15 @@ export default function AdminDashboardPage() {
   const syncRate = syncStats.total > 0 ? Math.round((syncStats.synced / syncStats.total) * 100) : 100;
   const syncTone: Tone = syncStats.failed > 0 ? 'danger' : syncStats.pending > 0 ? 'warn' : 'ok';
 
-  const backupIso = typeof window !== 'undefined' ? localStorage.getItem('safeguard_last_backup') : null;
+  // One source, three-way state (KAN-117). This previously read a localStorage
+  // key nothing ever wrote and treated its absence as `Infinity` hours old —
+  // reporting the backup as definitively overdue, a measured-sounding claim
+  // about something never measured.
   const rpoHours = config?.superAdminPolicies?.backupRpoHours ?? 24;
-  const backupAgeHours = backupIso ? (Date.now() - new Date(backupIso).getTime()) / 3600000 : Infinity;
-  const backupOverdue = backupAgeHours > rpoHours;
+  const backupStatus = useBackupStatus(rpoHours);
+  const backupAgeHours = backupStatus?.ageHours ?? null;
+  const backupOverdue = backupStatus?.state === 'overdue';
+  const backupUnknown = backupStatus?.state === 'unknown';
 
   const readiness = Math.max(0, Math.min(100,
     100
@@ -287,7 +293,18 @@ export default function AdminDashboardPage() {
       rows.push({
         severity: 'high',
         title: 'Backup overdue',
-        detail: backupIso ? `Last backup ${formatWhen(backupIso)} · RPO ${rpoHours}h` : `No backup recorded · RPO ${rpoHours}h`,
+        detail: `Last backup ${formatWhen(backupStatus!.lastBackupAt!)} · RPO ${rpoHours}h`,
+        href: '/admin/security',
+      });
+    } else if (backupUnknown) {
+      // Distinct from overdue, and deliberately still a risk row: "we cannot
+      // tell whether backups are running" is an operational problem worth an
+      // administrator's attention — it is just not the same problem as a
+      // backup that is known to be late.
+      rows.push({
+        severity: 'medium',
+        title: 'Backup status unknown',
+        detail: `Nothing has reported a backup · RPO ${rpoHours}h`,
         href: '/admin/security',
       });
     }
@@ -299,7 +316,7 @@ export default function AdminDashboardPage() {
     }
     const order: SaSeverity[] = ['critical', 'high', 'medium', 'low'];
     return rows.sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity)).slice(0, 8);
-  }, [failedAudits, syncStats.failed, conflictCount, suspendedOrgs, trialOrgs, backupOverdue, backupIso, rpoHours, config?.maintenanceMode]);
+  }, [failedAudits, syncStats.failed, conflictCount, suspendedOrgs, trialOrgs, backupOverdue, backupUnknown, backupStatus, rpoHours, config?.maintenanceMode]);
 
   /* Tenant health matrix (searchable). */
   const tenantMatrix = useMemo(() => {

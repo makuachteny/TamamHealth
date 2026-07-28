@@ -1654,6 +1654,27 @@ const familyNames = ['Deng', 'Garang', 'Mabior', 'Kuol', 'Bol', 'Atem', 'Kiir', 
 // AllergyEntry, DirectiveType/Entry, CareAlertCategory/Entry and ScreeningEntry
 // moved to lib/types/patient-clinical.ts (imported + re-exported at the top).
 
+/**
+ * A non-owning member of a patient's care team. Distinct from
+ * `Patient.assignedDoctor`, which is the single accountable owner: a care-team
+ * member can read and contribute to the chart, but responsibility has not moved
+ * to them.
+ */
+export interface CareTeamMember {
+  providerId: string;
+  providerName?: string;
+  department?: string;
+  facilityId?: string;
+  /** Why they have access — 'shared_care' consult, or the displaced owner of a
+   *  temporary transfer waiting to get the patient back. */
+  role: 'consult' | 'covering' | 'previous_owner';
+  /** Transfer that granted the access, so it can be traced and revoked. */
+  transferId?: string;
+  grantedAt: string;
+  /** Absent means open-ended (only valid for `consult`). */
+  expiresAt?: string;
+}
+
 export interface Patient {
   id: string;
   hospitalNumber: string;
@@ -1738,6 +1759,17 @@ export interface Patient {
   assignedByName?: string;
   /** Optional handoff note from the nurse to the doctor. */
   assignmentNote?: string;
+  /** Department currently responsible for the patient (e.g. "Paediatrics"). */
+  assignedDepartment?: string;
+  /**
+   * Additional clinicians with care-team access who are NOT the owner —
+   * specialist consults, covering providers, co-management. Written by the
+   * internal-transfer workflow for `shared_care` transfers and by `temporary`
+   * transfers (which park the original owner here so ownership can return).
+   * Entries past their `expiresAt` are lapsed and must be treated as revoked
+   * — see `activeCareTeam()` in patient-transfer-service.
+   */
+  careTeam?: CareTeamMember[];
   isActive: boolean;
   /** Set when patient death is recorded within the platform. */
   deceasedAt?: string;
@@ -2394,6 +2426,19 @@ export interface Referral {
   outcome?: ReferralOutcome;
   transferPackage?: TransferPackage;
   referralAttachments?: Attachment[];
+  /**
+   * Organization that owns the DESTINATION facility (KAN-101).
+   *
+   * `orgId` on a referral resolves to the *sending* org, and `filterByScope`
+   * filters on org before it ever looks at hospital — so a referral sent across
+   * an organisational boundary was invisible to the receiving org. The
+   * referring clinician saw a sent referral that the receiver would never get.
+   *
+   * Carrying the destination org lets scope enforcement grant read access to
+   * both sides of a cross-org referral without widening anything else.
+   * Undefined for same-org referrals, where `orgId` already covers both ends.
+   */
+  toOrgId?: string;
   /**
    * When the receiving facility is expected to have acknowledged this referral,
    * derived from `urgency` at creation (emergency +4h, urgent +24h, routine
