@@ -30,6 +30,7 @@ import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import { jubaDate, jubaNow, jubaTime } from '@/lib/time-juba';
 import PageInstructionCard from '@/components/PageInstructionCard';
+import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 
 // react-big-calendar (and its CSS) is a heavy client-only library. Split it out
 // of the route's initial bundle so it loads only when the calendar view renders.
@@ -845,6 +846,13 @@ export default function AppointmentsPage() {
                 </span>
                 <InsuranceBadge insured={insuredIds.has(eventApt.patientId)} pill />
               </div>
+              <EhrWorkItemProgress
+                status={statusConfig[eventApt.status].label}
+                owner={eventApt.providerName || 'Unassigned'}
+                waiting={`${formatClockTime(eventApt.appointmentTime)} · ${eventApt.duration}m`}
+                timeLabel="Visit time"
+                nextAction={eventApt.status === 'completed' ? 'Review visit' : eventApt.status === 'cancelled' ? 'No action' : 'Check in or open chart'}
+              />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 18 }}>
                 <Detail label="Date" value={new Date(eventApt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} icon={<Calendar size={14} />} />
                 <Detail label="Time" value={`${formatClockTime(eventApt.appointmentTime)} · ${eventApt.duration}m`} icon={<Clock size={14} />} />
@@ -1072,15 +1080,15 @@ export default function AppointmentsPage() {
 
 /* ─── Reusable Components ─── */
 
-function Modal({ children, onClose, title, titleColor, icon, size = 'md', nav }: {
+function Modal({ children, onClose, title, titleColor, icon, size = 'md', nav, variant = 'dialog' }: {
   children: React.ReactNode; onClose: () => void; title: string; titleColor?: string;
-  icon?: React.ReactNode; size?: 'sm' | 'md' | 'lg'; nav?: React.ReactNode;
+  icon?: React.ReactNode; size?: 'sm' | 'md' | 'lg'; nav?: React.ReactNode; variant?: 'dialog' | 'drawer';
 }) {
   const sizeClass = size === 'sm' ? 'modal-panel--sm' : size === 'lg' ? 'modal-panel--lg' : 'modal-panel--md';
-  const width = size === 'sm' ? 440 : size === 'lg' ? 820 : 600;
+  const width = size === 'sm' ? 400 : size === 'lg' ? 720 : 560;
   return (
-    <PortalModal onClose={onClose} width={width}>
-      <div className={`modal-panel ${sizeClass}`} style={{ maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', width: '100%' }}>
+    <PortalModal onClose={onClose} width={width} variant={variant}>
+      <div className={`modal-panel ${sizeClass}`} style={{ maxHeight: variant === 'drawer' ? '100vh' : 'calc(100vh - 32px)', height: variant === 'drawer' ? '100%' : undefined, overflowY: 'auto', width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             {icon}

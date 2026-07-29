@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWards } from '@/lib/hooks/useWards';
 import { useAppointments } from '@/lib/hooks/useAppointments';
-import { formatClockTime, formatTimeUntil } from '@/lib/format-utils';
+import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
 import { patientFullName, patientAgeLabel, initials, stateTint } from '@/lib/patient-utils';
 import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
@@ -231,7 +231,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                     : appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime) : '—';
                   const waitSubtext = entry
                     ? waitLabel(entry.minutesWaiting)
-                    : appointmentAt && !Number.isNaN(appointmentAt.getTime()) ? formatTimeUntil(appointmentAt.toISOString(), now) : today;
+                    : appointmentAt && !Number.isNaN(appointmentAt.getTime()) ? formatAppointmentTimeUntil(appointmentAt, now) : today;
                   const overTarget = Boolean(entry?.flaggedForReassessment);
                   const subtitle = `${triage?.chiefComplaint || patient.hospitalNumber || 'No ID'} · ${patientAgeLabel(patient)} · ${patient.gender || 'Not recorded'}`;
                   const activate = patient._demo ? undefined : () => router.push(`/patients/${patient._id}?tab=vitals`);
@@ -287,11 +287,11 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                         <span>{admission ? location : appointment ? 'Appointment' : 'Ward'}</span>
                       </div>
 
-                      <div className="appointment-card-status">
-                        <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText}</span>
-                        <small>{statusSubtext}</small>
+                        <div className="appointment-card-status">
+                          <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText}</span>
+                          <small>{statusSubtext}</small>
+                        </div>
                       </div>
-                    </div>
                   );
                 })}
                 </div>
@@ -299,6 +299,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
             )}
           </div>
       </section>
+
 
     </>
   );

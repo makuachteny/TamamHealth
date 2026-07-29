@@ -1,22 +1,8 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import TriageWorkflow from '@/components/nurse/TriageWorkflow';
-
-function TriageRoute() {
-  const patient = useSearchParams().get('patient') ?? undefined;
-  return (
-    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column' }}>
-      <TriageWorkflow initialPatientId={patient} />
-    </main>
-  );
-}
-
-export default function Page() {
-  return (
-    <Suspense>
-      <TriageRoute />
-    </Suspense>
-  );
+export default async function Page({ searchParams }: { searchParams: Promise<{ patient?: string }> }) {
+  const params = await searchParams;
+  const target = new URLSearchParams({ station: 'triage' });
+  if (params.patient) target.set('patient', params.patient);
+  redirect(`/dashboard/nurse?${target.toString()}`);
 }

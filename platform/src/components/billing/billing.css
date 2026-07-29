@@ -1,0 +1,550 @@
+/**
+ * Billing module — OpenMRS O3-style bill list & bill detail.
+ *
+ * Scoped under the `bl-` namespace (same convention as the chart's `omrs-`
+ * classes) so the legacy globals.css cascade — force-uppercased labels, icon
+ * color overrides — can't leak in. Reuses the shared --ehr-* palette tokens
+ * with the same fallbacks as openmrs-chart.css.
+ */
+
+.bl-root {
+  --bl-teal: #007d79;
+  --bl-teal-dark: #005d5d;
+  --bl-teal-soft: rgba(0, 125, 121, 0.08);
+  font-size: 13px;
+  color: var(--ehr-text, #102634);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* globals.css uppercases every <label>; billing forms use sentence case. */
+.bl-root label,
+.bl-modal-body label {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* ── Home header ─────────────────────────────────────────────────── */
+
+.bl-home-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  padding: 14px 20px;
+}
+.bl-home-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  background: var(--bl-teal-soft);
+  color: var(--bl-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.bl-eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ehr-muted, #8395A8);
+  margin: 0 0 2px;
+}
+.bl-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* ── Filter row ──────────────────────────────────────────────────── */
+
+.bl-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ehr-text-body, #39536B);
+}
+.bl-filter-row span { white-space: nowrap; }
+.bl-filter-row select {
+  width: auto;
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ehr-text-title, #132C44);
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+/* ── Card / section ──────────────────────────────────────────────── */
+
+.bl-card {
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.bl-card-head {
+  padding: 16px 18px 0;
+}
+.bl-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+  margin: 0 0 4px;
+}
+.bl-card-sub {
+  font-size: 12px;
+  color: var(--ehr-muted, #8395A8);
+  margin: 0 0 6px;
+}
+.bl-underline {
+  display: block;
+  width: 34px;
+  height: 3px;
+  background: var(--bl-teal);
+  margin-bottom: 12px;
+}
+
+/* ── Search ──────────────────────────────────────────────────────── */
+
+.bl-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 18px 0;
+  padding: 0 12px;
+  background: var(--ehr-page-bg, #F8FBFD);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 6px;
+  color: var(--ehr-muted, #8395A8);
+}
+.bl-search:focus-within {
+  border-color: var(--bl-teal);
+  box-shadow: 0 0 0 2px var(--bl-teal-soft);
+}
+.bl-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ehr-text, #102634);
+  padding: 10px 0;
+  outline: none;
+  min-width: 0;
+}
+.bl-search input::placeholder { color: var(--ehr-muted, #8395A8); }
+
+/* ── Tables ──────────────────────────────────────────────────────── */
+
+.bl-table-wrap { overflow-x: auto; margin-top: 12px; }
+.bl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+/* !important + .bl-root scoping: the legacy globals.css cascade paints table
+   heads white; this is the same escape hatch openmrs-chart.css uses. */
+.bl-root .bl-table thead th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ehr-text-title, #132C44);
+  background: #E3E9EF !important;
+  padding: 10px 18px;
+  white-space: nowrap;
+}
+.bl-table tbody td {
+  padding: 11px 18px;
+  color: var(--ehr-text, #102634);
+  border-bottom: 1px solid var(--ehr-border-soft, #E7EEF5);
+  vertical-align: middle;
+}
+.bl-table tbody tr:last-child td { border-bottom: none; }
+.bl-table tbody tr:hover td { background: var(--ehr-hover, #FAFCFE); }
+.bl-table .bl-num { font-variant-numeric: tabular-nums; }
+
+.bl-link {
+  color: var(--accent-primary, #2563eb);
+  font-weight: 600;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.bl-link:hover { text-decoration: underline; }
+
+/* ── Chips ───────────────────────────────────────────────────────── */
+
+.bl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  line-height: 1.7;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.bl-chip--unpaid   { background: rgba(218, 30, 40, 0.09);  color: #B3251E; }
+.bl-chip--partial  { background: rgba(178, 112, 8, 0.10);  color: #8A5A00; }
+.bl-chip--paid     { background: rgba(25, 128, 56, 0.10);  color: #14713A; }
+.bl-chip--waived   { background: var(--ehr-soft, #E9F0F5); color: var(--ehr-text-body, #39536B); }
+.bl-chip--cancelled{ background: var(--ehr-soft, #E9F0F5); color: var(--ehr-muted, #8395A8); text-decoration: line-through; }
+.bl-chip--visit    { background: var(--accent-primary, #2563eb); color: #fff; text-transform: none; letter-spacing: 0; font-size: 11px; }
+.bl-chip--ontime   { background: var(--ehr-soft, #E9F0F5); color: var(--ehr-text-body, #39536B); text-transform: none; letter-spacing: 0; font-size: 11px; }
+
+/* ── Pagination footer ───────────────────────────────────────────── */
+
+.bl-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--ehr-border, #D8E3EC);
+  font-size: 12px;
+  color: var(--ehr-text-body, #39536B);
+}
+.bl-pagination span { white-space: nowrap; }
+.bl-pagination select {
+  font: inherit;
+  color: var(--ehr-text-title, #132C44);
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 5px;
+  padding: 4px 6px;
+  cursor: pointer;
+  width: auto;
+  flex: 0 0 auto;
+}
+.bl-pagination .bl-page-group { display: flex; align-items: center; gap: 10px; }
+.bl-pager-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 5px;
+  background: var(--ehr-panel, #fff);
+  color: var(--ehr-text-body, #39536B);
+  cursor: pointer;
+}
+.bl-pager-btn:hover:not(:disabled) { background: var(--ehr-hover, #FAFCFE); }
+.bl-pager-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Patient banner (detail page) ────────────────────────────────── */
+
+.bl-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  padding: 14px 20px;
+}
+.bl-avatar {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+  overflow: hidden;
+  position: relative;
+}
+.bl-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bl-banner-body { flex: 1 1 auto; min-width: 0; }
+.bl-banner-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bl-banner-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+  margin: 0;
+}
+.bl-gender { font-size: 15px; font-weight: 700; color: var(--ehr-muted, #8395A8); }
+.bl-gender.male { color: var(--accent-primary, #2563eb); }
+.bl-gender.female { color: #C2408A; }
+.bl-banner-meta {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ehr-muted, #8395A8);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.bl-id-tag {
+  background: var(--ehr-soft, #E9F0F5);
+  color: var(--ehr-text-body, #39536B);
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+.bl-id-tag strong { color: var(--ehr-text-title, #132C44); }
+.bl-banner-actions { flex-shrink: 0; }
+
+/* ── Detail action row ───────────────────────────────────────────── */
+
+.bl-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.bl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.bl-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.bl-btn--primary { background: var(--bl-teal); color: #fff; }
+.bl-btn--primary:hover:not(:disabled) { background: var(--bl-teal-dark); }
+.bl-btn--outline { background: var(--ehr-panel, #fff); color: var(--bl-teal); border-color: var(--bl-teal); }
+.bl-btn--outline:hover:not(:disabled) { background: var(--bl-teal-soft); }
+.bl-btn--link { background: none; color: var(--accent-primary, #2563eb); padding: 10px 4px; }
+.bl-btn--link:hover:not(:disabled) { text-decoration: underline; }
+.bl-btn--danger-link { background: none; color: var(--color-danger, #DA1E28); padding: 10px 4px; }
+.bl-btn--danger-link:hover:not(:disabled) { text-decoration: underline; }
+.bl-btn--dark { background: #393939; color: #fff; }
+.bl-btn--dark:hover:not(:disabled) { background: #262626; }
+.bl-btn--ghost { background: var(--ehr-panel, #fff); color: var(--ehr-text-body, #39536B); border-color: var(--ehr-border, #D8E3EC); }
+.bl-btn--ghost:hover:not(:disabled) { background: var(--ehr-hover, #FAFCFE); }
+
+/* ── Summary strip ───────────────────────────────────────────────── */
+
+.bl-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px 24px;
+  padding: 4px 2px 8px;
+}
+.bl-summary-label {
+  font-size: 12.5px;
+  color: var(--ehr-text-body, #39536B);
+  margin: 0 0 8px;
+}
+.bl-summary-value {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ehr-text-title, #132C44);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Line-item row menu ──────────────────────────────────────────── */
+
+.bl-row-menu { position: relative; display: inline-flex; }
+.bl-row-menu-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ehr-muted, #8395A8);
+  cursor: pointer;
+}
+.bl-row-menu-btn:hover { background: var(--ehr-soft, #E9F0F5); color: var(--ehr-text-title, #132C44); }
+.bl-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 180px;
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16, 38, 52, 0.14);
+  z-index: 30;
+  overflow: hidden;
+  padding: 4px;
+}
+.bl-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ehr-text-body, #39536B);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  text-align: left;
+  cursor: pointer;
+}
+.bl-menu button:hover { background: var(--ehr-hover, #FAFCFE); color: var(--ehr-text-title, #132C44); }
+.bl-menu button.bl-menu-danger { color: var(--color-danger, #DA1E28); }
+.bl-menu-backdrop { position: fixed; inset: 0; z-index: 29; }
+
+/* ── Payments + totals layout ────────────────────────────────────── */
+
+.bl-pay-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 0;
+}
+.bl-pay-main { padding: 16px 18px 18px; min-width: 0; }
+.bl-pay-aside {
+  border-left: 1px solid var(--ehr-border, #D8E3EC);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@media (max-width: 860px) {
+  .bl-pay-layout { grid-template-columns: 1fr; }
+  .bl-pay-aside { border-left: none; border-top: 1px solid var(--ehr-border, #D8E3EC); }
+}
+
+.bl-totals { display: flex; flex-direction: column; gap: 9px; font-size: 13px; }
+.bl-totals-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.bl-totals-row dt { color: var(--ehr-text-body, #39536B); font-weight: 600; }
+.bl-totals-row dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--ehr-text-title, #132C44); }
+.bl-totals-rule { border: none; border-top: 1px solid var(--ehr-border, #D8E3EC); margin: 4px 0; }
+.bl-totals-row--due dt, .bl-totals-row--due dd { font-weight: 700; font-size: 14px; }
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+
+.bl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 48px 16px;
+}
+.bl-empty h3 { font-size: 15px; font-weight: 700; color: var(--ehr-text-title, #132C44); margin: 0; }
+.bl-empty p { font-size: 12.5px; color: var(--ehr-muted, #8395A8); margin: 0; max-width: 340px; }
+.bl-empty svg { color: var(--ehr-muted, #8395A8); opacity: 0.45; }
+
+/* ── Forms (payment entry, modals) ───────────────────────────────── */
+
+.bl-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.bl-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.bl-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ehr-text-body, #39536B);
+}
+.bl-field input,
+.bl-field select,
+.bl-field textarea {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ehr-text, #102634);
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 6px;
+  padding: 9px 10px;
+  outline: none;
+  width: 100%;
+}
+.bl-field input:focus,
+.bl-field select:focus,
+.bl-field textarea:focus {
+  border-color: var(--bl-teal);
+  box-shadow: 0 0 0 2px var(--bl-teal-soft);
+}
+
+.bl-modal-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.bl-modal-title { font-size: 15px; font-weight: 700; color: var(--ehr-text-title, #132C44); margin: 0; }
+.bl-modal-sub { font-size: 12.5px; color: var(--ehr-muted, #8395A8); margin: -8px 0 0; }
+.bl-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+
+/* Fee-schedule picker inside "Add items to bill" */
+.bl-fee-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 6px;
+}
+.bl-fee-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--ehr-border-soft, #E7EEF5);
+  font-size: 12.5px;
+}
+.bl-fee-row:last-child { border-bottom: none; }
+.bl-fee-row:hover { background: var(--ehr-hover, #FAFCFE); }
+.bl-fee-name { font-weight: 600; color: var(--ehr-text-title, #132C44); }
+.bl-fee-cat { color: var(--ehr-muted, #8395A8); font-size: 11.5px; }
+.bl-fee-price { font-variant-numeric: tabular-nums; color: var(--ehr-text-body, #39536B); white-space: nowrap; }
+.bl-fee-add {
+  border: 1px solid var(--bl-teal);
+  color: var(--bl-teal);
+  background: none;
+  border-radius: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.bl-fee-add:hover { background: var(--bl-teal-soft); }
+.bl-qty-input {
+  width: 58px !important;
+  text-align: center;
+  padding: 5px 6px !important;
+}
+
+/* ── Misc ────────────────────────────────────────────────────────── */
+
+.bl-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 280px;
+  color: var(--ehr-muted, #8395A8);
+}
+.bl-muted { color: var(--ehr-muted, #8395A8); }
+.bl-danger { color: var(--color-danger, #DA1E28); }
+.bl-right { text-align: right; }

@@ -37,14 +37,16 @@ describe('CSRF token', () => {
   it('a tampered signature does not verify', async () => {
     const token = await mintCsrfToken('user-dr.wani');
     const dot = token.indexOf('.');
-    const tampered = token.slice(0, dot + 1) + 'A' + token.slice(dot + 2);
+    const signatureChar = token[dot + 1] === 'A' ? 'B' : 'A';
+    const tampered = token.slice(0, dot + 1) + signatureChar + token.slice(dot + 2);
     await expect(verifyCsrfToken(tampered, 'user-dr.wani')).resolves.toBe(false);
   });
 
   it('a tampered nonce does not verify (HMAC binds nonce + sub)', async () => {
     const token = await mintCsrfToken('user-dr.wani');
     const dot = token.indexOf('.');
-    const tampered = 'X' + token.slice(1, dot) + token.slice(dot);
+    const replacement = token[0] === 'X' ? 'Y' : 'X';
+    const tampered = replacement + token.slice(1, dot) + token.slice(dot);
     await expect(verifyCsrfToken(tampered, 'user-dr.wani')).resolves.toBe(false);
   });
 

@@ -85,6 +85,11 @@ function offsetTime(minutes: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function offsetSchedule(minutes: number): { scheduledDate: string; scheduledTime: string } {
+  const d = new Date(jubaNow().getTime() + minutes * 60_000);
+  return { scheduledDate: jubaDate(d), scheduledTime: offsetTime(minutes) };
+}
+
 async function makeSession(overrides: Record<string, unknown> = {}) {
   return createSession({
     patientId: 'pat-001',
@@ -121,7 +126,7 @@ describe('POST /api/telehealth/token — join window', () => {
   });
 
   test('refuses a patient who is too early, stating when it opens', async () => {
-    const s = await makeSession({ scheduledTime: offsetTime(240) });
+    const s = await makeSession(offsetSchedule(240));
     mockPatient.mockResolvedValue({ sub: 'pat-001' });
 
     const res = await POST(req({ sessionId: s._id }));
@@ -133,7 +138,7 @@ describe('POST /api/telehealth/token — join window', () => {
   });
 
   test('refuses a patient who is too late', async () => {
-    const s = await makeSession({ scheduledTime: offsetTime(-240) });
+    const s = await makeSession(offsetSchedule(-240));
     mockPatient.mockResolvedValue({ sub: 'pat-001' });
 
     const res = await POST(req({ sessionId: s._id }));
@@ -144,7 +149,7 @@ describe('POST /api/telehealth/token — join window', () => {
   test('the window does NOT apply to the assigned clinician', async () => {
     // A provider opens the room early to prepare and stays past the slot when
     // the clinic runs late — and decides when the visit is over.
-    const s = await makeSession({ scheduledTime: offsetTime(240) });
+    const s = await makeSession(offsetSchedule(240));
     mockStaff.mockResolvedValue({ sub: 'prov-001', name: 'Dr. Smith' });
 
     const res = await POST(req({ sessionId: s._id }));

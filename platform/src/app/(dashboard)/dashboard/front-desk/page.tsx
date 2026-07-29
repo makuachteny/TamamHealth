@@ -29,6 +29,7 @@ import {
   Send, Stethoscope,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
+import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 
 /**
  * Front-desk operations workspace.
@@ -873,7 +874,13 @@ export default function FrontDeskDashboardPage() {
         locationLabel: 'Location',
         status: 'registered',
         statusLabel: 'Registered',
-        statusSecondary: patient.assignedDoctor ? 'Assigned' : 'Needs care team',
+        statusSecondary: patient.assignmentStatus === 'completed'
+          ? 'Visit completed'
+          : patient.assignmentStatus === 'accepted' || patient.assignmentStatus === 'in_progress'
+            ? 'Provider accepted'
+            : patient.assignedDoctor
+              ? 'Assigned'
+              : 'Needs care team',
         statusTone: 'ready',
         date: isoDateKey(patientRegisteredAt(patient)),
         onClick: () => openPatientDetail(patient._id, null),
@@ -1025,7 +1032,7 @@ export default function FrontDeskDashboardPage() {
         />
 
         {selectedPatient && (
-          <Modal onClose={() => { setSelectedPatientId(null); setSelectedEntry(null); }} width={520} labelledBy="fd-patient-detail-title">
+          <Modal onClose={() => { setSelectedPatientId(null); setSelectedEntry(null); }} width={480} labelledBy="fd-patient-detail-title">
             <div className="modal-panel" style={{ padding: 0, overflow: 'hidden' }}>
               <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <div className="min-w-0">
@@ -1037,6 +1044,12 @@ export default function FrontDeskDashboardPage() {
                 </button>
               </div>
               <div className="p-5 flex flex-col gap-4">
+                <EhrWorkItemProgress
+                  status={selectedEntry?.stageLabel || selectedEntry?.status || 'Patient lookup'}
+                  owner={selectedEntry?.assignedDoctorName || selectedEntry?.assignedNurseName || 'Reception'}
+                  waiting={selectedEntry?.waitMinutes !== undefined ? waitLabel(selectedEntry.waitMinutes) : undefined}
+                  nextAction={selectedEntry?.status === 'DONE' ? 'Complete checkout' : canConsult ? 'Start consultation' : 'Open chart'}
+                />
                 <dl className="fd-detail-dl">
                   <div><dt>{t('frontDesk.genderAge')}</dt><dd>{patientGenderAge(selectedPatient)}</dd></div>
                   <div><dt>{t('patient.phone')}</dt><dd>{selectedPatient.phone ? formatPhoneDisplay(selectedPatient.phone) : 'N/A'}</dd></div>

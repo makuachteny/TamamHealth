@@ -11,6 +11,7 @@ import {
   updateProgressMilestone,
   updateProgressStage,
   updateProgressTask,
+  syncConsultationProgressStage,
 } from '@/lib/services/consultation-progress-service';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
@@ -46,5 +47,31 @@ describe('consultation progress service', () => {
     expect(final?.milestones.find(m => m.key === 'orders_placed')?.status).toBe('completed');
     expect(final?.events.length).toBeGreaterThanOrEqual(5);
     expect((await getConsultationProgressByPatient('pat-2'))?.currentStage).toBe('orders_pending');
+  });
+
+  test('syncs a nursing handoff without creating a duplicate tracker', async () => {
+    const first = await syncConsultationProgressStage({
+      patientId: 'pat-3',
+      patientName: 'Nyandeng Lual',
+      hospitalId: 'hosp-1',
+      orgId: 'org-1',
+      stage: 'waiting_for_provider',
+      nextAction: 'Assign patient to a provider',
+      actor,
+    });
+    const second = await syncConsultationProgressStage({
+      patientId: 'pat-3',
+      patientName: 'Nyandeng Lual',
+      hospitalId: 'hosp-1',
+      orgId: 'org-1',
+      stage: 'waiting_for_provider',
+      nextAction: 'Start consultation',
+      actor: { ...actor, name: 'Rooming Nurse' },
+    });
+
+    expect(second?._id).toBe(first?._id);
+    expect(second?.currentStage).toBe('waiting_for_provider');
+    expect(second?.nextAction).toBe('Start consultation');
+    expect(second?.events.filter(event => event.kind === 'stage')).toHaveLength(2);
   });
 });

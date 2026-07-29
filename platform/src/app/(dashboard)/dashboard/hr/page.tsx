@@ -221,6 +221,7 @@ export default function HRDashboardPage() {
             subtitle: `${r.leaveType} · ${r.days}d · ${r.startDate} → ${r.endDate}`,
             compactMeta: `${r.days}d`,
             time,
+            date: r.requestedAt.slice(0, 10),
             timeSecondary: r.requestedAt.slice(0, 10),
             careTeam: r.role ? titleCase(r.role) : undefined,
             careTeamLabel: 'Role',

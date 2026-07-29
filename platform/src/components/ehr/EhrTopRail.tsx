@@ -23,7 +23,6 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { NavItem } from '@/lib/permissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { moduleBadgeCounts } from '@/lib/module-badges';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { patientFullName, patientGenderAge, initials } from '@/lib/patient-utils';
 import { formatPhoneDisplay } from '@/lib/field-formats';
@@ -37,6 +36,7 @@ import {
   isHrefAllowed,
   uniqueAllowedNavItems,
 } from './ehr-navigation';
+import { moduleBadgeCounts } from '@/lib/module-badges';
 
 export default function EhrTopRail() {
   const router = useRouter();
@@ -57,8 +57,6 @@ export default function EhrTopRail() {
   const { canRegisterPatients } = usePermissions();
   const { available: tourAvailable, start: startTour } = useTourContext();
   const { patients } = usePatients();
-  // One feed for the whole rail: the bell's unread count and the "something is
-  // waiting in here" numbers on the module shortcuts come from the same load.
   const { items: notifications, unreadCount } = useNotifications();
   const moduleBadges = useMemo(() => moduleBadgeCounts(notifications), [notifications]);
   const [query, setQuery] = useState('');
@@ -104,8 +102,20 @@ export default function EhrTopRail() {
     return uniqueAllowedNavItems(roleConfig?.navItems || [], allowedRoutes);
   }, [allowedRoutes, currentUser, roleConfig]);
 
-  const navGroups = useMemo(() => groupNavItemsBySection(navItems), [navItems]);
-  const quickActionItems = useMemo(() => getPrimaryShortcutItems(navItems, currentUser?.role), [navItems, currentUser?.role]);
+  // Keep three high-frequency destinations visible in the header. They are
+  // removed from the module menu so each destination has one visible home.
+  const headerShortcutItems = useMemo(
+    () => getPrimaryShortcutItems(navItems, currentUser?.role, 3),
+    [navItems, currentUser?.role],
+  );
+  const headerShortcutHrefs = useMemo(
+    () => new Set(headerShortcutItems.map(item => item.href)),
+    [headerShortcutItems],
+  );
+  const navGroups = useMemo(
+    () => groupNavItemsBySection(navItems.filter(item => !headerShortcutHrefs.has(item.href))),
+    [headerShortcutHrefs, navItems],
+  );
 
   const navLabel = (item: NavItem): string => {
     const keyMap: Record<string, string> = {
@@ -147,9 +157,8 @@ export default function EhrTopRail() {
     const matches = navItems
       .filter(item => isActiveHref(item.href))
       .sort((a, b) => (b.href?.length || 0) - (a.href?.length || 0));
-    if (matches[0]) return matches[0];
-    return quickActionItems.find(item => isActiveHref(item.href)) || null;
-  }, [navItems, pathname, quickActionItems]);
+    return matches[0] || null;
+  }, [navItems, pathname]);
 
   const ActiveModuleIcon = activeModuleItem?.icon || LayoutDashboard;
 
@@ -234,7 +243,13 @@ export default function EhrTopRail() {
           />
         )}
 
-        <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} badges={moduleBadges} />
+        <EhrTopActions
+          items={headerShortcutItems}
+          navLabel={navLabel}
+          onOpenModule={openModule}
+          badges={moduleBadges}
+        />
+
       </nav>
 
       {/* Overlaid on the rail's true center (not a grid cell), so it never

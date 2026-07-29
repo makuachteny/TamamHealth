@@ -179,6 +179,23 @@ export async function updateProgressStage(
   }, 'UPDATE_CONSULTATION_PROGRESS_STAGE', actor);
 }
 
+/** Ensure the shared tracker exists, then move it with a single operational action. */
+export async function syncConsultationProgressStage(input: {
+  patientId: string;
+  patientName: string;
+  hospitalId: string;
+  hospitalName?: string;
+  orgId?: string;
+  encounterId?: string;
+  appointmentId?: string;
+  stage: ConsultationProgressStage;
+  nextAction?: string;
+  actor?: ProgressActor;
+}): Promise<ConsultationProgressDoc | null> {
+  const tracker = await ensureConsultationProgress(input);
+  return updateProgressStage(tracker._id, input.stage, input.actor, input.nextAction);
+}
+
 export async function assignProgressOwner(
   id: string,
   owner: { id?: string; name?: string; role?: UserRole },

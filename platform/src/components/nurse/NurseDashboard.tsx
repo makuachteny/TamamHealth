@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  BedDouble, ArrowRightLeft, Plus, Printer,
-  Syringe, Users, Calendar, Activity, Baby, UserX, PieChart as PieChartIcon,
+  ArrowRightLeft, Plus, Printer,
+  PieChart as PieChartIcon,
 } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -23,7 +23,12 @@ import TriageWorkflow from './TriageWorkflow';
 import RoomingWorkflow from './RoomingWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
 
-type StationTab = 'ward' | 'mar' | 'triage' | 'rooming';
+type StationTab = 'ward' | 'mar' | 'triage' | 'rooming' | 'handoff';
+const STATION_TABS: readonly StationTab[] = ['ward', 'mar', 'triage', 'rooming', 'handoff'];
+
+function isStationTab(value: string | null): value is StationTab {
+  return !!value && STATION_TABS.includes(value as StationTab);
+}
 
 // Chart palette per design spec: flat clinical look, matched to triage colors.
 const CHART_GREEN = '#199e70';
@@ -43,6 +48,7 @@ export default function NurseDashboard() {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { patients } = usePatients();
   const { triages } = useTriage();
   const { activeAdmissions } = useWards();
@@ -65,12 +71,14 @@ export default function NurseDashboard() {
   ]), [criticalTriage, urgentTriage, routineTriage]);
   const acuityTotal = criticalTriage + urgentTriage + routineTriage;
 
-  // The Quick Actions cards act as the station switcher — each swaps the inline
-  // body below (the clinical-officer dashboard pattern: quick-action cards drive
-  // the view rather than top-bar tabs).
-  const [activeTab, setActiveTab] = useState<StationTab>('ward');
-  // Shift handoff opens as a popup over the dashboard, not a station view.
-  const [handoffOpen, setHandoffOpen] = useState(false);
+  // The station is URL-addressable so notifications, redirects, bookmarks, and
+  // the browser back button can return a nurse to the exact station they need.
+  const [fallbackStation, setFallbackStation] = useState<StationTab>(() => (
+    isStationTab(searchParams.get('station')) ? searchParams.get('station') as StationTab : 'ward'
+  ));
+  const urlStation = searchParams.get('station');
+  const initialTriagePatientId = searchParams.get('patient') ?? undefined;
+  const activeTab: StationTab = isStationTab(urlStation) ? urlStation : fallbackStation;
 
   // Free-text search for the station lives in the LEFT RAIL (between the
   // mini-calendar and the day chart); WardWorkflow receives it as a prop so
@@ -82,11 +90,10 @@ export default function NurseDashboard() {
     mar: t('nurse.tabMar'),
     triage: t('nurse.tabTriage'),
     rooming: 'Rooming',
+    handoff: 'Handoff',
   }), [t]);
 
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
-  const allowedRoutes = useMemo(() => roleConfig?.allowedRoutes ?? [], [roleConfig]);
-  const canUseRoute = useCallback((href: string) => allowedRoutes.includes(href), [allowedRoutes]);
 
   // Tab counts must match what each station board actually displays. The ward
   // board (shared.tsx `wardPatients`) swaps in the demo roster when the real
@@ -105,23 +112,30 @@ export default function NurseDashboard() {
     // RoomingWorkflow, and any number derived at this level would disagree
     // with the board whenever an encounter moved. Same reasoning as MAR.
     { key: 'rooming' as const, label: stationLabel.rooming },
-  ]), [wardBoardCount, stationLabel.mar, stationLabel.rooming, stationLabel.triage, stationLabel.ward, triageToday.length]);
+    { key: 'handoff' as const, label: stationLabel.handoff },
+  ]), [wardBoardCount, stationLabel.handoff, stationLabel.mar, stationLabel.rooming, stationLabel.triage, stationLabel.ward, triageToday.length]);
 
-  // Ward/MAR/Triage switch via the daybar tabs (design 02); Handoff is a popup.
+  const selectStation = useCallback((station: StationTab) => {
+    setFallbackStation(station);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('station', station);
+    // A triage deep link may contain a patient id. Clear it whenever the user
+    // changes stations so a later return to Triage does not reopen stale work.
+    params.delete('patient');
+    // Push station changes so browser Back returns to the previous station.
+    router.push(`/dashboard/nurse?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  // Ward/MAR/Triage/Rooming/Handoff switch via the daybar tabs.
   const daybarTabs = stationTabs;
-  useEffect(() => {
-    if (!daybarTabs.some(tab => tab.key === activeTab) && daybarTabs[0]) {
-      setActiveTab(daybarTabs[0].key);
-    }
-  }, [activeTab, daybarTabs]);
 
   // Header actions per the nurse-station design: "+ New triage" as the rail
   // CTA, then Print and the primary "Start handoff" on the right.
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
-    { label: 'New triage', icon: Plus, onClick: () => setActiveTab('triage'), tone: 'primary' },
+    { label: 'New triage', icon: Plus, onClick: () => selectStation('triage'), tone: 'primary' },
     { label: 'Print', icon: Printer, onClick: () => window.print(), tone: 'neutral' },
-    { label: 'Start handoff', icon: ArrowRightLeft, onClick: () => setHandoffOpen(true), tone: 'primary' },
-  ]), []);
+    { label: 'Start handoff', icon: ArrowRightLeft, onClick: () => selectStation('handoff'), tone: 'primary' },
+  ]), [selectStation]);
 
   // Patient portraits by id, so triage and ward rows show the same face as the
   // patient register instead of falling back to initials.
@@ -271,11 +285,10 @@ export default function NurseDashboard() {
           eyebrow={roleConfig?.label || 'Nursing'}
           greetingName={currentUser.name || 'nurse'}
           dateLabel={dateLabel}
-          // Ward/MAR/Triage switch uses the shared doctor-module daybar pills;
-          // Handoff opens from the header button.
+          // All nursing stations use the same URL-addressable daybar.
           tabs={daybarTabs}
           activeTab={activeTab}
-          onTabChange={(tab) => setActiveTab(tab as StationTab)}
+          onTabChange={(tab) => selectStation(tab as StationTab)}
           searchValue={railSearch}
           onSearchChange={setRailSearch}
           searchPlaceholder={t('nurse.searchPatientPlaceholder')}
@@ -330,16 +343,9 @@ export default function NurseDashboard() {
               )}
             </div>
           )}
-          actionStrip={[
-            ...(canUseRoute('/patients') ? [{ label: 'Patient search', icon: Users, onClick: () => router.push('/patients') }] : []),
-            ...(canUseRoute('/wards') ? [{ label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') }] : []),
-            ...(canUseRoute('/lab') ? [{ label: 'Lab results', icon: Activity, onClick: () => router.push('/lab') }] : []),
-            ...(canUseRoute('/immunizations') ? [{ label: 'Immunizations', icon: Syringe, onClick: () => router.push('/immunizations') }] : []),
-            ...(canUseRoute('/anc') ? [{ label: 'ANC', icon: Baby, onClick: () => router.push('/anc') }] : []),
-            ...(canUseRoute('/births') ? [{ label: 'Births', icon: Baby, onClick: () => router.push('/births') }] : []),
-            ...(canUseRoute('/deaths') ? [{ label: 'Deaths', icon: UserX, onClick: () => router.push('/deaths') }] : []),
-            ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
-          ]}
+          // The rail search and global module menu already provide patient and
+          // cross-service navigation. Keeping a second action strip here made
+          // the same destinations appear twice on every nursing station.
           rows={rows}
           // The design's daybar carries only the station title + tabs — the
           // tabs already show each board's count, so no subtitle.
@@ -357,17 +363,11 @@ export default function NurseDashboard() {
           <div className="flex flex-col" style={{ minHeight: 0 }}>
             {activeTab === 'ward' && <WardWorkflow search={railSearch} showHeader={false} />}
             {activeTab === 'mar' && <MarWorkflow />}
-            {activeTab === 'triage' && <TriageWorkflow />}
+            {activeTab === 'triage' && <TriageWorkflow initialPatientId={initialTriagePatientId} />}
             {activeTab === 'rooming' && <RoomingWorkflow />}
+            {activeTab === 'handoff' && <HandoffWorkflow variant="page" />}
           </div>
         </EhrCareDashboard>
-
-        {handoffOpen && (
-          <HandoffWorkflow
-            variant="modal"
-            onClose={() => setHandoffOpen(false)}
-          />
-        )}
       </main>
     </>
   );

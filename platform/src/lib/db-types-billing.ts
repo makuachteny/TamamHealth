@@ -68,6 +68,11 @@ export interface BillingDoc extends BaseDoc {
   insuranceApprovedAmount?: number;
   // Status
   status: BillingStatus;
+  // Finalization — a bill stays editable (items, discount, delete) until a
+  // cashier finalizes it; payments can only be recorded after finalization.
+  finalizedAt?: string;
+  finalizedBy?: string;
+  finalizedByName?: string;
   // Audit
   generatedBy: string;
   generatedByName: string;

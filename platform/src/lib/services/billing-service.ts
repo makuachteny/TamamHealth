@@ -325,6 +325,235 @@ export async function recordPayment(
   }
 }
 
+/**
+ * Finalize a bill so payments can be recorded against it. Until then the bill
+ * stays editable (items, discount) and deletable.
+ */
+export async function finalizeBill(
+  billId: string,
+  finalizedBy: string,
+  finalizedByName: string,
+): Promise<BillingDoc | null> {
+  const db = billingDB();
+  try {
+    const bill = await db.get(billId) as BillingDoc;
+    if (bill.finalizedAt || bill.status === 'cancelled' || bill.status === 'waived') return null;
+    const now = new Date().toISOString();
+    bill.finalizedAt = now;
+    bill.finalizedBy = finalizedBy;
+    bill.finalizedByName = finalizedByName;
+    bill.updatedAt = now;
+    const resp = await db.put(bill);
+    bill._rev = resp.rev;
+
+    await logAuditSafe(
+      'BILL_FINALIZED', finalizedBy, finalizedByName,
+      `Finalized ${bill.invoiceNumber}: ${bill.totalAmount} ${bill.currency} for ${bill.patientName}`
+    );
+
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
+
+    return bill;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Replace a bill's line items and recompute totals. Only allowed before
+ * finalization and before any payment has been recorded. The ledger charge is
+ * corrected with an adjustment entry for the delta.
+ */
+export async function updateBillItems(
+  billId: string,
+  items: BillLineItem[],
+  updatedBy: string,
+  updatedByName: string,
+): Promise<BillingDoc | null> {
+  const db = billingDB();
+  try {
+    const bill = await db.get(billId) as BillingDoc;
+    if (bill.finalizedAt || bill.payments.length > 0 || bill.status !== 'pending') return null;
+    if (!items.length) return null;
+
+    const oldTotal = bill.totalAmount;
+    const normalized: BillLineItem[] = items.map(item => ({
+      ...item,
+      id: item.id || uuidv4().slice(0, 8),
+      totalPrice: Math.round(item.quantity * item.unitPrice * 100) / 100,
+    }));
+    const { subtotal, taxAmount, totalAmount } = calculateTotals(normalized, bill.discount, bill.taxRate);
+
+    bill.items = normalized;
+    bill.subtotal = subtotal;
+    bill.taxAmount = taxAmount;
+    bill.totalAmount = totalAmount;
+    // Insurance-covered portion tracks the new total when coverage applies.
+    if (bill.insuranceCoveragePercent && bill.insuranceCoveragePercent > 0) {
+      bill.amountPaid = Math.round(totalAmount * (bill.insuranceCoveragePercent / 100) * 100) / 100;
+    }
+    bill.balanceDue = Math.round((totalAmount - bill.amountPaid) * 100) / 100;
+    bill.updatedAt = new Date().toISOString();
+    const resp = await db.put(bill);
+    bill._rev = resp.rev;
+
+    await postLedgerAdjustment(bill, totalAmount - oldTotal, `Bill items updated — ${bill.invoiceNumber}`, updatedBy);
+
+    await logAuditSafe(
+      'BILL_UPDATED', updatedBy, updatedByName,
+      `Updated items on ${bill.invoiceNumber}: total ${oldTotal} → ${totalAmount} ${bill.currency}`
+    );
+
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
+
+    return bill;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Apply (or change) a discount on an open bill and recompute totals.
+ */
+export async function applyDiscount(
+  billId: string,
+  discount: number,
+  reason: string,
+  appliedBy: string,
+  appliedByName: string,
+): Promise<BillingDoc | null> {
+  const db = billingDB();
+  try {
+    const bill = await db.get(billId) as BillingDoc;
+    if (bill.status !== 'pending' && bill.status !== 'partial') return null;
+    if (!Number.isFinite(discount) || discount < 0 || discount > bill.subtotal) return null;
+
+    const oldTotal = bill.totalAmount;
+    const { subtotal, taxAmount, totalAmount } = calculateTotals(bill.items, discount, bill.taxRate);
+
+    bill.discount = discount;
+    bill.discountReason = reason;
+    bill.subtotal = subtotal;
+    bill.taxAmount = taxAmount;
+    bill.totalAmount = totalAmount;
+    bill.balanceDue = Math.round((totalAmount - bill.amountPaid) * 100) / 100;
+    if (bill.balanceDue <= 0 && bill.amountPaid > 0) {
+      bill.status = 'paid';
+      bill.balanceDue = 0;
+    }
+    bill.updatedAt = new Date().toISOString();
+    const resp = await db.put(bill);
+    bill._rev = resp.rev;
+
+    await postLedgerAdjustment(bill, totalAmount - oldTotal, `Discount — ${bill.invoiceNumber}: ${reason}`, appliedBy);
+
+    await logAuditSafe(
+      'BILL_DISCOUNTED', appliedBy, appliedByName,
+      `Discount ${discount} ${bill.currency} on ${bill.invoiceNumber} — ${reason}`
+    );
+
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
+
+    return bill;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cancel (delete) a bill. Only allowed while no payment has been recorded;
+ * the original ledger charge is reversed so the patient balance nets to zero.
+ * The document is kept (status: cancelled) for the audit trail and to protect
+ * invoice-number integrity.
+ */
+export async function cancelBill(
+  billId: string,
+  cancelledBy: string,
+  cancelledByName: string,
+  reason?: string,
+): Promise<BillingDoc | null> {
+  const db = billingDB();
+  try {
+    const bill = await db.get(billId) as BillingDoc;
+    if (bill.payments.length > 0 || bill.status === 'paid' || bill.status === 'cancelled') return null;
+
+    bill.status = 'cancelled';
+    bill.balanceDue = 0;
+    if (reason) bill.notes = bill.notes ? `${bill.notes}\nCancelled: ${reason}` : `Cancelled: ${reason}`;
+    bill.updatedAt = new Date().toISOString();
+    const resp = await db.put(bill);
+    bill._rev = resp.rev;
+
+    await postLedgerAdjustment(bill, -(bill.totalAmount - bill.amountPaid), `Bill cancelled — ${bill.invoiceNumber}`, cancelledBy);
+
+    await logAuditSafe(
+      'BILL_CANCELLED', cancelledBy, cancelledByName,
+      `Cancelled ${bill.invoiceNumber}: ${bill.totalAmount} ${bill.currency}${reason ? ` — ${reason}` : ''}`
+    );
+
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
+
+    return bill;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Post a ledger adjustment mirroring a change to a bill's total, so patient
+ * balances (which read the ledger, not the billing store) stay in sync.
+ * Best-effort, same as the mirrors in createBill/recordPayment.
+ */
+async function postLedgerAdjustment(bill: BillingDoc, amount: number, description: string, createdBy: string) {
+  if (!amount) return;
+  try {
+    const { createLedgerEntry } = await import('./ledger-service');
+    await createLedgerEntry({
+      patientId: bill.patientId,
+      encounterId: bill.encounterId,
+      entryType: 'adjustment',
+      amount: Math.round(amount * 100) / 100,
+      description,
+      referenceId: bill._id,
+      referenceType: 'billing',
+      currency: bill.currency,
+      facilityId: bill.facilityId,
+      orgId: bill.orgId,
+      createdBy,
+    });
+  } catch (err) {
+    console.warn('[billing] ledger adjustment mirror failed for', bill._id, err);
+  }
+}
+
 export async function waiveBill(
   billId: string,
   waivedBy: string,

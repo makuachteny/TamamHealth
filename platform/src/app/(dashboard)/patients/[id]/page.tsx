@@ -82,6 +82,7 @@ import OrdersSection from '@/components/ehr/chart/sections/OrdersSection';
 import ProceduresSection from '@/components/ehr/chart/sections/ProceduresSection';
 import ProgramsSection from '@/components/ehr/chart/sections/ProgramsSection';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
+import NurseVitalsModal from '@/components/nurse/NurseVitalsModal';
 
 // Administrative tabs are the only ones a non-clinical role (e.g. Medical
 // Receptionist) may see — the "minimum necessary" rule: contact details,
@@ -175,6 +176,7 @@ export default function PatientDetailPage() {
   const [showOrderLabModal, setShowOrderLabModal] = useState(false);
   const [showPrescribeModal, setShowPrescribeModal] = useState(false);
   const [showReferModal, setShowReferModal] = useState(false);
+  const [showNurseVitals, setShowNurseVitals] = useState(false);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [showTriagePopup, setShowTriagePopup] = useState(false);
   // One-shot request for the chart shell to open a workspace drawer panel
@@ -254,7 +256,7 @@ export default function PatientDetailPage() {
   const { appointments: patientAppointments } = usePatientAppointments(patient?._id);
   const { prescriptions: allPrescriptions } = usePrescriptions(patient?._id);
   const { triages: patientTriages } = useTriage(patient?._id);
-  const { canConsult, canViewClinical, canOrderLabs, canPrescribe, canBookAppointments, canManageReferrals } = usePermissions();
+  const { canConsult, canViewClinical, canOrderLabs, canPrescribe, canBookAppointments, canManageReferrals, canRecordVitalEvents } = usePermissions();
   const canAssignPatients = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
 
   // Defence in depth: if a non-clinical viewer lands on (or deep-links to) a
@@ -359,7 +361,7 @@ export default function PatientDetailPage() {
   const facesheetActions: FacesheetActions = {
     ...(canPrescribe ? { medications: { label: 'Prescribe', onClick: () => setShowPrescribeModal(true) } } : {}),
     ...(canConsult ? { problems: { label: 'Add', onClick: () => openSectionAdd('problems') } } : {}),
-    ...(canConsult && patient ? { vitals: { label: 'Record', onClick: () => router.push(`/consultation?patientId=${patient._id}`) } } : {}),
+    ...((canConsult || canRecordVitalEvents) && patient ? { vitals: { label: 'Record', onClick: () => canConsult ? router.push(`/consultation?patientId=${patient._id}`) : setShowNurseVitals(true) } } : {}),
     ...(canConsult ? { recommendations: { label: 'Review', onClick: () => setActiveTab('careChecklist'), icon: ClipboardList } } : {}),
   };
 
@@ -1226,8 +1228,11 @@ export default function PatientDetailPage() {
                 latestVitals={latestVitalsRecord?.vitalSigns}
                 latestRecordDate={latestVitalsRecord?.consultedAt || latestVitalsRecord?.visitDate}
                 onViewVitalsHistory={() => setActiveTab('vitals')}
-                onRecordVitals={() => (canConsult ? router.push(`/consultation?patientId=${patient._id}`) : setActiveTab('vitals'))}
-                canRecordVitals={canConsult}
+                onRecordVitals={() => {
+                  if (canConsult) router.push(`/consultation?patientId=${patient._id}`);
+                  else { setActiveTab('vitals'); setShowNurseVitals(true); }
+                }}
+                canRecordVitals={canConsult || canRecordVitalEvents}
               />
             ) : undefined}
           >
@@ -1240,6 +1245,7 @@ export default function PatientDetailPage() {
           {patient && (
             <TransferBanner patient={patient} onOpenHistory={() => setActiveTab('referrals')} />
           )}
+
 
           {activeTab === 'overview' && (
             <PatientFacesheetView
@@ -1470,6 +1476,8 @@ export default function PatientDetailPage() {
           {activeTab === 'vitals' && (
             <ChartSection
               title={vitalsView === 'flowsheet' ? 'Vital sign flowsheet' : 'Vitals'}
+              onAdd={(canRecordVitalEvents && vitalsView === 'table') ? () => setShowNurseVitals(true) : undefined}
+              addLabel="Record vitals"
               toggleSlot={(
                 <div className="ehr-chart-subtabs" role="tablist" aria-label="Vitals view">
                   <button
@@ -1723,6 +1731,19 @@ export default function PatientDetailPage() {
       </main>
 
       {/* Edit Demographics Modal */}
+      {showNurseVitals && patient && currentUser && (
+        <NurseVitalsModal
+          patientId={patient._id}
+          patientName={patientFullName(patient)}
+          hospitalNumber={patient.hospitalNumber}
+          hospitalId={currentUser.hospitalId || patient.registrationHospital || ''}
+          hospitalName={currentUser.hospital?.name || currentUser.hospitalName || patient.registrationHospital || undefined}
+          orgId={currentUser.orgId}
+          currentUser={currentUser}
+          onClose={() => setShowNurseVitals(false)}
+        />
+      )}
+
       {showMessageModal && patient && (
         <Modal onClose={() => !messageSending && setShowMessageModal(false)} width={500} labelledBy="patient-message-title">
           <div className="modal-content card-elevated p-5 w-full" onClick={e => e.stopPropagation()}>

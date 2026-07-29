@@ -94,7 +94,38 @@ export default function AssignDoctorModal({
         assignedBy: currentUser?._id,
         assignedByName: currentUser?.name,
         assignmentNote: note.trim() || undefined,
+        assignmentStatus: 'assigned',
+        assignmentAcceptedAt: undefined,
+        assignmentAcceptedBy: undefined,
+        assignmentAcceptedByName: undefined,
       });
+
+      // Create the shared operational tracker at the moment responsibility is
+      // handed to the provider. The patient assignment remains the source of
+      // truth; tracker failure must not block care routing.
+      try {
+        const { ensureConsultationProgress, assignProgressOwner, updateProgressStage } = await import('@/lib/services/consultation-progress-service');
+        const tracker = await ensureConsultationProgress({
+          patientId: target.patientId,
+          patientName: target.patientName,
+          hospitalId: currentUser?.hospitalId || '',
+          hospitalName: currentUser?.hospital?.name || currentUser?.hospitalName || '',
+          orgId: currentUser?.orgId,
+          actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
+        });
+        await assignProgressOwner(tracker._id, { id: doctor._id, name: doctor.name, role: doctor.role }, {
+          id: currentUser?._id,
+          name: currentUser?.name,
+          role: currentUser?.role,
+        });
+        await updateProgressStage(tracker._id, 'waiting_for_provider', {
+          id: currentUser?._id,
+          name: currentUser?.name,
+          role: currentUser?.role,
+        }, 'Provider to accept assignment');
+      } catch {
+        // Operational tracking is additive and must not prevent assignment.
+      }
 
       // Stamp the triage handoff too, so the triage record shows who took over.
       if (target.triageId) {

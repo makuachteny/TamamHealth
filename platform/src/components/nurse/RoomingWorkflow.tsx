@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useRooming } from '@/lib/hooks/useRooming';
-import { BedDouble, Clock, CheckCircle2, ArrowRightLeft, LogIn } from '@/components/icons/lucide';
+import { BedDouble, Clock, CheckCircle2, ArrowRightLeft, LogIn, Activity, Save, X } from '@/components/icons/lucide';
 import type { RoomingWorklistEntry } from '@/lib/services/rooming-service';
+import { getVitalFlags, isVitalInRange, type VitalsInput } from '@/lib/clinical/vitals';
+import Modal from '@/components/Modal';
 
 /**
  * The rooming station (KAN-99 / KAN-108).
@@ -33,16 +35,42 @@ function waitTone(minutes: number): { bg: string; fg: string } {
   return { bg: 'var(--overlay-subtle)', fg: 'var(--text-secondary)' };
 }
 
+type RoomingVitals = VitalsInput & { height?: string };
+
+const VITAL_FIELDS: Array<{ key: keyof RoomingVitals; label: string; unit: string; placeholder: string; rangeKey?: keyof typeof import('@/lib/clinical/vitals').VITAL_RANGES }> = [
+  { key: 'temperature', label: 'Temperature', unit: '°C', placeholder: '36.8', rangeKey: 'temperature' },
+  { key: 'systolic', label: 'Systolic BP', unit: 'mmHg', placeholder: '120', rangeKey: 'systolic' },
+  { key: 'diastolic', label: 'Diastolic BP', unit: 'mmHg', placeholder: '80', rangeKey: 'diastolic' },
+  { key: 'pulse', label: 'Pulse', unit: 'bpm', placeholder: '72', rangeKey: 'pulse' },
+  { key: 'respiratoryRate', label: 'Respiratory rate', unit: '/min', placeholder: '16', rangeKey: 'respiratoryRate' },
+  { key: 'spo2', label: 'Oxygen saturation', unit: '%', placeholder: '98', rangeKey: 'spo2' },
+  { key: 'weight', label: 'Weight', unit: 'kg', placeholder: '65', rangeKey: 'weight' },
+  { key: 'height', label: 'Height', unit: 'cm', placeholder: '170' },
+  { key: 'painScore', label: 'Pain score', unit: '/10', placeholder: '0', rangeKey: 'painScore' },
+  { key: 'bloodGlucose', label: 'Blood glucose', unit: 'mmol/L', placeholder: '5.5', rangeKey: 'bloodGlucose' },
+  { key: 'gcs', label: 'GCS', unit: '/15', placeholder: '15', rangeKey: 'gcs' },
+  { key: 'muac', label: 'MUAC', unit: 'cm', placeholder: '22', rangeKey: 'muac' },
+];
+
+const emptyVitals = (): RoomingVitals => ({
+  temperature: '', systolic: '', diastolic: '', pulse: '', respiratoryRate: '', spo2: '',
+  weight: '', height: '', painScore: '', bloodGlucose: '', gcs: '', muac: '', notes: '',
+});
+
 export default function RoomingWorkflow() {
   const { currentUser } = useAuth();
   const toast = useToast();
-  const { entries, loading, error, markArrived, assignRoom, transferClinic, markReady } = useRooming();
+  const { entries, loading, error, markArrived, assignRoom, transferClinic, markReady, recordVitals } = useRooming();
 
   // Room being typed, keyed by encounter — several patients can be part-way
   // through rooming at once, so a single shared input would leak one nurse's
   // half-finished entry onto another patient's row.
   const [roomDraft, setRoomDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [vitalsEntry, setVitalsEntry] = useState<RoomingWorklistEntry | null>(null);
+  const [vitalsDraft, setVitalsDraft] = useState<RoomingVitals>(emptyVitals);
+  const [vitalsSaving, setVitalsSaving] = useState(false);
+  const [vitalsRecorded, setVitalsRecorded] = useState<Record<string, string>>({});
 
   const actor = { actorId: currentUser?._id, actorName: currentUser?.name };
 
@@ -59,6 +87,63 @@ export default function RoomingWorkflow() {
       setBusy(null);
     }
   }
+
+  const syncReadyProgress = async (encounter: RoomingWorklistEntry['encounter']) => {
+    const { syncConsultationProgressStage } = await import('@/lib/services/consultation-progress-service');
+    await syncConsultationProgressStage({
+      patientId: encounter.patientId,
+      patientName: encounter.patientName,
+      hospitalId: encounter.hospitalId || currentUser?.hospitalId || 'facility-unassigned',
+      hospitalName: encounter.hospitalName || currentUser?.hospitalName,
+      orgId: encounter.orgId || currentUser?.orgId,
+      encounterId: encounter._id,
+      stage: 'waiting_for_provider',
+      nextAction: 'Start consultation',
+      actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
+    });
+  };
+
+  const openVitals = (entry: RoomingWorklistEntry) => {
+    setVitalsEntry(entry);
+    setVitalsDraft(emptyVitals());
+  };
+
+  const saveVitals = async () => {
+    if (!vitalsEntry || !currentUser) return;
+    const entered = Object.entries(vitalsDraft).some(([key, value]) => key !== 'notes' && Boolean(value?.trim()));
+    if (!entered) {
+      toast.showToast('Enter at least one vital sign.', 'error');
+      return;
+    }
+    for (const field of VITAL_FIELDS) {
+      const value = vitalsDraft[field.key]?.trim();
+      if (value && field.rangeKey && !isVitalInRange(field.rangeKey, value)) {
+        toast.showToast(`${field.label} is outside the valid range. Check the value.`, 'error');
+        return;
+      }
+    }
+    setVitalsSaving(true);
+    try {
+      await recordVitals({
+        patientId: vitalsEntry.encounter.patientId,
+        patientName: vitalsEntry.encounter.patientName,
+        hospitalId: vitalsEntry.encounter.hospitalId,
+        hospitalName: vitalsEntry.encounter.hospitalName,
+        orgId: vitalsEntry.encounter.orgId,
+        encounterId: vitalsEntry.encounter._id,
+        recordedById: currentUser._id,
+        recordedByName: currentUser.name,
+        vitals: vitalsDraft,
+      });
+      setVitalsRecorded(previous => ({ ...previous, [vitalsEntry.encounter._id]: new Date().toISOString() }));
+      toast.showToast(`Vitals saved for ${vitalsEntry.encounter.patientName}`, 'success');
+      setVitalsEntry(null);
+    } catch (err) {
+      toast.showToast(err instanceof Error ? err.message : 'Failed to save vitals', 'error');
+    } finally {
+      setVitalsSaving(false);
+    }
+  };
 
   if (loading) {
     return <div className="p-6 text-sm" style={{ color: 'var(--text-muted)' }}>Loading the rooming worklist…</div>;
@@ -109,6 +194,9 @@ export default function RoomingWorkflow() {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         · {encounter.destinationClinic}
                       </span>
+                    )}
+                    {vitalsRecorded[encounter._id] && (
+                      <span className="text-xs font-semibold" style={{ color: 'var(--color-success)' }}>· Vitals recorded</span>
                     )}
                   </div>
                 </div>
@@ -161,15 +249,32 @@ export default function RoomingWorkflow() {
                   )}
 
                   {step === 'being_roomed' && (
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => run(encounter._id, () => markReady(encounter._id, actor), 'Ready for the clinician')}
-                      className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded"
-                      style={{ background: 'var(--accent-primary)', color: '#fff' }}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Ready
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => openVitals({ encounter, step, waitingMinutes })}
+                        className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded"
+                        style={{ background: 'var(--overlay-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}
+                      >
+                        <Activity className="w-3.5 h-3.5" /> Vitals
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => run(encounter._id, async () => {
+                          await markReady(encounter._id, actor);
+                          // The encounter transition is the source of truth;
+                          // an offline tracker sync must not tell the nurse
+                          // that the ready handoff failed after it succeeded.
+                          await syncReadyProgress(encounter).catch(() => undefined);
+                        }, 'Ready for the clinician')}
+                        className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded"
+                        style={{ background: 'var(--accent-primary)', color: '#fff' }}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                      </button>
+                    </>
                   )}
 
                   {step !== 'awaiting_arrival' && (
@@ -195,6 +300,55 @@ export default function RoomingWorkflow() {
             );
           })}
         </div>
+      )}
+
+      {vitalsEntry && (
+        <Modal onClose={() => { if (!vitalsSaving) setVitalsEntry(null); }} width={620} labelledBy="rooming-vitals-title">
+          <div className="p-5" style={{ background: 'var(--bg-card-solid, var(--bg-card))' }}>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                  <h2 id="rooming-vitals-title" className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Record vitals</h2>
+                </div>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{vitalsEntry.encounter.patientName} · {vitalsEntry.encounter.hospitalNumber || 'No ID'}</p>
+              </div>
+              <button type="button" onClick={() => setVitalsEntry(null)} disabled={vitalsSaving} aria-label="Close" style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {VITAL_FIELDS.map(field => {
+                const flagged = Boolean(getVitalFlags(vitalsDraft)[field.key]);
+                return (
+                  <label key={field.key} className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="flex justify-between gap-2 mb-1"><span>{field.label}</span><span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{field.unit}</span></span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      value={vitalsDraft[field.key] || ''}
+                      onChange={event => setVitalsDraft(current => ({ ...current, [field.key]: event.target.value }))}
+                      placeholder={field.placeholder}
+                      className="w-full rounded border px-2.5 py-2 text-sm"
+                      style={{ borderColor: flagged ? 'var(--color-danger)' : 'var(--border-light)', background: 'var(--bg-input, var(--bg-app))', color: 'var(--text-primary)' }}
+                    />
+                    {flagged && <span className="block mt-1 text-[10px]" style={{ color: 'var(--color-danger)' }}>Check this value</span>}
+                  </label>
+                );
+              })}
+            </div>
+            <label className="block mt-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              Notes
+              <textarea value={vitalsDraft.notes || ''} onChange={event => setVitalsDraft(current => ({ ...current, notes: event.target.value }))} rows={2} className="w-full mt-1 rounded border px-2.5 py-2 text-sm resize-none" placeholder="Position, oxygen, symptoms, or other observation" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-input, var(--bg-app))', color: 'var(--text-primary)' }} />
+            </label>
+            <div className="flex justify-end gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--border-light)' }}>
+              <button type="button" onClick={() => setVitalsEntry(null)} disabled={vitalsSaving} className="px-3 py-2 rounded text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>Cancel</button>
+              <button type="button" onClick={() => void saveVitals()} disabled={vitalsSaving} className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--accent-primary)' }}>
+                <Save className="w-3.5 h-3.5" /> {vitalsSaving ? 'Saving…' : 'Save vitals'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -853,6 +853,7 @@ export default function PharmacyDashboardPage() {
               meta: `${rx.prescribedBy} · ${formatTime(rx.createdAt)}`,
               compactMeta: formatTime(rx.createdAt),
               time: formatTime(rx.createdAt),
+              date: rx.createdAt.slice(0, 10),
               timeSecondary: rx.createdAt.slice(0, 10),
               careTeam: rx.prescribedBy,
               careTeamLabel: 'Prescriber',

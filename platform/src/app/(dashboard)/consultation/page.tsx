@@ -1538,6 +1538,7 @@ export default function ConsultationPage() {
           lastVisitHospital: hospitalId,
           lastConsultedAt: now,
           lastConsultedBy: currentUser?.name || '',
+          assignmentStatus: 'completed',
         });
       } catch (e) {
         console.warn('Could not update patient lastConsultedAt', e);

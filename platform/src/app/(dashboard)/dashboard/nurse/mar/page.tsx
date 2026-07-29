@@ -1,11 +1,5 @@
-'use client';
-
-import MarWorkflow from '@/components/nurse/MarWorkflow';
+import { redirect } from 'next/navigation';
 
 export default function NurseMarPage() {
-  return (
-    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column' }}>
-      <MarWorkflow />
-    </main>
-  );
+  redirect('/dashboard/nurse?station=mar');
 }

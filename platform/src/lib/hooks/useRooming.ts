@@ -82,5 +82,14 @@ export function useRooming() {
     return doc;
   }, [load]);
 
-  return { entries, loading, error, markArrived, assignRoom, transferClinic, markReady, reload: load };
+  const recordVitals = useCallback(async (
+    input: import('../services/medical-record-service').NursingVitalsInput,
+  ) => {
+    const svc = await import('../services/rooming-service');
+    const doc = await svc.recordRoomingVitals(input);
+    await load();
+    return doc;
+  }, [load]);
+
+  return { entries, loading, error, markArrived, assignRoom, transferClinic, markReady, recordVitals, reload: load };
 }

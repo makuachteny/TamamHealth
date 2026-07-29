@@ -1,11 +1,5 @@
-'use client';
-
-import HandoffWorkflow from '@/components/nurse/HandoffWorkflow';
+import { redirect } from 'next/navigation';
 
 export default function NurseHandoffPage() {
-  return (
-    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column' }}>
-      <HandoffWorkflow variant="page" />
-    </main>
-  );
+  redirect('/dashboard/nurse?station=handoff');
 }

@@ -146,6 +146,43 @@ export function formatTimeUntil(value?: string | Date | null, now: Date = new Da
   return past ? `${label} ago` : `in ${label}`;
 }
 
+/**
+ * Compact appointment display used in shared worklists. Same-day meetings
+ * count down to seconds; meetings on another day use a calendar date. A
+ * meeting from a previous calendar day stays a date instead of becoming an
+ * ambiguous "2d ago" label.
+ */
+export function formatAppointmentTimeUntil(value?: string | Date | null, now: Date = new Date()): string {
+  if (!value) return '';
+  const target = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(target.getTime())) return '';
+
+  const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  const sameDay = dayKey(target) === dayKey(now);
+  const dateLabel = target.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  if (!sameDay) return dateLabel;
+
+  const diffMs = target.getTime() - now.getTime();
+  const past = diffMs < 0;
+  const totalSeconds = Math.floor(Math.abs(diffMs) / 1000);
+  if (totalSeconds < 60) {
+    const label = `${totalSeconds}s`;
+    return past ? `${label} ago` : `in ${label}`;
+  }
+
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const label = hours > 0
+    ? (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`)
+    : `${minutes}m`;
+  return past ? `${label} ago` : `in ${label}`;
+}
+
 /** Part of day for greetings. Pure function of the hour (local time). */
 export function timeOfDay(date: Date = new Date()): 'morning' | 'afternoon' | 'evening' {
   const h = date.getHours();

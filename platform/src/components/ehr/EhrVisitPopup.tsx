@@ -8,6 +8,7 @@ import { STAGE_LABELS, type QueueEntry, type QueueStage } from '@/lib/services/p
 import { formatClockTime } from '@/lib/format-utils';
 import { initials, stateTint } from '@/lib/patient-utils';
 import type { AppointmentDoc, TriageDoc } from '@/lib/db-types';
+import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 
 /* ─── Visit popup + move dialog (clinician worklist) ───
    Row click on "Patients assigned to you" opens this popup: the current
@@ -112,7 +113,7 @@ export default function EhrVisitPopup({
   const vitals = triage ? triageVitals(triage) : [];
 
   return (
-    <Modal onClose={onClose} width={640} labelledBy="ehr-visit-pop-title">
+    <Modal onClose={onClose} width={500} labelledBy="ehr-visit-pop-title">
       <div className="modal-content card-elevated ehr-visit-pop">
         <div className="ehr-visit-pop-head">
           <span className="ehr-patient-icon" style={stateTint(acuity)} aria-hidden>
@@ -147,6 +148,12 @@ export default function EhrVisitPopup({
 
         {tab === 'current' ? (
           <div className="ehr-visit-pop-body">
+            <EhrWorkItemProgress
+              status={statusLabel}
+              owner={entry?.assignedToName || comingFrom}
+              waiting={wait}
+              nextAction={entry && !entry.assignedToId ? 'Call patient' : todaysNote ? 'Resume consultation' : 'Start consultation'}
+            />
             <div className="ehr-visit-pop-row">
               <span className="ehr-visit-pop-label">Status</span>
               <div className="ehr-visit-pop-chips">

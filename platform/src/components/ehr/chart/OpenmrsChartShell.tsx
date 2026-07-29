@@ -19,7 +19,7 @@
 import { useEffect, useState } from 'react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import {
-  ShoppingCart, Stethoscope, ClipboardCheck, FileText, Users, X, Maximize2,
+  ShoppingCart, Stethoscope, ClipboardCheck, FileText, Users, X, Maximize2, ChevronDown,
 } from '@/components/icons/lucide';
 import type { PatientDoc } from '@/lib/db-types';
 import OrderBasketPanel from './panels/OrderBasketPanel';
@@ -92,6 +92,7 @@ export default function OpenmrsChartShell({
   const [openPanel, setOpenPanel] = useState<string | null>(null);
   // Drawer expand toggle — widens the workspace drawer to near-full-width.
   const [drawerMaximized, setDrawerMaximized] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     if (panelRequest) {
@@ -100,6 +101,9 @@ export default function OpenmrsChartShell({
       onPanelRequestHandled?.();
     }
   }, [panelRequest, onPanelRequestHandled]);
+  useEffect(() => {
+    if (moreItems.some(item => item.id === activeTab)) setMoreOpen(true);
+  }, [activeTab, moreItems]);
   const activePanel = DRAWER_PANELS.find(p => p.id === openPanel) || null;
 
   const togglePanel = (id: string) => {
@@ -194,8 +198,16 @@ export default function OpenmrsChartShell({
         {moreItems.length > 0 && (
           <>
             <div className="omrs-rail-divider" />
-            <div className="omrs-rail-section-label">More</div>
-            {moreItems.map(item => {
+            <button
+              type="button"
+              className="omrs-rail-section-toggle"
+              onClick={() => setMoreOpen(open => !open)}
+              aria-expanded={moreOpen}
+            >
+              <span>More sections</span>
+              <ChevronDown className={moreOpen ? 'rotate-180' : ''} aria-hidden="true" />
+            </button>
+            {moreOpen && moreItems.map(item => {
               const isActive = activeTab === item.id;
               return (
                 <button

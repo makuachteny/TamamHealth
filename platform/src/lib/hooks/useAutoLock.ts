@@ -22,9 +22,10 @@ const DEFAULT_TIMEOUT_MS = 600_000;
 
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll'] as const;
 
-/** Disables auto-lock entirely — for local development only. Leave unset in
- *  production; this is a security feature for shared clinical devices. */
-const AUTO_LOCK_DISABLED = process.env.NEXT_PUBLIC_AUTO_LOCK_DISABLED === 'true';
+/** TEMPORARY TEST MODE: screen locking is disabled while the platform is being
+ * tested. Restore the environment-based flag before production use. */
+const AUTO_LOCK_DISABLED = true;
+// const AUTO_LOCK_DISABLED = process.env.NEXT_PUBLIC_AUTO_LOCK_DISABLED === 'true';
 
 /** Fired when the lock PIN is set/cleared so a mounted useAutoLock can update
  *  its `hasPin` state immediately (otherwise it'd be stale until remount). */

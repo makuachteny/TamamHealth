@@ -692,6 +692,7 @@ export default function LabDashboardPage() {
               careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
+              date: (lab.completedAt || lab.orderedAt || '').slice(0, 10),
               timeSecondary: lab.completedAt ? lab.completedAt.slice(0, 10) : 'Resulted',
               status: 'completed',
               statusLabel: 'Complete',
@@ -719,6 +720,7 @@ export default function LabDashboardPage() {
               careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
+              date: (order.completedAt || order.orderedAt || '').slice(0, 10),
               timeSecondary: order.status === 'completed'
                 ? (order.completedAt ? order.completedAt.slice(0, 10) : 'Completed')
                 : (order.orderedAt ? order.orderedAt.slice(0, 10) : 'Ordered'),

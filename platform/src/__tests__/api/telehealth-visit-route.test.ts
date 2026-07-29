@@ -57,6 +57,11 @@ function offsetTime(minutes: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function offsetSchedule(minutes: number): { scheduledDate: string; scheduledTime: string } {
+  const d = new Date(jubaNow().getTime() + minutes * 60_000);
+  return { scheduledDate: jubaDate(d), scheduledTime: offsetTime(minutes) };
+}
+
 async function makeSession(overrides: Record<string, unknown> = {}) {
   return createSession({
     patientId: 'pat-001',
@@ -135,7 +140,7 @@ describe('GET /api/telehealth/visit/[sessionId]', () => {
   });
 
   test('reports a too-early visit as closed, with the time it opens', async () => {
-    const s = await makeSession({ scheduledTime: offsetTime(240) });
+    const s = await makeSession(offsetSchedule(240));
     mockVerify.mockResolvedValue({ sub: 'pat-001' });
 
     const body = await (await GET(req, ctx(s._id))).json();
@@ -146,7 +151,7 @@ describe('GET /api/telehealth/visit/[sessionId]', () => {
   });
 
   test('reports a long-past visit as closed', async () => {
-    const s = await makeSession({ scheduledTime: offsetTime(-240) });
+    const s = await makeSession(offsetSchedule(-240));
     mockVerify.mockResolvedValue({ sub: 'pat-001' });
 
     const body = await (await GET(req, ctx(s._id))).json();

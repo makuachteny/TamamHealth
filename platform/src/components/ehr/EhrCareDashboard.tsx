@@ -7,8 +7,9 @@ import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
+import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 import { initials, stateTint } from '@/lib/patient-utils';
-import { formatTimeUntil } from '@/lib/format-utils';
+import { formatAppointmentTimeUntil } from '@/lib/format-utils';
 
 export type EhrCareDashboardAction = {
   label: string;
@@ -110,6 +111,33 @@ function inferredChartSeries(row: EhrCareDashboardRow): 0 | 1 {
 
 function detailPair(primary?: string, secondary?: string) {
   return [primary, secondary].filter(Boolean).join(' · ') || undefined;
+}
+
+function clockMinutes(value?: string): number | null {
+  if (!value) return null;
+  const normalized = value.trim().toUpperCase();
+  const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/);
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  if (minutes > 59) return null;
+  if (match[3] === 'AM') hours = hours === 12 ? 0 : hours;
+  if (match[3] === 'PM') hours = hours === 12 ? 12 : hours + 12;
+  return hours <= 23 ? hours * 60 + minutes : null;
+}
+
+function compareDashboardRows(a: EhrCareDashboardRow, b: EhrCareDashboardRow): number {
+  const dateA = a.date || '9999-12-31';
+  const dateB = b.date || '9999-12-31';
+  if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+  const timestampA = a.timeAt ? new Date(a.timeAt).getTime() : Number.NaN;
+  const timestampB = b.timeAt ? new Date(b.timeAt).getTime() : Number.NaN;
+  const timeA = clockMinutes(a.time) ?? (Number.isFinite(timestampA) ? timestampA : Number.POSITIVE_INFINITY);
+  const timeB = clockMinutes(b.time) ?? (Number.isFinite(timestampB) ? timestampB : Number.POSITIVE_INFINITY);
+  if (timeA !== timeB) return timeA - timeB;
+
+  return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id);
 }
 
 /**
@@ -250,18 +278,22 @@ export default function EhrCareDashboard({
     series: inferredChartSeries(row),
   })), [rows]);
   const visibleRows = useMemo(() => {
-    if (!showCalendar || effectiveView !== 'calendar' || rowEventDates.length === 0) return rows;
-    return rows.filter(row => row.date === selectedDate);
-  }, [effectiveView, rowEventDates.length, rows, selectedDate, showCalendar]);
-  // Live clock for the time column's "in 2h 15m" countdown. Starts null so the
+    // The mini-calendar remains active in dashboard mode. Selecting a day
+    // must change the worklist itself, not only the calendar highlight.
+    const scopedRows = !showCalendar || rowEventDates.length === 0
+      ? rows
+      : rows.filter(row => row.date === selectedDate);
+    return scopedRows.slice().sort(compareDashboardRows);
+  }, [rowEventDates.length, rows, selectedDate, showCalendar]);
+  // Live clock for the time column's countdown. Starts null so the
   // server-rendered markup and the first client render match, then ticks every
-  // 30s — only while some visible row actually carries a `timeAt`.
+  // second so imminent meetings can show accurate seconds.
   const hasCountdown = useMemo(() => visibleRows.some(row => !!row.timeAt), [visibleRows]);
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
     if (!hasCountdown) { setNow(null); return; }
     setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 30000);
+    const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, [hasCountdown]);
   useEffect(() => {
@@ -455,13 +487,22 @@ export default function EhrCareDashboard({
                     const activate = () => openDetail(row);
                     const countdown = (() => {
                       if (!now || !row.timeAt) return null;
-                      const label = formatTimeUntil(row.timeAt, now);
+                      const target = new Date(row.timeAt);
+                      if (Number.isNaN(target.getTime())) return null;
+                      const label = formatAppointmentTimeUntil(target, now);
                       if (!label) return null;
-                      const minutesAway = (new Date(row.timeAt).getTime() - now.getTime()) / 60000;
+                      const minutesAway = (target.getTime() - now.getTime()) / 60000;
+                      const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+                      const usesDate = dayKey(target) !== dayKey(now);
+                      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                      const isPastDay = target.getTime() < startOfToday;
                       const tone = minutesAway < 0 ? 'is-past' : minutesAway <= 30 ? 'is-soon' : '';
-                      return { label, tone };
+                      return { label, tone, usesDate, isPastDay };
                     })();
-                    const timeSubtext = row.timeSecondary || countdown?.label || '';
+                    const displayTime = countdown?.usesDate ? countdown.label : row.time || row.date || '—';
+                    const timeSubtext = countdown
+                      ? (countdown.usesDate ? (countdown.isPastDay ? '' : (row.time || '')) : countdown.label)
+                      : row.timeSecondary || '';
                     // Status pill tone reuses the appointment pill classes.
                     const statusPillClass = row.statusTone === 'done' ? 'status-completed'
                       : row.statusTone === 'active' ? 'status-checked-in'
@@ -499,7 +540,7 @@ export default function EhrCareDashboard({
                           </div>
 
                           <div className="ehr-appointment-time">
-                            <strong>{row.time || row.date || '—'}</strong>
+                            <strong>{displayTime}</strong>
                             <span className={countdown?.tone || ''}>{timeSubtext}</span>
                           </div>
 
@@ -665,6 +706,13 @@ export default function EhrCareDashboard({
                   ))}
               </div>
             )}
+
+            <EhrWorkItemProgress
+              status={openRow.statusLabel || (openRow.status ? titleCase(openRow.status) : undefined)}
+              owner={openRow.careTeam}
+              waiting={openRow.time || openRow.timeSecondary}
+              nextAction={openRow.actionLabel}
+            />
 
             <div className="appointment-detail-sidebar__actions">
               {openRow.actionLabel && openRow.onAction && (

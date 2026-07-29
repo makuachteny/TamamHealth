@@ -1759,6 +1759,12 @@ export interface Patient {
   assignedByName?: string;
   /** Optional handoff note from the nurse to the doctor. */
   assignmentNote?: string;
+  /** Current visit-level state after the patient is assigned to a provider. */
+  assignmentStatus?: 'assigned' | 'accepted' | 'in_progress' | 'completed';
+  /** When the receiving provider acknowledged the assignment. */
+  assignmentAcceptedAt?: string;
+  assignmentAcceptedBy?: string;
+  assignmentAcceptedByName?: string;
   /** Department currently responsible for the patient (e.g. "Paediatrics"). */
   assignedDepartment?: string;
   /**

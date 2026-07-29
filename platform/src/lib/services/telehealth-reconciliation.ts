@@ -99,12 +99,13 @@ function scheduledAt(session: TelehealthSessionDoc): number {
  * `now` is injected rather than read from the clock so the behaviour is
  * testable without freezing time globally.
  */
-export async function expireStaleSessions(now: number = Date.now()): Promise<ReconciliationFinding[]> {
+export async function expireStaleSessions(now: number = Date.now(), excludedAppointmentIds?: Set<string>): Promise<ReconciliationFinding[]> {
   const findings: ReconciliationFinding[] = [];
   const sessions = await getAllSessions();
 
   for (const s of sessions) {
     if (!OPEN_STATUSES.includes(s.status)) continue;
+    if (s.appointmentId && excludedAppointmentIds?.has(s.appointmentId)) continue;
     const due = scheduledAt(s);
     if (!due) continue;
 
@@ -199,7 +200,10 @@ export async function reconcileTelehealth(
   const { now = Date.now(), repair = true } = options;
   const findings: ReconciliationFinding[] = [];
 
-  if (repair) findings.push(...await expireStaleSessions(now));
+  const cancelledAppointmentIds = new Set(
+    appointments.filter(appointment => appointment.status === 'cancelled').map(appointment => appointment._id),
+  );
+  if (repair) findings.push(...await expireStaleSessions(now, cancelledAppointmentIds));
 
   const sessions = await getAllSessions();
   const byAppointment = new Map<string, TelehealthSessionDoc[]>();

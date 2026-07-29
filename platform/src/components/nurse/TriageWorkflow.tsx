@@ -16,7 +16,7 @@ import {
 import {
   ACCENT, calculateTriagePriority, type TriageResult,
 } from './shared';
-import { PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
+import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import ListSearch from './ListSearch';
 import RowActionsMenu, { type RowAction } from '@/components/referrals/RowActionsMenu';
 
@@ -31,13 +31,6 @@ function modeOfArrivalLabel(mode: string | undefined, t: (key: string) => string
     case 'other': return t('nurse.modeOther');
     default: return '—';
   }
-}
-
-// Triage status → Status column label. No dedicated i18n key exists per
-// status today (the old row just printed the raw value); title-case it so
-// the queue-card Status cell reads like the rest of the app.
-function triageStatusLabel(status: string): string {
-  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 export default function TriageWorkflow({ initialPatientId }: { initialPatientId?: string }) {
@@ -252,6 +245,18 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
           status: 'pending',
         });
       }
+      void import('@/lib/services/consultation-progress-service').then(({ syncConsultationProgressStage }) =>
+        syncConsultationProgressStage({
+          patientId: selectedTriagePatient._id,
+          patientName: patientFullName(selectedTriagePatient),
+          hospitalId: currentUser?.hospitalId || selectedTriagePatient.registrationHospital || 'facility-unassigned',
+          hospitalName: currentUser?.hospitalName,
+          orgId: currentUser?.orgId,
+          stage: 'waiting_for_provider',
+          nextAction: 'Assign patient to a provider',
+          actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
+        })
+      ).catch(() => { /* queue save remains successful if progress sync is offline */ });
       showToast(t('nurse.triageSaved', { priority: triageData.priority, name: patientFullName(selectedTriagePatient) }), 'success');
       // Reset form only on success
       setEditingTriageId(null);
@@ -676,12 +681,11 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
           ) : (
             <div className="ehr-queue-cards ehr-queue-cards--triage">
               <div className="ehr-queue-guide ehr-queue-guide--triage" aria-hidden="true">
-                {['Patient', 'Source', 'Acuity', 'Status', 'Wait', 'Action'].map(head => (
+                {['Patient', 'Source', 'Wait', 'Action'].map(head => (
                   <span key={head}>{head}</span>
                 ))}
               </div>
               {filteredHistory.slice(0, 12).map(ti => {
-                const priorityMeta = PRIORITY_META[ti.priority];
                 const minutesAgo = Math.max(0, Math.floor((nowMs - new Date(ti.triagedAt).getTime()) / 60000));
                 const actions: RowAction[] = [
                   { key: 'view', label: t('nurse.triageActionView'), icon: <Eye />, onClick: () => router.push(`/patients/${ti.patientId}`) },
@@ -718,14 +722,6 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
 
                     <div className="ehr-queue-cell ehr-queue-muted-cell">
                       {modeOfArrivalLabel(ti.modeOfArrival, t)}
-                    </div>
-
-                    <div className="ehr-queue-cell">
-                      <span className="ehr-queue-pill" data-tone={priorityMeta.tone}>{priorityMeta.label}</span>
-                    </div>
-
-                    <div className="ehr-queue-cell">
-                      <span className="ehr-queue-status">{triageStatusLabel(ti.status)}</span>
                     </div>
 
                     <div className="ehr-queue-cell ehr-queue-num-col">

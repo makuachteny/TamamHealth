@@ -27,7 +27,7 @@ import { initials, stateTint, AVATAR_TINT_NEUTRAL } from '@/lib/patient-utils';
 // One palette for "what is this and how urgent" across the bell and the rail.
 import { NOTIFICATION_META, SEVERITY_META } from '@/lib/notification-meta';
 import type { NotificationSeverity, NotificationType } from '@/lib/hooks/useNotifications';
-import { formatClockTime, formatTimeUntil } from '@/lib/format-utils';
+import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
 import { useToast } from '@/components/Toast';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -43,6 +43,7 @@ import {
 } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import EhrVisitPopup, { EhrQueueMoveDialog, PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
+import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useAuth } from '@/lib/context';
 import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
@@ -70,6 +71,10 @@ type WorklistPatient = {
   nurse?: string;
   division?: string;
   triagePriority?: 'RED' | 'YELLOW' | 'GREEN';
+  assignedDoctor?: string;
+  assignedDoctorName?: string;
+  assignmentStatus?: 'assigned' | 'accepted' | 'in_progress' | 'completed';
+  assignmentNote?: string;
 };
 
 type UnifiedPatientRow = {
@@ -468,6 +473,8 @@ export default function EhrClinicalDashboard({
         name: patient.name,
         patientId: patient._id,
         triagePriority: patient.triagePriority || (appointment ? appointmentTriage(appointment.priority) : 'GREEN'),
+        assignmentStatus: patient.assignmentStatus || (patient.assignedDoctor ? 'assigned' : undefined),
+        assignmentNote: patient.assignmentNote,
         reason: appointment?.reason || patient.division || patient.ward || 'Assigned patient',
         timeLabel: appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime) : 'Assigned',
         status: status as AppointmentStatus,
@@ -505,11 +512,15 @@ export default function EhrClinicalDashboard({
       return aTime.localeCompare(bTime) || a.name.localeCompare(b.name);
     });
   }, [clinicianName, patients, photoByPatientId, selectedAppointmentsForDay]);
-  const visiblePatientRows = unifiedPatientRows.filter(row => (
-    !appointmentQuery ||
-    [row.name, row.reason, row.timeLabel, row.department, row.provider, row.status]
-      .some(value => value?.toLowerCase().includes(appointmentQuery))
-  ));
+  const visiblePatientRows = unifiedPatientRows.filter(row => {
+    // Assigned patients without a scheduled appointment belong to today's
+    // worklist. Appointment-backed rows follow the selected calendar day.
+    const rowDate = row.appointment?.appointmentDate || todayIso;
+    if (rowDate !== selectedDate) return false;
+    return !appointmentQuery ||
+      [row.name, row.reason, row.timeLabel, row.department, row.provider, row.status]
+        .some(value => value?.toLowerCase().includes(appointmentQuery));
+  });
 
   // ── Live queue state behind the worklist columns ──
   // Coming from / Queue / Wait time derive from the patient's active triage
@@ -621,7 +632,7 @@ export default function EhrClinicalDashboard({
   const [queueNowMs, setQueueNowMs] = useState<number | null>(null);
   useEffect(() => {
     setQueueNowMs(Date.now());
-    const timer = setInterval(() => setQueueNowMs(Date.now()), 60_000);
+    const timer = setInterval(() => setQueueNowMs(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, []);
   const activeTriageByPatient = useMemo(() => {
@@ -653,8 +664,17 @@ export default function EhrClinicalDashboard({
       : null;
     const relativeNow = queueNowMs === null ? null : new Date(queueNowMs);
     const appointmentRelative = appointmentAt && relativeNow && !Number.isNaN(appointmentAt.getTime())
-      ? formatTimeUntil(appointmentAt.toISOString(), relativeNow)
+      ? formatAppointmentTimeUntil(appointmentAt, relativeNow)
       : '';
+    const assignmentLabel = row.patient?.assignmentStatus === 'assigned'
+      ? 'Assigned'
+      : row.patient?.assignmentStatus === 'accepted'
+        ? 'Accepted'
+        : row.patient?.assignmentStatus === 'in_progress'
+          ? 'In service'
+          : row.patient?.assignmentStatus === 'completed'
+            ? 'Completed'
+            : null;
     return {
       entry: entry ?? null,
       triage: triage ?? null,
@@ -665,19 +685,19 @@ export default function EhrClinicalDashboard({
       careTeamSecondary: row.patient?.nurse || entry?.assignedToName || 'Nurse unassigned',
       statusText: inService
         ? 'In service'
-        : entry ? 'Waiting' : statusLabel(row.status),
+        : entry ? 'Waiting' : assignmentLabel || statusLabel(row.status),
       queueText: entry ? STAGE_LABELS[entry.stage] : typeLabel(row.department),
       waitText: entry ? formatClockTime(entry.enteredStageAt) : row.appointment?.appointmentTime ? formatClockTime(row.appointment.appointmentTime) : '—',
       waitSubtext: entry
         ? waitLabel(entry.minutesWaiting)
-        : row.appointment?.appointmentDate || appointmentRelative || 'Assigned list',
+        : appointmentRelative || row.appointment?.appointmentDate || 'Assigned list',
       statusSubtext: entry?.acuity === 'RED'
         ? 'Critical'
         : entry?.acuity === 'YELLOW'
           ? 'Urgent'
           : entry?.acuity === 'GREEN'
             ? 'Routine'
-            : PRIORITY_META[row.triagePriority].label,
+            : row.patient?.assignmentNote || PRIORITY_META[row.triagePriority].label,
       overTarget: Boolean(entry?.flaggedForReassessment),
       inService,
     };
@@ -766,6 +786,22 @@ export default function EhrClinicalDashboard({
   // row flips to "In service" for every station) and open the consultation.
   const callPatient = async (row: UnifiedPatientRow) => {
     if (!row.patientId) return;
+    const now = new Date().toISOString();
+    const patientAssignment = row.patient;
+    try {
+      const { updatePatient } = await import('@/lib/services/patient-service');
+      await updatePatient(row.patientId, {
+        assignedDoctor: currentUser?._id || patientAssignment?.assignedDoctor,
+        assignedDoctorName: currentUser?.name || patientAssignment?.assignedDoctorName,
+        assignmentStatus: 'accepted',
+        assignmentAcceptedAt: now,
+        assignmentAcceptedBy: currentUser?._id,
+        assignmentAcceptedByName: currentUser?.name,
+      });
+    } catch {
+      // The queue handoff and consultation can still proceed if the patient
+      // cache is temporarily unavailable; the event is retried by sync.
+    }
     const entry = queueEntryByPatient.get(row.patientId);
     if (entry && !entry.assignedToId && currentUser) {
       await updateTriageDoc(entry.triageId, {
@@ -773,6 +809,30 @@ export default function EhrClinicalDashboard({
         handoffToName: currentUser.name,
         handoffAt: new Date().toISOString(),
       });
+    }
+    try {
+      const { ensureConsultationProgress, assignProgressOwner, updateProgressStage } = await import('@/lib/services/consultation-progress-service');
+      const tracker = await ensureConsultationProgress({
+        patientId: row.patientId,
+        patientName: row.name,
+        hospitalId: currentUser?.hospitalId || '',
+        hospitalName: currentUser?.hospital?.name || currentUser?.hospitalName || '',
+        orgId: currentUser?.orgId,
+        appointmentId: row.appointment?._id,
+        actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
+      });
+      await assignProgressOwner(tracker._id, {
+        id: currentUser?._id,
+        name: currentUser?.name,
+        role: currentUser?.role,
+      }, { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role });
+      await updateProgressStage(tracker._id, 'in_progress', {
+        id: currentUser?._id,
+        name: currentUser?.name,
+        role: currentUser?.role,
+      }, 'Complete the consultation assessment');
+    } catch {
+      // Tracker updates must not block opening the clinical encounter.
     }
     router.push(`/consultation?patientId=${row.patientId}`);
   };
@@ -853,6 +913,13 @@ export default function EhrClinicalDashboard({
       </div>
 
       <div className="appointment-detail-modal__body" role="tabpanel">
+        <EhrWorkItemProgress
+          status={statusLabel(openAppointment.status)}
+          owner={openAppointment.providerName || clinicianName || 'Unassigned'}
+          waiting={appointmentTimeRange(openAppointment)}
+          timeLabel="Visit time"
+          nextAction={canConsult && openAppointment.patientId ? 'Start consultation' : 'Open patient record'}
+        />
         <div className="appointment-detail-modal__summary-grid">
           {[
             { label: 'Visit', value: openAppointment.appointmentType === 'telehealth' ? 'Telehealth' : openAppointment.appointmentType === 'walk_in' ? 'Walk-in' : 'In office' },
@@ -1365,7 +1432,7 @@ export default function EhrClinicalDashboard({
           )}
 
           {openAppointment && (
-            <Modal onClose={() => setOpenAppointment(null)} width={520} labelledBy="appointment-clinical-title">
+            <Modal onClose={() => setOpenAppointment(null)} width={480} labelledBy="appointment-clinical-title">
               {appointmentPanel}
             </Modal>
           )}

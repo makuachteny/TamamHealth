@@ -330,6 +330,7 @@ export default function StateDashboardPage() {
               time: c.lastReportAt
                 ? new Date(c.lastReportAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : undefined,
+              date: c.lastReportAt ? c.lastReportAt.slice(0, 10) : undefined,
               timeSecondary: c.lastReportAt ? c.lastReportAt.slice(0, 10) : 'No report',
             };
           })}
