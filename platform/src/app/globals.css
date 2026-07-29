@@ -11541,13 +11541,13 @@ span:has(> svg:only-child) {
   padding: 8px 18px 4px;
 }
 
+/* Renders as a flush section of its host card (no nested-card chrome):
+   content lines up with the parent's edges and a bottom rule separates it
+   from what follows. */
 .ehr-work-item-progress {
-  margin: 0 0 12px;
-  padding: 9px 12px 8px;
-  border: 1px solid var(--border-light);
-  border-left: 3px solid var(--accent-primary);
-  border-radius: 6px;
-  background: var(--bg-card-solid);
+  margin: 0 0 14px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .ehr-work-item-progress__title {
@@ -11657,11 +11657,6 @@ span:has(> svg:only-child) {
   white-space: nowrap;
 }
 
-@media (max-width: 520px) {
-  .ehr-work-item-progress {
-    padding-inline: 11px;
-  }
-}
 
 .appointment-detail-sidebar__actions {
   display: flex;
