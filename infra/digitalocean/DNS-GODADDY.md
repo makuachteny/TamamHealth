@@ -27,6 +27,16 @@ Replace or remove old `@` records that point at AWS (`13.248.243.5`, etc.).
 | A | `app` | `138.68.124.30` |
 | A | `couch` | `138.68.124.30` |
 
+## Staging URLs (after Caddy is up)
+
+| URL | Serves |
+|-----|--------|
+| **https://staging.tamamhealth.org/login** | EHR app (platform) |
+| https://app.staging.tamamhealth.org/login | Same EHR app |
+| https://www.staging.tamamhealth.org | Same EHR app |
+
+Production keeps marketing on the apex (`tamamhealth.org`) and the EHR on `app.tamamhealth.org`. Staging puts the **app on the apex** so `/login` works at `staging.tamamhealth.org/login`.
+
 ## Verify
 
 Wait 5–15 minutes, then:
@@ -34,6 +44,7 @@ Wait 5–15 minutes, then:
 ```bash
 ./scripts/check-deploy-dns.sh
 dig +short app.staging.tamamhealth.org   # should print 146.190.179.153
+curl -sI https://staging.tamamhealth.org/login | head -1   # expect HTTP/2 200
 ```
 
 Caddy on the droplet will auto-issue Let's Encrypt certs once DNS resolves publicly (may take a few minutes after DNS propagates). **Then remove `tls internal` from the staging Caddyfile** (see deploy.sh / re-run bootstrap) so browsers get a trusted cert.

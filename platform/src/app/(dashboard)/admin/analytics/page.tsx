@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import {
-  PieChart as PieChartIcon, TrendingUp, Users, HeartPulse, Building2
+  PieChart as PieChartIcon, TrendingUp, Users, HeartPulse, Building2, Activity
 } from '@/components/icons/lucide';
 import EmptyState from '@/components/EmptyState';
 import {
@@ -22,6 +22,17 @@ interface OrgDataPoint {
   color: string;
 }
 
+interface UsageSummary {
+  dau: number;
+  wau: number;
+  sessionCount: number;
+  eventCount: number;
+  dauTrend: Array<{ date: string; users: number; events: number }>;
+  topPaths: Array<{ path: string; count: number }>;
+  topActions: Array<{ action: string; count: number }>;
+  perOrg?: Array<{ orgId: string; users: number; events: number }>;
+}
+
 export default function AdminAnalyticsPage() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -30,6 +41,8 @@ export default function AdminAnalyticsPage() {
 
   const [orgData, setOrgData] = useState<OrgDataPoint[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
 
   // Access control
   useEffect(() => {
@@ -67,6 +80,26 @@ export default function AdminAnalyticsPage() {
     };
     load();
   }, [organizations, getStats]);
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'super_admin') return;
+    let cancelled = false;
+    (async () => {
+      setUsageLoading(true);
+      try {
+        const res = await fetch('/api/usage/summary?days=30');
+        if (res.ok) {
+          const data = await res.json() as UsageSummary;
+          if (!cancelled) setUsage(data);
+        }
+      } catch {
+        /* ignore — usage panel stays empty */
+      } finally {
+        if (!cancelled) setUsageLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser]);
 
   if (!currentUser || currentUser.role !== 'super_admin') return null;
 
@@ -444,6 +477,136 @@ export default function AdminAnalyticsPage() {
               })}
             </tbody>
           </table>
+          </div>
+        </div>
+
+        {/* Usage metrics (real interaction data) */}
+        <div className="dash-card mb-4 mt-4" style={{ padding: '16px 20px' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <span style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 20, color: 'var(--text-primary)' }}>
+              {t('analytics.usageHeading')}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+          {[
+            { label: t('analytics.dau'), value: usage?.dau ?? '—', color: '#2191D0' },
+            { label: t('analytics.wau'), value: usage?.wau ?? '—', color: 'var(--accent-primary)' },
+            { label: t('analytics.sessions'), value: usage?.sessionCount ?? '—', color: 'var(--color-success)' },
+            { label: t('analytics.events'), value: usage?.eventCount ?? '—', color: 'var(--color-warning)' },
+          ].map(stat => (
+            <div key={stat.label} className="dash-card" style={{ padding: '14px 16px' }}>
+              <span className="kpi-card-title">{stat.label}</span>
+              <div className="stat-value text-3xl mt-2" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>
+                {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <ChartCard title={t('analytics.dauTrend')} defaultType="area" defaultPeriod="month">
+            {() => {
+              if (usageLoading) {
+                return <div className="flex items-center justify-center h-64"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('analytics.loadingChartData')}</p></div>;
+              }
+              if (!usage?.dauTrend?.length || usage.dauTrend.every(d => !d.users && !d.events)) {
+                return (
+                  <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <EmptyState icon={Activity} title={t('analytics.noUsageYet')} message={t('analytics.noDataShort')} />
+                  </div>
+                );
+              }
+              return (
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={usage.dauTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <AreaGradients />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                    <XAxis dataKey="date" tick={axisTick} tickFormatter={(v: string) => v.slice(5)} />
+                    <YAxis tick={axisTick} />
+                    <Tooltip {...chartTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Area type="monotone" dataKey="users" name={t('analytics.legendUsers')} stroke="#2191D0" fill="url(#grad1)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="events" name={t('analytics.events')} stroke="#059669" fill="#059669" fillOpacity={0.12} strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              );
+            }}
+          </ChartCard>
+
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.topModules')}</h3>
+            </div>
+            <div className="p-4">
+              {!usage?.topPaths?.length ? (
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('analytics.noDataShort')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {usage.topPaths.slice(0, 8).map((row) => (
+                    <div key={row.path} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate font-mono" style={{ color: 'var(--text-secondary)' }}>{row.path}</span>
+                      <span className="font-bold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>{row.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.topActions')}</h3>
+            </div>
+            <div className="p-4">
+              {!usage?.topActions?.length ? (
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('analytics.noDataShort')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {usage.topActions.slice(0, 10).map((row) => (
+                    <div key={row.action} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{row.action}</span>
+                      <span className="font-bold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>{row.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.perOrgActivity')}</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ minWidth: 320 }}>
+                <thead>
+                  <tr>
+                    {[t('analytics.colOrgId'), t('analytics.colUsers'), t('analytics.colEvents')].map(h => (
+                      <th key={h} className="text-left px-4 py-2 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(usage?.perOrg || []).slice(0, 12).map((row) => (
+                    <tr key={row.orgId} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td className="px-4 py-2 text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>{row.orgId}</td>
+                      <td className="px-4 py-2 text-sm font-bold" style={{ color: '#2191D0' }}>{row.users}</td>
+                      <td className="px-4 py-2 text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{row.events}</td>
+                    </tr>
+                  ))}
+                  {!usage?.perOrg?.length && (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-6 text-center text-xs" style={{ color: 'var(--text-muted)' }}>{t('analytics.noDataShort')}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </main>

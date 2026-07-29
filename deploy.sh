@@ -102,7 +102,29 @@ fi
 
 # ===== 3. CADDY CONFIG =====================================================
 say "Writing /etc/caddy/Caddyfile"
-cat > /etc/caddy/Caddyfile <<EOF
+# Staging: apex (staging.example.com) serves the app so /login works without
+# the app. prefix. Production keeps marketing on apex and the EHR on app.*.
+if [[ "${DOMAIN_ROOT}" == staging.* ]]; then
+  cat > /etc/caddy/Caddyfile <<EOF
+# Staging — platform on apex + app.* (marketing site still on :3001 locally)
+${DOMAIN_ROOT}, www.${DOMAIN_ROOT}, ${DOMAIN_APP} {
+    reverse_proxy localhost:3000
+    encode gzip
+}
+
+# CouchDB (browser-facing for live sync)
+${DOMAIN_COUCH} {
+    reverse_proxy localhost:5984
+    header {
+        Access-Control-Allow-Origin "https://${DOMAIN_ROOT}"
+        Access-Control-Allow-Credentials true
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, HEAD"
+        Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With, X-CouchDB-Www-Authenticate"
+    }
+}
+EOF
+else
+  cat > /etc/caddy/Caddyfile <<EOF
 # Marketing site
 ${DOMAIN_ROOT}, www.${DOMAIN_ROOT} {
     reverse_proxy localhost:3001
@@ -127,6 +149,7 @@ ${DOMAIN_COUCH} {
     }
 }
 EOF
+fi
 
 systemctl reload caddy || systemctl restart caddy
 

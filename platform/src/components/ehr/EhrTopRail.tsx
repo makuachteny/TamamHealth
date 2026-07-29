@@ -204,7 +204,7 @@ export default function EhrTopRail() {
   return (
     <>
     <header className={`ehr-top-rail ${mobileSearchOpen ? 'is-searching' : ''}`}>
-      <div className="ehr-top-brand" onClick={() => router.push(homeHref)} role="button" tabIndex={0}>
+      <div className="ehr-top-brand" onClick={() => router.push(homeHref)} role="button" tabIndex={0} data-track="nav.home">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="ehr-top-brand-logo-full" src="/assets/tamamhealth-logo-full-white.svg" alt="Tamam Healthcare System" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -219,6 +219,7 @@ export default function EhrTopRail() {
           aria-expanded={moduleOpen}
           aria-haspopup="menu"
           title="Open module menu"
+          data-track="nav.module_menu"
         >
           <ActiveModuleIcon className="w-5 h-5" />
           <ChevronDown className="w-3 h-3 ehr-module-chevron" />
@@ -253,12 +254,13 @@ export default function EhrTopRail() {
         onClick={() => router.push('/dashboard?view=calendar')}
         aria-label="Open calendar"
         title="Calendar"
+        data-track="nav.calendar"
       >
         <Calendar className="w-4 h-4" />
       </button>
 
       {(canSearchPatients || isNationalRole) ? (
-        <div className={`ehr-top-search ${mobileSearchOpen ? 'is-mobile-open' : ''}`} ref={boxRef}>
+        <div className={`ehr-top-search ${mobileSearchOpen ? 'is-mobile-open' : ''}`} ref={boxRef} data-track="patient.search">
           <Search className="w-4 h-4" />
           <input
             ref={searchInputRef}
@@ -270,6 +272,7 @@ export default function EhrTopRail() {
             onFocus={() => setOpen(query.trim().length >= 2)}
             placeholder="Start typing a patient name, ID, or phone"
             type="search"
+            data-track="patient.search_input"
           />
           {(query || mobileSearchOpen) && (
             <button type="button" onClick={query ? clearSearch : closeMobileSearch} aria-label={query ? 'Clear patient search' : 'Close patient search'}>
@@ -308,6 +311,7 @@ export default function EhrTopRail() {
               setOpen(query.trim().length >= 2);
             }}
             aria-label="Search patients"
+            data-track="patient.search_mobile"
           >
             <Search className="w-4 h-4" />
           </button>
@@ -318,6 +322,7 @@ export default function EhrTopRail() {
             onClick={() => router.push('/patients/new')}
             aria-label={t('frontDesk.registerNewPatient')}
             title={t('frontDesk.registerNewPatient')}
+            data-track="patient.create"
           >
             <UserPlus className="w-4 h-4" />
           </button>

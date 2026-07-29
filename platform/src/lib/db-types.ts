@@ -603,6 +603,33 @@ export interface AuditLogDoc extends BaseDoc {
   resultCount?: number;
 }
 
+/** Product-analytics interaction event (not compliance audit). */
+export type UsageEventName =
+  | 'session_start'
+  | 'session_end'
+  | 'page_view'
+  | 'click'
+  | 'change';
+
+export interface UsageEventDoc extends BaseDoc {
+  type: 'usage_event';
+  eventName: UsageEventName;
+  /** Pathname with dynamic IDs templated (e.g. /patients/[id]). */
+  path: string;
+  /** Compact element descriptor or data-track value. */
+  element?: string;
+  userId?: string;
+  username?: string;
+  role?: string;
+  orgId?: string;
+  hospitalId?: string;
+  sessionId: string;
+  /** Client event timestamp (ISO). */
+  ts: string;
+  /** Small scrubbed metadata bag only — never PHI. */
+  meta?: Record<string, unknown>;
+}
+
 /**
  * Sync-event outbox row — one written for every clinical mutation. Gives us
  * an auditable, queryable stream independent of PouchDB's internal _changes

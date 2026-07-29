@@ -3209,7 +3209,7 @@ export default function ConsultationPage() {
                       {isProviderRole(currentUser?.role) ? 'Sign & lock note' : 'Sign & route for co-sign'}
                     </label>
                   )}
-                  <button onClick={handleSubmit} disabled={isSaving || !selectedPatient} className="btn btn-primary btn-lg" style={{ opacity: isSaving ? 0.7 : 1 }}>
+                  <button onClick={handleSubmit} disabled={isSaving || !selectedPatient} className="btn btn-primary btn-lg" data-track="consultation.complete" style={{ opacity: isSaving ? 0.7 : 1 }}>
                     {isSaving ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('consultation.saving')}</> : <><Check className="w-4 h-4" /> {t('consultation.saveConsultation')}</>}
                   </button>
                 </div>

@@ -162,6 +162,7 @@ export const labResultsDB = () => getDB('tamamhealth_lab_results');
 export const diseaseAlertsDB = () => getDB('tamamhealth_disease_alerts');
 export const prescriptionsDB = () => getDB('tamamhealth_prescriptions');
 export const auditLogDB = () => getDB('tamamhealth_audit_log');
+export const usageEventsDB = () => getDB('tamamhealth_usage_events');
 export const messagesDB = () => getDB('tamamhealth_messages');
 export const conversationsDB = () => getDB('tamamhealth_conversations');
 export const patientNotesDB = () => getDB('tamamhealth_patient_notes');
@@ -387,7 +388,7 @@ export async function resetAllDatabases(): Promise<void> {
   const dbNames = [
     'tamamhealth_users', 'tamamhealth_patients', 'tamamhealth_hospitals',
     'tamamhealth_medical_records', 'tamamhealth_referrals', 'tamamhealth_lab_results',
-    'tamamhealth_disease_alerts', 'tamamhealth_prescriptions', 'tamamhealth_audit_log', 'tamamhealth_messages', 'tamamhealth_conversations', 'tamamhealth_patient_notes',
+    'tamamhealth_disease_alerts', 'tamamhealth_prescriptions', 'tamamhealth_audit_log', 'tamamhealth_usage_events', 'tamamhealth_messages', 'tamamhealth_conversations', 'tamamhealth_patient_notes',
     'tamamhealth_births', 'tamamhealth_deaths', 'tamamhealth_facility_assessments',
     'tamamhealth_immunizations', 'tamamhealth_anc', 'tamamhealth_follow_ups',
     'tamamhealth_organizations', 'tamamhealth_platform_config',

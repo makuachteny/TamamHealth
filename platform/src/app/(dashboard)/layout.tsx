@@ -20,6 +20,7 @@ import { Loader2 } from '@/components/icons/lucide';
 import { useIsMobileViewport } from '@/lib/hooks/useIsMobileViewport';
 import { getMobileShellArchetype } from '@/lib/mobile-shell/dashboard-strategy';
 import MobileAppShell from '@/components/mobile/MobileAppShell';
+import UsageTracker from '@/components/UsageTracker';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -100,6 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           slot in the mockup — the shell's Inbox tab is the mobile messaging
           entry point instead. */}
       {!useShell && <MessagingDock />}
+      <UsageTracker />
     </div>
     </TourProvider>
     </MessagingDockProvider>
