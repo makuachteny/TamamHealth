@@ -100,17 +100,19 @@ function sortByShortcutPriority(list: NavItem[]): NavItem[] {
 
 /**
  * The top-rail shortcut row next to the module dropdown. Returns up to
- * `maxItems` shortcuts that are not already represented by the active role's
- * dashboard. A short row is intentional: adding unrelated destinations just
- * to fill header space recreates the navigation duplication this helper is
- * meant to prevent.
+ * `maxItems` shortcuts from the active role's permitted navigation. Routes
+ * already represented by the role dashboard are preferred only as fallbacks,
+ * so the header stays useful without introducing unauthorized or unrelated
+ * destinations. The fallback also keeps specialist roles with small menus
+ * from ending up with an incomplete header.
  *
  * Tiers, in fill order:
  *   1. Primary destinations — not the home dashboard, messages, or a route the
  *      role's own dashboard body already duplicates.
- *   2. Messages — included only when the role has no better shortcut.
- * The role dashboard is never added as a shortcut because it is already the
- * home destination.
+ *   2. Messages, then the role dashboard — preferred before reusing a route
+ *      already represented by the dashboard.
+ *   3. Dashboard-duplicate destinations — used only when still needed to
+ *      reach the requested header size.
  */
 export function getPrimaryShortcutItems(items: NavItem[], role?: UserRole, maxItems = 5) {
   const duplicateRoutes = role ? HEADER_SHORTCUT_DUPLICATE_ROUTES[role] : undefined;
@@ -119,11 +121,15 @@ export function getPrimaryShortcutItems(items: NavItem[], role?: UserRole, maxIt
   const tier1 = sortByShortcutPriority(
     items.filter(item => !isDashboard(item.href) && item.href !== '/messages' && !duplicateRoutes?.includes(item.href)),
   );
-  const tier2 = sortByShortcutPriority(items.filter(item => item.href === '/messages'));
+  const duplicateFallbacks = sortByShortcutPriority(
+    items.filter(item => !isDashboard(item.href) && item.href !== '/messages' && duplicateRoutes?.includes(item.href)),
+  );
+  const messagesFallback = sortByShortcutPriority(items.filter(item => item.href === '/messages'));
+  const dashboardFallback = sortByShortcutPriority(items.filter(item => isDashboard(item.href)));
 
   // De-duplicate by href across tiers (defensive; nav items are already unique).
   const seen = new Set<string>();
-  const ordered = [...tier1, ...tier2].filter(item => {
+  const ordered = [...tier1, ...messagesFallback, ...dashboardFallback, ...duplicateFallbacks].filter(item => {
     if (seen.has(item.href)) return false;
     seen.add(item.href);
     return true;
