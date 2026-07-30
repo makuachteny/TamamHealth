@@ -1,13 +1,19 @@
 /**
- * Date helpers scoped to Africa/Juba (UTC+03:00, no DST).
+ * Date helpers scoped to Africa/Juba (UTC+02:00, no DST).
  *
  * All clinical events are recorded by users physically in South Sudan; if
  * we compare them with `new Date().toISOString()` on a UTC server, a death
  * at 22:00 Juba on Mar 31 shifts into April UTC and lands in the wrong
  * monthly bucket. Use these helpers wherever you'd otherwise slice
  * `toISOString()` for month/day comparisons.
+ *
+ * South Sudan moved from EAT (UTC+3) to CAT (UTC+2) on 1 Feb 2021. This
+ * constant MUST agree with `jubaNow()`, which reads the offset from the
+ * platform's Africa/Juba zone data — when the two disagreed (+3 here vs +2
+ * from Intl), every date-based comparison against jubaNow() broke for the
+ * hour of UTC 21:00–22:00, when only one of them had rolled to the next day.
  */
-const JUBA_OFFSET_MS = 3 * 60 * 60 * 1000;
+const JUBA_OFFSET_MS = 2 * 60 * 60 * 1000;
 
 function toJuba(d: Date | string | number): Date {
   const date = typeof d === 'string' || typeof d === 'number' ? new Date(d) : d;
