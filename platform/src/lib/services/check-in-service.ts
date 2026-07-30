@@ -157,12 +157,15 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
     patientId: input.patientId,
     patientName: input.patientName,
     hospitalNumber: input.hospitalNumber,
-    // ABCC not assessed at the front desk — recorded as stable defaults; the
-    // nurse re-triages with the full ETAT decision tree.
-    airway: 'clear',
-    breathing: 'normal',
-    circulation: 'normal',
-    consciousness: 'alert',
+    // ABCC is NOT assessed at the front desk, and the record must say so
+    // (KAN-100): writing normal-looking defaults here fabricated clinical
+    // findings no clinician made. The clerk-selected acuity is real user
+    // input and is kept; the nurse re-triages with the full ETAT tree.
+    airway: 'not_assessed',
+    breathing: 'not_assessed',
+    circulation: 'not_assessed',
+    consciousness: 'not_assessed',
+    assessmentSource: 'clerical_checkin',
     priority: ACUITY_TO_PRIORITY[acuity],
     temperature: v.temperature,
     pulse: v.pulse,

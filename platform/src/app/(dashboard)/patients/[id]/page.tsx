@@ -587,7 +587,9 @@ export default function PatientDetailPage() {
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{latest.chiefComplaint}</p>
                 )}
                 <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  A: {latest.airway} · B: {latest.breathing} · C: {latest.circulation} · AVPU: {latest.consciousness?.toUpperCase()[0]}
+                  {latest.assessmentSource === 'clerical_checkin' || latest.airway === 'not_assessed'
+                    ? 'ABCC not assessed — clerical check-in'
+                    : <>A: {latest.airway} · B: {latest.breathing} · C: {latest.circulation} · AVPU: {latest.consciousness?.toUpperCase()[0]}</>}
                 </p>
                 {(latest.temperature || latest.pulse || latest.oxygenSaturation || latest.systolic) && (
                   <p className="text-[11px] font-mono" style={{ color: 'var(--text-secondary)' }}>

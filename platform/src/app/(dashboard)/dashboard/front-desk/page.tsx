@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -481,13 +482,13 @@ export default function FrontDeskDashboardPage() {
   }, [updateTriage, showToast]);
 
   // ── Final checkout: close out a completed visit ──
-  const handleCompleteCheckout = useCallback(async (target: CheckoutTarget) => {
+  // Stage 10 — Facility checkout gate (KAN-96). The gate decision comes from
+  // evaluateCheckoutGate against LIVE data — never from a hand-asserted key
+  // list, which is exactly the self-satisfying behaviour the ticket removed.
+  // Unmet critical conditions BLOCK the discharge; the desk may override only
+  // with an explicit reason, which is audited naming the overridden conditions.
+  const handleCompleteCheckout = useCallback(async (target: CheckoutTarget, override?: { reason: string }) => {
     try {
-      // Stage 10 — Facility checkout gate. Evaluate the documented checkout gate
-      // (prescriptions dispensed, critical labs reviewed, …) and advance the
-      // clinical encounter to a terminal `discharged` status. Unmet critical
-      // items don't block the desk from closing the visit, but they flag it as
-      // `discharged_with_pending_items` and warn the receptionist.
       let gateNote = '';
       try {
         const {
@@ -497,30 +498,29 @@ export default function FrontDeskDashboardPage() {
           ? await getEncounter(target.encounterId)
           : await getOpenEncounterForPatient(target.patientId);
         if (enc) {
-          const { getPrescriptionsByPatient } = await import('@/lib/services/prescription-service');
-          const { getLabResultsByPatient } = await import('@/lib/services/lab-service');
-          const { unmetCriticalGateItems } = await import('@/lib/clinical-flow/encounter-journey');
+          const { evaluateCheckoutGate } = await import('@/lib/services/checkout-gate-service');
+          const evaluation = await evaluateCheckoutGate(target.patientId, enc as never);
 
-          const rxs = (await getPrescriptionsByPatient(target.patientId)).filter(r => !r.encounterId || r.encounterId === enc._id);
-          // Lab results aren't encounter-linked, so critical labs are checked at
-          // patient level (any unreviewed critical result blocks a clean discharge).
-          const labs = await getLabResultsByPatient(target.patientId);
-          const reviewed = new Set(['reviewed_by_clinician', 'acted_upon', 'communicated_to_patient']);
-
-          const satisfied: string[] = [
-            // The clinician closing the visit implies these were handled.
-            'all_clinic_visits_closed', 'in_clinic_procedures_complete',
-            'required_documentation_generated', 'payment_status_determined',
-            'pending_items_flagged',
-          ];
-          if (rxs.every(r => r.status !== 'pending')) satisfied.push('prescriptions_dispensed');
-          if (!labs.some(l => l.critical && l.status === 'completed' && !reviewed.has(l.orderStatus ?? ''))) {
-            satisfied.push('critical_labs_reviewed');
+          if (!evaluation.canDischarge && !override) {
+            showToast(
+              `Cannot check out — unresolved: ${evaluation.blocking.map(b => b.label).join('; ')}`,
+              'error',
+            );
+            return;
           }
-
-          const unmet = unmetCriticalGateItems(satisfied);
-          await dischargeEncounter(enc._id, { actorId: currentUser?._id, pendingItems: unmet.length > 0 });
-          if (unmet.length > 0) gateNote = ` — flagged: ${unmet.map(u => u.label).join('; ')}`;
+          if (!evaluation.canDischarge && override) {
+            const { logAuditSafe } = await import('@/lib/services/audit-service');
+            await logAuditSafe(
+              'CHECKOUT_GATE_OVERRIDDEN', currentUser?._id, currentUser?.name,
+              `Discharged ${target.patientName} over unmet gate conditions ` +
+              `[${evaluation.blocking.map(b => b.key).join(', ')}] — ${override.reason}`,
+            );
+            gateNote = ` — override: ${evaluation.blocking.map(b => b.label).join('; ')}`;
+          }
+          await dischargeEncounter(enc._id, {
+            actorId: currentUser?._id,
+            pendingItems: !evaluation.canDischarge,
+          });
         }
       } catch (e) {
         console.warn('Encounter discharge during checkout failed', e);
@@ -1270,13 +1270,18 @@ function CheckoutModal({
 }: {
   target: CheckoutTarget;
   onClose: () => void;
-  onComplete: (target: CheckoutTarget) => Promise<void>;
+  onComplete: (target: CheckoutTarget, override?: { reason: string }) => Promise<void>;
   canCollectPayment: boolean;
   onCollectPayment: (patientId: string) => void;
 }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [charges, setCharges] = useState<{ description: string; amount: number }[]>([]);
   const [completing, setCompleting] = useState(false);
+  // Live checkout-gate evaluation (KAN-96): unmet critical conditions render
+  // here with a route to resolve each, and block the button until either
+  // resolved or explicitly overridden with a reason.
+  const [gate, setGate] = useState<import('@/lib/services/checkout-gate-service').CheckoutGateEvaluation | null>(null);
+  const [overrideReason, setOverrideReason] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -1299,6 +1304,11 @@ function CheckoutModal({
           const ch = await getChargesByEncounter(enc._id);
           if (!cancelled) setCharges(ch.map(c => ({ description: c.description, amount: c.billedAmount })));
         }
+        // The same evaluation the discharge handler runs, shown up front so
+        // the desk can resolve conditions before pressing the button.
+        const { evaluateCheckoutGate } = await import('@/lib/services/checkout-gate-service');
+        const evaluation = await evaluateCheckoutGate(target.patientId, (enc ?? undefined) as never);
+        if (!cancelled) setGate(evaluation);
       } catch { /* non-fatal — balance still shows */ }
     })();
     return () => { cancelled = true; };
@@ -1372,6 +1382,35 @@ function CheckoutModal({
               </div>
             </div>
           )}
+
+          {gate && gate.blocking.length > 0 && (
+            <div className="rounded-xl p-3" style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#B45309' }}>
+                Checkout blocked — unresolved items
+              </p>
+              <ul className="space-y-1.5">
+                {gate.blocking.map(condition => (
+                  <li key={condition.key} className="text-[12px]" style={{ color: 'var(--text-primary)' }}>
+                    <span className="font-semibold">{condition.label}</span>
+                    {condition.detail && <span style={{ color: 'var(--text-secondary)' }}> — {condition.detail}</span>}
+                    {condition.resolveHref && (
+                      <Link href={condition.resolveHref} className="ml-1.5 font-semibold underline" style={{ color: 'var(--accent-primary)' }}>
+                        Resolve
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <input
+                type="text"
+                value={overrideReason}
+                onChange={e => setOverrideReason(e.target.value)}
+                placeholder="Override reason (required to check out anyway)"
+                className="mt-2.5 w-full rounded-lg px-3 py-2 text-[12px]"
+                style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-primary)' }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -1379,15 +1418,25 @@ function CheckoutModal({
           <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-black/5" style={{ color: 'var(--text-muted)' }}>
             Cancel
           </button>
-          <button
-            onClick={async () => { setCompleting(true); await onComplete(target); setCompleting(false); }}
-            disabled={completing}
-            className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-            style={{ background: 'var(--color-success)' }}
-          >
-            <CheckCircle className="w-4 h-4" />
-            {completing ? 'Closing…' : 'Complete checkout'}
-          </button>
+          {(() => {
+            const blocked = !!gate && gate.blocking.length > 0;
+            const canSubmit = !completing && (!blocked || overrideReason.trim().length > 0);
+            return (
+              <button
+                onClick={async () => {
+                  setCompleting(true);
+                  await onComplete(target, blocked ? { reason: overrideReason.trim() } : undefined);
+                  setCompleting(false);
+                }}
+                disabled={!canSubmit}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+                style={{ background: blocked ? '#B45309' : 'var(--color-success)' }}
+              >
+                <CheckCircle className="w-4 h-4" />
+                {completing ? 'Closing…' : blocked ? 'Override & check out' : 'Complete checkout'}
+              </button>
+            );
+          })()}
         </div>
       </div>
     </Modal>

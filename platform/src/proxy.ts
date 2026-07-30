@@ -62,6 +62,7 @@ const CSRF_EXEMPT_API_PATHS = new Set<string>([
 const MACHINE_CALLER_ROUTES: Record<string, string> = {
   '/api/patient-reminders/dispatch': 'x-reminder-dispatch-secret',
   '/api/patient-transfers/sweep': 'x-transfer-sweep-secret',
+  '/api/telehealth/maintenance': 'x-telehealth-maintenance-secret',
 };
 
 function isMachineCallerRequest(pathname: string, request: NextRequest): boolean {

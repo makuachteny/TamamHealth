@@ -72,7 +72,9 @@ function buildEvents(props: PatientTimelineProps, t: TFunc): TimelineEvent[] {
       date: tr.triagedAt || tr.createdAt,
       category: 'triage',
       title: tr.chiefComplaint || t('timeline.titleTriage'),
-      subtitle: `A: ${tr.airway} · B: ${tr.breathing} · C: ${tr.circulation} · AVPU-${tr.consciousness.toUpperCase()[0]}`,
+      subtitle: tr.assessmentSource === 'clerical_checkin' || tr.airway === 'not_assessed'
+        ? t('timeline.triageNotAssessed')
+        : `A: ${tr.airway} · B: ${tr.breathing} · C: ${tr.circulation} · AVPU-${tr.consciousness.toUpperCase()[0]}`,
       meta: `${tr.triagedByName}${vitals.length ? ' · ' + vitals.join(' · ') : ''}`,
       badge: tr.priority === 'RED'
         ? { dot: true, bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }

@@ -111,11 +111,15 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
     setEditingTriageId(ti._id);
     setTriagePatientId(ti.patientId);
     setTriagePatientSearch('');
+    // 'not_assessed' (clerical check-in, KAN-100) maps to the form's unset
+    // state — the nurse must make the actual assessment, not inherit one.
+    const formValue = <T extends string>(v: string | undefined): T =>
+      (v === 'not_assessed' ? '' : v || '') as T;
     setTriageData({
-      airway: (ti.airway as TriageResult['airway']) || '',
-      breathing: (ti.breathing as TriageResult['breathing']) || '',
-      circulation: (ti.circulation as TriageResult['circulation']) || '',
-      consciousness: (ti.consciousness as TriageResult['consciousness']) || '',
+      airway: formValue<TriageResult['airway']>(ti.airway),
+      breathing: formValue<TriageResult['breathing']>(ti.breathing),
+      circulation: formValue<TriageResult['circulation']>(ti.circulation),
+      consciousness: formValue<TriageResult['consciousness']>(ti.consciousness),
       priority: (ti.priority as TriageResult['priority']) || '',
     });
     setTriageVitals({
@@ -153,6 +157,31 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
     try {
       await updateTriageRecord(ti._id, { status });
       showToast(t('nurse.triageStatusUpdated', { name: ti.patientName, status: label }), 'success');
+    } catch {
+      showToast(t('nurse.triageStatusFailed'), 'error');
+    }
+  };
+
+  // LWBS and emergency escalation act on the ENCOUNTER (KAN-100): the state
+  // machine removes the visit from waiting worklists (lwbs is terminal;
+  // escalation hands the visit to emergency care). The triage doc mirrors
+  // lwbs so this queue stops showing a patient who has left.
+  const markLeftWithoutBeingSeen = async (ti: typeof triageHistory[number]) => {
+    try {
+      const { recordLeftWithoutBeingSeen } = await import('@/lib/services/encounter-service');
+      await recordLeftWithoutBeingSeen(ti.encounterId!, { actorId: currentUser?._id });
+      await updateTriageRecord(ti._id, { status: 'lwbs' });
+      showToast(t('nurse.triageStatusUpdated', { name: ti.patientName, status: t('nurse.triageActionLwbs') }), 'success');
+    } catch {
+      showToast(t('nurse.triageStatusFailed'), 'error');
+    }
+  };
+
+  const escalateToEmergency = async (ti: typeof triageHistory[number]) => {
+    try {
+      const { escalateEncounterToEmergency } = await import('@/lib/services/encounter-service');
+      await escalateEncounterToEmergency(ti.encounterId!, { actorId: currentUser?._id });
+      showToast(t('nurse.triageStatusUpdated', { name: ti.patientName, status: t('nurse.triageActionEscalate') }), 'success');
     } catch {
       showToast(t('nurse.triageStatusFailed'), 'error');
     }
@@ -207,6 +236,9 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
         breathing: triageData.breathing as 'normal' | 'distressed' | 'absent',
         circulation: triageData.circulation as 'normal' | 'impaired' | 'absent',
         consciousness: triageData.consciousness as 'alert' | 'verbal' | 'pain' | 'unresponsive',
+        // This form IS the clinician assessment — the submit guard above
+        // refuses to save until every ABCC dimension is chosen (KAN-100).
+        assessmentSource: 'clinician' as const,
         priority: triageData.priority as 'RED' | 'YELLOW' | 'GREEN',
         temperature: triageVitals.temperature || undefined,
         pulse: triageVitals.pulse || undefined,
@@ -702,6 +734,13 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
                 }
                 if (ti.status !== 'discharged') {
                   actions.push({ key: 'discharge', label: t('nurse.triageActionDischarge'), tone: 'danger', icon: <LogOut />, onClick: () => setTriageStatus(ti, 'discharged', t('nurse.triageActionDischarge')) });
+                }
+                // Escalation and LWBS act on the visit's encounter, so they
+                // are only offered while the patient is still waiting and the
+                // triage is linked to one (KAN-100).
+                if (ti.status === 'pending' && ti.encounterId) {
+                  actions.push({ key: 'escalate', label: t('nurse.triageActionEscalate'), tone: 'danger', icon: <AlertTriangle />, onClick: () => escalateToEmergency(ti) });
+                  actions.push({ key: 'lwbs', label: t('nurse.triageActionLwbs'), icon: <X />, onClick: () => markLeftWithoutBeingSeen(ti) });
                 }
                 return (
                   <div key={ti._id} className="ehr-queue-card ehr-queue-card--triage" data-triage={ti.priority}>
