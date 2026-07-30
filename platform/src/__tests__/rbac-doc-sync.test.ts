@@ -17,6 +17,15 @@ import { join } from 'node:path';
 const DOC = join(process.cwd(), '..', 'docs', 'RBAC-MATRIX.md');
 const TYPES = join(process.cwd(), 'src', 'lib', 'db-types.ts');
 
+/** Other product docs that historically described the phantom roles as real
+ *  (KAN-120/121 found them regrown in README and DEMO after the matrix was
+ *  cleaned). Only the phantom-absence check runs against these — they contain
+ *  plenty of legitimate snake_case that is not a role. */
+const OTHER_DOCS = [
+  join(process.cwd(), 'README.md'),
+  join(process.cwd(), '..', 'DEMO.md'),
+];
+
 /** Pull the UserRole union members straight out of the source of truth. */
 function declaredRoles(): string[] {
   const src = readFileSync(TYPES, 'utf8');
@@ -52,6 +61,23 @@ describe('RBAC-MATRIX.md matches the UserRole union', () => {
     for (const phantom of ['boma_health_worker', 'community_health_volunteer', 'payam_supervisor']) {
       expect(roles).not.toContain(phantom); // still absent from code
       expect(mentions).not.toContain(phantom); // and no longer claimed by the doc
+    }
+  });
+
+  test('the phantom roles are not described as real in README or DEMO', () => {
+    for (const path of OTHER_DOCS) {
+      const body = readFileSync(path, 'utf8')
+        .split('\n')
+        .filter((l) => !l.trimStart().startsWith('>'))
+        .join('\n');
+      for (const phantom of ['boma_health_worker', 'community_health_volunteer', 'payam_supervisor']) {
+        expect(body).not.toContain(phantom);
+      }
+      // The demo usernames for those roles must not be offered either — no
+      // such users are seeded, so following the doc would fail at login.
+      for (const deadUser of ['bhw.akol', 'sup.mary', 'chv.ajak']) {
+        expect(body).not.toContain(deadUser);
+      }
     }
   });
 

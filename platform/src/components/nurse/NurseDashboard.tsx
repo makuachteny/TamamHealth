@@ -73,12 +73,16 @@ export default function NurseDashboard() {
 
   // The station is URL-addressable so notifications, redirects, bookmarks, and
   // the browser back button can return a nurse to the exact station they need.
-  const [fallbackStation, setFallbackStation] = useState<StationTab>(() => (
-    isStationTab(searchParams.get('station')) ? searchParams.get('station') as StationTab : 'ward'
+  // Null until the nurse explicitly picks a station, so the role-aware default
+  // below can resolve after currentUser hydrates: a rooming nurse's home
+  // station is Rooming (KAN-108 AC-1); everyone else starts on the ward board.
+  const [fallbackStation, setFallbackStation] = useState<StationTab | null>(() => (
+    isStationTab(searchParams.get('station')) ? searchParams.get('station') as StationTab : null
   ));
   const urlStation = searchParams.get('station');
   const initialTriagePatientId = searchParams.get('patient') ?? undefined;
-  const activeTab: StationTab = isStationTab(urlStation) ? urlStation : fallbackStation;
+  const defaultStation: StationTab = currentUser?.role === 'rooming_nurse' ? 'rooming' : 'ward';
+  const activeTab: StationTab = isStationTab(urlStation) ? urlStation : (fallbackStation ?? defaultStation);
 
   // Free-text search for the station lives in the LEFT RAIL (between the
   // mini-calendar and the day chart); WardWorkflow receives it as a prop so

@@ -27,7 +27,7 @@ A comprehensive, offline-first healthcare information system built for South Sud
 TAMAMHEALTH is purpose-built for the South Sudanese health system, addressing the unique challenges of delivering healthcare across 10 states with limited connectivity, infrastructure, and resources. The system supports:
 
 - **Hospital networks** — Patient registration, consultations, referrals, lab, pharmacy
-- **Community health** — Boma health worker household visits, payam supervisor oversight
+- **Community health** — household follow-up tracking across boma/payam administrative geography
 - **Maternal & child health** — 8-contact ANC protocol (WHO), birth registration, immunization tracking
 - **Disease surveillance** — Real-time outbreak alerts, epidemic intelligence
 - **Vital registration** — Birth and death CRVS with ICD-11 cause coding
@@ -125,8 +125,6 @@ Or click any role chip on the login page — it auto-fills the form.
 | `lab.gatluak` | Lab Technician |
 | `pharma.rose` | Pharmacist |
 | `desk.amira` | Front Desk |
-| `bhw.akol` | Boma Health Worker |
-| `sup.mary` | Payam Supervisor |
 | `org.admin` / `dr.mercy` | Private-org accounts (Mercy Hospital) |
 
 The `/api/demo-credentials` endpoint is gated on
@@ -269,9 +267,7 @@ src/
 │   │   ├── nurse/             # Nurse station dashboard
 │   │   ├── lab-dashboard/     # Lab command center
 │   │   ├── pharmacy-dashboard/# Pharmacy operations
-│   │   ├── front-desk/        # Patient reception
-│   │   ├── boma/              # Community health worker dashboard
-│   │   └── payam/             # Payam supervisor dashboard
+│   │   └── front-desk/        # Patient reception
 │   ├── api/
 │   │   ├── auth/              # Login, logout, session endpoints
 │   │   └── sync/              # CouchDB sync API
@@ -326,8 +322,6 @@ src/
 | `pharmacist` | Pharmacy operations | `/dashboard/pharmacy` |
 | `front_desk` | Patient reception & registry | `/dashboard/front-desk` |
 | `government` | Ministry of Health oversight | `/government` |
-| `boma_health_worker` | Community household visits | `/dashboard/boma` |
-| `payam_supervisor` | Administrative health unit | `/dashboard/payam`  |
 
 Each role has granular permissions controlling access to modules, data scope, and available actions. Unauthorized routes redirect to the user's default dashboard.
 
@@ -567,7 +561,6 @@ TAMAMHEALTH is designed around South Sudan's administrative and health system st
 - **Facility levels** — National referral hospitals, state hospitals, county health departments, PHCCs (Primary Health Care Centers), PHCUs (Primary Health Care Units)
 - **Administrative divisions** — 10 states, counties, payams, bomas
 - **Disease priorities** — Malaria-endemic protocols, maternal mortality reduction, immunization coverage expansion
-- **Community health** — Boma health workers conduct household visits; payam supervisors provide oversight
 - **Vital registration** — CRVS (Civil Registration and Vital Statistics) integration for births and deaths
 - **National reporting** — DHIS2 export for Ministry of Health data aggregation
 

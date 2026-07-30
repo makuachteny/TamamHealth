@@ -47,7 +47,6 @@ Then open three browser tabs:
 | Nursing workflow | **Nurse** (`nurse.stella`) | nurse |
 | Pharmacy dispensing | **Pharmacist** (`pharma.rose`) | pharmacist |
 | Lab order management | **Lab Tech** (`lab.gatluak`) | lab_tech |
-| Community / outreach | **Boma Health Worker** (`bhw.akol`) | boma_health_worker |
 | Hospital administration | **Med. Superintendent** (`supt.lado`) | medical_superintendent |
 | Platform admin | **Super Admin** (`superadmin`) | super_admin |
 | National oversight | **Government** (`admin`) | government |
