@@ -63,3 +63,73 @@ describe('usage sanitize', () => {
     expect(describeElement(btn)).toBe('patient.create');
   });
 });
+
+/**
+ * PHI regression cover.
+ *
+ * describeElement used to fall back to the element's textContent (and
+ * aria-label) when no data-track ancestor existed. On a patient list the link
+ * text IS the patient's name, so every click wrote a direct identifier into
+ * usage_events and — with PostHog configured — POSTed it to a third party.
+ */
+describe('usage sanitize — no PHI in element descriptors', () => {
+  test('never captures link text, even when it is a patient name', () => {
+    document.body.innerHTML = `
+      <div class="patient-row">
+        <a href="/patients/pat-00001">Deng Mabior Garang</a>
+      </div>
+    `;
+    const link = document.querySelector('a');
+    const descriptor = describeElement(link);
+    expect(descriptor).not.toMatch(/deng|mabior|garang/i);
+    expect(descriptor).toBe('a');
+  });
+
+  test('never captures aria-label, which names the patient on action buttons', () => {
+    document.body.innerHTML = `
+      <button type="button" aria-label="Open chart for Nyamal Koang Gatdet">Open</button>
+    `;
+    const btn = document.querySelector('button');
+    const descriptor = describeElement(btn);
+    expect(descriptor).not.toMatch(/nyamal|koang|gatdet/i);
+    expect(descriptor).toBe('button|type=button');
+  });
+
+  test('drops a name attribute that looks like a PHI field', () => {
+    document.body.innerHTML = `<input type="text" name="patientEmail" />`;
+    const input = document.querySelector('input');
+    expect(describeElement(input)).toBe('input|type=text');
+  });
+
+  test('keeps a non-PHI name attribute', () => {
+    document.body.innerHTML = `<select name="ward"></select>`;
+    expect(describeElement(document.querySelector('select'))).toBe('select|name=ward');
+  });
+
+  test('ingest rejects a free-text element from a stale or tampered client', () => {
+    // The API runs sanitizeUsageEvent over client JSON, so a client still
+    // sending textContent (or one deliberately posting PHI) must not persist it.
+    const ev = sanitizeUsageEvent({
+      eventName: 'click',
+      path: '/patients/pat-00001',
+      element: 'a|Deng Mabior Garang',
+      sessionId: 'sess-1',
+      ts: '2026-08-03T12:00:00.000Z',
+    });
+    expect(ev).not.toBeNull();
+    expect(ev!.element).toBeUndefined();
+    // The event itself still counts — only the unsafe descriptor is dropped.
+    expect(ev!.path).toBe('/patients/[id]');
+  });
+
+  test('ingest keeps a well-formed machine descriptor', () => {
+    const ev = sanitizeUsageEvent({
+      eventName: 'click',
+      path: '/pharmacy',
+      element: 'button|type=submit|name=dispense',
+      sessionId: 'sess-1',
+      ts: '2026-08-03T12:00:00.000Z',
+    });
+    expect(ev!.element).toBe('button|type=submit|name=dispense');
+  });
+});

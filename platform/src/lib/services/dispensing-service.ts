@@ -32,7 +32,8 @@ import type {
 } from '../db-types';
 import { findByType } from './db-query';
 import { recordMovement } from './controlled-substance-service';
-import { updatePrescription } from './prescription-service';
+import { updatePrescription, effectivePrescriptionStatus } from './prescription-service';
+import { getUserById } from './user-service';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
@@ -43,6 +44,9 @@ export type DispenseErrorCode =
   | 'STOCK_OUT'
   | 'INSUFFICIENT_STOCK'
   | 'WITNESS_REQUIRED'
+  | 'WITNESS_INVALID'
+  | 'AMBIGUOUS_MEDICATION'
+  | 'PARTIAL_NOT_ALLOWED'
   | 'REGISTER_FAILED'
   | 'WRITE_FAILED';
 
@@ -80,7 +84,10 @@ export interface DispenseResult {
   allocations: DispenseAllocation[];
   quantityDispensed: number;
   outcome: 'full' | 'partial';
+  /** First register entry, kept for callers that show a single reference. */
   controlledLogId?: string;
+  /** Every register entry this dispense wrote — one per controlled lot. */
+  controlledLogIds?: string[];
 }
 
 /** Stages from which a dispense is legal — mirrors PRESCRIPTION_TRANSITIONS. */
@@ -112,13 +119,58 @@ export function normalizeMedicationName(name: string): string {
     .trim();
 }
 
+/**
+ * Tokens that may separate a base drug name from a salt, hydrate or grade
+ * without changing which medicine it is: "Amoxicillin" and "Amoxicillin
+ * trihydrate" are the same product on the shelf.
+ *
+ * Deliberately excludes release-modifier tokens (xr, sr, er, la, mr, cr) and
+ * anything naming a second active ingredient. Metformin XR is not Metformin,
+ * and Amoxicillin-Clavulanate is not Amoxicillin.
+ */
+const SALT_QUALIFIERS = new Set([
+  'trihydrate', 'dihydrate', 'monohydrate', 'anhydrous', 'hydrate',
+  'sulfate', 'sulphate', 'hydrochloride', 'hcl', 'sodium', 'potassium',
+  'calcium', 'magnesium', 'maleate', 'tartrate', 'citrate', 'phosphate',
+  'succinate', 'besylate', 'mesylate', 'fumarate', 'acetate', 'nitrate',
+  'base', 'usp', 'bp', 'ph', 'eur',
+]);
+
+function medicationTokens(name: string): string[] {
+  return name.split(/[\s/+-]+/).filter(Boolean);
+}
+
+/**
+ * Does a prescribed name refer to the same product as a stocked line?
+ *
+ * This used to be `a.includes(b) || b.includes(a)`, which is true for any
+ * shared prefix — so a prescription for "Insulin" matched insulin glargine,
+ * aspart and isophane alike, and "Amoxicillin" matched
+ * "Amoxicillin-Clavulanate". FEFO then picked whichever expired first, which
+ * is a route to handing over the wrong drug.
+ *
+ * Now the shorter name must be a leading token-for-token match of the longer,
+ * and every extra token in the longer name must be a salt/grade qualifier.
+ * The trade-off is a false stock-out when a catalogue line carries a
+ * distinguishing token the prescription omits ("Metformin" vs stock only
+ * catalogued as "Metformin XR"); the pharmacist sees "out of stock" and picks
+ * the product explicitly, which is the safe direction to fail.
+ */
 export function medicationMatches(prescribed: string, stocked: string): boolean {
   const a = normalizeMedicationName(prescribed);
   const b = normalizeMedicationName(stocked);
   if (!a || !b) return false;
-  // Equality first; then containment, so "Amoxicillin" also matches a stock
-  // line catalogued as "Amoxicillin trihydrate".
-  return a === b || a.includes(b) || b.includes(a);
+  if (a === b) return true;
+
+  const at = medicationTokens(a);
+  const bt = medicationTokens(b);
+  const [shorter, longer] = at.length <= bt.length ? [at, bt] : [bt, at];
+  if (shorter.length === 0) return false;
+
+  for (let i = 0; i < shorter.length; i++) {
+    if (longer[i] !== shorter[i]) return false;
+  }
+  return longer.slice(shorter.length).every(t => SALT_QUALIFIERS.has(t));
 }
 
 /**
@@ -280,6 +332,65 @@ async function revertBatchDecrement(allocation: DispenseAllocation): Promise<voi
   }
 }
 
+/** A register movement that actually landed, with what it was written against. */
+interface WrittenRegisterEntry {
+  logId: string;
+  batch: PharmacyInventoryDoc;
+  allocation: DispenseAllocation;
+}
+
+/**
+ * Counter-entry register movements that landed for a dispense that then failed.
+ *
+ * The controlled-substance register is append-only: a mistake is corrected by a
+ * `reconciliation` movement in the opposite direction, never by deleting the
+ * original, so an inspector sees both the error and its correction. One
+ * counter-entry per original entry, each quoting that lot's own balance.
+ *
+ * Best-effort by design — the caller is already unwinding a failure, and a
+ * register that rejects the reversal must not mask the original error. Failures
+ * are pushed to the audit log for manual reconciliation instead.
+ */
+async function reverseControlledEntries(
+  written: WrittenRegisterEntry[],
+  ctx: {
+    rx: PrescriptionDoc;
+    input: DispenseInput;
+    witness: { id: string; name: string };
+    reason: string;
+  },
+): Promise<void> {
+  for (const { logId, batch, allocation } of written) {
+    try {
+      await recordMovement({
+        inventoryId: batch._id,
+        medicationName: batch.medicationName,
+        schedule: batch.controlledSchedule || 'II',
+        movement: 'reconciliation',
+        quantity: allocation.quantity,
+        unit: batch.unit,
+        // The balance with this dispense's units still out of the lot — the
+        // state the counter-entry is correcting from.
+        beforeBalance: allocation.afterBalance,
+        prescriptionId: ctx.rx._id,
+        operatorId: ctx.input.dispenserId,
+        operatorName: ctx.input.dispenserName,
+        witnessId: ctx.witness.id,
+        witnessName: ctx.witness.name,
+        reason: `Reversal of ${logId} — ${ctx.reason}`,
+        facilityId: ctx.input.facilityId,
+        facilityName: ctx.input.facilityName || '',
+        orgId: ctx.input.orgId,
+      });
+    } catch {
+      await logAuditSafe('CONTROLLED_REVERSAL_FAILED', ctx.input.dispenserId, ctx.input.dispenserName,
+        `Could not counter-entry register movement ${logId} for batch ${batch.batchNumber} `
+        + `(${allocation.quantity} ${batch.unit}). Manual register reconciliation required.`,
+      ).catch(() => {});
+    }
+  }
+}
+
 /**
  * Dispense a prescription: stock gate → FEFO decrement → controlled-substance
  * register → prescription update, with rollback of anything already applied
@@ -289,8 +400,14 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
   const { prescription: rx, quantity } = input;
 
   // ── 1. Validate. Nothing is written before every check passes. ──
-  const stage = rx.orderStatus;
-  if (stage && !DISPENSABLE_STAGES.has(stage)) {
+  //
+  // Legacy prescriptions carry no `orderStatus`. The gate used to read the raw
+  // field as `if (stage && !DISPENSABLE_STAGES.has(stage))`, so an absent value
+  // skipped the check completely and an uncleared order could be dispensed
+  // straight out of the queue. effectivePrescriptionStatus defaults those docs
+  // to `received_in_pharmacy_queue` — not cleared — which is the safe direction.
+  const stage = effectivePrescriptionStatus(rx);
+  if (!DISPENSABLE_STAGES.has(stage)) {
     throw new DispenseError(
       'This order must be reviewed and cleared before it can be dispensed.',
       'NOT_CLEARED',
@@ -300,12 +417,32 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
     throw new DispenseError('Dispense quantity must be greater than zero.', 'BAD_QUANTITY');
   }
 
+  // Completeness is cumulative, not per-visit: a patient who collected 10 of 21
+  // last week and 11 today has the full course. Computed here, before any
+  // write, so an unintended short fill costs nothing.
+  const requested = rx.quantityToDispense || quantity;
+  const totalDispensed = (rx.quantityDispensed || 0) + quantity;
+  const outcome: 'full' | 'partial' = totalDispensed < requested ? 'partial' : 'full';
+
   const batches = await getDispensableBatches(rx.medication, input.facilityId);
   if (batches.length === 0) {
     throw new DispenseError(
       `${rx.medication} is out of stock at this facility.`,
       'STOCK_OUT',
       0,
+    );
+  }
+
+  // Defence in depth behind medicationMatches: if the order still resolves to
+  // more than one distinct product, FEFO would allocate by expiry date across
+  // different medicines. Refuse and make the choice explicit rather than let
+  // the shelf decide which drug the patient gets.
+  const distinctProducts = [...new Set(batches.map(b => normalizeMedicationName(b.medicationName)))];
+  if (distinctProducts.length > 1) {
+    throw new DispenseError(
+      `"${rx.medication}" matches ${distinctProducts.length} different products in stock `
+      + `(${distinctProducts.join(', ')}). Re-prescribe naming the exact product.`,
+      'AMBIGUOUS_MEDICATION',
     );
   }
 
@@ -320,9 +457,13 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
 
   // A controlled schedule on ANY allocated batch forces the two-signature
   // path — checked before the first write so a missing witness costs nothing.
-  const controlledBatch = plan.allocations
-    .map(a => a.batch)
-    .find(b => b.controlledSchedule || b.requiresWitness);
+  const controlledAllocations = plan.allocations
+    .filter(a => a.batch.controlledSchedule || a.batch.requiresWitness);
+  const controlledBatch = controlledAllocations[0]?.batch;
+
+  /** Verified witness identity — authoritative name, not the caller's string. */
+  let witness: { id: string; name: string } | undefined;
+
   if (controlledBatch) {
     if (!input.witnessId || !input.witnessName) {
       throw new DispenseError(
@@ -336,6 +477,51 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
         'WITNESS_REQUIRED',
       );
     }
+
+    // The witness is the second signature on a Schedule II movement, so it has
+    // to be a real, active member of staff at this facility. Previously both
+    // `witnessId` and `witnessName` were free-form strings that no layer ever
+    // checked, so one pharmacist could satisfy the two-signature control alone
+    // by inventing a colleague — precisely the diversion the register exists
+    // to make impossible. Verified before any stock moves.
+    const witnessDoc = await getUserById(input.witnessId);
+    if (!witnessDoc || witnessDoc.isActive === false) {
+      throw new DispenseError(
+        'The witnessing staff member could not be verified. Select an active member of staff.',
+        'WITNESS_INVALID',
+      );
+    }
+    if (input.facilityId && witnessDoc.hospitalId && witnessDoc.hospitalId !== input.facilityId) {
+      throw new DispenseError(
+        'The witness must be staff at the dispensing facility.',
+        'WITNESS_INVALID',
+      );
+    }
+    if (input.orgId && witnessDoc.orgId && witnessDoc.orgId !== input.orgId) {
+      throw new DispenseError(
+        'The witness must belong to the same organisation.',
+        'WITNESS_INVALID',
+      );
+    }
+    // Register the name on record, so a mistyped or spoofed display name
+    // cannot end up as the signature in an append-only register.
+    witness = { id: witnessDoc._id, name: witnessDoc.name };
+  }
+
+  // Last of the pre-write checks, deliberately: a short fill is a confirmation
+  // prompt, not a hard error, so every genuine blocker (not cleared, no stock,
+  // ambiguous product, unverifiable witness) is reported first rather than
+  // being masked by "confirm a partial fill".
+  //
+  // `allowPartial` was previously declared and never read, so a caller passing
+  // `false` still got a silent short fill. The balance stays owed to the
+  // patient, so dispensing less than the course has to be asked for.
+  if (outcome === 'partial' && !input.allowPartial) {
+    throw new DispenseError(
+      `This fills ${totalDispensed} of ${requested} ${rx.medication}. `
+      + 'Confirm a partial fill to dispense less than the prescribed course.',
+      'PARTIAL_NOT_ALLOWED',
+    );
   }
 
   // ── 2. Apply the batch decrements, remembering each for rollback. ──
@@ -353,34 +539,53 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
     throw err;
   }
 
-  // ── 3. Controlled-substance register. ──
-  let controlledLogId: string | undefined;
-  if (controlledBatch) {
+  // ── 3. Controlled-substance register — one entry per controlled batch. ──
+  //
+  // A register entry is a per-lot record: it says "this many units left THIS
+  // batch, witnessed by these two people". FEFO routinely spans lots, so a
+  // single entry carrying the whole dispense quantity against the first
+  // controlled batch (what this used to do) left the second lot's stock
+  // decremented with no register movement at all, and overstated the first.
+  // Neither lot could then be reconciled against a physical count.
+  const written: WrittenRegisterEntry[] = [];
+  if (controlledAllocations.length > 0) {
     try {
-      const entry = await recordMovement({
-        inventoryId: controlledBatch._id,
-        medicationName: controlledBatch.medicationName,
-        schedule: controlledBatch.controlledSchedule || 'II',
-        movement: 'dispense',
-        quantity,
-        unit: controlledBatch.unit,
-        // Balance across every batch this dispense touched, so the register
-        // reconciles against the shelf rather than against one batch.
-        beforeBalance: applied.reduce((sum, a) => sum + a.beforeBalance, 0),
-        patientId: rx.patientId,
-        patientName: rx.patientName,
-        prescriptionId: rx._id,
-        operatorId: input.dispenserId,
-        operatorName: input.dispenserName,
-        witnessId: input.witnessId!,
-        witnessName: input.witnessName!,
-        reason: input.note,
-        facilityId: input.facilityId,
-        facilityName: input.facilityName || '',
-        orgId: input.orgId,
-      });
-      controlledLogId = entry._id;
+      for (const { batch } of controlledAllocations) {
+        // Use the applied allocation, not the plan: it carries the balance
+        // actually observed at decrement time, which is what the register has
+        // to reconcile against after a concurrent dispense forced a re-read.
+        const appliedForBatch = applied.find(a => a.inventoryId === batch._id);
+        if (!appliedForBatch) continue;
+        const entry = await recordMovement({
+          inventoryId: batch._id,
+          medicationName: batch.medicationName,
+          schedule: batch.controlledSchedule || 'II',
+          movement: 'dispense',
+          quantity: appliedForBatch.quantity,
+          unit: batch.unit,
+          beforeBalance: appliedForBatch.beforeBalance,
+          patientId: rx.patientId,
+          patientName: rx.patientName,
+          prescriptionId: rx._id,
+          operatorId: input.dispenserId,
+          operatorName: input.dispenserName,
+          witnessId: witness!.id,
+          witnessName: witness!.name,
+          reason: input.note,
+          facilityId: input.facilityId,
+          facilityName: input.facilityName || '',
+          orgId: input.orgId,
+        });
+        written.push({ logId: entry._id, batch, allocation: appliedForBatch });
+      }
     } catch (err) {
+      // Counter-entry anything already written before returning the stock —
+      // the register is append-only, so a partial run is corrected by
+      // reversal, never by deleting the entries that landed.
+      await reverseControlledEntries(written, {
+        rx, input, witness: witness!,
+        reason: 'Reversal — a later register entry in the same dispense failed.',
+      });
       await rollback();
       throw new DispenseError(
         err instanceof Error ? err.message : 'Controlled-substance register entry failed.',
@@ -388,14 +593,11 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
       );
     }
   }
+  const controlledLogIds = written.map(w => w.logId);
+  const controlledLogId = controlledLogIds[0];
 
-  // ── 4. Update the prescription. ──
-  const requested = rx.quantityToDispense || quantity;
-  // Completeness is cumulative, not per-visit: a patient who collected 10 of
-  // 21 last week and 11 today has the full course. Comparing only this
-  // dispense against the course would leave that order open forever.
-  const totalDispensed = (rx.quantityDispensed || 0) + quantity;
-  const outcome: 'full' | 'partial' = totalDispensed < requested ? 'partial' : 'full';
+  // ── 4. Update the prescription. `requested`, `totalDispensed` and `outcome`
+  // were settled during validation, before any stock moved. ──
   const now = new Date().toISOString();
 
   let updated: PrescriptionDoc | null = null;
@@ -419,29 +621,16 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
   }
 
   if (!updated) {
-    await rollback();
-    if (controlledLogId && input.witnessId && input.witnessName) {
-      // The register is append-only: correct a landed entry with a counter-
-      // movement rather than deleting it, so the audit trail shows both.
-      await recordMovement({
-        inventoryId: controlledBatch!._id,
-        medicationName: controlledBatch!.medicationName,
-        schedule: controlledBatch!.controlledSchedule || 'II',
-        movement: 'reconciliation',
-        quantity,
-        unit: controlledBatch!.unit,
-        beforeBalance: applied.reduce((sum, a) => sum + a.afterBalance, 0),
-        prescriptionId: rx._id,
-        operatorId: input.dispenserId,
-        operatorName: input.dispenserName,
-        witnessId: input.witnessId,
-        witnessName: input.witnessName,
-        reason: `Reversal of ${controlledLogId} — dispense record could not be written.`,
-        facilityId: input.facilityId,
-        facilityName: input.facilityName || '',
-        orgId: input.orgId,
-      }).catch(() => {});
+    // Counter-entry every register movement this dispense wrote, then return
+    // the stock. Order matters: the reversal quotes the balance as it stood
+    // with the stock still out, so it must run before the decrements are undone.
+    if (written.length > 0 && witness) {
+      await reverseControlledEntries(written, {
+        rx, input, witness,
+        reason: 'Reversal — dispense record could not be written.',
+      });
     }
+    await rollback();
     throw new DispenseError(
       'Could not record the dispense; stock has been returned. Please retry.',
       'WRITE_FAILED',
@@ -460,6 +649,7 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
     quantityDispensed: quantity,
     outcome,
     controlledLogId,
+    ...(controlledLogIds.length > 0 ? { controlledLogIds } : {}),
   };
 }
 

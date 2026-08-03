@@ -57,6 +57,8 @@ async function patchHandler(
           orgId: existingRx.orgId ?? auth.orgId,
           witnessId: typeof body.witnessId === 'string' ? body.witnessId : undefined,
           witnessName: typeof body.witnessName === 'string' ? body.witnessName : undefined,
+          // A short fill has to be asked for explicitly — see PARTIAL_NOT_ALLOWED.
+          allowPartial: body.allowPartial === true,
           note: typeof body.note === 'string' ? body.note : undefined,
         });
         return NextResponse.json({
@@ -65,14 +67,17 @@ async function patchHandler(
           quantityDispensed: result.quantityDispensed,
           outcome: result.outcome,
           controlledLogId: result.controlledLogId,
+          controlledLogIds: result.controlledLogIds,
         });
       } catch (err) {
         if (err instanceof DispenseError) {
-          // 409 for "the shelf says no" (stock/clearance), 400 for a bad
-          // request (missing witness, nonsense quantity) — the client shows
-          // the message either way, but the codes stay meaningful.
+          // 409 for "the shelf says no" (stock/clearance/ambiguity — state the
+          // caller must resolve before retrying), 400 for a bad request
+          // (missing or unverifiable witness, nonsense quantity, unconfirmed
+          // partial). The client shows the message either way, but the codes
+          // stay meaningful.
           const status = err.code === 'STOCK_OUT' || err.code === 'INSUFFICIENT_STOCK'
-            || err.code === 'NOT_CLEARED' ? 409 : 400;
+            || err.code === 'NOT_CLEARED' || err.code === 'AMBIGUOUS_MEDICATION' ? 409 : 400;
           return NextResponse.json(
             { error: err.message, code: err.code, available: err.available },
             { status },
