@@ -1,6 +1,8 @@
 /**
  * Tests for role-based permissions and route access control
  */
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { getRoleConfig, isRouteAllowed, getDefaultDashboard, ROLE_PERMISSIONS } from '../lib/permissions';
 import { ROLE_ROUTE_TABLE, isPathAllowed } from '../lib/role-routes';
 import type { UserRole } from '../lib/db-types';
@@ -99,7 +101,10 @@ describe('permissions', () => {
 
     test('all roles can access /messages', () => {
       for (const role of ALL_ROLES) {
-        if (role === 'government') return; // government doesn't have messages
+        // `continue`, not `return`: government sits 11th in ROLE_PERMISSIONS,
+        // so returning here exited the whole test and silently skipped the
+        // 14 roles declared after it.
+        if (role === 'government') continue; // government doesn't have messages
         expect(isRouteAllowed(role, '/messages')).toBe(true);
       }
     });
@@ -158,6 +163,53 @@ describe('permissions', () => {
     test.each(ALL_ROLES)('navItems contain no duplicate hrefs for role: %s', (role) => {
       const hrefs = getRoleConfig(role).navItems.map(i => i.href);
       expect(new Set(hrefs).size).toBe(hrefs.length);
+    });
+  });
+
+  /**
+   * The allow-list and the App Router are maintained independently, so a route
+   * can be granted to a role while no page exists to serve it — the nav renders
+   * a link that 404s, and the role's landing redirect can dead-end. Everything
+   * else in this file checks the tables against each other; this checks them
+   * against what is actually on disk.
+   */
+  describe('routes resolve to real pages', () => {
+    /** Concrete routes that have a page.tsx, with route groups `(x)` stripped. */
+    const collectRoutes = (dir: string, prefix = ''): string[] => {
+      const out: string[] = [];
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (!statSync(full).isDirectory()) {
+          if (entry === 'page.tsx') out.push(prefix || '/');
+          continue;
+        }
+        const seg = /^\(.*\)$/.test(entry) ? '' : `/${entry}`;
+        out.push(...collectRoutes(full, prefix + seg));
+      }
+      return out;
+    };
+
+    const realRoutes = collectRoutes(join(__dirname, '..', 'app'));
+    const realSet = new Set(realRoutes);
+    // A dynamic page (/billing/[id]) also serves its parent's children.
+    const dynamicParents = realRoutes
+      .filter(r => r.includes('['))
+      .map(r => r.slice(0, r.indexOf('/[')));
+
+    const resolves = (route: string) =>
+      realSet.has(route) || dynamicParents.some(p => route === p || route.startsWith(p + '/'));
+
+    test('the app has pages at all (guards against a bad glob)', () => {
+      expect(realRoutes.length).toBeGreaterThan(50);
+    });
+
+    test.each(ALL_ROLES)('every allowed route has a page for role: %s', (role) => {
+      const dead = ROLE_ROUTE_TABLE[role].allowed.filter(r => !resolves(r));
+      expect(dead).toEqual([]);
+    });
+
+    test.each(ALL_ROLES)('the landing dashboard has a page for role: %s', (role) => {
+      expect(resolves(getDefaultDashboard(role))).toBe(true);
     });
   });
 });
