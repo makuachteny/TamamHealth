@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -26,10 +27,9 @@ import {
   Calendar, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList,
   MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
-  Send, Stethoscope,
+  Send, Stethoscope, FileText, Ban, RotateCcw, type LucideIcon,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
-import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 
 /**
  * Front-desk operations workspace.
@@ -136,10 +136,6 @@ export default function FrontDeskDashboardPage() {
   const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered'>('all');
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  // The queue entry backing the open detail popup (carries triage/room context);
-  // null when a non-queue row (e.g. a registered patient) opened the popup.
-  const [selectedEntry, setSelectedEntry] = useState<QueueItem | null>(null);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
   const [checkInTarget, setCheckInTarget] = useState<AppointmentDoc | null>(null);
@@ -154,8 +150,6 @@ export default function FrontDeskDashboardPage() {
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [encounters, setEncounters] = useState<EncounterDoc[]>([]);
-  const [roomDraft, setRoomDraft] = useState('');
-  const [savingRoom, setSavingRoom] = useState(false);
 
   const [queueNowMs, setQueueNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -199,7 +193,8 @@ export default function FrontDeskDashboardPage() {
   const todaysAppointments = useMemo(() =>
     appointments
       .filter(a => a.appointmentDate === today && a.status !== 'cancelled')
-      .sort((a, b) => a.appointmentTime.localeCompare(b.appointmentTime)),
+      // appointmentTime can be missing on seeded/synced rows — guard before sort
+      .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || '')),
     [appointments, today]
   );
 
@@ -404,7 +399,7 @@ export default function FrontDeskDashboardPage() {
     // Order by the queue-stage service's acuity+wait score (desc) — highest
     // priority, longest-waiting patients surface first. Same-score rows keep
     // a stable time-based tiebreak.
-    items.sort((a, b) => (b.score - a.score) || a.time.localeCompare(b.time));
+    items.sort((a, b) => (b.score - a.score) || (a.time || '').localeCompare(b.time || ''));
 
     return items;
   }, [currentUser?.hospitalName, encounters, patients, queueNowMs, today, todaysAppointments, triages]);
@@ -424,8 +419,8 @@ export default function FrontDeskDashboardPage() {
     if (queueSort !== 'priority') {
       const statusOrder: Record<string, number> = { 'WAITING': 0, 'IN CONSULT': 1, 'DONE': 2, 'ADMITTED': 3, 'REFERRED': 4 };
       items = [...items].sort((a, b) => {
-        if (queueSort === 'name') return a.patientName.localeCompare(b.patientName);
-        if (queueSort === 'time') return a.time.localeCompare(b.time);
+        if (queueSort === 'name') return (a.patientName || '').localeCompare(b.patientName || '');
+        if (queueSort === 'time') return (a.time || '').localeCompare(b.time || '');
         return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
       });
     }
@@ -447,47 +442,27 @@ export default function FrontDeskDashboardPage() {
     });
   }, [patients, queueSearch]);
 
-  // ── Selected patient previous visit info (from real records) ──
-  const selectedPatient = useMemo(() =>
-    selectedPatientId ? patients.find(p => p._id === selectedPatientId) : null,
-    [selectedPatientId, patients]
-  );
-
-  // Open a row's detail popup. The popup reads the full patient doc, so if the
-  // patient isn't in this facility's loaded list (e.g. an appointment for a
-  // patient registered elsewhere), fall back to opening their chart — which
-  // loads the doc — instead of a click that silently does nothing.
-  const openPatientDetail = useCallback((patientId: string, entry: QueueItem | null) => {
-    if (patients.some(p => p._id === patientId)) {
-      setSelectedPatientId(patientId);
-      setSelectedEntry(entry);
-    } else {
-      router.push(`/patients/${patientId}`);
-    }
-  }, [patients, router]);
-
   // ── Room assignment (OPD rooming) for triage-sourced queue entries ──
+  // The saving flag now lives on RoomAssignmentControl itself (one control
+  // mounts per expanded row), so this just does the write + toast.
   const handleSaveRoom = useCallback(async (triageId: string, room: string) => {
-    setSavingRoom(true);
     try {
       await updateTriage(triageId, { assignedRoom: room || undefined });
       showToast(room ? `Room set to ${room}` : 'Room cleared', 'success');
       // Only assigning a room (not clearing one) counts as "roomed a walk-in".
     } catch {
       showToast('Failed to set room', 'error');
-    } finally {
-      setSavingRoom(false);
     }
   }, [updateTriage, showToast]);
 
   // ── Final checkout: close out a completed visit ──
-  const handleCompleteCheckout = useCallback(async (target: CheckoutTarget) => {
+  // Stage 10 — Facility checkout gate (KAN-96). The gate decision comes from
+  // evaluateCheckoutGate against LIVE data — never from a hand-asserted key
+  // list, which is exactly the self-satisfying behaviour the ticket removed.
+  // Unmet critical conditions BLOCK the discharge; the desk may override only
+  // with an explicit reason, which is audited naming the overridden conditions.
+  const handleCompleteCheckout = useCallback(async (target: CheckoutTarget, override?: { reason: string }) => {
     try {
-      // Stage 10 — Facility checkout gate. Evaluate the documented checkout gate
-      // (prescriptions dispensed, critical labs reviewed, …) and advance the
-      // clinical encounter to a terminal `discharged` status. Unmet critical
-      // items don't block the desk from closing the visit, but they flag it as
-      // `discharged_with_pending_items` and warn the receptionist.
       let gateNote = '';
       try {
         const {
@@ -497,30 +472,29 @@ export default function FrontDeskDashboardPage() {
           ? await getEncounter(target.encounterId)
           : await getOpenEncounterForPatient(target.patientId);
         if (enc) {
-          const { getPrescriptionsByPatient } = await import('@/lib/services/prescription-service');
-          const { getLabResultsByPatient } = await import('@/lib/services/lab-service');
-          const { unmetCriticalGateItems } = await import('@/lib/clinical-flow/encounter-journey');
+          const { evaluateCheckoutGate } = await import('@/lib/services/checkout-gate-service');
+          const evaluation = await evaluateCheckoutGate(target.patientId, enc as never);
 
-          const rxs = (await getPrescriptionsByPatient(target.patientId)).filter(r => !r.encounterId || r.encounterId === enc._id);
-          // Lab results aren't encounter-linked, so critical labs are checked at
-          // patient level (any unreviewed critical result blocks a clean discharge).
-          const labs = await getLabResultsByPatient(target.patientId);
-          const reviewed = new Set(['reviewed_by_clinician', 'acted_upon', 'communicated_to_patient']);
-
-          const satisfied: string[] = [
-            // The clinician closing the visit implies these were handled.
-            'all_clinic_visits_closed', 'in_clinic_procedures_complete',
-            'required_documentation_generated', 'payment_status_determined',
-            'pending_items_flagged',
-          ];
-          if (rxs.every(r => r.status !== 'pending')) satisfied.push('prescriptions_dispensed');
-          if (!labs.some(l => l.critical && l.status === 'completed' && !reviewed.has(l.orderStatus ?? ''))) {
-            satisfied.push('critical_labs_reviewed');
+          if (!evaluation.canDischarge && !override) {
+            showToast(
+              `Cannot check out — unresolved: ${evaluation.blocking.map(b => b.label).join('; ')}`,
+              'error',
+            );
+            return;
           }
-
-          const unmet = unmetCriticalGateItems(satisfied);
-          await dischargeEncounter(enc._id, { actorId: currentUser?._id, pendingItems: unmet.length > 0 });
-          if (unmet.length > 0) gateNote = ` — flagged: ${unmet.map(u => u.label).join('; ')}`;
+          if (!evaluation.canDischarge && override) {
+            const { logAuditSafe } = await import('@/lib/services/audit-service');
+            await logAuditSafe(
+              'CHECKOUT_GATE_OVERRIDDEN', currentUser?._id, currentUser?.name,
+              `Discharged ${target.patientName} over unmet gate conditions ` +
+              `[${evaluation.blocking.map(b => b.key).join(', ')}] — ${override.reason}`,
+            );
+            gateNote = ` — override: ${evaluation.blocking.map(b => b.label).join('; ')}`;
+          }
+          await dischargeEncounter(enc._id, {
+            actorId: currentUser?._id,
+            pendingItems: !evaluation.canDischarge,
+          });
         }
       } catch (e) {
         console.warn('Encounter discharge during checkout failed', e);
@@ -727,15 +701,22 @@ export default function FrontDeskDashboardPage() {
         // show no priority pill rather than a free-text 'Appointment' label.
         priority: appointment.priority === 'emergency' ? 'RED' : appointment.priority === 'urgent' ? 'YELLOW' : undefined,
         date: isoDateKey(appointment.appointmentDate),
-        onClick: () => openPatientDetail(appointment.patientId, null),
-        actionLabel: 'Check in',
-        onAction: () => setCheckInTarget(appointment),
-        secondaryActionLabel: 'Record',
-        onSecondaryAction: () => router.push(`/patients/${appointment.patientId}`),
-        extraActions: [
-          { label: 'Reschedule', onClick: () => openReschedule(appointment) },
-          { label: 'No show', onClick: () => setNoShowTarget(appointment), tone: 'danger' as const },
-        ],
+        patientId: appointment.patientId,
+        popupDetail: (
+          <>
+            <FrontDeskDetailActions actions={[
+              { icon: LogIn, label: 'Check in', onClick: () => setCheckInTarget(appointment), primary: true },
+              { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${appointment.patientId}`) },
+              { icon: Calendar, label: 'Reschedule', onClick: () => openReschedule(appointment) },
+              { icon: Ban, label: 'No show', onClick: () => setNoShowTarget(appointment) },
+            ]} />
+            <FrontDeskDetailFacts facts={[
+              { label: 'Reason', value: appointment.reason || 'Scheduled visit' },
+              { label: t('patient.phone'), value: patient?.phone ? formatPhoneDisplay(patient.phone) : undefined },
+              { label: 'Hospital number', value: patient?.hospitalNumber },
+            ]} />
+          </>
+        ),
       };
     });
 
@@ -786,6 +767,50 @@ export default function FrontDeskDashboardPage() {
       // Wait column: actual queue/slot time on the first line; the shared
       // dashboard row renders hours/minutes underneath from `timeAt`.
       const waitTime = entry.time || entry.date || undefined;
+
+      // Icon actions for the row's inline panel. "Open chart" is always
+      // offered; the primary desk action (Checkout/Assign) and the secondary
+      // one (Undo/Start consultation) mirror the same state machine the old
+      // popup's buttons used — a plain "Record" fallback isn't needed here
+      // since Open chart already covers it.
+      const popupActions: { icon: LucideIcon; label: string; onClick: () => void; primary?: boolean }[] = [
+        { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${entry.patientId}`) },
+      ];
+      if (checkoutReady) {
+        popupActions.push({
+          icon: LogOut,
+          label: t('frontDesk.checkout'),
+          primary: true,
+          onClick: () => setCheckoutTarget({
+            patientId: entry.patientId,
+            patientName: entry.patientName,
+            hospitalNumber: patient?.hospitalNumber,
+            encounterId: entry.encounterId,
+            appointmentId: entry.id.startsWith('appt-') ? entry.sourceId : undefined,
+            triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
+          }),
+        });
+      } else if (activeForCare) {
+        popupActions.push({
+          icon: Stethoscope,
+          label: t('frontDesk.assign'),
+          primary: true,
+          onClick: () => setAssignTarget({
+            patientId: entry.patientId,
+            patientName: entry.patientName,
+            hospitalNumber: patient?.hospitalNumber,
+            triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
+            currentDoctorId: patient?.assignedDoctor,
+          }),
+        });
+      }
+      if (checkoutReady && entry.id.startsWith('appt-')) {
+        popupActions.push({ icon: RotateCcw, label: t('action.undo'), onClick: () => handleUndoCheckout(entry.sourceId, entry.patientName) });
+      } else if (canConsult && activeForCare) {
+        popupActions.push({ icon: Stethoscope, label: t('frontDesk.startConsultation'), onClick: () => router.push(`/consultation?patientId=${entry.patientId}`) });
+      }
+      const hasAllergies = Boolean(patient?.allergies?.length) && patient?.allergies[0] !== 'None known';
+
       return {
         id: entry.id,
         photoUrl: (patient as { photoUrl?: string } | undefined)?.photoUrl,
@@ -809,48 +834,28 @@ export default function FrontDeskDashboardPage() {
         locationSecondary: entry.stage ? entry.department : entry.location || entry.department,
         locationLabel: entry.stage ? 'Stage' : entry.type === 'appointment' ? 'Department' : 'Location',
         date: entry.calendarDate,
-        onClick: () => openPatientDetail(entry.patientId, entry),
-        actionLabel: checkoutReady ? t('frontDesk.checkout') : activeForCare ? t('frontDesk.assign') : 'Record',
-        onAction: () => {
-          if (checkoutReady) {
-            setCheckoutTarget({
-              patientId: entry.patientId,
-              patientName: entry.patientName,
-              hospitalNumber: patient?.hospitalNumber,
-              encounterId: entry.encounterId,
-              appointmentId: entry.id.startsWith('appt-') ? entry.sourceId : undefined,
-              triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
-            });
-            return;
-          }
-          if (!activeForCare) {
-            router.push(`/patients/${entry.patientId}`);
-            return;
-          }
-          setAssignTarget({
-            patientId: entry.patientId,
-            patientName: entry.patientName,
-            hospitalNumber: patient?.hospitalNumber,
-            triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
-            currentDoctorId: patient?.assignedDoctor,
-          });
-        },
-        secondaryActionLabel: checkoutReady && entry.id.startsWith('appt-')
-          ? t('action.undo')
-          : canConsult && activeForCare
-            ? t('frontDesk.startConsultation')
-            : 'Records',
-        onSecondaryAction: () => {
-          if (checkoutReady && entry.id.startsWith('appt-')) {
-            handleUndoCheckout(entry.sourceId, entry.patientName);
-            return;
-          }
-          if (canConsult && activeForCare) {
-            router.push(`/consultation?patientId=${entry.patientId}`);
-            return;
-          }
-          router.push(`/patients/${entry.patientId}`);
-        },
+        patientId: entry.patientId,
+        popupDetail: (
+          <>
+            <FrontDeskDetailActions actions={popupActions} />
+            <FrontDeskDetailFacts facts={[
+              { label: t('patient.phone'), value: patient?.phone ? formatPhoneDisplay(patient.phone) : undefined },
+              { label: 'Hospital number', value: patient?.hospitalNumber },
+            ]} />
+            {hasAllergies && (
+              <p className="ehr-care-alert">{t('frontDesk.allergiesLabel', { list: (patient?.allergies ?? []).join(', ') })}</p>
+            )}
+            {entry.id.startsWith('triage-') && (
+              <RoomAssignmentControl
+                triageId={entry.sourceId}
+                currentRoom={entry.assignedRoom}
+                priority={entry.priority}
+                roomOptions={roomOptions}
+                onSave={handleSaveRoom}
+              />
+            )}
+          </>
+        ),
       };
     });
 
@@ -883,9 +888,32 @@ export default function FrontDeskDashboardPage() {
               : 'Needs care team',
         statusTone: 'ready',
         date: isoDateKey(patientRegisteredAt(patient)),
-        onClick: () => openPatientDetail(patient._id, null),
-        actionLabel: 'Record',
-        onAction: () => router.push(`/patients/${patient._id}`),
+        patientId: patient._id,
+        popupDetail: (
+          <>
+            <FrontDeskDetailActions actions={[
+              { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${patient._id}`), primary: true },
+              {
+                icon: Stethoscope,
+                label: patient.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign'),
+                onClick: () => setAssignTarget({
+                  patientId: patient._id,
+                  patientName: patientFullName(patient),
+                  hospitalNumber: patient.hospitalNumber,
+                  currentDoctorId: patient.assignedDoctor,
+                }),
+              },
+            ]} />
+            <FrontDeskDetailFacts facts={[
+              { label: t('patient.phone'), value: patient.phone ? formatPhoneDisplay(patient.phone) : undefined },
+              { label: 'Assigned doctor', value: patient.assignedDoctorName },
+              {
+                label: t('frontDesk.lastVisit'),
+                value: patient.lastConsultedAt ? formatCompactDateTime(patient.lastConsultedAt) : (patient.lastVisitDate || t('frontDesk.firstVisit')),
+              },
+            ]} />
+          </>
+        ),
       };
     };
 
@@ -900,11 +928,12 @@ export default function FrontDeskDashboardPage() {
     currentUser?.hospitalName,
     filteredQueue,
     filteredRegisteredPatients,
+    handleSaveRoom,
     handleUndoCheckout,
-    openPatientDetail,
     patients,
     panelView,
     openReschedule,
+    roomOptions,
     router,
     t,
     visiblePendingAppointments,
@@ -1030,91 +1059,6 @@ export default function FrontDeskDashboardPage() {
             setRegisterOpen(true);
           }}
         />
-
-        {selectedPatient && (
-          <Modal onClose={() => { setSelectedPatientId(null); setSelectedEntry(null); }} width={480} labelledBy="fd-patient-detail-title">
-            <div className="modal-panel" style={{ padding: 0, overflow: 'hidden' }}>
-              <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <div className="min-w-0">
-                  <h3 id="fd-patient-detail-title" className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(selectedPatient)}</h3>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{selectedPatient.hospitalNumber || 'No hospital number'}</p>
-                </div>
-                <button type="button" onClick={() => { setSelectedPatientId(null); setSelectedEntry(null); }} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-5 flex flex-col gap-4">
-                <EhrWorkItemProgress
-                  status={selectedEntry?.stageLabel || selectedEntry?.status || 'Patient lookup'}
-                  owner={selectedEntry?.assignedDoctorName || selectedEntry?.assignedNurseName || 'Reception'}
-                  waiting={selectedEntry?.waitMinutes !== undefined ? waitLabel(selectedEntry.waitMinutes) : undefined}
-                  nextAction={selectedEntry?.status === 'DONE' ? 'Complete checkout' : canConsult ? 'Start consultation' : 'Open chart'}
-                />
-                <dl className="fd-detail-dl">
-                  <div><dt>{t('frontDesk.genderAge')}</dt><dd>{patientGenderAge(selectedPatient)}</dd></div>
-                  <div><dt>{t('patient.phone')}</dt><dd>{selectedPatient.phone ? formatPhoneDisplay(selectedPatient.phone) : 'N/A'}</dd></div>
-                  <div><dt>{t('patient.location')}</dt><dd>{selectedPatient.county}, {selectedPatient.state}</dd></div>
-                  <div><dt>{t('frontDesk.lastVisit')}</dt><dd>{selectedPatient.lastConsultedAt ? formatCompactDateTime(selectedPatient.lastConsultedAt) : selectedPatient.lastVisitDate || t('frontDesk.firstVisit')}</dd></div>
-                </dl>
-                {selectedPatient.allergies?.length > 0 && selectedPatient.allergies[0] !== 'None known' && (
-                  <p className="ehr-care-alert">{t('frontDesk.allergiesLabel', { list: selectedPatient.allergies.join(', ') })}</p>
-                )}
-                {selectedEntry?.id.startsWith('triage-') && (
-                  <div className="ehr-care-rooming">
-                    <MapPin className="w-4 h-4" />
-                    <span>Exam room</span>
-                    <select
-                      value={roomDraft || selectedEntry.assignedRoom || ''}
-                      onChange={(event) => setRoomDraft(event.target.value)}
-                    >
-                      <option value="">Unassigned</option>
-                      {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={savingRoom}
-                      onClick={() => { handleSaveRoom(selectedEntry.sourceId, roomDraft || selectedEntry.assignedRoom || ''); setRoomDraft(''); }}
-                    >
-                      {savingRoom ? 'Saving...' : selectedEntry.assignedRoom ? 'Update room' : 'Assign room'}
-                    </button>
-                    <span style={{ color: priorityColor(selectedEntry.priority) }}>
-                      {selectedEntry.priority === 'RED' ? t('appointments.priorityEmergency') : selectedEntry.priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      const target = {
-                        patientId: selectedPatient._id,
-                        patientName: patientFullName(selectedPatient),
-                        hospitalNumber: selectedPatient.hospitalNumber,
-                        triageId: selectedEntry?.id.startsWith('triage-') ? selectedEntry.sourceId : undefined,
-                        currentDoctorId: selectedPatient.assignedDoctor,
-                      };
-                      setSelectedPatientId(null);
-                      setSelectedEntry(null);
-                      setAssignTarget(target);
-                    }}
-                  >
-                    <Stethoscope className="w-3.5 h-3.5" />
-                    {selectedPatient.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign')}
-                  </button>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => { const pid = selectedPatient._id; setSelectedPatientId(null); setSelectedEntry(null); router.push(`/patients/${pid}`); }}>
-                    Open chart
-                  </button>
-                  {canConsult && (
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => { const pid = selectedPatient._id; setSelectedPatientId(null); setSelectedEntry(null); router.push(`/consultation?patientId=${pid}`); }}>
-                      {t('frontDesk.startConsultation')}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Modal>
-        )}
 
         {assignTarget && (
           <AssignDoctorModal
@@ -1260,6 +1204,99 @@ export default function FrontDeskDashboardPage() {
   );
 }
 
+/* ─── Row-detail panel pieces (inline expansion) ───
+   The queue row's popup used to be a Modal; it now drops open in place under
+   the row (EhrCareDashboard's shared inline-expansion shell). These three
+   pieces reproduce that popup's shape without the dialog chrome: an icon
+   action line matching the doctor worklist's ehr-visit-pop-* classes, a
+   label/value fact grid for what the row itself doesn't already show, and —
+   for triage-sourced rows — the exam-room control. */
+
+// Icon actions on the panel's first line (Open chart / Check in / Assign /
+// etc.), reusing EhrVisitPopup's classes so every role's inline panel reads
+// the same way. No tabs here — front desk has one view per row — so the
+// "tabs" row is just the flex/border-bottom line the icons sit on.
+function FrontDeskDetailActions({ actions }: {
+  actions: { icon: LucideIcon; label: string; onClick: () => void; primary?: boolean }[];
+}) {
+  return (
+    <div className="ehr-visit-pop-tabs">
+      <div className="ehr-visit-pop-actions">
+        {actions.map(action => (
+          <button
+            key={action.label}
+            type="button"
+            className={`ehr-visit-pop-icon${action.primary ? ' is-primary' : ''}`}
+            onClick={action.onClick}
+            aria-label={action.label}
+            title={action.label}
+          >
+            <action.icon className="w-4 h-4" aria-hidden />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Label/value facts unique to this row — never the name/time/status the row
+// above already shows. Empty values are dropped rather than rendered blank.
+function FrontDeskDetailFacts({ facts }: { facts: { label: string; value?: string }[] }) {
+  const visible = facts.filter((f): f is { label: string; value: string } => Boolean(f.value));
+  if (visible.length === 0) return null;
+  return (
+    <div className="ehr-row-detail__body">
+      {visible.map(f => (
+        <div className="appointment-detail-row" key={f.label}>
+          <dt>{f.label}</dt>
+          <dd>{f.value}</dd>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Exam-room assignment for a triage-sourced queue row. Saving state is local
+// to this component (not page-level) because it now mounts fresh each time
+// its row expands, rather than being the single target of a page-level modal.
+function RoomAssignmentControl({
+  triageId,
+  currentRoom,
+  priority,
+  roomOptions,
+  onSave,
+}: {
+  triageId: string;
+  currentRoom?: string;
+  priority: 'RED' | 'YELLOW' | 'GREEN' | 'normal';
+  roomOptions: string[];
+  onSave: (triageId: string, room: string) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(currentRoom || '');
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="ehr-care-rooming">
+      <MapPin className="w-4 h-4" />
+      <span>Exam room</span>
+      <select value={draft} onChange={(event) => setDraft(event.target.value)}>
+        <option value="">Unassigned</option>
+        {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
+      </select>
+      <button
+        type="button"
+        disabled={saving}
+        onClick={async () => { setSaving(true); try { await onSave(triageId, draft); } finally { setSaving(false); } }}
+      >
+        {saving ? 'Saving...' : currentRoom ? 'Update room' : 'Assign room'}
+      </button>
+      <span style={{ color: priorityColor(priority) }}>
+        {priority === 'RED' ? t('appointments.priorityEmergency') : priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
+      </span>
+    </div>
+  );
+}
+
 // ── Final-checkout modal: confirm balance settled, mark the visit complete ──
 function CheckoutModal({
   target,
@@ -1270,13 +1307,18 @@ function CheckoutModal({
 }: {
   target: CheckoutTarget;
   onClose: () => void;
-  onComplete: (target: CheckoutTarget) => Promise<void>;
+  onComplete: (target: CheckoutTarget, override?: { reason: string }) => Promise<void>;
   canCollectPayment: boolean;
   onCollectPayment: (patientId: string) => void;
 }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [charges, setCharges] = useState<{ description: string; amount: number }[]>([]);
   const [completing, setCompleting] = useState(false);
+  // Live checkout-gate evaluation (KAN-96): unmet critical conditions render
+  // here with a route to resolve each, and block the button until either
+  // resolved or explicitly overridden with a reason.
+  const [gate, setGate] = useState<import('@/lib/services/checkout-gate-service').CheckoutGateEvaluation | null>(null);
+  const [overrideReason, setOverrideReason] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -1299,6 +1341,11 @@ function CheckoutModal({
           const ch = await getChargesByEncounter(enc._id);
           if (!cancelled) setCharges(ch.map(c => ({ description: c.description, amount: c.billedAmount })));
         }
+        // The same evaluation the discharge handler runs, shown up front so
+        // the desk can resolve conditions before pressing the button.
+        const { evaluateCheckoutGate } = await import('@/lib/services/checkout-gate-service');
+        const evaluation = await evaluateCheckoutGate(target.patientId, (enc ?? undefined) as never);
+        if (!cancelled) setGate(evaluation);
       } catch { /* non-fatal — balance still shows */ }
     })();
     return () => { cancelled = true; };
@@ -1372,6 +1419,35 @@ function CheckoutModal({
               </div>
             </div>
           )}
+
+          {gate && gate.blocking.length > 0 && (
+            <div className="rounded-xl p-3" style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#B45309' }}>
+                Checkout blocked — unresolved items
+              </p>
+              <ul className="space-y-1.5">
+                {gate.blocking.map(condition => (
+                  <li key={condition.key} className="text-[12px]" style={{ color: 'var(--text-primary)' }}>
+                    <span className="font-semibold">{condition.label}</span>
+                    {condition.detail && <span style={{ color: 'var(--text-secondary)' }}> — {condition.detail}</span>}
+                    {condition.resolveHref && (
+                      <Link href={condition.resolveHref} className="ml-1.5 font-semibold underline" style={{ color: 'var(--accent-primary)' }}>
+                        Resolve
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <input
+                type="text"
+                value={overrideReason}
+                onChange={e => setOverrideReason(e.target.value)}
+                placeholder="Override reason (required to check out anyway)"
+                className="mt-2.5 w-full rounded-lg px-3 py-2 text-[12px]"
+                style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-primary)' }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -1379,15 +1455,25 @@ function CheckoutModal({
           <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-black/5" style={{ color: 'var(--text-muted)' }}>
             Cancel
           </button>
-          <button
-            onClick={async () => { setCompleting(true); await onComplete(target); setCompleting(false); }}
-            disabled={completing}
-            className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-            style={{ background: 'var(--color-success)' }}
-          >
-            <CheckCircle className="w-4 h-4" />
-            {completing ? 'Closing…' : 'Complete checkout'}
-          </button>
+          {(() => {
+            const blocked = !!gate && gate.blocking.length > 0;
+            const canSubmit = !completing && (!blocked || overrideReason.trim().length > 0);
+            return (
+              <button
+                onClick={async () => {
+                  setCompleting(true);
+                  await onComplete(target, blocked ? { reason: overrideReason.trim() } : undefined);
+                  setCompleting(false);
+                }}
+                disabled={!canSubmit}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+                style={{ background: blocked ? '#B45309' : 'var(--color-success)' }}
+              >
+                <CheckCircle className="w-4 h-4" />
+                {completing ? 'Closing…' : blocked ? 'Override & check out' : 'Complete checkout'}
+              </button>
+            );
+          })()}
         </div>
       </div>
     </Modal>

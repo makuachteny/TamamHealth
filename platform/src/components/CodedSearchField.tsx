@@ -119,7 +119,9 @@ export default function CodedSearchField({
 
   return (
     <div className="relative">
-      <label>{label}</label>
+      {/* Callers that already head the field with their own question pass "" —
+          an empty <label> would still occupy its bottom margin. */}
+      {label && <label>{label}</label>}
       <div className="relative" ref={anchorRef}>
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
         <input

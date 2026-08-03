@@ -62,6 +62,7 @@ const CSRF_EXEMPT_API_PATHS = new Set<string>([
 const MACHINE_CALLER_ROUTES: Record<string, string> = {
   '/api/patient-reminders/dispatch': 'x-reminder-dispatch-secret',
   '/api/patient-transfers/sweep': 'x-transfer-sweep-secret',
+  '/api/telehealth/maintenance': 'x-telehealth-maintenance-secret',
 };
 
 function isMachineCallerRequest(pathname: string, request: NextRequest): boolean {
@@ -233,6 +234,11 @@ export async function proxy(request: NextRequest) {
   // Country metadata is static reference data (no PHI) — facility nodes
   // fetch it to sync code mappings without requiring a session.
   if (pathname === '/api/country/metadata') {
+    return NextResponse.next();
+  }
+
+  // Liveness/readiness probe — intentionally unauthenticated (see health route).
+  if (pathname === '/api/health') {
     return NextResponse.next();
   }
 

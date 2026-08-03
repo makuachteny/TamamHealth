@@ -38,14 +38,64 @@ async function patchHandler(
     if (filterByScope([existingRx], buildScopeFromAuth(auth)).length === 0) {
       return forbidden('Access denied to this prescription.');
     }
-    // Check if this is a dispensing action
-    if (body.status === 'dispensed') {
-      const { dispensePrescription } = await import('@/lib/services/prescription-service');
-      const dispensed = await dispensePrescription(id, auth.name);
-      if (!dispensed) {
+    // ── Dispense: one server-side transaction ──
+    // Stock gate, FEFO decrement, controlled-substance register and the
+    // prescription update all happen inside dispenseMedication(), which rolls
+    // back anything already applied if a later step fails. The client can no
+    // longer perform these as separate writes, so a half-finished dispense is
+    // not reachable from the UI.
+    if (body.status === 'dispensed' || body.action === 'dispense') {
+      const { dispenseMedication, DispenseError } = await import('@/lib/services/dispensing-service');
+      try {
+        const result = await dispenseMedication({
+          prescription: existingRx,
+          quantity: Number(body.quantity) || existingRx.quantityToDispense || 1,
+          dispenserId: auth.sub,
+          dispenserName: auth.name,
+          facilityId: existingRx.hospitalId || auth.hospitalId || '',
+          facilityName: existingRx.hospitalName,
+          orgId: existingRx.orgId ?? auth.orgId,
+          witnessId: typeof body.witnessId === 'string' ? body.witnessId : undefined,
+          witnessName: typeof body.witnessName === 'string' ? body.witnessName : undefined,
+          note: typeof body.note === 'string' ? body.note : undefined,
+        });
+        return NextResponse.json({
+          prescription: result.prescription,
+          allocations: result.allocations,
+          quantityDispensed: result.quantityDispensed,
+          outcome: result.outcome,
+          controlledLogId: result.controlledLogId,
+        });
+      } catch (err) {
+        if (err instanceof DispenseError) {
+          // 409 for "the shelf says no" (stock/clearance), 400 for a bad
+          // request (missing witness, nonsense quantity) — the client shows
+          // the message either way, but the codes stay meaningful.
+          const status = err.code === 'STOCK_OUT' || err.code === 'INSUFFICIENT_STOCK'
+            || err.code === 'NOT_CLEARED' ? 409 : 400;
+          return NextResponse.json(
+            { error: err.message, code: err.code, available: err.available },
+            { status },
+          );
+        }
+        throw err;
+      }
+    }
+
+    // ── Unfilled outcomes: stock-out referral, or held for prescriber
+    // clarification. Both keep the order active. ──
+    if (body.action === 'stock_out' || body.action === 'request_clarification') {
+      const { recordUnfilled } = await import('@/lib/services/dispensing-service');
+      const updated = await recordUnfilled(
+        existingRx,
+        body.action === 'stock_out' ? 'stock_out' : 'clarification_requested',
+        typeof body.note === 'string' ? body.note : '',
+        { id: auth.sub, name: auth.name },
+      );
+      if (!updated) {
         return NextResponse.json({ error: 'Prescription not found' }, { status: 404 });
       }
-      return NextResponse.json({ prescription: dispensed });
+      return NextResponse.json({ prescription: updated });
     }
     // Generic update
     delete body._id;

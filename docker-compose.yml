@@ -62,6 +62,11 @@ services:
       DOPPLER_TOKEN: ${DOPPLER_TOKEN:-}
     ports:
       - "${PLATFORM_PORT:-3000}:3000"
+    # Persist generated demo/bootstrap passwords across container recreate.
+    # Host file must be owned by the container `node` UID (usually 1000) so
+    # seed-credentials.ts can read/write without EACCES on /app.
+    volumes:
+      - ./platform/.seed-credentials.json:/app/.seed-credentials.json
     depends_on:
       couchdb:
         condition: service_healthy

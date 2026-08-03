@@ -14,8 +14,6 @@ const ACCENT_DEEP = 'var(--accent-hover)';
 
 // Real display names for each demo account (from the seed roster).
 const ACCOUNT_NAME: Record<string, string> = {
-  'chv.ajak': 'Ajak Deng Mawien',
-  'bhw.akol': 'Akol Deng Mading',
   'desk.amira': 'Amira Juma Hassan',
   'reg.clerk': 'Grace Poni Lukudu',
   'clinic.clerk': 'Joseph Taban Lado',
@@ -34,7 +32,6 @@ const ACCOUNT_NAME: Record<string, string> = {
   'data.ayen': 'Ayen Dut Malual',
   'hmis.john': 'John Majok Chol',
   'org.admin': 'Mercy Org Administrator',
-  'sup.mary': 'Mary Lado Kenyi',
   'county.lopez': 'Dr. Lopez Lokai Modi',
   'admin': 'Ministry of Health',
   'superadmin': 'TamamHealth Platform Admin',

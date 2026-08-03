@@ -14,7 +14,7 @@ import {
   Thermometer, Weight, Droplets, Eye, EyeOff, Lock,
   Receipt,
   UserCircle,
-  Upload, FileUp, ClipboardList,
+  Upload, FileUp, ClipboardList, Video,
 } from '@/components/icons/lucide';
 import type { PatientDoc, AppointmentDoc, LabResultDoc, MedicalRecordDoc, PrescriptionDoc, ImmunizationDoc } from '@/lib/db-types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -1142,6 +1142,26 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.reason || apt.appointmentType}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{/^dr\.?\s/i.test(apt.providerName || '') ? apt.providerName : `${t('patientPortal.drPrefix')} ${apt.providerName}`} &middot; {apt.department}</div>
                     </div>
+                    {(() => {
+                      // KAN-124: the server attaches a join path only for live
+                      // telehealth appointments with a usable session — this
+                      // button is the patient's entry point to the video visit.
+                      const joinPath = (apt as AppointmentDoc & { telehealth?: { joinPath: string } }).telehealth?.joinPath;
+                      if (!joinPath || isPast) return null;
+                      return (
+                        <a
+                          href={joinPath}
+                          style={{
+                            fontSize: 12, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap',
+                            background: 'var(--accent-primary)', borderRadius: 8, padding: '7px 12px',
+                            display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none',
+                          }}
+                        >
+                          <Video style={{ width: 14, height: 14 }} />
+                          {t('patientPortal.joinVideoVisit')}
+                        </a>
+                      );
+                    })()}
                     <Badge text={apt.status.replace('_', ' ')} color={isPast ? 'var(--text-muted)' : apt.status === 'confirmed' ? 'var(--color-success)' : 'var(--accent-primary)'} />
                   </div>
                 );

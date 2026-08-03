@@ -102,11 +102,13 @@ export async function createLabResult(
   const db = labResultsDB();
   const now = new Date().toISOString();
   const orgId = data.orgId || await inferOrgIdFromHospital(data.hospitalId);
+  const accessionNumber = data.accessionNumber || `ACC-${now.slice(2, 10).replace(/-/g, '')}-${uuidv4().slice(0, 5).toUpperCase()}`;
   const doc: LabResultDoc = encryptLabFields(withPendingOfflineSync({
     _id: `lab-${uuidv4().slice(0, 8)}`,
     type: 'lab_result',
     ...data,
     orgId,
+    accessionNumber,
     createdAt: now,
     updatedAt: now,
   } as LabResultDoc, now));
@@ -238,7 +240,13 @@ export async function getOverdueUnreviewedResults(scope?: DataScope): Promise<La
   });
 }
 
-export async function getPendingLabResults(): Promise<LabResultDoc[]> {
-  const all = await getAllLabResults();
+/**
+ * Orders still on the bench. Takes a scope like every other list accessor here:
+ * the local database holds every organisation's rows, so an unscoped read is a
+ * cross-tenant leak rather than a convenience. `scope` is optional only for
+ * parity with `getAllLabResults`; callers serving a request must pass one.
+ */
+export async function getPendingLabResults(scope?: DataScope): Promise<LabResultDoc[]> {
+  const all = await getAllLabResults(scope);
   return all.filter(l => l.status === 'pending' || l.status === 'in_progress');
 }

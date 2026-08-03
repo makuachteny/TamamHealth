@@ -26,6 +26,10 @@ export interface ChartSectionPagination {
 interface ChartSectionProps {
   title: string;
   addLabel?: string;
+  /** Glyph for the action button. Defaults to a plus; pass the domain's own
+   *  icon (a flask for lab orders, say) when the action is a specific verb
+   *  rather than a generic "add a row here". */
+  addIcon?: React.ReactNode;
   onAdd?: () => void;
   filterSlot?: React.ReactNode;
   toggleSlot?: React.ReactNode;
@@ -35,7 +39,7 @@ interface ChartSectionProps {
 }
 
 export default function ChartSection({
-  title, addLabel = 'Add', onAdd, filterSlot, toggleSlot, pagination, className, children,
+  title, addLabel = 'Add', addIcon, onAdd, filterSlot, toggleSlot, pagination, className, children,
 }: ChartSectionProps) {
   const totalPages = pagination ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize)) : 1;
   const shown = pagination
@@ -54,7 +58,7 @@ export default function ChartSection({
           {toggleSlot}
           {onAdd && (
             <button type="button" className="omrs-section-add" onClick={onAdd}>
-              <Plus /> {addLabel}
+              {addIcon ?? <Plus />} {addLabel}
             </button>
           )}
         </div>

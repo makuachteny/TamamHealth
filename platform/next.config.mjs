@@ -1,9 +1,17 @@
 /** @type {import('next').NextConfig} */
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { withSentryConfig } from '@sentry/nextjs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Allow CouchDB URL in Content-Security-Policy connect-src when sync is enabled
 const couchdbUrl = process.env.NEXT_PUBLIC_COUCHDB_URL || '';
 const couchdbConnectSrc = couchdbUrl ? ` ${couchdbUrl}` : '';
+
+// Optional PostHog host for usage-metrics forwarding (autocapture off).
+const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || '';
+const posthogConnectSrc = posthogHost ? ` ${posthogHost}` : '';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -23,6 +31,12 @@ const scriptSrc = isProd
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || String(Date.now());
 
 const nextConfig = {
+  // Pin Turbopack to this package so a stray lockfile under $HOME (e.g.
+  // ~/package-lock.json) is not treated as the workspace root — that broke
+  // `@/` module resolution and inflated compile failures in local dev.
+  turbopack: {
+    root: __dirname,
+  },
   devIndicators: false,
   env: {
     NEXT_PUBLIC_BUILD_ID: BUILD_ID,
@@ -75,7 +89,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob:",
-              `connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com${couchdbConnectSrc}`,
+              `connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com${couchdbConnectSrc}${posthogConnectSrc}`,
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",

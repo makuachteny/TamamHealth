@@ -1843,7 +1843,7 @@ const relationships = ['Spouse', 'Parent', 'Child', 'Sibling', 'Uncle', 'Aunt', 
 // Portrait photos of real African people, bundled locally in public/assets/patients.
 // Grouped by gender so the gender-based deterministic pick below never
 // assigns a visibly male photo to a female patient.
-const MALE_PATIENT_PHOTOS = [
+export const MALE_PATIENT_PHOTOS = [
   '/assets/patients/founder-teny.jpg',
   '/assets/patients/founder-toye.jpg',
   '/assets/patients/founder-ekow.jpg',
@@ -1853,7 +1853,7 @@ const MALE_PATIENT_PHOTOS = [
   '/assets/patients/portrait-man-camera.jpg',
   '/assets/patients/portrait-man-beanie.jpg',
 ];
-const FEMALE_PATIENT_PHOTOS = [
+export const FEMALE_PATIENT_PHOTOS = [
   '/assets/patients/doctor-tablet-smiling.jpg',
   '/assets/patients/doctor-prescription.jpg',
   '/assets/patients/doctor-nurse-consultation.jpg',

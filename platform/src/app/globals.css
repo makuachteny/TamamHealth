@@ -3026,8 +3026,27 @@ thead th {
   --ehr-warning: #FFF2CC;
 }
 
+/* The top rail's height lives on :root, not only on the app shell, because
+   portalled overlays render into <body> — outside `.tamam-ehr-app` — and so
+   cannot inherit a variable scoped to it.
+ *
+ * Two variables, because "how tall is the rail" and "how far down must an
+ * overlay start" are not the same question. The mobile app shell replaces the
+ * rail entirely (see the `useShell` branch in (dashboard)/layout.tsx), so on a
+ * phone there is no rail to clear — an overlay that offset itself by the rail
+ * height there would leave a 112px band of nothing above it. `:has()` makes the
+ * inset follow whether the rail is actually in the document. */
+:root {
+  --app-top-rail-height: 60px;
+  --app-overlay-top-inset: 0px;
+}
+
+html:has(.ehr-top-rail) {
+  --app-overlay-top-inset: var(--app-top-rail-height);
+}
+
 .tamam-ehr-app {
-  --ehr-top-rail-height: 60px;
+  --ehr-top-rail-height: var(--app-top-rail-height);
   background: var(--ehr-page-bg) !important;
 }
 
@@ -5801,13 +5820,14 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   list-style: none;
 }
 
-/* Exactly four rows, then scroll (measured: 54.7px row + 4px gap → 4 rows =
-   231px). Keeps the card a fixed size no matter how deep the backlog is, so
-   the cards below stay reachable in the rail; a fifth row peeks under the
-   fourth as the scroll cue. The tighter padding buys that fourth row in
-   roughly the space the old three took. */
+/* Five rows, then scroll (measured: 54.7px row + 4px gap → 5 rows = 290px).
+   Keeps the card a fixed size no matter how deep the backlog is, so the cards
+   below stay reachable in the rail; a sixth row peeks under the fifth as the
+   scroll cue. Raised from four at the user's direction: the "view all" footer
+   sat close enough to the header that the card read as mostly empty chrome,
+   so the list now carries one more row of real work before it. */
 .ehr-action-feed.is-scrollable {
-  max-height: 231px;
+  max-height: 290px;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Overlay scrollbar: with the rows now edge-to-edge there is no gutter to
@@ -5969,19 +5989,47 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   white-space: nowrap;
 }
 
-.ehr-action-more {
-  width: 100%;
-  margin-top: 8px;
-  padding: 6px;
-  background: none;
-  border: none;
+/* "View all N in notifications" — the card's centred footer link, not a metric
+   row. The selector carries the parent because `.ehr-side-card > button`
+   (class + element) outranks a lone class and was winning: it dragged this
+   into the metric-row look — 13px, dark ink, left-aligned, space-between.
+   Full-bleed like the rows above it, with a hairline divider so the card ends
+   on a deliberate edge rather than a stray link floating in padding; the bed
+   stays untinted, per the flat-clinical direction. */
+.ehr-side-card > .ehr-action-more {
+  /* A `<button>` sizes to fit-content even at display:flex, so the width has
+     to be stated: card content width plus the 14px padding cancelled on each
+     side. The card's own `overflow: hidden` clips the bleed to its radius. */
+  width: calc(100% + 28px);
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* Cancel the card's 14px padding on three sides so the divider meets the
+     card border; 10px above keeps the link off the last row. */
+  margin: 10px -14px -14px;
+  padding: 10px 14px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--ehr-border);
+  /* Matches .ehr-side-card's 12px, less the border it sits inside. */
+  border-radius: 0 0 11px 11px;
   color: var(--accent-primary);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
   cursor: pointer;
+  transition: background .12s, color .12s;
 }
 
-.ehr-action-more:hover { text-decoration: underline; }
+.ehr-side-card > .ehr-action-more:hover {
+  /* Same hover bed as the rail's metric rows, so the footer reads as part of
+     the same control family. */
+  background: rgba(33, 145, 208, 0.07);
+  color: var(--tb-blue-800, #015697);
+  text-decoration: none;
+}
 
 .ehr-side-card p {
   margin-bottom: 12px;
@@ -7112,8 +7160,8 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 @media (max-width: 1023px) {
-  .tamam-ehr-app {
-    --ehr-top-rail-height: 96px;
+  :root {
+    --app-top-rail-height: 96px;
   }
 
   .tamam-ehr-app .page-container:has(> .ehr-schedule-shell) {
@@ -7380,8 +7428,8 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 @media (max-width: 639px) {
-  .tamam-ehr-app {
-    --ehr-top-rail-height: 112px;
+  :root {
+    --app-top-rail-height: 112px;
   }
 
   .ehr-top-rail {
@@ -16113,9 +16161,13 @@ textarea.ehr-handoff-input {
 
 /* One row language for every right-rail card, on every role's dashboard: the
    clinical "Outstanding items" rows and the care-team metric rows (Clinic
-   today, Reception today, Today's triage, …) are the same control. */
+   today, Reception today, Today's triage, …) are the same control.
+
+   `.ehr-action-more` opts out: it is the "Needs your attention" card's footer
+   link, not a metric row, and this block was stretching it into a 48px
+   dark-ink left-aligned row. */
 .ehr-right-rail .ehr-outstanding-chips button,
-.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row) {
+.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):not(.ehr-action-more) {
   min-height: 48px;
   padding: 0;
   border: 0;
@@ -16127,16 +16179,22 @@ textarea.ehr-handoff-input {
 }
 
 .ehr-right-rail .ehr-outstanding-chips button:last-child,
-.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):last-child {
+.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):not(.ehr-action-more):last-child {
   border-bottom: 0;
 }
 
 .ehr-right-rail .ehr-outstanding-chips button:hover,
-.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):hover {
+.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):not(.ehr-action-more):hover {
   padding-inline: 10px;
   border-radius: 8px;
   background: rgba(33, 145, 208, 0.07);
   color: var(--tb-blue-800, #015697);
+}
+
+/* Footer bleed measured against the rail card's own padding (22px 14px 24px
+   just above), not the generic 14px side card. */
+.ehr-right-rail .ehr-side-card > .ehr-action-more {
+  margin: 12px -14px -24px;
 }
 
 .ehr-right-rail .ehr-outstanding-chips button.is-open,
@@ -23502,3 +23560,223 @@ table.patient-data-table.patient-data-table {
   .xfer-foot { flex-wrap: wrap; }
   .xfer-foot-note { flex-basis: 100%; }
 }
+
+/* ============ Work-queue rows: details expand in place ============
+   Rows used to open a slide-over. They now unfold underneath instead, so the
+   queue stays on screen while one patient is read — the list is the context,
+   not something to be covered up. The panel is white like everything around
+   it; a left accent bar ties it to the row it belongs to. */
+
+/* Collapsed, the group is just a wrapper — the row keeps its own card edge. */
+.ehr-appointment-group { border: 0; }
+
+/* Expanded, the row and its panel become ONE block: the group takes the card
+   edge, the row inside gives up its border and rounding, and a single accent
+   bar runs down both. That leaves exactly one outline and one divider between
+   the row and what dropped out of it — no doubled hairlines. */
+.ehr-appointment-group.is-expanded {
+  border: 1px solid var(--ehr-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--card-shadow, 0 1px 2px rgba(16, 42, 67, 0.05));
+  margin: 4px 0 10px;
+}
+
+.tamam-ehr-app .ehr-appointment-group.is-expanded > .ehr-appointment-row,
+.tamam-ehr-app .ehr-appointment-group.is-expanded > .ehr-appointment-row:hover,
+.ehr-appointment-group.is-expanded > .ehr-appointment-row,
+.ehr-appointment-group.is-expanded > .ehr-appointment-row:hover {
+  /* The app-wide row rule paints every row with an `!important` card edge; the
+     expanded row hands that job to the group so the block has one outline
+     instead of two nested ones. */
+  border: 0 !important;
+  border-bottom: 1px solid var(--ehr-border-soft, #E5EDF5) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Caret sits ahead of the avatar so the identity column keeps its shape and
+   the row grid is untouched. */
+.ehr-row-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  flex: 0 0 18px;
+  margin-right: 2px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.ehr-appointment-group.is-expanded .ehr-row-caret {
+  transform: rotate(180deg);
+  color: var(--accent-primary);
+}
+
+.ehr-row-detail {
+  padding: 4px 20px 16px 44px;
+  border-top: 0;
+  animation: ehrRowDetailIn 0.16s ease-out;
+}
+
+@keyframes ehrRowDetailIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Two columns of label/value on anything but a narrow screen — the fields are
+   short, and a single column pushed the actions below the fold. */
+.ehr-row-detail__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 28px;
+  margin-bottom: 4px;
+}
+
+.ehr-row-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .ehr-row-detail { padding-left: 20px; }
+}
+
+/* The visit panel in its inline frame: no dialog chrome, no shadow of its own —
+   the row's accent bar and the surrounding edges already place it. With the
+   duplicate header gone the tab row is the panel's top edge, so it keeps the
+   same breathing room the rest of the detail rows have. */
+/* The panel is as wide as the row it dropped out of — same 4px gutters the
+   row itself uses, so the two read as one block rather than an inset card. */
+.ehr-row-detail--visit { padding: 4px 4px 12px; }
+
+/* Same panel inside a dialog — the calendar's event popup, where there is no
+   row to unfold beneath. The left indent exists to clear a row's avatar
+   column; in a dialog there is no avatar, so it sits flush and drops the
+   unfold animation the dialog's own transition already covers. */
+.ehr-row-detail--dialog {
+  padding: 0;
+  animation: none;
+}
+
+/* A form unfolded under its row (recording a dose, say) rather than a set of
+   read-only fields. It brings its own padding from the markup it inherited
+   from the dialog, so the wrapper only supplies the indent that lines it up
+   with the row's content column. */
+.ehr-row-detail--form {
+  padding: 0 0 4px 32px;
+}
+
+.ehr-row-detail--form > * > .px-5 { padding-inline: 12px; }
+
+@media (max-width: 720px) {
+  .ehr-row-detail--form { padding-left: 8px; }
+}
+
+/* The same panel inside a data table, where the unfolded content has to live
+   in its own full-width <tr>/<td> rather than beside the row. The cell kills
+   the table's usual padding so the panel controls its own, and a left accent
+   bar ties the detail to the row it dropped out of — the job the group's
+   border does in the card lists. */
+.ehr-table-detail-row > td {
+  padding: 0 !important;
+  background: var(--ehr-page-bg, #F8FBFD);
+  border-bottom: 1px solid var(--border-light, #E4EBF1);
+}
+
+.ehr-table-detail-row > td > .ehr-row-detail--table {
+  padding: 14px 18px;
+  border-left: 3px solid var(--accent-primary);
+}
+
+.ehr-visit-pop--inline {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  width: 100%;
+  max-width: none;
+}
+
+.ehr-visit-pop--inline .ehr-visit-pop-tabs { border-top: 0; margin-top: 0; }
+
+/* The inline frame has its own way out (collapsing the row), so the dialog's
+   close affordance would be a second, weaker one. */
+.ehr-visit-pop--inline .ehr-visit-pop-close { display: none; }
+
+
+
+/* Visit-panel actions — Open chart / Move / Start consultation, as icons on the
+   tab line rather than a footer strip that scrolls away. */
+.ehr-visit-pop-tabs { align-items: center; }
+
+.ehr-visit-pop-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding-bottom: 6px;
+}
+
+/* These live in the tab row, so the tab styling (2px underline, tall padding,
+   muted ink) lands on them unasked. Put it back. */
+.ehr-visit-pop-tabs .ehr-visit-pop-icon,
+.ehr-visit-pop-tabs .ehr-visit-pop-icon:hover {
+  padding: 0;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 6px;
+  font-size: 0;
+}
+
+.ehr-visit-pop-tabs .ehr-visit-pop-icon.is-primary {
+  border-color: var(--accent-primary);
+}
+
+.ehr-visit-pop-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  background: #fff;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ehr-visit-pop-icon:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-light, rgba(33, 145, 208, 0.08));
+}
+
+/* The primary action stays an icon, but the accent says which one it is. */
+.ehr-visit-pop-icon.is-primary {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.ehr-visit-pop-icon.is-primary:hover {
+  background: var(--accent-hover, #015697);
+  border-color: var(--accent-hover, #015697);
+  color: #fff;
+}
+
+/* The global `svg.lucide` rule pins icon colour (and lucide writes stroke as a
+   literal attribute), so a glyph on the accent-filled action would otherwise
+   stay brand blue on brand blue. Repaint both. */
+.ehr-visit-pop-icon svg.lucide { color: inherit; stroke: currentColor; }
+.ehr-visit-pop-icon.is-primary svg.lucide,
+.ehr-visit-pop-icon.is-primary svg.lucide * { color: #fff; stroke: #fff; fill: none; }
+
+/* A patient name in a queue row is a link to their chart — say so on hover,
+   without turning every row title blue at rest. */
+.ehr-row-name-link { cursor: pointer; }
+.ehr-row-name-link:hover { color: var(--accent-primary); text-decoration: underline; }
+
+/* A dashboard-supplied panel lays itself out; the shell only gives it room. */
+.ehr-row-detail__custom { display: block; }

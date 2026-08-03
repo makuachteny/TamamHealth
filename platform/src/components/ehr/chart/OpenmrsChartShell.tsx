@@ -19,7 +19,7 @@
 import { useEffect, useState } from 'react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import {
-  ShoppingCart, Stethoscope, ClipboardCheck, FileText, Users, X, Maximize2, ChevronDown,
+  ShoppingCart, Stethoscope, ClipboardCheck, FileText, Users, X, Maximize2,
 } from '@/components/icons/lucide';
 import type { PatientDoc } from '@/lib/db-types';
 import OrderBasketPanel from './panels/OrderBasketPanel';
@@ -59,8 +59,9 @@ interface OpenmrsChartShellProps {
   setActiveTab: (id: string) => void;
   /** Primary OpenMRS-mapped rail items, already permission-filtered. */
   railItems: OmrsRailItem[];
-  /** Existing tabs that don't have an OpenMRS-rail slot — surfaced under a
-   *  "More" section at the bottom of the rail so nothing becomes unreachable. */
+  /** Existing tabs that don't have an OpenMRS-rail slot. They render straight
+   *  after `railItems` in the same single list — the two arrays stay separate
+   *  only to preserve that ordering. */
   moreItems: OmrsRailItem[];
   header: ReactNode;
   vitalsBand?: ReactNode;
@@ -92,7 +93,6 @@ export default function OpenmrsChartShell({
   const [openPanel, setOpenPanel] = useState<string | null>(null);
   // Drawer expand toggle — widens the workspace drawer to near-full-width.
   const [drawerMaximized, setDrawerMaximized] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     if (panelRequest) {
@@ -101,10 +101,14 @@ export default function OpenmrsChartShell({
       onPanelRequestHandled?.();
     }
   }, [panelRequest, onPanelRequestHandled]);
-  useEffect(() => {
-    if (moreItems.some(item => item.id === activeTab)) setMoreOpen(true);
-  }, [activeTab, moreItems]);
   const activePanel = DRAWER_PANELS.find(p => p.id === openPanel) || null;
+
+  // One list, not two. `moreItems` used to hide behind a collapsed "More
+  // sections" toggle, which meant half the chart's sections were one click away
+  // for no reason a clinician could see — the split reflects which tabs happen
+  // to map onto OpenMRS's rail, which is our history, not their task. The
+  // ordering still puts the mapped sections first.
+  const allRailItems = [...railItems, ...moreItems];
 
   const togglePanel = (id: string) => {
     setOpenPanel(prev => (prev === id ? null : id));
@@ -175,9 +179,14 @@ export default function OpenmrsChartShell({
 
   return (
     <div className="omrs-root">
-      {/* ══ Left vertical nav rail ══ */}
-      <nav className="omrs-left-rail no-print" aria-label="Patient chart sections">
-        {railItems.map(item => {
+      {/* ══ Left vertical nav rail ══
+          The column and the nav are separate elements on purpose: the column
+          stretches to the shell's full height so the rail's surface and its
+          divider run the length of the chart, while the nav inside it stays
+          sticky and only as tall as its own list. */}
+      <div className="omrs-rail-col no-print">
+      <nav className="omrs-left-rail" aria-label="Patient chart sections">
+        {allRailItems.map(item => {
           const isActive = activeTab === item.id;
           return (
             <button
@@ -194,39 +203,8 @@ export default function OpenmrsChartShell({
             </button>
           );
         })}
-
-        {moreItems.length > 0 && (
-          <>
-            <div className="omrs-rail-divider" />
-            <button
-              type="button"
-              className="omrs-rail-section-toggle"
-              onClick={() => setMoreOpen(open => !open)}
-              aria-expanded={moreOpen}
-            >
-              <span>More sections</span>
-              <ChevronDown className={moreOpen ? 'rotate-180' : ''} aria-hidden="true" />
-            </button>
-            {moreOpen && moreItems.map(item => {
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={isActive ? 'omrs-rail-item is-active' : 'omrs-rail-item'}
-                  onClick={() => setActiveTab(item.id)}
-                  onMouseDown={e => e.preventDefault()}
-                  aria-current={isActive ? 'page' : undefined}
-                  title={item.label}
-                >
-                  <item.icon className="w-4 h-4" />
-                  <span className="omrs-rail-label">{item.label}</span>
-                </button>
-              );
-            })}
-          </>
-        )}
       </nav>
+      </div>
 
       {/* ══ Main column: sticky header/vitals + scrolling tab content ══ */}
       <div className="omrs-main-col">

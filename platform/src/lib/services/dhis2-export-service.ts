@@ -43,8 +43,8 @@ export interface DHIS2ExportScope {
   role?: string;
 }
 
-/** Africa/Juba is UTC+03:00, no DST — mirrors the constant in time-juba.ts. */
-const JUBA_OFFSET_MS = 3 * 60 * 60 * 1000;
+/** Africa/Juba is UTC+02:00 (CAT since 1 Feb 2021), no DST — mirrors the constant in time-juba.ts. */
+const JUBA_OFFSET_MS = 2 * 60 * 60 * 1000;
 
 /**
  * Convert a normalized DHIS2 period (YYYYMM / YYYYWww / YYYY — the output of

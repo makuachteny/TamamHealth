@@ -38,8 +38,9 @@ import {
 } from '@/lib/telehealth-join-window';
 import type { TelehealthSessionDoc } from '@/lib/db-types';
 
-/** How long a minted token stays valid. Short — clients reconnect by re-minting. */
-const TOKEN_TTL_SECONDS = 15 * 60;
+/** How long a minted token stays valid. Short — clients reconnect by
+ *  re-minting. KAN-123 caps this at 10 minutes. */
+const TOKEN_TTL_SECONDS = 10 * 60;
 
 /** Session states in which media credentials may be issued. */
 const JOINABLE: ReadonlySet<TelehealthSessionDoc['status']> = new Set([

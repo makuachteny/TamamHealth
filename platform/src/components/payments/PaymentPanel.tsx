@@ -10,6 +10,7 @@ import Modal from '@/components/Modal';
 import { formatMoney } from '@/lib/format-utils';
 import type { PaymentDoc } from '@/lib/db-types-payments';
 import type { FeeScheduleDoc } from '@/lib/db-types-billing';
+import '@/components/billing/billing.css';
 
 interface PaymentPanelProps {
   patientId: string;
@@ -260,12 +261,12 @@ export default function PaymentPanel({
   if (success && paymentDoc) {
     return (
       <Modal onClose={() => onSuccess(paymentDoc._id)} width={420} disableBackdropClose>
-        <div className="modal-content" style={{ width: '100%' }}>
-          {/* Success header with green gradient */}
+        <div className="bl-root modal-content" style={{ width: '100%', display: 'block' }}>
+          {/* Success header — flat, no gradient wash; the checkmark carries the
+              "it worked" signal on its own. */}
           <div style={{
             padding: '28px 20px', textAlign: 'center',
-            background: 'linear-gradient(135deg, rgba(33, 145, 208, 0.12), rgba(59, 130, 246,0.04))',
-            borderBottom: '1px solid var(--border-medium)',
+            borderBottom: '1px solid var(--ehr-border, #D8E3EC)',
           }}>
             <div style={{
               width: 56, height: 56, borderRadius: '50%', margin: '0 auto 12px',
@@ -299,34 +300,22 @@ export default function PaymentPanel({
 
           {/* Action buttons */}
           <div style={{ padding: '0 20px 12px', display: 'flex', gap: 8 }}>
-            <button onClick={handlePrint} style={{
-              flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border-medium)',
-              background: 'transparent', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}>
+            <button type="button" className="bl-btn bl-btn--outline" style={{ flex: 1 }} onClick={handlePrint}>
               <Printer size={14} /> {t('payments.printReceipt')}
             </button>
-            <button onClick={() => setShowEmailInput(!showEmailInput)} style={{
-              flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border-medium)',
-              background: 'transparent', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}>
+            <button type="button" className="bl-btn bl-btn--outline" style={{ flex: 1 }} onClick={() => setShowEmailInput(!showEmailInput)}>
               <Mail size={14} /> {emailSent ? t('payments.sent') : t('payments.emailReceipt')}
             </button>
           </div>
 
           {/* Email input (shown when email button clicked) */}
           {showEmailInput && !emailSent && (
-            <div style={{ padding: '0 20px 12px', display: 'flex', gap: 8 }}>
+            <div className="bl-field" style={{ padding: '0 20px 12px', flexDirection: 'row' }}>
               <input type="email" value={emailAddress} onChange={e => setEmailAddress(e.target.value)}
                 placeholder="support.tamam@gmail.com"
-                style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 13, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                style={{ flex: 1 }}
               />
-              <button onClick={handleEmailReceipt} disabled={emailSending || !emailAddress} style={{
-                padding: '8px 16px', borderRadius: 8, border: 'none',
-                background: 'var(--accent-primary)', color: '#fff', fontSize: 13, fontWeight: 600,
-                cursor: emailSending ? 'not-allowed' : 'pointer', opacity: emailSending ? 0.7 : 1,
-              }}>
+              <button type="button" className="bl-btn bl-btn--primary" disabled={emailSending || !emailAddress} onClick={handleEmailReceipt}>
                 {emailSending ? t('payments.sending') : t('payments.send')}
               </button>
             </div>
@@ -334,7 +323,7 @@ export default function PaymentPanel({
 
           {emailSent && (
             <div style={{ padding: '0 20px 12px' }}>
-              <div style={{ fontSize: 12, color: 'var(--accent-primary)', padding: '6px 12px', background: 'rgba(33, 145, 208, 0.08)', borderRadius: 8, textAlign: 'center' }}>
+              <div className="bl-muted" style={{ fontSize: 12, padding: '6px 12px', background: 'var(--ehr-page-bg, #F8FBFD)', border: '1px solid var(--ehr-border, #D8E3EC)', borderRadius: 6, textAlign: 'center' }}>
                 {t('payments.receiptSentTo', { email: emailAddress })}
               </div>
             </div>
@@ -342,7 +331,7 @@ export default function PaymentPanel({
 
           {emailError && !emailSent && (
             <div style={{ padding: '0 20px 12px' }}>
-              <div style={{ fontSize: 12, color: 'var(--color-danger)', padding: '6px 12px', background: 'rgba(229, 46, 66, 0.08)', borderRadius: 8, textAlign: 'center' }}>
+              <div className="bl-danger" style={{ fontSize: 12, padding: '6px 12px', background: 'var(--ehr-page-bg, #F8FBFD)', border: '1px solid var(--ehr-border, #D8E3EC)', borderRadius: 6, textAlign: 'center' }}>
                 {emailError}
               </div>
             </div>
@@ -350,10 +339,7 @@ export default function PaymentPanel({
 
           {/* Done button */}
           <div style={{ padding: '0 20px 20px' }}>
-            <button onClick={() => onSuccess(paymentDoc._id)} style={{
-              width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
-              background: 'var(--accent-primary)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}>
+            <button type="button" className="bl-btn bl-btn--primary" style={{ width: '100%' }} onClick={() => onSuccess(paymentDoc._id)}>
               {t('payments.done')}
             </button>
           </div>
@@ -392,8 +378,10 @@ export default function PaymentPanel({
           </button>
         </div>
 
-        {/* Amount hero */}
-        <div style={{ padding: '18px 22px', background: 'linear-gradient(135deg, var(--accent-light), transparent 80%)', borderBottom: '1px solid var(--border-light)' }}>
+        {/* Amount hero — flat panel, no gradient wash: the figure itself is
+            the emphasis, matching the billing module's plain label-above-
+            value stat treatment. */}
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border-light)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-text)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('payments.amountDueLabel')}</div>
           <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--accent-text)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{formatMoney(amountDue, { currency })}</div>
         </div>
@@ -430,7 +418,7 @@ export default function PaymentPanel({
           {fees.length > 0 && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>{t('billing.service', { defaultValue: 'Service' })}</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>{t('billing.service')}</label>
                 {/* Deselect the chosen catalog service — clears the picker and the
                     amount it auto-filled so the cashier can start over. */}
                 {selectedFeeId && (
@@ -577,7 +565,7 @@ export default function PaymentPanel({
                 <>
                   {settings.payors.filter(p => p !== 'out_of_pocket').length > 0 && (
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.payor', { defaultValue: 'Payor' })}</label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.payor')}</label>
                       <select
                         value={payerName}
                         onChange={e => setPayerName(e.target.value)}
@@ -633,19 +621,11 @@ export default function PaymentPanel({
           {error && <div style={{ fontSize: 13, color: 'var(--error)', padding: '8px 12px', background: 'color-mix(in srgb, var(--error) 8%, transparent)', borderRadius: 8 }}>{error}</div>}
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: '14px 22px 20px', display: 'flex', gap: 10, position: 'sticky', bottom: 0, background: 'var(--bg-card-solid, #fff)', borderTop: '1px solid var(--border-light)' }}>
-          <button onClick={onCancel} style={{
-            flex: 1, padding: '13px 0', borderRadius: 11, border: '1px solid var(--border-medium)',
-            background: 'transparent', color: 'var(--text-secondary)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-          }}>{t('action.cancel')}</button>
-          <button onClick={handleSubmit} disabled={processing} style={{
-            flex: 2, padding: '13px 0', borderRadius: 11, border: 'none',
-            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover, #015697))',
-            color: '#fff', fontSize: 14, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer',
-            opacity: processing ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            boxShadow: '0 4px 14px var(--accent-glow, rgba(33,145,208,0.3))',
-          }}>
+        {/* Footer — flat bl-btn instead of the gradient-fill + drop-shadow
+            "glow" button; the amount label already carries the emphasis. */}
+        <div className="bl-root" style={{ padding: '14px 22px 20px', display: 'flex', flexDirection: 'row', gap: 10, position: 'sticky', bottom: 0, background: 'var(--bg-card-solid, #fff)', borderTop: '1px solid var(--border-light)' }}>
+          <button type="button" className="bl-btn bl-btn--ghost" style={{ flex: 1 }} onClick={onCancel}>{t('action.cancel')}</button>
+          <button type="button" className="bl-btn bl-btn--primary" style={{ flex: 2 }} disabled={processing} onClick={handleSubmit}>
             {processing ? <><Loader2 size={14} className="animate-spin" /> {t('payments.processing')}</> : t('payments.recordAmount', { amount: parseFloat(amount).toLocaleString(), currency })}
           </button>
         </div>

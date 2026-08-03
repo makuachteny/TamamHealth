@@ -11,7 +11,7 @@ import { useWards } from '@/lib/hooks/useWards';
 import { formatMoney } from '@/lib/format-utils';
 import {
   Building2, Users, CalendarClock, BedDouble, DollarSign,
-  Wallet, Package, Receipt, BarChart3, ChevronRight,
+  Wallet, Package, Receipt, BarChart3, ChevronRight, Activity,
 } from '@/components/icons/lucide';
 import type { ClaimDoc } from '@/lib/db-types-payments';
 import TransferInboxCard from '@/components/patients/TransferInboxCard';
@@ -352,6 +352,7 @@ export default function OrgAdminDashboard() {
   const shortcuts = [
     { label: 'Facilities', desc: 'Manage hospitals & clinics', icon: Building2, path: '/hospitals' },
     { label: 'Manage Users', desc: 'Staff accounts & access', icon: Users, path: '/org-admin/users' },
+    { label: 'Analytics', desc: 'Usage & activity insights', icon: Activity, path: '/org-admin/analytics' },
     { label: 'Billing & Payments', desc: 'Cash flow, invoices', icon: Wallet, path: '/payments' },
     { label: 'Claims', desc: 'Insurance claim tracking', icon: Receipt, path: '/payments/claims' },
     { label: 'Reports', desc: 'Operational reporting', icon: BarChart3, path: '/reports' },

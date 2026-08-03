@@ -255,15 +255,15 @@ async function fetchAdminCredential(): Promise<{ username: string; password: str
 }
 
 export const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
-  { _id: 'lab-001', type: 'lab_result', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001', testName: 'Malaria RDT', specimen: 'Blood', status: 'completed', result: 'Positive (P. falciparum)', unit: '', referenceRange: 'Negative', abnormal: true, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T08:30:00Z', completedAt: '2026-02-09T09:15:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T08:30:00Z', updatedAt: '2026-02-09T09:15:00Z' },
-  { _id: 'lab-002', type: 'lab_result', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', hospitalNumber: 'JTH-000005', testName: 'Full Blood Count', specimen: 'Blood (EDTA)', status: 'completed', result: 'Hb 7.2 g/dL, WBC 14.3\u00d710\u00b3/\u03bcL', unit: '', referenceRange: '', abnormal: true, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T07:45:00Z', completedAt: '2026-02-09T10:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T07:45:00Z', updatedAt: '2026-02-09T10:30:00Z' },
-  { _id: 'lab-003', type: 'lab_result', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', hospitalNumber: 'JTH-000012', testName: 'CD4 Count', specimen: 'Blood (EDTA)', status: 'in_progress', result: '', unit: '', referenceRange: '500-1500 cells/\u03bcL', abnormal: false, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T09:00:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:00:00Z', updatedAt: '2026-02-09T09:00:00Z' },
+  { _id: 'lab-001', type: 'lab_result', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001', testName: 'Malaria RDT', specimen: 'Blood', status: 'completed', result: 'Positive (P. falciparum)', unit: '', referenceRange: 'Negative', abnormal: true, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T08:30:00Z', completedAt: '2026-02-09T09:15:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', accessionNumber: 'ACC-260209-001', specimenCollectedAt: '2026-02-09T08:38:00Z', specimenCollectedBy: 'Nurse Stella Keji Lemi', specimenReceivedAt: '2026-02-09T08:47:00Z', specimenReceivedBy: 'Lab Tech Gatluak Puok', specimenContainer: 'Capillary tube', specimenCondition: 'acceptable', orderStatus: 'resulted', createdAt: '2026-02-09T08:30:00Z', updatedAt: '2026-02-09T09:15:00Z' },
+  { _id: 'lab-002', type: 'lab_result', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', hospitalNumber: 'JTH-000005', testName: 'Full Blood Count', specimen: 'Blood (EDTA)', status: 'completed', result: 'Hb 7.2 g/dL, WBC 14.3\u00d710\u00b3/\u03bcL', unit: '', referenceRange: '', abnormal: true, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T07:45:00Z', completedAt: '2026-02-09T10:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', accessionNumber: 'ACC-260209-002', specimenCollectedAt: '2026-02-09T07:58:00Z', specimenCollectedBy: 'Nurse Stella Keji Lemi', specimenReceivedAt: '2026-02-09T08:06:00Z', specimenReceivedBy: 'Lab Tech Gatluak Puok', specimenContainer: 'Purple-top EDTA tube', specimenCondition: 'acceptable', orderStatus: 'resulted', createdAt: '2026-02-09T07:45:00Z', updatedAt: '2026-02-09T10:30:00Z' },
+  { _id: 'lab-003', type: 'lab_result', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', hospitalNumber: 'JTH-000012', testName: 'CD4 Count', specimen: 'Blood (EDTA)', status: 'in_progress', result: '', unit: '', referenceRange: '500-1500 cells/\u03bcL', abnormal: false, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T09:00:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', accessionNumber: 'ACC-260209-003', specimenCollectedAt: '2026-02-09T09:12:00Z', specimenCollectedBy: 'Nurse Stella Keji Lemi', specimenReceivedAt: '2026-02-09T09:23:00Z', specimenReceivedBy: 'Lab Tech Gatluak Puok', specimenContainer: 'Purple-top EDTA tube', specimenCondition: 'acceptable', orderStatus: 'in_process', createdAt: '2026-02-09T09:00:00Z', updatedAt: '2026-02-09T09:00:00Z' },
   { _id: 'lab-004', type: 'lab_result', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', hospitalNumber: 'JTH-000018', testName: 'Blood Glucose (Fasting)', specimen: 'Blood', status: 'completed', result: '198 mg/dL', unit: 'mg/dL', referenceRange: '70-100', abnormal: true, critical: false, orderedBy: 'CO Deng Mabior Kuol', orderedAt: '2026-02-09T06:30:00Z', completedAt: '2026-02-09T07:00:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T06:30:00Z', updatedAt: '2026-02-09T07:00:00Z' },
   { _id: 'lab-005', type: 'lab_result', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', hospitalNumber: 'JTH-000022', testName: 'Hemoglobin', specimen: 'Blood', status: 'completed', result: '4.2 g/dL', unit: 'g/dL', referenceRange: '12.0-16.0', abnormal: true, critical: true, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T10:00:00Z', completedAt: '2026-02-09T10:45:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:00:00Z', updatedAt: '2026-02-09T10:45:00Z' },
-  { _id: 'lab-006', type: 'lab_result', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', hospitalNumber: 'JTH-000030', testName: 'Liver Function Tests', specimen: 'Blood', status: 'pending', result: '', unit: '', referenceRange: '', abnormal: false, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T11:00:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T11:00:00Z', updatedAt: '2026-02-09T11:00:00Z' },
+  { _id: 'lab-006', type: 'lab_result', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', hospitalNumber: 'JTH-000030', testName: 'Liver Function Tests', specimen: 'Blood', status: 'pending', result: '', unit: '', referenceRange: '', abnormal: false, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T11:00:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', accessionNumber: 'ACC-260209-006', orderStatus: 'ordered', createdAt: '2026-02-09T11:00:00Z', updatedAt: '2026-02-09T11:00:00Z' },
   { _id: 'lab-007', type: 'lab_result', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', hospitalNumber: 'JTH-000035', testName: 'HIV Rapid Test', specimen: 'Blood', status: 'completed', result: 'Non-reactive', unit: '', referenceRange: 'Non-reactive', abnormal: false, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T08:00:00Z', completedAt: '2026-02-09T08:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T08:00:00Z', updatedAt: '2026-02-09T08:30:00Z' },
   { _id: 'lab-008', type: 'lab_result', patientId: 'pat-00040', patientName: 'Majok Chol Wol', hospitalNumber: 'JTH-000040', testName: 'Urinalysis', specimen: 'Urine', status: 'in_progress', result: '', unit: '', referenceRange: 'Normal', abnormal: false, critical: false, orderedBy: 'Dr. Peter Garang Deng', orderedAt: '2026-02-09T09:30:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:30:00Z', updatedAt: '2026-02-09T09:30:00Z' },
-  { _id: 'lab-009', type: 'lab_result', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', hospitalNumber: 'JTH-000008', testName: 'Sputum AFB', specimen: 'Sputum', status: 'pending', result: '', unit: '', referenceRange: 'Negative', abnormal: false, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T11:30:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T11:30:00Z', updatedAt: '2026-02-09T11:30:00Z' },
+  { _id: 'lab-009', type: 'lab_result', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', hospitalNumber: 'JTH-000008', testName: 'Sputum AFB', specimen: 'Sputum', status: 'pending', result: '', unit: '', referenceRange: 'Negative', abnormal: false, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T11:30:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', accessionNumber: 'ACC-260209-009', specimenCollectedAt: '2026-02-09T11:42:00Z', specimenCollectedBy: 'Nurse Stella Keji Lemi', specimenContainer: 'Sterile sputum cup', specimenCondition: 'insufficient_quantity', specimenRejectionReason: 'Insufficient quantity', specimenRejectionNotes: 'Cup contained saliva only; recollect early-morning sputum.', specimenRejectedAt: '2026-02-09T11:55:00Z', specimenRejectedBy: 'Lab Tech Gatluak Puok', orderStatus: 'rejected_needs_recollection', createdAt: '2026-02-09T11:30:00Z', updatedAt: '2026-02-09T11:30:00Z' },
   { _id: 'lab-010', type: 'lab_result', patientId: 'pat-00015', patientName: 'Tut Chuol Both', hospitalNumber: 'JTH-000015', testName: 'Renal Function', specimen: 'Blood', status: 'completed', result: 'Creatinine 1.8 mg/dL, BUN 45 mg/dL', unit: '', referenceRange: 'Cr 0.6-1.2, BUN 7-20', abnormal: true, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-08T14:00:00Z', completedAt: '2026-02-08T16:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-08T14:00:00Z', updatedAt: '2026-02-08T16:30:00Z' },
 ];
 
@@ -949,6 +949,21 @@ const seedPharmacyInventory: Omit<PharmacyInventoryDoc, '_rev' | 'createdBy'>[] 
   { _id: 'inv-8', type: 'pharmacy_inventory', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', medicationName: 'Diazepam 5mg/mL injection', category: 'Sedative', stockLevel: 45, unit: 'vials', reorderLevel: 20, batchNumber: 'DZP-2026-003', expiryDate: dateFromNow(240), lastReceived: daysAgo(25), lastDispensed: daysAgo(3), dispensedToday: 1, controlledSchedule: 'IV', requiresWitness: true, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(3) },
   { _id: 'inv-9', type: 'pharmacy_inventory', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', medicationName: 'Ceftriaxone 1g injection', category: 'Antibiotic', stockLevel: 12, unit: 'vials', reorderLevel: 50, batchNumber: 'CFT-2025-077', expiryDate: dateFromNow(60), lastReceived: daysAgo(45), lastDispensed: daysAgo(0), dispensedToday: 3, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(90), updatedAt: daysAgo(0) },
   { _id: 'inv-10', type: 'pharmacy_inventory', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', medicationName: 'Magnesium Sulfate injection', category: 'Obstetric', stockLevel: 0, unit: 'vials', reorderLevel: 30, batchNumber: 'MGS-2025-041', expiryDate: dateFromNow(150), lastReceived: daysAgo(70), lastDispensed: daysAgo(6), dispensedToday: 0, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: daysAgo(6) },
+  // ── Multi-batch lines (KAN-113) ──────────────────────────────────────
+  // Several medicines carry more than one batch at the same facility so FEFO
+  // is actually exercised: dispensing must drain the earliest-expiring batch
+  // first and only then spill into the next one. `inv-3b` is a near-expiry
+  // batch of a drug that also has a longer-dated batch, and `inv-exp-1` is
+  // already expired — it stays on the shelf for the physical count but must
+  // never be dispensed.
+  { _id: 'inv-3b', type: 'pharmacy_inventory', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', medicationName: 'Amoxicillin 500mg', category: 'Antibiotic', stockLevel: 60, unit: 'capsules', reorderLevel: 500, batchNumber: 'AMX-2026-044', expiryDate: dateFromNow(35), lastReceived: daysAgo(8), dispensedToday: 0, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(8), updatedAt: daysAgo(8) },
+  { _id: 'inv-2b', type: 'pharmacy_inventory', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', medicationName: 'Paracetamol 500mg', category: 'Analgesic', stockLevel: 400, unit: 'tablets', reorderLevel: 1000, batchNumber: 'PCM-2026-058', expiryDate: dateFromNow(75), lastReceived: daysAgo(5), dispensedToday: 0, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
+  { _id: 'inv-1b', type: 'pharmacy_inventory', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', medicationName: 'Artemether-Lumefantrine (Coartem)', category: 'Antimalarial', stockLevel: 300, unit: 'tablets', reorderLevel: 400, batchNumber: 'CTM-2026-051', expiryDate: dateFromNow(90), lastReceived: daysAgo(3), dispensedToday: 0, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(3) },
+  { _id: 'inv-exp-1', type: 'pharmacy_inventory', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', medicationName: 'Ferrous Sulfate + Folic Acid', category: 'Supplement', stockLevel: 150, unit: 'tablets', reorderLevel: 300, batchNumber: 'FEF-2024-077', expiryDate: dateAgo(20), lastReceived: daysAgo(400), dispensedToday: 0, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(400), updatedAt: daysAgo(400) },
+  // A Schedule II line so the two-signature register path is reachable in the
+  // demo (Diazepam above is Schedule IV).
+  { _id: 'inv-11', type: 'pharmacy_inventory', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', medicationName: 'Morphine 10mg/mL injection', category: 'Analgesic', stockLevel: 30, unit: 'ampoules', reorderLevel: 10, batchNumber: 'MOR-2026-002', expiryDate: dateFromNow(300), lastReceived: daysAgo(12), dispensedToday: 0, controlledSchedule: 'II', requiresWitness: true, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(60), updatedAt: daysAgo(12) },
+
   // Mercy General Hospital (hosp-mercy-001, private org)
   { _id: 'inv-mercy-1', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Artemether-Lumefantrine (Coartem)', category: 'Antimalarial', stockLevel: 480, unit: 'tablets', reorderLevel: 150, batchNumber: 'MGH-CTM-2026-002', expiryDate: dateFromNow(380), lastReceived: daysAgo(18), lastDispensed: daysAgo(0), dispensedToday: 6, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(50), updatedAt: daysAgo(0) },
   { _id: 'inv-mercy-2', type: 'pharmacy_inventory', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', medicationName: 'Paracetamol 500mg', category: 'Analgesic', stockLevel: 1100, unit: 'tablets', reorderLevel: 400, batchNumber: 'MGH-PCM-2026-005', expiryDate: dateFromNow(280), lastReceived: daysAgo(12), lastDispensed: daysAgo(0), dispensedToday: 14, orgId: PRIVATE_ORG_ID, createdAt: daysAgo(50), updatedAt: daysAgo(0) },
@@ -1220,26 +1235,46 @@ async function seedProduction(): Promise<void> {
 // photoUrl from the in-memory mock into each patient doc that's missing
 // one. Idempotent: safe to run on every app start.
 //
+// Patients the mock does not know about — the hand-authored facility rosters
+// (BSH-*, JTH-*, and the Mercy set) — used to fall through this and keep their
+// initials for good, so a chart's avatar was a photo or a monogram depending
+// on which list the patient happened to come from. They now draw from the same
+// gender-matched pools, keyed off the document id so a given patient keeps the
+// same face across reloads, devices and re-runs of this migration.
+//
 // Production-mode installs never hold mock-IDed patients, so the migration
 // is gated on IS_DEMO — this also keeps the 88 KB mock import out of the
 // production bundle.
+
+/** Stable non-negative hash of a document id, so photo choice is deterministic
+ *  rather than depending on iteration order. */
+function photoSeed(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 async function migratePatientPhotos(): Promise<void> {
   if (!IS_DEMO) return;
   try {
-    const { patients } = await import('@/data/mock');
+    const { patients, MALE_PATIENT_PHOTOS, FEMALE_PATIENT_PHOTOS } = await import('@/data/mock');
     const pDB = patientsDB();
     const photoById = new Map<string, string>();
     for (const p of patients) {
       if (p.photoUrl) photoById.set(p.id, p.photoUrl);
     }
-    if (photoById.size === 0) return;
     const res = await pDB.allDocs({ include_docs: true });
     const updates: Record<string, unknown>[] = [];
     for (const row of res.rows) {
       const doc = row.doc as (PatientDoc & { _rev: string }) | null;
       if (!doc) continue;
       if ((doc as { photoUrl?: string }).photoUrl) continue;
-      const photo = photoById.get(doc._id);
+      // Prefer the face the mock already assigned; otherwise pick one from the
+      // pool matching the patient's gender. Unknown/other gender falls to the
+      // female pool only because it must pick something — the pools are
+      // demo portraits, not a claim about the patient.
+      const pool = doc.gender === 'Male' ? MALE_PATIENT_PHOTOS : FEMALE_PATIENT_PHOTOS;
+      const photo = photoById.get(doc._id) ?? pool[photoSeed(doc._id) % pool.length];
       if (!photo) continue;
       updates.push({ ...doc, photoUrl: photo, updatedAt: new Date().toISOString() });
     }
@@ -1748,6 +1783,17 @@ async function seedDatabaseExclusive(): Promise<void> {
       const status = bentiuStatuses[i % bentiuStatuses.length];
       const orderedAt = daysAgo(i % 3);
       const completedAt = status === 'completed' ? daysAgo(Math.max(0, (i % 3) - 0.03)) : '';
+      const accessionNumber = `ACC-BEN-${String(i + 1).padStart(3, '0')}`;
+      const isRejectedSpecimen = i === 3;
+      const orderStatus = isRejectedSpecimen
+        ? 'rejected_needs_recollection'
+        : status === 'completed'
+          ? 'resulted'
+          : status === 'in_progress'
+            ? 'in_process'
+            : i === 0
+              ? 'ordered'
+              : 'specimen_collected';
       await safePut(bDB, {
         _id: `lab-bentiu-${bp.id}`, type: 'lab_result', patientId: bp.id, patientName: bp.name, hospitalNumber: bp.num,
         testName: tst.testName, specimen: tst.specimen, status,
@@ -1757,6 +1803,18 @@ async function seedDatabaseExclusive(): Promise<void> {
         orderedBy: 'CO Deng Mabior Kuol', orderedAt: orderedAt.replace('T', ' ').slice(0, 16),
         completedAt: completedAt ? completedAt.replace('T', ' ').slice(0, 16) : '',
         hospitalId: 'hosp-004', hospitalName: 'Bentiu State Hospital',
+        accessionNumber,
+        specimenCollectedAt: orderStatus === 'ordered' ? undefined : orderedAt,
+        specimenCollectedBy: orderStatus === 'ordered' ? undefined : 'Nurse Grace Achai Lual',
+        specimenReceivedAt: status === 'in_progress' || status === 'completed' ? orderedAt : undefined,
+        specimenReceivedBy: status === 'in_progress' || status === 'completed' ? 'Lab Tech Gatluak Puok' : undefined,
+        specimenContainer: tst.specimen.includes('Urine') ? 'Sterile urine cup' : tst.specimen.includes('EDTA') ? 'Purple-top EDTA tube' : 'Plain tube',
+        specimenCondition: isRejectedSpecimen ? 'clotted' : 'acceptable',
+        specimenRejectionReason: isRejectedSpecimen ? 'Clotted' : undefined,
+        specimenRejectionNotes: isRejectedSpecimen ? 'Repeat blood draw requested before analyzer run.' : undefined,
+        specimenRejectedAt: isRejectedSpecimen ? orderedAt : undefined,
+        specimenRejectedBy: isRejectedSpecimen ? 'Lab Tech Gatluak Puok' : undefined,
+        orderStatus,
         createdAt: orderedAt, updatedAt: completedAt || orderedAt, orgId: PUBLIC_ORG_ID,
       } as unknown as Record<string, unknown>);
     }
@@ -3457,6 +3515,11 @@ async function seedDatabaseExclusive(): Promise<void> {
       }
     }
   }
+
+  // Give the freshly-written rosters their avatars now rather than on the next
+  // boot — the migration is idempotent, and without this a first-run demo shows
+  // monograms for every hand-authored patient until the app is restarted.
+  await migratePatientPhotos();
 
   await markSeeded();
 }

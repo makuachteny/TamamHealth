@@ -73,12 +73,16 @@ export default function NurseDashboard() {
 
   // The station is URL-addressable so notifications, redirects, bookmarks, and
   // the browser back button can return a nurse to the exact station they need.
-  const [fallbackStation, setFallbackStation] = useState<StationTab>(() => (
-    isStationTab(searchParams.get('station')) ? searchParams.get('station') as StationTab : 'ward'
+  // Null until the nurse explicitly picks a station, so the role-aware default
+  // below can resolve after currentUser hydrates: a rooming nurse's home
+  // station is Rooming (KAN-108 AC-1); everyone else starts on the ward board.
+  const [fallbackStation, setFallbackStation] = useState<StationTab | null>(() => (
+    isStationTab(searchParams.get('station')) ? searchParams.get('station') as StationTab : null
   ));
   const urlStation = searchParams.get('station');
   const initialTriagePatientId = searchParams.get('patient') ?? undefined;
-  const activeTab: StationTab = isStationTab(urlStation) ? urlStation : fallbackStation;
+  const defaultStation: StationTab = currentUser?.role === 'rooming_nurse' ? 'rooming' : 'ward';
+  const activeTab: StationTab = isStationTab(urlStation) ? urlStation : (fallbackStation ?? defaultStation);
 
   // Free-text search for the station lives in the LEFT RAIL (between the
   // mini-calendar and the day chart); WardWorkflow receives it as a prop so
@@ -185,6 +189,7 @@ export default function NurseDashboard() {
           room: triage.assignedRoom,
           locationSecondary: triage.modeOfArrival || 'Triage',
           date: (triage.triagedAt || today).slice(0, 10),
+          patientId: triage.patientId,
           onClick: () => router.push(`/patients/${triage.patientId}`),
           actionLabel: 'Open',
           onAction: () => router.push(`/patients/${triage.patientId}`),
@@ -220,6 +225,7 @@ export default function NurseDashboard() {
           room: admission.bedNumber ? `${admission.wardName} · Bed ${admission.bedNumber}` : admission.wardName,
           locationSecondary: 'Ward',
           date: (admission.admissionDate || today).slice(0, 10),
+          patientId: admission.patientId,
           onClick: () => router.push(`/wards/mar/${admission._id}`),
           actionLabel: 'MAR',
           onAction: () => router.push(`/wards/mar/${admission._id}`),
@@ -254,6 +260,7 @@ export default function NurseDashboard() {
         room: patient.county || patient.state,
         locationSecondary: 'Location',
         date: (patient.registeredAt || patient.registrationDate || today).slice(0, 10),
+        patientId: patient._id,
         onClick: () => router.push(`/patients/${patient._id}`),
         actionLabel: 'Open',
         onAction: () => router.push(`/patients/${patient._id}`),

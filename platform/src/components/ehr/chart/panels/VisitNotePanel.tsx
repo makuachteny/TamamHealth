@@ -19,7 +19,6 @@ import { Image as ImageIcon, Stethoscope, X } from '@/components/icons/lucide';
 import CodedSearchField from '@/components/CodedSearchField';
 import { useToast } from '@/components/Toast';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
-import { patientFullName } from '@/lib/patient-utils';
 import type { PatientDoc } from '@/lib/db-types';
 import type { ChartPanelRouter, ChartPanelUser } from './types';
 
@@ -182,10 +181,9 @@ export default function VisitNotePanel({ patient, currentUser, router, canConsul
   return (
     <>
       <div className="omrs-drawer-body">
-        <p className="omrs-panel-row-sub" style={{ marginBottom: 12 }}>
-          For {patientFullName(patient)}
-        </p>
-
+        {/* No "For <patient>" line: this drawer only ever opens over the chart
+            of the patient it writes to, and the banner behind it already names
+            them. */}
         <div className="omrs-panel-field">
           <label className="omrs-panel-label">Primary diagnosis</label>
           {primaryDx ? (

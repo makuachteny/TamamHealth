@@ -723,6 +723,7 @@ export default function ReportsPage() {
           </div>
           <button
             className="btn btn-secondary btn-sm"
+            data-track="reports.export_csv"
             onClick={(e) => {
               e.stopPropagation();
               downloadCSV(rows, title.replace(/\s+/g, '_').toLowerCase());

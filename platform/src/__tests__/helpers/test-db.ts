@@ -56,6 +56,7 @@ export function createDBMock() {
     diseaseAlertsDB: () => getTestDB('test_tamamhealth_disease_alerts'),
     prescriptionsDB: () => getTestDB('test_tamamhealth_prescriptions'),
     auditLogDB: () => getTestDB('test_tamamhealth_audit_log'),
+    usageEventsDB: () => getTestDB('test_tamamhealth_usage_events'),
     messagesDB: () => getTestDB('test_tamamhealth_messages'),
     birthsDB: () => getTestDB('test_tamamhealth_births'),
     deathsDB: () => getTestDB('test_tamamhealth_deaths'),

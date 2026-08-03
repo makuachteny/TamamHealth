@@ -291,6 +291,18 @@ export interface LabResultDoc extends BaseDoc {
   orgId?: string;
   /** Optional clinical notes from the ordering clinician (symptoms, suspected Dx) */
   clinicalNotes?: string;
+  /** Specimen handling traceability for the diagnostics bench. */
+  accessionNumber?: string;
+  specimenCollectedAt?: string;
+  specimenCollectedBy?: string;
+  specimenReceivedAt?: string;
+  specimenReceivedBy?: string;
+  specimenContainer?: string;
+  specimenCondition?: 'acceptable' | 'hemolyzed' | 'clotted' | 'insufficient_quantity' | 'wrong_container' | 'unlabeled' | 'leaking' | 'delayed_transport' | 'other';
+  specimenRejectionReason?: string;
+  specimenRejectionNotes?: string;
+  specimenRejectedAt?: string;
+  specimenRejectedBy?: string;
   /** 'basic' = routine panel (CBC, urinalysis); 'special' = doctor-selected
    *  targeted investigation (cultures, ANA, vitamin D, etc.). */
   tier?: 'basic' | 'special';
@@ -308,12 +320,85 @@ export interface LabResultDoc extends BaseDoc {
    * consultation path's own orders, are still reached through the record.
    */
   encounterId?: string;
+
+  // ── Requisition detail captured by the Create Lab Order wizard ────────────
+  // All optional: orders placed by the consultation path and by older builds
+  // simply don't carry them, and every read site treats them as extra context
+  // rather than something to branch on.
+
+  /** Clinical urgency as ordered. The coarse `status` above still carries STAT
+   *  into the queue; this keeps the ordered intent legible after the fact. */
+  priority?: 'routine' | 'urgent' | 'stat';
+  /** Coded indications (ICD-11) justifying the order — what the requisition
+   *  answers, and what a payer or auditor asks for. */
+  indications?: { code: string; title: string }[];
+  /** Ask-at-Order-Entry answers (fasting state, recent antibiotics, pregnancy
+   *  status before an X-ray …) captured with the order rather than chased. */
+  aoeAnswers?: { question: string; answer: string }[];
+  /** Fasting state declared at order entry. */
+  fasting?: 'yes' | 'no' | 'unknown';
+  /** Where/when the specimen is taken. */
+  collectionTiming?: 'draw_now' | 'lab_collect' | 'future';
+  /** Scheduled collection datetime when `collectionTiming` is 'future'. */
+  scheduledCollectionAt?: string;
+  /** Run at this facility or sent to a reference lab. */
+  processing?: 'in_house' | 'send_out';
+  /** Every test placed on one requisition shares this id, so the requisition
+   *  can be reprinted and the group cancelled as a unit. */
+  orderGroupId?: string;
+
+  // ── Closing out the lifecycle ────────────────────────────────────────────
+  // Who carried the result past `resulted`, and when. Without these the tail
+  // of LAB_ORDER_TRANSITIONS was unreachable and every reported result
+  // escalated against its review SLA for ever.
+
+  /** Clinician who reviewed the reported value. */
+  reviewedBy?: string;
+  reviewedAt?: string;
+  /** Clinician who acted on it — treatment changed, repeat ordered, referred. */
+  actedUponBy?: string;
+  actedUponAt?: string;
+  /** Who told the patient, and when. */
+  communicatedBy?: string;
+  communicatedAt?: string;
+
+  // ── Amendments ───────────────────────────────────────────────────────────
+
+  /**
+   * Set once a reported value has been corrected. A corrected result must be
+   * visibly distinguishable from an original one — a clinician who acted on
+   * the first value needs to know it moved. The audit log recorded the change
+   * but nothing on the document did, so every read site showed an amended
+   * result as though it had always said that.
+   */
+  amended?: boolean;
+  amendedAt?: string;
+  amendedBy?: string;
+  /** What the value said before the correction, for the amendment note. */
+  amendedFrom?: string;
+  /** Why it changed — required by the amend form. */
+  amendmentReason?: string;
 }
 
 export interface DiseaseAlertDoc extends BaseDoc, Omit<DiseaseAlert, 'id'> {
   type: 'disease_alert';
   orgId?: string;
   reportedBy?: string;
+}
+
+/**
+ * One batch's contribution to a dispense. A single dispense can draw from
+ * several batches when the earliest-expiring one cannot cover the full
+ * quantity, so this is a list rather than a single batch reference.
+ */
+export interface DispenseAllocation {
+  inventoryId: string;
+  batchNumber: string;
+  expiryDate: string;
+  quantity: number;
+  /** Stock on that batch before this dispense — lets the ledger be replayed. */
+  beforeBalance: number;
+  afterBalance: number;
 }
 
 export interface PrescriptionDoc extends BaseDoc {
@@ -348,6 +433,31 @@ export interface PrescriptionDoc extends BaseDoc {
   /** Quantity (in dispensing units) the full course requires. Defaults to 1
    *  when not computed; the pharmacy decrements stock by this amount. */
   quantityToDispense?: number;
+  /**
+   * Quantity actually handed to the patient. Differs from `quantityToDispense`
+   * on a partial fill (short stock), so the two must be recorded separately —
+   * the prescribed course is a clinical decision, the dispensed amount is what
+   * left the shelf and what the register must reconcile against.
+   */
+  quantityDispensed?: number;
+  /**
+   * Which batch(es) satisfied this dispense, in FEFO order. Required for a
+   * recall: without it there is no way to answer "who received batch X?".
+   */
+  dispenseAllocations?: DispenseAllocation[];
+  /** Identity of the pharmacist who performed the dispense. */
+  dispensedBy?: string;
+  dispensedByName?: string;
+  /**
+   * How the dispense resolved. `partial` and `stock_out` leave the order
+   * active (`stockout_partial_referred`) so the balance can still be filled;
+   * `clarification_requested` parks it on the prescriber.
+   */
+  dispenseOutcome?: 'full' | 'partial' | 'stock_out' | 'clarification_requested';
+  /** Free-text reason recorded with a stock-out / clarification outcome. */
+  dispenseNote?: string;
+  /** Controlled-substance register entry proving the two-signature sign-off. */
+  controlledLogId?: string;
   /** 'immediate' = emergency/stat med given before results (IV fluids, antipyretic,
    *  anticonvulsant); 'definitive' = started after diagnosis. */
   urgency?: 'immediate' | 'definitive';
@@ -601,6 +711,33 @@ export interface AuditLogDoc extends BaseDoc {
   query?: string;
   /** For search/list reads: how many records were returned. */
   resultCount?: number;
+}
+
+/** Product-analytics interaction event (not compliance audit). */
+export type UsageEventName =
+  | 'session_start'
+  | 'session_end'
+  | 'page_view'
+  | 'click'
+  | 'change';
+
+export interface UsageEventDoc extends BaseDoc {
+  type: 'usage_event';
+  eventName: UsageEventName;
+  /** Pathname with dynamic IDs templated (e.g. /patients/[id]). */
+  path: string;
+  /** Compact element descriptor or data-track value. */
+  element?: string;
+  userId?: string;
+  username?: string;
+  role?: string;
+  orgId?: string;
+  hospitalId?: string;
+  sessionId: string;
+  /** Client event timestamp (ISO). */
+  ts: string;
+  /** Small scrubbed metadata bag only — never PHI. */
+  meta?: Record<string, unknown>;
 }
 
 /**
@@ -1381,12 +1518,22 @@ export interface TriageDoc extends BaseDoc {
   patientId: string;
   patientName: string;
   hospitalNumber?: string;
-  // ETAT ABCC
-  airway: 'clear' | 'obstructed';
-  breathing: 'normal' | 'distressed' | 'absent';
-  circulation: 'normal' | 'impaired' | 'absent';
-  consciousness: 'alert' | 'verbal' | 'pain' | 'unresponsive';
+  // ETAT ABCC. 'not_assessed' means exactly that — no clinician has examined
+  // this dimension yet (e.g. a clerical check-in). It must never be defaulted
+  // to a normal-looking value: fabricated ETAT was a KAN-100 record-integrity
+  // finding.
+  airway: 'clear' | 'obstructed' | 'not_assessed';
+  breathing: 'normal' | 'distressed' | 'absent' | 'not_assessed';
+  circulation: 'normal' | 'impaired' | 'absent' | 'not_assessed';
+  consciousness: 'alert' | 'verbal' | 'pain' | 'unresponsive' | 'not_assessed';
   priority: TriagePriority;
+  /**
+   * Who produced the ABCC values (KAN-100): a clinician running the ETAT
+   * decision tree, or clerical check-in (which records 'not_assessed' ABCC and
+   * only the clerk-selected acuity). Absent on records created before the
+   * field existed — treat those as unknown provenance, not as clinical.
+   */
+  assessmentSource?: 'clinician' | 'clerical_checkin';
   // Vitals captured at triage (optional — string for partial entry)
   temperature?: string;
   pulse?: string;
@@ -1413,8 +1560,9 @@ export interface TriageDoc extends BaseDoc {
   facilityId?: string;
   facilityName?: string;
   orgId?: string;
-  // Follow-through
-  status: 'pending' | 'seen' | 'admitted' | 'discharged' | 'referred';
+  // Follow-through. 'lwbs' = left without being seen (terminal; pairs with the
+  // encounter-level lwbs transition, KAN-100).
+  status: 'pending' | 'seen' | 'admitted' | 'discharged' | 'referred' | 'lwbs';
   /**
    * OPD rooming: the exam room / bay the patient has been placed in to meet
    * the provider (e.g. "Room 3", "Bay B"). Set by front-desk/rooming staff.

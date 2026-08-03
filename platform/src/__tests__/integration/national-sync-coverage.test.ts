@@ -60,6 +60,7 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
 // Local-only databases that never participate in sync at all.
 const LOCAL_ONLY_DBS = new Set<string>([
   'tamamhealth_meta', // local sync cursors / device metadata
+  'tamamhealth_usage_events', // facility analytics; not part of national sync
 ]);
 
 const repoRoot = process.cwd();
