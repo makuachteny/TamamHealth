@@ -102,10 +102,10 @@ export default function EhrTopRail() {
     return uniqueAllowedNavItems(roleConfig?.navItems || [], allowedRoutes);
   }, [allowedRoutes, currentUser, roleConfig]);
 
-  // Keep three high-frequency destinations visible in the header. They are
+  // Keep four high-frequency destinations visible in the header. They are
   // removed from the module menu so each destination has one visible home.
   const headerShortcutItems = useMemo(
-    () => getPrimaryShortcutItems(navItems, currentUser?.role, 3),
+    () => getPrimaryShortcutItems(navItems, currentUser?.role, 4),
     [navItems, currentUser?.role],
   );
   const headerShortcutHrefs = useMemo(
