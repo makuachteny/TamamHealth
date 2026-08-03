@@ -6,10 +6,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AvailabilityModal from '@/components/AvailabilityModal';
 import {
-  Calendar, Plus, Clock, CheckCircle2, User,
+  Calendar, Plus, CheckCircle2, User,
   AlertTriangle, RefreshCw,
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
-  Building2, X, UserPlus, ClipboardList,
+  X, UserPlus, ClipboardList,
   ExternalLink, ChevronLeft, ChevronRight,
   Download, Filter,
 } from '@/components/icons/lucide';
@@ -30,7 +30,6 @@ import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import { jubaDate, jubaNow, jubaTime } from '@/lib/time-juba';
 import PageInstructionCard from '@/components/PageInstructionCard';
-import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 
 // react-big-calendar (and its CSS) is a heavy client-only library. Split it out
 // of the route's initial bundle so it loads only when the calendar view renders.
@@ -178,6 +177,10 @@ export default function AppointmentsPage() {
   // Header "service type" filter (appointment type), applied to the table only.
   // Appointment opened in the click-to-view detail popup.
   const [eventApt, setEventApt] = useState<typeof appointments[0] | null>(null);
+  // List rows unfold in place instead of opening a dialog — the queue stays on
+  // screen while one appointment is read. `eventApt` above is now only the
+  // calendar's dialog, where there is no row to unfold beneath.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
@@ -510,6 +513,76 @@ export default function AppointmentsPage() {
     URL.revokeObjectURL(url);
   }, [tableRows, patientById, listDate, t, statusLabelKey]);
 
+  /**
+   * The appointment's detail and its actions, rendered wherever they are
+   * needed. In the list this unfolds under the row it belongs to — the same
+   * treatment the work-queue dashboards use, so the list stays on screen while
+   * one appointment is read. The calendar still shows it in a dialog: a
+   * calendar cell has no row to unfold beneath.
+   *
+   * `onDone` closes whichever container it is in, so an action that navigates
+   * away or opens another dialog doesn't leave this hanging open behind it.
+   */
+  const renderAppointmentDetail = (apt: typeof appointments[0], onDone: () => void) => (
+    <>
+      <div className="ehr-row-detail__body">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, gridColumn: '1 / -1', marginBottom: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: statusConfig[apt.status].color, background: statusConfig[apt.status].bg }}>
+            {t(statusLabelKey[apt.status])}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: priorityConfig[apt.priority].color, background: `${priorityConfig[apt.priority].color}14` }}>
+            {t(priorityLabelKey[apt.priority])}
+          </span>
+          <InsuranceBadge insured={insuredIds.has(apt.patientId)} pill />
+        </div>
+        <div className="appointment-detail-row"><dt>Date</dt><dd>{new Date(apt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</dd></div>
+        <div className="appointment-detail-row"><dt>Time</dt><dd>{formatClockTime(apt.appointmentTime)} · {apt.duration}m</dd></div>
+        <div className="appointment-detail-row"><dt>Type</dt><dd>{appointmentTypes.find(x => x.value === apt.appointmentType)?.label || apt.appointmentType}</dd></div>
+        <div className="appointment-detail-row"><dt>Provider</dt><dd>{apt.providerName || 'Unassigned'}</dd></div>
+        <div className="appointment-detail-row"><dt>Department</dt><dd>{apt.department || '—'}</dd></div>
+        {apt.reason && <div className="appointment-detail-row"><dt>Reason</dt><dd>{apt.reason}</dd></div>}
+      </div>
+
+      <div className="ehr-row-detail__actions">
+        {canDoTelehealth && apt.appointmentType === 'telehealth' && apt.status !== 'cancelled' && apt.status !== 'completed' && (
+          <button onClick={() => { onDone(); router.push(`/telehealth/visit/${encodeURIComponent(apt._id)}`); }} className="btn btn-primary btn-sm" style={{ gap: 6, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
+            <Video size={14} /> Join session
+          </button>
+        )}
+        <button onClick={() => { onDone(); router.push(`/patients/${apt.patientId}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
+          <User size={14} /> Open patient record
+        </button>
+        {canConfirmAppointments && (apt.status === 'requested' || apt.status === 'scheduled') && (
+          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'confirmed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionApprove')}</button>
+        )}
+        {canCheckInAppointments && (apt.status === 'requested' || apt.status === 'scheduled' || apt.status === 'confirmed') && (
+          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'checked_in'); }} className="btn btn-secondary btn-sm">{t('appointments.actionCheckIn')}</button>
+        )}
+        {canAdvanceAppointments && apt.status === 'checked_in' && (
+          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'in_progress'); }} className="btn btn-secondary btn-sm">{t('appointments.actionStart')}</button>
+        )}
+        {canAdvanceAppointments && (apt.status === 'checked_in' || apt.status === 'in_progress') && (
+          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'completed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionComplete')}</button>
+        )}
+        {canManageAppointmentSchedule && (
+          <button onClick={() => { loadEditForm(apt); setEditingApt(apt._id); onDone(); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
+        )}
+        {canManageAppointmentSchedule && (
+          <button onClick={() => { setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); onDone(); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
+        )}
+        {(canManageAppointmentSchedule || canCheckInAppointments || canAdvanceAppointments) && PRIOR_STATUS[apt.status] && (
+          <button onClick={() => { onDone(); handleStatusChange(apt._id, PRIOR_STATUS[apt.status]!); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
+        )}
+        {canManageAppointmentSchedule && (apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'no_show') && (
+          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
+        )}
+        {canManageAppointmentSchedule && apt.status !== 'cancelled' && apt.status !== 'completed' && (
+          <button onClick={() => { setCancelId(apt._id); onDone(); }} className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger)' }}>{t('appointments.actionCancel')}</button>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -597,17 +670,20 @@ export default function AppointmentsPage() {
                     ? `${patientAgeLabel(patient)}${patient.gender ? ` · ${String(patient.gender).charAt(0).toUpperCase()}` : ''}`
                     : '';
                   const subtitle = [apt.reason, patientMeta].filter(Boolean).join(' · ');
+                  const isExpanded = expandedId === apt._id;
+                  const toggle = () => setExpandedId(current => (current === apt._id ? null : apt._id));
                   return (
+                    <div key={apt._id} className={isExpanded ? 'ehr-appointment-group is-expanded' : 'ehr-appointment-group'}>
                     <div
-                      key={apt._id}
                       className="ehr-appointment-row appointment-card-row"
                       role="button"
                       tabIndex={0}
-                      onClick={() => setEventApt(apt)}
+                      aria-expanded={isExpanded}
+                      onClick={toggle}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          setEventApt(apt);
+                          toggle();
                         }
                       }}
                     >
@@ -619,7 +695,7 @@ export default function AppointmentsPage() {
                           {apt.patientId ? (
                             <Link href={`/patients/${apt.patientId}`} onClick={e => e.stopPropagation()}>{apt.patientName}</Link>
                           ) : (
-                            <button type="button" onClick={() => setEventApt(apt)}>{apt.patientName}</button>
+                            <button type="button" onClick={e => { e.stopPropagation(); toggle(); }}>{apt.patientName}</button>
                           )}
                           <p>{subtitle || svc?.label || apt.department || 'Appointment'}</p>
                         </div>
@@ -647,6 +723,12 @@ export default function AppointmentsPage() {
                         </span>
                         <small>{appointmentOperationalCue(apt)}</small>
                       </div>
+                    </div>
+                    {isExpanded && (
+                      <div className="ehr-row-detail" role="region" aria-label={`${apt.patientName} appointment details`}>
+                        {renderAppointmentDetail(apt, () => setExpandedId(null))}
+                      </div>
+                    )}
                     </div>
                   );
                     })}
@@ -837,71 +919,10 @@ export default function AppointmentsPage() {
                 </div>
               }
             >
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: statusConfig[eventApt.status].color, background: statusConfig[eventApt.status].bg }}>
-                  {t(statusLabelKey[eventApt.status])}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: priorityConfig[eventApt.priority].color, background: `${priorityConfig[eventApt.priority].color}14` }}>
-                  {t(priorityLabelKey[eventApt.priority])}
-                </span>
-                <InsuranceBadge insured={insuredIds.has(eventApt.patientId)} pill />
-              </div>
-              <EhrWorkItemProgress
-                status={statusConfig[eventApt.status].label}
-                owner={eventApt.providerName || 'Unassigned'}
-                waiting={`${formatClockTime(eventApt.appointmentTime)} · ${eventApt.duration}m`}
-                timeLabel="Visit time"
-                nextAction={eventApt.status === 'completed' ? 'Review visit' : eventApt.status === 'cancelled' ? 'No action' : 'Check in or open chart'}
-              />
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 18 }}>
-                <Detail label="Date" value={new Date(eventApt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} icon={<Calendar size={14} />} />
-                <Detail label="Time" value={`${formatClockTime(eventApt.appointmentTime)} · ${eventApt.duration}m`} icon={<Clock size={14} />} />
-                <Detail label="Type" value={appointmentTypes.find(x => x.value === eventApt.appointmentType)?.label || eventApt.appointmentType} icon={<ClipboardList size={14} />} />
-                <Detail label="Provider" value={eventApt.providerName} icon={<Stethoscope size={14} />} />
-                <Detail label="Department" value={eventApt.department} icon={<Building2 size={14} />} />
-              </div>
-              {eventApt.reason && (
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Reason</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{eventApt.reason}</div>
-                </div>
-              )}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {canDoTelehealth && eventApt.appointmentType === 'telehealth' && eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
-                  <button onClick={() => { const id = eventApt._id; setEventApt(null); router.push(`/telehealth/visit/${encodeURIComponent(id)}`); }} className="btn btn-primary btn-sm" style={{ gap: 6, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
-                    <Video size={14} /> Join session
-                  </button>
-                )}
-                <button onClick={() => { const id = eventApt.patientId; setEventApt(null); router.push(`/patients/${id}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
-                  <User size={14} /> Open patient record
-                </button>
-                {canConfirmAppointments && (eventApt.status === 'requested' || eventApt.status === 'scheduled') && (
-                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'confirmed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionApprove')}</button>
-                )}
-                {canCheckInAppointments && (eventApt.status === 'requested' || eventApt.status === 'scheduled' || eventApt.status === 'confirmed') && (
-                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'checked_in'); }} className="btn btn-secondary btn-sm">{t('appointments.actionCheckIn')}</button>
-                )}
-                {canAdvanceAppointments && eventApt.status === 'checked_in' && (
-                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'in_progress'); }} className="btn btn-secondary btn-sm">{t('appointments.actionStart')}</button>
-                )}
-                {canAdvanceAppointments && (eventApt.status === 'checked_in' || eventApt.status === 'in_progress') && (
-                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'completed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionComplete')}</button>
-                )}
-                {canManageAppointmentSchedule && (
-                  <button onClick={() => { loadEditForm(eventApt); setEditingApt(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
-                )}
-                {canManageAppointmentSchedule && (
-                  <button onClick={() => { setRescheduleId(eventApt._id); setRescheduleDate(eventApt.appointmentDate); setRescheduleTime(eventApt.appointmentTime); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
-                )}
-                {(canManageAppointmentSchedule || canCheckInAppointments || canAdvanceAppointments) && PRIOR_STATUS[eventApt.status] && (
-                  <button onClick={() => { const id = eventApt._id; const to = PRIOR_STATUS[eventApt.status]!; setEventApt(null); handleStatusChange(id, to); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
-                )}
-                {canManageAppointmentSchedule && (eventApt.status === 'completed' || eventApt.status === 'cancelled' || eventApt.status === 'no_show') && (
-                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
-                )}
-                {canManageAppointmentSchedule && eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
-                  <button onClick={() => { setCancelId(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger)' }}>{t('appointments.actionCancel')}</button>
-                )}
+              {/* Same detail and actions the list unfolds inline; a calendar
+                  cell has no row to unfold beneath, so here it stays a dialog. */}
+              <div className="ehr-row-detail ehr-row-detail--dialog">
+                {renderAppointmentDetail(eventApt, () => setEventApt(null))}
               </div>
             </Modal>
           );
@@ -1136,15 +1157,6 @@ function InsuranceBadge({ insured, compact, pill }: { insured: boolean; compact?
     }}>
       {insured ? 'Insured' : 'Not insured'}
     </span>
-  );
-}
-
-function Detail({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
-      <div style={{ fontSize: 13, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 5 }}>{icon}{value}</div>
-    </div>
   );
 }
 

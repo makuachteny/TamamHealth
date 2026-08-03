@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useNutritionScreenings } from '@/lib/hooks/useNutritionScreenings';
-import { classifyScreening, MUAC_THRESHOLDS } from '@/lib/services/nutrition-screening-service';
+import { classifyScreening } from '@/lib/services/nutrition-screening-service';
 import { useNutritionSupplies } from '@/lib/hooks/useNutritionSupplies';
 import { classifySupplyStatus } from '@/lib/services/nutrition-supply-service';
 import {
@@ -30,6 +30,10 @@ type Screening = {
    *  carry one; demo rows render without a Source column instead of a
    *  fabricated name. */
   screenedBy?: string;
+  /** Registered patient this screening is linked to, when one exists — lets
+   *  the row's name open the chart. Screenings can precede registration, so
+   *  this is frequently absent even on real (saved) rows. */
+  patientId?: string;
 };
 
 function formatTime(iso?: string): string | undefined {
@@ -103,7 +107,6 @@ export default function NutritionDashboard() {
   const [formError, setFormError] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [queueSearch, setQueueSearch] = useState('');
-  const [selectedScreening, setSelectedScreening] = useState<string | null>(null);
 
   const screenings = useMemo<Screening[]>(
     () => [
@@ -120,6 +123,7 @@ export default function NutritionDashboard() {
         date: s.screeningDate,
         createdAt: s.createdAt,
         screenedBy: s.screenedByName,
+        patientId: s.patientId,
       })),
       ...(IS_DEMO ? SAMPLE_SCREENINGS : []),
     ],
@@ -245,47 +249,21 @@ export default function NutritionDashboard() {
 
   const dateLabel = formatDateTitle(toIsoDate(new Date()));
 
-  // Expandable per-screening detail (MUAC / anthropometry / edema / status /
-  // date). Rendered inline beneath the row via EhrCareDashboard's `row.detail`
-  // slot, mirroring radiology's `renderStudyDetail`.
+  // Per-screening detail, rendered inline via `row.popupDetail` (EhrCareDashboard's
+  // shared expand-in-place panel). Name/age/status/MUAC/weight/height/date are
+  // all already on the row above (title, subtitle, location and status
+  // columns) — the one field with nowhere else to live is edema, so that's
+  // all this panel adds.
   const renderScreeningDetail = (s: Screening) => (
-    <div style={{ margin: '0 0 8px', padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        <div>
-          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colPatient')}</span>
-          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.name}</p>
-        </div>
-        <div>
-          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colAgeType')}</span>
-          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.age} · {s.sex}</p>
-        </div>
-        <div>
-          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colStatus')}</span>
-          <p><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${getStatusColor(s.status)}15`, color: getStatusColor(s.status) }}>{s.status}</span></p>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        <div>
-          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colMuac')}</span>
-          <p className="text-xs font-bold" style={{ color: s.muac < MUAC_THRESHOLDS.severe ? 'var(--color-danger)' : s.muac < MUAC_THRESHOLDS.moderate ? 'var(--color-warning)' : 'var(--text-primary)' }}>{s.muac}</p>
-        </div>
-        <div>
-          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colWeight')}</span>
-          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.weight}</p>
-        </div>
-        <div>
-          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colHeight')}</span>
-          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.height}</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colEdema')}</span>
-          <p className="text-xs font-semibold">{s.edema ? <span style={{ color: 'var(--color-danger)' }}>{t('nutrition.edemaYes')}</span> : <span style={{ color: 'var(--text-muted)' }}>{t('nutrition.edemaNo')}</span>}</p>
-        </div>
-        <div>
-          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colDate')}</span>
-          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.date}</p>
+    <div className="ehr-visit-pop ehr-visit-pop--inline">
+      <div className="ehr-visit-pop-body">
+        <div className="ehr-visit-pop-row">
+          <span className="ehr-visit-pop-label">{t('nutrition.colEdema')}</span>
+          <div>
+            {s.edema
+              ? <strong style={{ color: 'var(--color-danger)' }}>{t('nutrition.edemaYes')}</strong>
+              : <p>{t('nutrition.edemaNo')}</p>}
+          </div>
         </div>
       </div>
     </div>
@@ -330,11 +308,11 @@ export default function NutritionDashboard() {
         // flagged classification (SAM/MAM/At Risk/Underweight) stays open.
         chartSeriesNames={['Flagged', 'Normal']}
         rows={filteredScreenings.map((s): EhrCareDashboardRow => {
-          const isOpen = selectedScreening === s.id;
           const time = formatTime(s.createdAt);
           return {
             id: s.id,
             title: s.name,
+            patientId: s.patientId,
             subtitle: `${s.age} · ${s.sex}`,
             compactMeta: s.date,
             date: s.date,
@@ -351,8 +329,7 @@ export default function NutritionDashboard() {
               : s.status === 'MAM' ? 'warning'
               : (s.status === 'At Risk' || s.status === 'Underweight') ? 'warning'
               : 'done',
-            onClick: () => setSelectedScreening(isOpen ? null : s.id),
-            detail: isOpen ? renderScreeningDetail(s) : undefined,
+            popupDetail: renderScreeningDetail(s),
           };
         })}
         metrics={[

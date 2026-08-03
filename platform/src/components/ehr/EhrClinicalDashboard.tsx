@@ -779,6 +779,18 @@ export default function EhrClinicalDashboard({
     return rows.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.weight - a.weight);
   }, [overdueLabRows, visiblePatientRows, queueEntryByPatient, router]);
 
+  // A visit opened from the alert rail may belong to a bucket the worklist is
+  // filtered away from — the panel would then expand a row nobody can see. Fall
+  // back to "all" and scroll the row into view so the panel is where the click
+  // implied it would be.
+  useEffect(() => {
+    if (!visitRow) return;
+    const visible = filteredPatientRows.some(row => row.id === visitRow.id);
+    if (!visible) { setWorklistFilter('all'); return; }
+    const el = document.getElementById(`worklist-row-${visitRow.id}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [visitRow, filteredPatientRows]);
+
   const [moveEntry, setMoveEntry] = useState<QueueEntry | null>(null);
   const [moveSaving, setMoveSaving] = useState(false);
 
@@ -1348,8 +1360,11 @@ export default function EhrClinicalDashboard({
                   )}
                   {filteredPatientRows.map((row) => {
                     const columns = rowQueueColumns(row);
+                    // Details drop down under the row rather than covering the
+                    // list — the queue is the context for reading one visit.
+                    const isExpanded = visitRow?.id === row.id;
                     const openRow = () => {
-                      if (row.patientId) setVisitRow(row);
+                      if (row.patientId) setVisitRow(isExpanded ? null : row);
                       else if (row.appointment) setOpenAppointment(row.appointment);
                     };
                     const statusPillClass = columns.inService || row.status === 'checked_in' || row.status === 'in_progress' ? 'status-checked-in'
@@ -1361,10 +1376,15 @@ export default function EhrClinicalDashboard({
                     return (
                       <div
                         key={row.id}
+                        id={`worklist-row-${row.id}`}
+                        className={isExpanded ? 'ehr-appointment-group is-expanded' : 'ehr-appointment-group'}
+                      >
+                      <div
                         data-triage={row.triagePriority}
                         className="ehr-appointment-row appointment-card-row"
                         role="button"
                         tabIndex={0}
+                        aria-expanded={row.patientId ? isExpanded : undefined}
                         onClick={openRow}
                         onKeyDown={event => {
                           if (event.key === 'Enter' || event.key === ' ') {
@@ -1381,7 +1401,18 @@ export default function EhrClinicalDashboard({
                               : initials(row.name)}
                           </div>
                           <div className="ehr-appointment-main appointment-card-patient">
-                            <button type="button" className="print-visible" onClick={event => { event.stopPropagation(); openRow(); }}>
+                            {/* The name opens the chart; the rest of the row
+                                expands this visit underneath. */}
+                            <button
+                              type="button"
+                              className={row.patientId ? 'print-visible ehr-row-name-link' : 'print-visible'}
+                              title={row.patientId ? `Open ${row.name}'s chart` : undefined}
+                              onClick={event => {
+                                event.stopPropagation();
+                                if (row.patientId) router.push(`/patients/${row.patientId}`);
+                                else openRow();
+                              }}
+                            >
                               {row.name}
                             </button>
                             <p>
@@ -1422,6 +1453,28 @@ export default function EhrClinicalDashboard({
                           <small>{columns.statusSubtext}</small>
                         </div>
                       </div>
+                      {isExpanded && (
+                        <div className="ehr-row-detail ehr-row-detail--visit">
+                          <EhrVisitPopup
+                            inline
+                            patientId={row.patientId}
+                            name={row.name}
+                            detail={row.patient
+                              ? `${row.reason} · ${row.patient.age ? `${row.patient.age}y` : 'Age unknown'} · ${row.patient.gender || 'Not recorded'}`
+                              : row.reason}
+                            acuity={row.triagePriority}
+                            wait={columns.waitText}
+                            appointment={row.appointment}
+                            triage={columns.triage}
+                            entry={columns.entry}
+                            onClose={() => setVisitRow(null)}
+                            onCall={() => { setVisitRow(null); void callPatient(row); }}
+                            onMove={columns.entry ? () => { setVisitRow(null); setMoveEntry(columns.entry); } : undefined}
+                            onOpenChart={row.patientId ? () => router.push(`/patients/${row.patientId}`) : undefined}
+                          />
+                        </div>
+                      )}
+                      </div>
                     );
                   })}
                 </div>
@@ -1436,31 +1489,6 @@ export default function EhrClinicalDashboard({
               {appointmentPanel}
             </Modal>
           )}
-
-          {visitRow && (() => {
-            const columns = rowQueueColumns(visitRow);
-            return (
-              <EhrVisitPopup
-                patientId={visitRow.patientId}
-                name={visitRow.name}
-                detail={visitRow.patient
-                  ? `${visitRow.reason} · ${visitRow.patient.age ? `${visitRow.patient.age}y` : 'Age unknown'} · ${visitRow.patient.gender || 'Not recorded'}`
-                  : visitRow.reason}
-                acuity={visitRow.triagePriority}
-                statusLabel={columns.statusText}
-                comingFrom={columns.comingFrom}
-                queueLabel={columns.queueText}
-                wait={columns.waitText}
-                appointment={visitRow.appointment}
-                triage={columns.triage}
-                entry={columns.entry}
-                onClose={() => setVisitRow(null)}
-                onCall={() => { setVisitRow(null); void callPatient(visitRow); }}
-                onMove={columns.entry ? () => { setVisitRow(null); setMoveEntry(columns.entry); } : undefined}
-                onOpenChart={visitRow.patientId ? () => router.push(`/patients/${visitRow.patientId}`) : undefined}
-              />
-            );
-          })()}
 
           {moveEntry && (
             <EhrQueueMoveDialog

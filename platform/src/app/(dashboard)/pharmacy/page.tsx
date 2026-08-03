@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, ChevronRight, AlertOctagon, Filter, Download, Check } from '@/components/icons/lucide';
@@ -15,6 +15,7 @@ import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
 import { medications } from '@/data/mock';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
+import { medicationMatches } from '@/lib/services/dispensing-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import PageInstructionCard from '@/components/PageInstructionCard';
 import { formatMoney } from '@/lib/format-utils';
@@ -78,7 +79,7 @@ export default function PharmacyPage() {
   const { showToast } = useToast();
   const { t } = useTranslation();
   const router = useRouter();
-  const { prescriptions: rxQueue, loading: rxLoading, dispense, advance } = usePrescriptions();
+  const { prescriptions: rxQueue, loading: rxLoading, dispense, markUnfilled, advance } = usePrescriptions();
   const { items: rawInventory, create: createInventory, update: updateInventory } = usePharmacyInventory();
   const { patients } = usePatients();
   const patientById = useMemo(() => new Map(patients.map(patient => [patient._id, patient])), [patients]);
@@ -159,8 +160,21 @@ export default function PharmacyPage() {
   const categories = useMemo(() => Array.from(new Set(inventory.map(i => i.category))).sort(), [inventory]);
 
   // Find the inventory row for a medication at the current facility.
+  // Same normalised match the dispensing transaction uses, so the button
+  // state can never disagree with what the transaction will find. Returns the
+  // earliest-expiring in-stock batch (FEFO), which is the one that will move.
   const findInventoryFor = (medication: string) =>
-    inventory.find(i => i.medicationName === medication && (!currentUser?.hospitalId || i.hospitalId === currentUser.hospitalId));
+    inventory
+      .filter(i => medicationMatches(medication, i.medicationName))
+      .filter(i => !currentUser?.hospitalId || i.hospitalId === currentUser.hospitalId)
+      .filter(i => (i.stockLevel || 0) > 0)
+      .sort((a, b) => (a.expiryDate || '9999').localeCompare(b.expiryDate || '9999'))[0];
+
+  const stockOnHandFor = (medication: string) =>
+    inventory
+      .filter(i => medicationMatches(medication, i.medicationName))
+      .filter(i => !currentUser?.hospitalId || i.hospitalId === currentUser.hospitalId)
+      .reduce((sum, i) => sum + (i.stockLevel || 0), 0);
 
   const advanceRx = async (rx: typeof rxQueue[number], to: PrescriptionStatus, successMessage: string) => {
     try {
@@ -201,82 +215,84 @@ export default function PharmacyPage() {
   const handleComplete = (rx: typeof rxQueue[number]) =>
     advanceRx(rx, 'complete', `${rx.medication} workflow completed.`);
 
-  // Perform the dispense: for controlled drugs record the witnessed movement
-  // FIRST (it validates two distinct signatories and a non-negative balance),
-  // then decrement stock by the full course and mark the prescription dispensed.
+  // One call, one transaction. The stock gate, FEFO batch decrement, the
+  // controlled-substance register entry and the prescription update all run
+  // inside dispenseMedication(), which rolls back anything already applied if
+  // a later step fails — so this can no longer leave stock moved with no
+  // dispense record (or the reverse), which the old three-await sequence did.
   const doDispense = async (
     rx: typeof rxQueue[number],
-    inv: typeof rawInventory[number],
+    inv: typeof rawInventory[number] | undefined,
     qty: number,
     witness: { id: string; name: string } | null,
   ): Promise<boolean> => {
-    if (inv?.controlledSchedule) {
-      try {
-        const { recordMovement } = await import('@/lib/services/controlled-substance-service');
-        await recordMovement({
-          inventoryId: inv._id,
-          medicationName: inv.medicationName,
-          schedule: inv.controlledSchedule,
-          movement: 'dispense',
-          quantity: qty,
-          unit: inv.unit,
-          beforeBalance: inv.stockLevel,
-          patientId: rx.patientId,
-          patientName: rx.patientName,
-          prescriptionId: rx._id,
-          operatorId: currentUser?._id || '',
-          operatorName: currentUser?.name || '',
-          witnessId: witness?.id || '',
-          witnessName: witness?.name || '',
-          facilityId: currentUser?.hospitalId || '',
-          facilityName: currentUser?.hospitalName || '',
-          orgId: currentUser?.orgId,
-        });
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : 'Controlled-substance log failed.', 'error');
-        return false;
-      }
-    }
     try {
-      const { decrementStock } = await import('@/lib/services/pharmacy-inventory-service');
-      await decrementStock(rx.medication, currentUser?.hospitalId, qty);
-    } catch {
-      showToast(t('pharmacy.outOfStockCannotDispense'), 'error');
+      const result = await dispense({
+        prescription: rx,
+        quantity: qty,
+        dispenserId: currentUser?._id || '',
+        dispenserName: currentUser?.name || currentUser?.username || '',
+        facilityId: currentUser?.hospitalId || '',
+        facilityName: currentUser?.hospitalName,
+        orgId: currentUser?.orgId,
+        witnessId: witness?.id,
+        witnessName: witness?.name,
+      });
+      const batches = result.allocations.map(a => a.batchNumber).join(', ');
+      showToast(
+        result.outcome === 'partial'
+          ? `Partial fill: ${result.quantityDispensed} ${inv?.unit || 'unit(s)'} of ${rx.medication} from batch ${batches}. Order stays open for the balance.`
+          : `${rx.medication} dispensed from batch ${batches}.`,
+        result.outcome === 'partial' ? 'error' : 'success',
+      );
+      return true;
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Dispense failed.', 'error');
       return false;
     }
-    try {
-      await dispense(rx._id);
-    } catch {
-      showToast(t('pharmacy.dispenseMarkFailed'), 'error');
-      return false;
-    }
-    const { logAudit } = await import('@/lib/services/audit-service');
-    logAudit('DISPENSE_PRESCRIPTION', currentUser?._id, currentUser?.username, `Dispensed ${qty} ${inv?.unit || 'unit(s)'} ${rx.medication} to ${rx.patientName} (${rx._id})`).catch(() => {});
-    showToast(t('pharmacy.dispensedMedication', { medication: rx.medication }), 'success');
-    return true;
   };
 
-  const handleDispense = async (rxId: string) => {
+  /** Stock-out referral / prescriber clarification — the two non-dispense
+   *  outcomes the lifecycle has always had but nothing could reach. */
+  const markRxUnfilled = async (
+    rx: typeof rxQueue[number],
+    reason: 'stock_out' | 'clarification_requested',
+  ) => {
+    const note = window.prompt(
+      reason === 'stock_out'
+        ? 'Where is the patient being referred for this medicine?'
+        : 'What needs clarifying with the prescriber?',
+    );
+    if (note === null) return;
+    try {
+      await markUnfilled(rx, reason, note.trim(), {
+        id: currentUser?._id || '',
+        name: currentUser?.name || currentUser?.username || '',
+      });
+      showToast(
+        reason === 'stock_out'
+          ? `${rx.medication} recorded as out of stock — order stays open.`
+          : `${rx.medication} held pending prescriber clarification.`,
+        'success',
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not record the outcome.', 'error');
+    }
+  };
+
+  const handleDispense = async (rxId: string, overrideQty?: number) => {
     const rx = rxQueue.find(r => r._id === rxId);
     if (!rx) return;
-    const stage = pharmacyStage(rx);
-    if (stage !== 'cleared_for_dispensing') {
-      showToast('Check and clear the medication order before dispensing.', 'error');
-      return;
-    }
     if (!isFinanciallyCleared(patientBalanceFor(rx))) {
       handlePaymentStep(rx);
       return;
     }
-    const qty = rx.quantityToDispense || 1;
+    const qty = overrideQty ?? ((rx.quantityToDispense || 1) - (rx.quantityDispensed || 0));
     const inv = findInventoryFor(rx.medication);
-    // Stock gate: never mark dispensed unless the full course is on the shelf.
-    if (!inv || inv.stockLevel < qty) {
-      showToast(`Insufficient stock: ${inv?.stockLevel ?? 0} ${inv?.unit || 'unit(s)'} available, ${qty} needed for the full course.`, 'error');
-      return;
-    }
-    // Controlled substances require a witnessing staff member before dispensing.
-    if (inv.controlledSchedule || inv.requiresWitness) {
+    // Clearance, stock and expiry are all re-checked inside the transaction
+    // against live batch data — this only decides whether to collect a
+    // witness signature first, so the modal isn't shown for nothing.
+    if (inv?.controlledSchedule || inv?.requiresWitness) {
       setWitnessId('');
       setDispenseTarget({ rx, inv, qty });
       return;
@@ -302,13 +318,14 @@ export default function PharmacyPage() {
    * reachable from the UI at all — so three states the lifecycle defines could
    * never be entered by a pharmacist who needed them.
    */
+  // Both outcomes capture WHY through recordUnfilled — a status flip alone
+  // tells the next pharmacist nothing about where the patient was referred or
+  // what the prescriber was asked.
   const handleHold = (rx: typeof rxQueue[number]) =>
-    advanceRx(rx, 'held_awaiting_clarification', `${rx.medication} held pending clarification from the prescriber.`);
+    markRxUnfilled(rx, 'clarification_requested');
 
-  const handleStockout = (rx: typeof rxQueue[number]) => {
-    const inv = findInventoryFor(rx.medication);
-    advanceRx(rx, 'stockout_partial_referred', `Stockout recorded for ${rx.medication}: ${inv?.stockLevel ?? 0} ${inv?.unit || 'unit(s)'} on hand. Patient referred.`);
-  };
+  const handleStockout = (rx: typeof rxQueue[number]) =>
+    markRxUnfilled(rx, 'stock_out');
 
   const handleRecall = (rx: typeof rxQueue[number]) =>
     advanceRx(rx, 'dispensing_error_recalled', `${rx.medication} recalled — dispensing error logged. Re-check before re-issuing.`);
@@ -351,19 +368,24 @@ export default function PharmacyPage() {
       return { label: canAccess('/payments') ? 'Collect payment' : 'Send to cashier', onClick: () => handlePaymentStep(rx) };
     }
     if (stage === 'cleared_for_dispensing') {
-      // Stock gate (KAN-39). handleDispense already refuses and explains, but
-      // an enabled button that always fails is a trap: the pharmacist reaches
-      // for it, gets an error, and has no route forward. Disabling it states
-      // the constraint up front and leaves "Record stockout" as the real next
-      // step. `quantityToDispense` is the FULL course — a partial shelf is not
-      // enough to dispense against.
-      const dispenseQty = rx.quantityToDispense || 1;
-      const dispenseInv = findInventoryFor(rx.medication);
-      if (!dispenseInv || dispenseInv.stockLevel < dispenseQty) {
+      // Stock position drives which dispense is on offer. A shelf that cannot
+      // cover the full course is not a dead end any more: the pharmacist can
+      // hand over what exists as a partial fill and the order stays open for
+      // the balance. Only a genuinely empty shelf disables the button, and
+      // "Record stockout" is the route forward there.
+      const dispenseQty = (rx.quantityToDispense || 1) - (rx.quantityDispensed || 0);
+      const onHand = stockOnHandFor(rx.medication);
+      if (onHand <= 0) {
         return {
           label: t('pharmacy.dispense'),
           disabled: true,
-          disabledReason: `Insufficient stock — ${dispenseInv?.stockLevel ?? 0} ${dispenseInv?.unit || 'unit(s)'} on hand, ${dispenseQty} needed for the full course.`,
+          disabledReason: 'Out of stock — record a stockout referral instead.',
+        };
+      }
+      if (onHand < dispenseQty) {
+        return {
+          label: `Dispense ${onHand} of ${dispenseQty}`,
+          onClick: () => handleDispense(rx._id, onHand),
         };
       }
       return { label: t('pharmacy.dispense'), onClick: () => handleDispense(rx._id) };
@@ -377,7 +399,6 @@ export default function PharmacyPage() {
     return {};
   };
 
-  const workflowRx = workflowRxId ? rxQueue.find(rx => rx._id === workflowRxId) || null : null;
 
   const renderWorkflowPopup = (rx: typeof rxQueue[number]) => {
     const stage = pharmacyStage(rx);
@@ -938,7 +959,12 @@ export default function PharmacyPage() {
                     const balance = patientBalanceFor(rx);
                     const paymentClear = isFinanciallyCleared(balance);
                     return (
-                      <tr key={rx._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setWorkflowRxId(rx._id)}>
+                      <Fragment key={rx._id}>
+                      <tr
+                        className="cursor-pointer hover:bg-[var(--table-row-hover)]"
+                        aria-expanded={workflowRxId === rx._id}
+                        onClick={() => setWorkflowRxId(current => (current === rx._id ? null : rx._id))}
+                      >
                         <td>
                           <PatientName
                             patient={patientById.get(rx.patientId)}
@@ -986,6 +1012,16 @@ export default function PharmacyPage() {
                           </span>
                         </td>
                       </tr>
+                      {workflowRxId === rx._id && (
+                        <tr className="ehr-table-detail-row">
+                          <td colSpan={8}>
+                            <div className="ehr-row-detail ehr-row-detail--table" role="region" aria-label={`${rx.patientName} — ${rx.medication}`}>
+                              {renderWorkflowPopup(rx)}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -1272,28 +1308,6 @@ export default function PharmacyPage() {
         </Modal>
       )}
 
-      {workflowRx && (
-        <Modal onClose={() => setWorkflowRxId(null)} width={520} labelledBy="pharmacy-workflow-title">
-          <div className="modal-content card-elevated w-full overflow-hidden" style={{ maxHeight: 'calc(100vh - 48px)' }}>
-            <div className="flex items-start justify-between gap-4 p-5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <div className="min-w-0">
-                <h3 id="pharmacy-workflow-title" className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                  {workflowRx.patientName}
-                </h3>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                  {workflowRx.medication} · {prescriptionSig(workflowRx)}
-                </p>
-              </div>
-              <button onClick={() => setWorkflowRxId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label={t('action.close')}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-5 overflow-auto" style={{ maxHeight: 'min(70vh, 620px)' }}>
-              {renderWorkflowPopup(workflowRx)}
-            </div>
-          </div>
-        </Modal>
-      )}
 
       {/* Stock-in modal */}
       {showStockInModal && (

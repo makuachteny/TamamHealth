@@ -68,7 +68,9 @@ import type {
 } from '@/lib/db-types';
 import { isValidPhone, normalizePhone, formatPhoneDisplay } from '@/lib/field-formats';
 import { useAuth } from '@/lib/context';
-import { OrderLabModal, PrescribeModal, ReferModal } from '@/components/patients/PatientActionModals';
+import { PrescribeModal, ReferModal } from '@/components/patients/PatientActionModals';
+import LabOrderModal from '@/components/lab/order/LabOrderModal';
+import LabWorkspace from '@/components/lab/workflow/LabWorkspace';
 import { useWards } from '@/lib/hooks/useWards';
 import OpenmrsChartShell from '@/components/ehr/chart/OpenmrsChartShell';
 import ChartHeader from '@/components/ehr/chart/ChartHeader';
@@ -77,7 +79,6 @@ import ChartSection, { OmrsEmptyState } from '@/components/ehr/chart/ChartSectio
 import AllergiesSection from '@/components/ehr/chart/sections/AllergiesSection';
 import ConditionsSection from '@/components/ehr/chart/sections/ConditionsSection';
 import MedicationsSection from '@/components/ehr/chart/sections/MedicationsSection';
-import ResultsSection from '@/components/ehr/chart/sections/ResultsSection';
 import OrdersSection from '@/components/ehr/chart/sections/OrdersSection';
 import ProceduresSection from '@/components/ehr/chart/sections/ProceduresSection';
 import ProgramsSection from '@/components/ehr/chart/sections/ProgramsSection';
@@ -94,6 +95,16 @@ import NurseVitalsModal from '@/components/nurse/NurseVitalsModal';
 // these roles — see TransferHistoryPanel's canViewClinical prop — so the tab
 // answers accountability without exposing the chart.
 const ADMIN_TAB_IDS = ['overview', 'appointments', 'demographics', 'billing', 'documents', 'recall', 'referrals'];
+// A lab technician works orders inside the chart (the bench steps live on the
+// Labs tab) but has no business in the notes, medications or problem list, so
+// their chart is exactly the two tabs the work needs: who the patient is, and
+// the labs. Minimum necessary access, enforced the same way ADMIN_TAB_IDS is.
+const LAB_TAB_IDS = ['overview', 'labs'];
+// A pharmacist dispenses against the prescription and the allergy list; a
+// radiographer reads the order and reports on it. Each gets the tabs their work
+// needs and nothing else — same minimum-necessary rule as LAB_TAB_IDS.
+const PHARMACY_TAB_IDS = ['overview', 'prescriptions', 'allergies'];
+const IMAGING_TAB_IDS = ['overview', 'labs'];
 type PrintSectionId = 'consultation' | 'problems' | 'vitals' | 'medications' | 'allergies' | 'labs' | 'immunizations' | 'appointments';
 const PRINT_SECTION_OPTIONS: Array<{ id: PrintSectionId; label: string; description: string }> = [
   { id: 'consultation', label: 'Latest consultation', description: 'Reason for visit, examination, assessment, and plan' },
@@ -149,6 +160,15 @@ export default function PatientDetailPage() {
   // scrolls to / highlights the specific record. Seeded once from the URL.
   const initialTab = searchParams.get('tab');
   const focusId = searchParams.get('focus') || undefined;
+  // An analyzer reading handed over from the lab queue: the value travels in
+  // the URL so the technician reviews and files it here, never auto-saved.
+  const seedResult = searchParams.get('value')
+    ? {
+        value: searchParams.get('value') || '',
+        unit: searchParams.get('unit') || '',
+        referenceRange: searchParams.get('range') || '',
+      }
+    : undefined;
   const [activeTab, setActiveTab] = useState(
     initialTab === 'transfers' ? 'referrals' : initialTab === 'recall' ? 'appointments' : initialTab && DEEP_LINK_TAB_IDS.has(initialTab) ? initialTab : 'overview',
   );
@@ -178,7 +198,6 @@ export default function PatientDetailPage() {
   const [showReferModal, setShowReferModal] = useState(false);
   const [showNurseVitals, setShowNurseVitals] = useState(false);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
-  const [showTriagePopup, setShowTriagePopup] = useState(false);
   // One-shot request for the chart shell to open a workspace drawer panel
   // (e.g. header "+ Note" → the persisting visit-note panel).
   const [chartPanelRequest, setChartPanelRequest] = useState<string | null>(null);
@@ -250,28 +269,34 @@ export default function PatientDetailPage() {
   const patient = scopedPatient ?? (fallbackPatient?._id === id ? fallbackPatient : undefined);
   const { records } = useMedicalRecords(patient?._id);
   const { referrals: patientReferrals } = usePatientReferrals(patient?._id);
-  const { results: allLabResults } = useLabResults(patient?._id);
+  const { results: allLabResults, reload: reloadLabResults } = useLabResults(patient?._id);
   const { immunizations: allImmunizations } = useImmunizations(patient?._id);
   const { visits: allANCVisits } = useANC();
   const { appointments: patientAppointments } = usePatientAppointments(patient?._id);
   const { prescriptions: allPrescriptions } = usePrescriptions(patient?._id);
   const { triages: patientTriages } = useTriage(patient?._id);
-  const { canConsult, canViewClinical, canOrderLabs, canPrescribe, canBookAppointments, canManageReferrals, canRecordVitalEvents } = usePermissions();
+  const { canConsult, canViewClinical, canOrderLabs, canEnterLabResults, canDispense, canPrescribe, canBookAppointments, canManageReferrals, canRecordVitalEvents } = usePermissions();
   const canAssignPatients = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
 
-  // Defence in depth: if a non-clinical viewer lands on (or deep-links to) a
-  // clinical tab, snap them back to the overview so clinical panels never render.
+  // Which tabs this viewer may open at all: clinicians get the chart, lab
+  // technicians get identity + labs, everyone else gets the admin set.
+  const allowedTabIds = canViewClinical ? null
+    : canEnterLabResults ? LAB_TAB_IDS
+    : canDispense ? PHARMACY_TAB_IDS
+    : currentUser?.role === 'radiologist' ? IMAGING_TAB_IDS
+    : ADMIN_TAB_IDS;
+
+  // Defence in depth: if a restricted viewer lands on (or deep-links to) a tab
+  // outside their set, snap them back so those panels never render.
   useEffect(() => {
-    if (!canViewClinical && !ADMIN_TAB_IDS.includes(activeTab)) {
-      setActiveTab('overview');
+    if (allowedTabIds && !allowedTabIds.includes(activeTab)) {
+      // Land on the tab the role came for, not a generic overview.
+      const landing = allowedTabIds.find(id => id !== 'overview') || 'overview';
+      setActiveTab(landing);
     }
-  }, [canViewClinical, activeTab]);
+  }, [allowedTabIds, activeTab]);
   const { balance: patientBalance, reload: reloadPayments } = usePatientPayments(patient?._id);
   const { problems: patientProblems } = useProblems(patient?._id);
-  // Used only to detect an active ward admission for the OpenMRS-style chart
-  // header's "Active Visit" chip.
-  const { admissions } = useWards();
-
   // Patient care notes (free-text staff notes) — surfaced on the overview only
   // when present, so the page never shows an empty "Notes" placeholder.
   const [, setPatientNotes] = useState<PatientNoteDoc[]>([]);
@@ -465,26 +490,26 @@ export default function PatientDetailPage() {
     new Date(`${a.appointmentDate}T${a.appointmentTime || '00:00'}:00`).getTime();
 
   const allTabs = [
-    { id: 'overview', label: 'Summary', icon: Heart },
-    { id: 'history', label: 'Activity', icon: FileText },
-    { id: 'problems', label: 'Problems', icon: AlertTriangle },
+    { id: 'overview', label: 'Patient summary', icon: Heart },
+    { id: 'history', label: 'Visits', icon: FileText },
+    { id: 'problems', label: 'Conditions', icon: AlertTriangle },
     { id: 'prescriptions', label: 'Medications', icon: Pill },
     { id: 'immunizations', label: 'Immunizations', icon: Syringe },
     { id: 'allergies', label: 'Allergies', icon: ShieldAlert },
-    { id: 'vitals', label: 'Vitals', icon: Activity },
+    { id: 'vitals', label: 'Vitals & Biometrics', icon: Activity },
     { id: 'notes', label: 'Notes', icon: FileText },
     { id: 'labs', label: 'Results', icon: FlaskConical },
     { id: 'orders', label: 'Orders', icon: ClipboardList },
     { id: 'procedures', label: 'Procedures', icon: Bandage },
     { id: 'programs', label: 'Programs', icon: Layers },
     { id: 'demographics', label: 'Demographics', icon: UserIcon },
-    { id: 'billing', label: 'Account', icon: Wallet },
-    { id: 'careChecklist', label: 'Care Plan', icon: ClipboardList },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'appointments', label: 'Appointments & follow-up', icon: Calendar },
+    { id: 'billing', label: 'Billing history', icon: Wallet },
+    { id: 'careChecklist', label: 'Care plan', icon: ClipboardList },
+    { id: 'documents', label: 'Attachments', icon: FileText },
+    { id: 'appointments', label: 'Appointments', icon: Calendar },
     { id: 'referrals', label: 'Care coordination', icon: ArrowRightLeft },
   ];
-  const tabs = canViewClinical ? allTabs : allTabs.filter(tb => ADMIN_TAB_IDS.includes(tb.id));
+  const tabs = allowedTabIds ? allTabs.filter(tb => allowedTabIds.includes(tb.id)) : allTabs;
 
   // records[] is sorted newest-first by the service layer.
   const latestRecord = records[0];
@@ -496,32 +521,41 @@ export default function PatientDetailPage() {
   const latestVitalsRecord = records.find(r => r.vitalSigns);
 
 
-  // ── OpenMRS-style chart shell wiring ────────────────────────────────────
-  // Keep the primary rail focused on the six tasks staff perform repeatedly.
-  // Less frequent clinical sections remain available under More.
+  // ── Chart rail ───────────────────────────────────────────────────────────
+  // The chart's sections, in the order a clinician reads them: who the patient
+  // is, then what is measured, then what is being done, then the record around
+  // it. One flat list — a "More" bucket only hid half the chart behind a click
+  // for no reason a clinician could see.
+  //
+  // Sections NOT on this rail (care plan, care coordination, notes,
+  // demographics) still render if something deep-links to them — the tab model
+  // in `allTabs` is unchanged — they are simply not navigation any more.
   const OMRS_RAIL_DEFS: { id: string; label: string; icon: typeof Heart; clinicalOnly?: boolean }[] = [
-    { id: 'overview', label: 'Summary', icon: Heart },
-    { id: 'history', label: 'Activity', icon: History },
+    { id: 'overview', label: 'Patient summary', icon: Heart },
+    { id: 'vitals', label: 'Vitals & Biometrics', icon: Activity },
     { id: 'prescriptions', label: 'Medications', icon: Pill },
+    { id: 'orders', label: 'Orders', icon: ClipboardList },
     { id: 'labs', label: 'Results', icon: FlaskConical },
-    { id: 'careChecklist', label: 'Care plan', icon: ClipboardList },
-    // Referrals and internal transfers are one coordination workflow. Keep it
-    // in the primary rail so ownership changes cannot be hidden under More.
-    { id: 'referrals', label: 'Care coordination', icon: ArrowRightLeft },
+    // The timeline IS the visit history — encounters, with the labs, drugs and
+    // referrals that hung off them.
+    { id: 'history', label: 'Visits', icon: History },
+    { id: 'allergies', label: 'Allergies', icon: ShieldAlert },
+    { id: 'problems', label: 'Conditions', icon: AlertTriangle },
+    { id: 'immunizations', label: 'Immunizations', icon: Syringe },
+    { id: 'procedures', label: 'Procedures', icon: Bandage },
+    { id: 'documents', label: 'Attachments', icon: FileText },
+    { id: 'programs', label: 'Programs', icon: Layers },
+    { id: 'appointments', label: 'Appointments', icon: Calendar },
+    // Who the patient is, as registered — contact details, address, next of
+    // kin, payor. Sits with the administrative tail rather than the clinical
+    // sections above it, and only appears for roles whose `tabs` include it.
+    { id: 'demographics', label: 'Demographics', icon: UserIcon },
+    { id: 'billing', label: 'Billing history', icon: Wallet },
   ];
-  const omrsRailIds = new Set(OMRS_RAIL_DEFS.map(d => d.id));
-  const omrsRailItems = OMRS_RAIL_DEFS.filter(item => (item.clinicalOnly ? canViewClinical : tabs.some(t => t.id === item.id)));
-  // Everything reachable from the full chart model that doesn't have an
-  // OpenMRS-rail slot is available under More.
-  const omrsMoreItems = tabs.filter(t => !omrsRailIds.has(t.id));
-
-  // Sticky header: "Active Visit" chip — a checked-in/in-progress appointment
-  // today, or an active ward admission.
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const hasActiveApptToday = (patientAppointments || []).some(a =>
-    a.appointmentDate === todayStr && (a.status === 'checked_in' || a.status === 'in_progress'));
-  const hasActiveAdmission = (admissions || []).some(a => a.patientId === patient._id && a.status === 'admitted');
-  const hasActiveVisit = hasActiveApptToday || hasActiveAdmission;
+  // Role restrictions still apply: a lab technician's rail is the two sections
+  // LAB_TAB_IDS allows, not the full list.
+  const omrsRailItems = OMRS_RAIL_DEFS.filter(item => tabs.some(t => t.id === item.id));
+  const omrsMoreItems: typeof omrsRailItems = [];
 
   // Sticky header: pregnancy pill — hoisted unchanged from the old inline
   // patient-banner IIFE so the ANC-derived pill keeps behaving identically.
@@ -537,77 +571,6 @@ export default function PatientDetailPage() {
     </span>
   ) : null;
 
-  // Sticky header: triage badge + popup — hoisted unchanged from the old
-  // inline patient-banner IIFE (same showTriagePopup state, same rendering).
-  const triageBadgeNode = patientTriages.length > 0 ? (() => {
-    const latest = patientTriages[0];
-    const hoursOld = (Date.now() - new Date(latest.triagedAt).getTime()) / 3600000;
-    if (hoursOld > 24 && latest.status !== 'pending') return null;
-    const color = latest.priority === 'RED' ? 'var(--color-danger)' : latest.priority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)';
-    const bg = latest.priority === 'RED' ? 'rgba(220,38,38,0.10)' : latest.priority === 'YELLOW' ? 'rgba(217,119,6,0.10)' : 'rgba(5,150,105,0.10)';
-    const label = latest.priority === 'RED' ? 'Emergency — immediate care' : latest.priority === 'YELLOW' ? 'Priority — see soon' : 'Non-urgent';
-    return (
-      <div className="relative">
-        <button
-          onClick={() => setShowTriagePopup(v => !v)}
-          aria-label="View triage details"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 28, height: 28, borderRadius: 8,
-            background: bg, border: `1.5px solid ${color}`,
-            color, cursor: 'pointer',
-            animation: latest.priority === 'RED' ? 'pulse 2s infinite' : undefined,
-          }}
-        >
-          <AlertTriangle className="w-4 h-4" />
-        </button>
-        {showTriagePopup && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowTriagePopup(false)} />
-            <div
-              className="absolute left-0 top-10 z-50 rounded-2xl overflow-hidden"
-              style={{ width: 340, background: 'var(--bg-card-solid)', border: `1px solid ${color}40`, boxShadow: 'none' }}
-            >
-              {/* Header strip */}
-              <div className="flex items-center gap-3 px-4 py-3" style={{ background: bg, borderBottom: `1px solid ${color}30` }}>
-                <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color }}>ETAT Triage · {label}</p>
-                  <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {new Date(latest.triagedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'var(--bg-app)', color }}>
-                  {latest.status}
-                </span>
-              </div>
-              {/* Body */}
-              <div className="px-4 py-3 space-y-2">
-                {latest.chiefComplaint && (
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{latest.chiefComplaint}</p>
-                )}
-                <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  {latest.assessmentSource === 'clerical_checkin' || latest.airway === 'not_assessed'
-                    ? 'ABCC not assessed — clerical check-in'
-                    : <>A: {latest.airway} · B: {latest.breathing} · C: {latest.circulation} · AVPU: {latest.consciousness?.toUpperCase()[0]}</>}
-                </p>
-                {(latest.temperature || latest.pulse || latest.oxygenSaturation || latest.systolic) && (
-                  <p className="text-[11px] font-mono" style={{ color: 'var(--text-secondary)' }}>
-                    {latest.temperature && `T ${latest.temperature}°C  `}
-                    {latest.pulse && `HR ${latest.pulse}  `}
-                    {latest.respiratoryRate && `RR ${latest.respiratoryRate}  `}
-                    {latest.oxygenSaturation && `SpO₂ ${latest.oxygenSaturation}%  `}
-                    {(latest.systolic && latest.diastolic) && `BP ${latest.systolic}/${latest.diastolic}`}
-                  </p>
-                )}
-                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>by {latest.triagedByName}</p>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    );
-  })() : null;
 
   return (
     <>
@@ -1198,9 +1161,7 @@ export default function PatientDetailPage() {
             header={
               <ChartHeader
                 patient={patient}
-                triageBadge={triageBadgeNode}
                 pregnancyPill={pregnancyPillNode}
-                hasActiveVisit={hasActiveVisit}
                 patientBalance={patientBalance}
                 onCollectPayment={openPaymentFromHeader}
                 onMessage={() => setShowMessageModal(true)}
@@ -1217,6 +1178,7 @@ export default function PatientDetailPage() {
                 onExchange={() => (canManageReferrals ? setShowReferModal(true) : setActiveTab('appointments'))}
                 onEdit={openEditModal}
                 onStickyNote={() => { if (canViewClinical) setActiveTab('notes'); }}
+                onShowAllergies={() => setActiveTab('allergies')}
                 onAssignProvider={canAssignPatients ? () => setAssignTarget({
                   patientId: patient._id,
                   patientName: patientFullName(patient),
@@ -1438,13 +1400,15 @@ export default function PatientDetailPage() {
             />
           )}
 
-          {/* Labs Tab */}
+          {/* Labs Tab — results list, and the bench workflow for one order. */}
           {activeTab === 'labs' && (
-            <ResultsSection
+            <LabWorkspace
               patientId={patient._id}
               canOrderLabs={canOrderLabs}
+              canWork={canEnterLabResults}
               onAdd={() => setShowOrderLabModal(true)}
               focusId={focusId}
+              seedResult={seedResult}
             />
           )}
 
@@ -1923,12 +1887,13 @@ export default function PatientDetailPage() {
       )}
 
       {/* Header action modals — open in place, pre-filled with this patient. */}
-      <OrderLabModal
-        isOpen={showOrderLabModal}
-        onClose={() => setShowOrderLabModal(false)}
-        patient={patient}
-        currentUser={currentUser}
-      />
+      {showOrderLabModal && (
+        <LabOrderModal
+          onClose={() => setShowOrderLabModal(false)}
+          onPlaced={() => { void reloadLabResults(); }}
+          presetPatientId={patient._id}
+        />
+      )}
       <PrescribeModal
         isOpen={showPrescribeModal}
         onClose={() => setShowPrescribeModal(false)}
@@ -2166,7 +2131,7 @@ function PatientFacesheetView({
               </div>
             ))}
           </div>
-        ) : <p className="tebra-none">No outstanding care actions — manage screenings on the Care plan tab.</p>}
+        ) : <p className="tebra-none">No outstanding care actions.</p>}
       </section>
       )}
 

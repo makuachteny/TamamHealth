@@ -101,7 +101,11 @@ export default function StateDashboardPage() {
   // streams (facilityId + createdAt are already on every record) — used to
   // fill the queue-card Source/Status/Wait columns honestly instead of
   // leaving them blank.
-  type CountyRow = { county: string; birthCount: number; deathCount: number; ancTotal: number; facilityIds: Set<string>; lastReportAt?: string };
+  // anc1/anc4/anc8 ride along with the total (the byCounty rollup already
+  // computes them, src/lib/services/mch-analytics-service.ts) purely for the
+  // row's detail panel — the ANC cascade rate is the one figure the queue
+  // row itself has no column for.
+  type CountyRow = { county: string; birthCount: number; deathCount: number; ancTotal: number; anc1: number; anc4: number; anc8: number; facilityIds: Set<string>; lastReportAt?: string };
   const counties: CountyRow[] = [];
   const byCounty = mch?.ancCascade?.byCounty ?? {};
   for (const [key, val] of Object.entries(byCounty)) {
@@ -112,13 +116,16 @@ export default function StateDashboardPage() {
       birthCount: countByState(undefined, c), // birth count by county is not yet aggregated; fall back below
       deathCount: 0,
       ancTotal: val.total,
+      anc1: val.anc1,
+      anc4: val.anc4,
+      anc8: val.anc8,
       facilityIds: new Set(),
     });
   }
   const touchCounty = (countyName: string): CountyRow => {
     let row = counties.find(c => c.county === countyName);
     if (!row) {
-      row = { county: countyName, birthCount: 0, deathCount: 0, ancTotal: 0, facilityIds: new Set() };
+      row = { county: countyName, birthCount: 0, deathCount: 0, ancTotal: 0, anc1: 0, anc4: 0, anc8: 0, facilityIds: new Set() };
       counties.push(row);
     }
     return row;
@@ -160,6 +167,38 @@ export default function StateDashboardPage() {
       'ANC Total': c.ancTotal,
     }));
     downloadCSV(rows, `${(stateName || 'state').toLowerCase().replace(/\s+/g, '_')}_county_data`);
+  };
+
+  // Per-county detail, rendered inline via `row.popupDetail` (EhrCareDashboard's
+  // shared expand-in-place panel). Births/deaths/ANC total and reporting
+  // status are already on the row above, so this only surfaces what the row
+  // has no room for: the ANC1/ANC4 cascade rate, and which facilities are
+  // behind the county's reporting figures.
+  const renderCountyDetail = (c: CountyRow) => {
+    const anc1Rate = c.ancTotal > 0 ? Math.round((c.anc1 / c.ancTotal) * 100) : 0;
+    const anc4Rate = c.ancTotal > 0 ? Math.round((c.anc4 / c.ancTotal) * 100) : 0;
+    const facilityNames = facilitiesInState.filter(h => c.facilityIds.has(h._id)).map(h => h.name).sort();
+    return (
+      <div className="ehr-visit-pop ehr-visit-pop--inline">
+        <div className="ehr-visit-pop-body">
+          <div className="ehr-visit-pop-row">
+            <span className="ehr-visit-pop-label">ANC coverage</span>
+            <div>
+              <strong>{anc1Rate}% ANC1 · {anc4Rate}% ANC4</strong>
+              <p>{c.ancTotal} tracked pregnanc{c.ancTotal === 1 ? 'y' : 'ies'}</p>
+            </div>
+          </div>
+          <div className="ehr-visit-pop-row">
+            <span className="ehr-visit-pop-label">Facilities</span>
+            <div>
+              {facilityNames.length > 0
+                ? <p>{facilityNames.join(', ')}</p>
+                : <p>No facility-linked reports yet.</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
 
@@ -332,6 +371,7 @@ export default function StateDashboardPage() {
                 : undefined,
               date: c.lastReportAt ? c.lastReportAt.slice(0, 10) : undefined,
               timeSecondary: c.lastReportAt ? c.lastReportAt.slice(0, 10) : 'No report',
+              popupDetail: renderCountyDetail(c),
             };
           })}
           metrics={[

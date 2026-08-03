@@ -5,11 +5,11 @@ import Link from 'next/link';
 import {
   AlertTriangle,
   Plus,
+  Search,
+  Activity,
   X,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
-import DataTile from '@/components/DataTile';
-import EhrListHeader from '@/components/ehr/EhrListHeader';
 import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -20,9 +20,11 @@ import { computeAdjudicatedStatus } from '@/lib/services/payment-service';
 import type { ClaimDoc, ClaimStatus, PayerType, InsurancePolicyDoc } from '@/lib/db-types-payments';
 import type { BillingDoc } from '@/lib/db-types-billing';
 import { formatMoney } from '@/lib/format-utils';
+import '@/components/billing/billing.css';
 
-// Payer mix labels/colours — relocated from the old Billing cockpit so the
-// payer breakdown lives next to the claims it summarises.
+// Payer mix labels — relocated from the old Billing cockpit so the payer
+// breakdown lives next to the claims it summarises. Colour is a single
+// accent (the bl-meter default) rather than one hue per payer.
 const PAYER_LABEL_KEYS: Record<PayerType, string> = {
   self_pay: 'billing.payerSelfPay',
   nhis: 'billing.payerNhis',
@@ -33,14 +35,18 @@ const PAYER_LABEL_KEYS: Record<PayerType, string> = {
   employer: 'billing.payerEmployer',
 };
 
-const PAYER_COLORS: Record<PayerType, string> = {
-  self_pay: 'var(--accent-primary)',
-  nhis: 'var(--color-success)',
-  cbhi: '#2191D0',
-  donor: 'var(--color-warning)',
-  government: 'var(--accent-primary)',
-  private: '#EA580C',
-  employer: '#0F766E',
+// Claim status → bl-chip variant. Claim statuses are their own union (not
+// BillingStatus), so this maps onto the closest billing-module chip meaning:
+// draft (not yet sent) reads as neutral, submitted/appealed as pending,
+// accepted/paid as settled, denied as the alarm colour.
+const CLAIM_STATUS_CHIP: Record<ClaimStatus, string> = {
+  draft: 'bl-chip--waived',
+  submitted: 'bl-chip--partial',
+  accepted: 'bl-chip--paid',
+  denied: 'bl-chip--unpaid',
+  paid: 'bl-chip--paid',
+  appealed: 'bl-chip--partial',
+  partial: 'bl-chip--partial',
 };
 
 interface ClaimKPIs {
@@ -335,6 +341,7 @@ export default function ClaimsPage() {
         0,
         currentUser?.name || 'Unknown',
         {
+          totalAllowed: allowed,
           denialReasons: adjForm.denialReason?.trim() ? [adjForm.denialReason.trim()] : undefined,
           notes: adjForm.notes.trim() || undefined,
         }
@@ -355,45 +362,6 @@ export default function ClaimsPage() {
     setAdjForm(null);
   };
 
-  const getStatusBgColor = (status: ClaimStatus): string => {
-    const colorMap: Record<ClaimStatus, string> = {
-      draft: 'var(--color-info-bg)',
-      submitted: 'var(--color-warning-bg)',
-      accepted: 'var(--color-success-bg)',
-      denied: 'var(--color-danger-bg)',
-      paid: 'var(--color-info-bg)',
-      appealed: 'var(--color-warning-bg)',
-      partial: 'var(--color-warning-bg)',
-    };
-    return colorMap[status] || 'var(--overlay-subtle)';
-  };
-
-  const getStatusTextColor = (status: ClaimStatus): string => {
-    const colorMap: Record<ClaimStatus, string> = {
-      draft: 'var(--color-info)',
-      submitted: 'var(--color-warning)',
-      accepted: 'var(--color-success)',
-      denied: 'var(--color-danger)',
-      paid: 'var(--color-info)',
-      appealed: 'var(--color-warning)',
-      partial: 'var(--color-warning)',
-    };
-    return colorMap[status] || 'var(--text-secondary)';
-  };
-
-  const getStatusBorderColor = (status: ClaimStatus): string => {
-    const colorMap: Record<ClaimStatus, string> = {
-      draft: 'var(--color-info)',
-      submitted: 'var(--color-warning)',
-      accepted: 'var(--color-success)',
-      denied: 'var(--color-danger)',
-      paid: 'var(--color-info)',
-      appealed: 'var(--color-warning)',
-      partial: 'var(--color-warning)',
-    };
-    return colorMap[status] || 'var(--text-secondary)';
-  };
-
   // Revenue share by payer type across all claims.
   const payerMix = useMemo(() => {
     const mix: Partial<Record<PayerType, number>> = {};
@@ -406,566 +374,249 @@ export default function ClaimsPage() {
 
   return (
     <>
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+      <main className="page-container page-enter">
+      <div className="bl-root">
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
-        <DataTile label={t('claims.kpiTotalClaims')} value={kpis.totalClaims} />
-        <DataTile label={t('claims.kpiPendingReview')} value={kpis.pendingReview} hint={formatMoney(kpis.pendingAmount)} tone={kpis.pendingReview > 0 ? 'warning' : 'default'} />
-        <DataTile label={t('claims.kpiApprovedClaims')} value={kpis.approved} hint={formatMoney(kpis.approvedAmount)} tone={kpis.approved > 0 ? 'ok' : 'default'} />
-        <DataTile label={t('claims.kpiDeniedClaims')} value={kpis.denied} hint={formatMoney(kpis.deniedAmount)} tone={kpis.denied > 0 ? 'danger' : 'default'} />
-      </div>
-
-      {/* Payer mix — revenue share by payer across all claims. */}
-      {payerMix.length > 0 && (
-        <section className="glass-section" style={{ marginBottom: 16 }}>
-          <div className="glass-section-header">
-            <span className="kpi-card-title">{t('billing.payerMix')}</span>
-          </div>
-          <div className="glass-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {payerMix.map(({ payer, amount, pct }) => (
-              <div key={payer}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 3 }}>
-                  <span style={{ fontWeight: 600 }}>{t(PAYER_LABEL_KEYS[payer])}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{formatMoney(amount)} · {pct}%</span>
-                </div>
-                <div style={{ height: 6, borderRadius: 3, background: 'var(--overlay-medium)', overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', background: PAYER_COLORS[payer] }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Claims Table */}
-      <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-        <EhrListHeader
-          title={t('claims.title')}
-          search={{ value: globalSearch, onChange: setGlobalSearch, placeholder: 'Search claims…' }}
-          actions={
-            <button
-              onClick={() => setNewClaimOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
-              style={{ background: 'var(--accent-primary)', color: '#fff', height: 38, whiteSpace: 'nowrap', flexShrink: 0 }}
-            >
-              <Plus className="w-4 h-4" /> New claim
-            </button>
-          }
-        />
-        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-        {loading ? (
-          <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
-            {t('claims.loading')}
-          </div>
-        ) : filteredClaims.length === 0 ? (
-          <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
-            <AlertTriangle className="w-8 h-8 mx-auto mb-2" style={{ opacity: 0.6 }} />
-            <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t('claims.emptyTitle')}</p>
-            <p style={{ marginTop: 4, fontSize: '0.8125rem' }}>
-              {t('claims.emptyDescription')}
-            </p>
-          </div>
-        ) : (
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: '0.875rem',
-            minWidth: 1120,
-          }}>
-            <thead>
-              <tr style={{
-                background: 'var(--overlay-subtle)',
-                borderBottom: '1px solid var(--border-light)',
-              }}>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'left',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colClaimNumber')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'left',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colPatientName')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'left',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colPayerName')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'left',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colPayerType')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'right',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colBilled')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'right',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colAllowed')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'right',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colPaid')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'center',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colStatus')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'left',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colSubmittedDate')}</th>
-                <th style={{
-                  padding: '12px 20px',
-                  textAlign: 'center',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-secondary)',
-                }}>{t('claims.colActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredClaims.map((claim) => (
-                <tr
-                  key={claim._id}
-                  style={{
-                    borderBottom: '1px solid var(--border-light)',
-                    transition: 'background-color 0.15s ease-in-out',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--overlay-subtle)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <td style={{
-                    padding: '12px 20px',
-                    color: 'var(--text-primary)',
-                    fontWeight: '600',
-                  }}>{claim.claimNumber}</td>
-                  <td style={{
-                    padding: '12px 20px',
-                    color: 'var(--text-primary)',
-                  }}>
-                    {claim.patientId && !claim.patientId.startsWith('demo-') && !claim.patientId.includes('_demo') ? (
-                      <Link
-                        href={`/patients/${claim.patientId}`}
-                        onClick={e => e.stopPropagation()}
-                        className="hover:underline"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {claim.patientName}
-                      </Link>
-                    ) : (
-                      claim.patientName
-                    )}
-                  </td>
-                  <td style={{
-                    padding: '12px 20px',
-                    color: 'var(--text-primary)',
-                  }}>{claim.payerName}</td>
-                  <td style={{
-                    padding: '12px 20px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.8125rem',
-                  }}>{claim.payerType}</td>
-                  <td style={{
-                    padding: '12px 20px',
-                    textAlign: 'right',
-                    color: 'var(--text-primary)',
-                    fontWeight: '500',
-                  }}>{formatMoney(claim.totalBilled || 0)}</td>
-                  <td style={{
-                    padding: '12px 20px',
-                    textAlign: 'right',
-                    color: 'var(--text-primary)',
-                    fontWeight: '500',
-                  }}>{formatMoney(claim.totalAllowed || 0)}</td>
-                  <td style={{
-                    padding: '12px 20px',
-                    textAlign: 'right',
-                    color: 'var(--text-primary)',
-                    fontWeight: '500',
-                  }}>{formatMoney(claim.totalApproved || 0)}</td>
-                  <td style={{
-                    padding: '12px 20px',
-                    textAlign: 'center',
-                  }}>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '3px 10px',
-                      borderRadius: '4px',
-                      fontSize: '0.625rem',
-                      fontWeight: '700',
-                      textTransform: 'uppercase',
-                      backgroundColor: getStatusBgColor(claim.status),
-                      color: getStatusTextColor(claim.status),
-                      borderLeft: `2px solid ${getStatusBorderColor(claim.status)}`,
-                    }}>{t(`claims.status_${claim.status}`)}</span>
-                  </td>
-                  <td style={{
-                    padding: '12px 20px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.8125rem',
-                  }}>{new Date(claim.submittedDate || '').toLocaleDateString()}</td>
-                  <td style={{
-                    padding: '12px 20px',
-                    textAlign: 'center',
-                  }}>
-                    <div style={{ display: 'inline-flex' }}>
-                      <RowActionsMenu
-                        actions={[
-                          ...((claim.status === 'submitted' || claim.status === 'draft') ? [{ key: 'adjudicate', label: t('claims.actionAdjudicate'), onClick: () => handleAdjudicate(claim) }] : []),
-                          ...(claim.status === 'denied' ? [{ key: 'appeal', label: 'Appeal denial', onClick: () => { setAppealNote(''); setAppealFor(claim); } }] : []),
-                          ...((claim.status === 'denied' || claim.status === 'appealed') ? [{ key: 'resubmit', label: 'Resubmit to payer', onClick: () => handleResubmit(claim) }] : []),
-                        ]}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      {/* KPI strip — no tinted tiles; denied/pending amounts speak for themselves. */}
+      <div className="bl-stats">
+        <div>
+          <span className="bl-stat-label">{t('claims.kpiTotalClaims')}</span>
+          <span className="bl-stat-value">{kpis.totalClaims}</span>
+        </div>
+        <div>
+          <span className="bl-stat-label">{t('claims.kpiPendingReview')}</span>
+          <span className="bl-stat-value">{kpis.pendingReview}</span>
+          <span className="bl-stat-sub">{formatMoney(kpis.pendingAmount)}</span>
+        </div>
+        <div>
+          <span className="bl-stat-label">{t('claims.kpiApprovedClaims')}</span>
+          <span className={`bl-stat-value${kpis.approved > 0 ? ' bl-stat-value--good' : ''}`}>{kpis.approved}</span>
+          <span className="bl-stat-sub">{formatMoney(kpis.approvedAmount)}</span>
+        </div>
+        <div>
+          <span className="bl-stat-label">{t('claims.kpiDeniedClaims')}</span>
+          <span className={`bl-stat-value${kpis.denied > 0 ? ' bl-stat-value--danger' : ''}`}>{kpis.denied}</span>
+          <span className="bl-stat-sub">{formatMoney(kpis.deniedAmount)}</span>
         </div>
       </div>
 
-      {/* Adjudication Modal - Premium Style */}
-      {editingId && adjForm && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(15, 31, 29, 0.70)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50,
-        }} onClick={handleCancel}>
-          <div style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-light)',
-            borderRadius: 'var(--card-radius)',
-            boxShadow: 'var(--card-shadow)',
-            maxWidth: '520px',
-            width: '90vw',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            padding: '2rem',
-          }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{
-              margin: '0 0 2rem 0',
-              color: 'var(--text-primary)',
-              fontSize: '1.375rem',
-              fontWeight: '700',
-            }}>
-              {t('claims.modalTitle')}
-            </h2>
+      {/* Payer mix — revenue share by payer across all claims. One accent
+          (the bl-meter default teal), not a colour per payer. */}
+      {payerMix.length > 0 && (
+        <div className="bl-section">
+          <div className="bl-section-head">
+            <h2 className="bl-section-title">{t('billing.payerMix')}</h2>
+          </div>
+          <div className="bl-meter">
+            {payerMix.map(({ payer, amount, pct }) => (
+              <div className="bl-meter-row" key={payer}>
+                <span>{t(PAYER_LABEL_KEYS[payer])}</span>
+                <span className="bl-meter-track"><span className="bl-meter-fill" style={{ width: `${pct}%` }} /></span>
+                <span className="bl-meter-value">{formatMoney(amount)} · {pct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '0.625rem',
-                fontWeight: '600',
-                color: 'var(--text-primary)',
-                fontSize: '0.875rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                {t('claims.colStatus')}
-              </label>
+      {/* Claims table */}
+      <div className="bl-card">
+        <div className="bl-card-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <h2 className="bl-card-title">{t('claims.title')}</h2>
+            <span className="bl-underline" />
+          </div>
+          <button type="button" className="bl-btn bl-btn--primary" onClick={() => setNewClaimOpen(true)}>
+            New claim <Plus size={15} />
+          </button>
+        </div>
+
+        <div className="bl-search">
+          <Search size={16} />
+          <input
+            type="text"
+            value={globalSearch}
+            onChange={e => setGlobalSearch(e.target.value)}
+            placeholder="Search this table"
+            aria-label="Search claims"
+          />
+        </div>
+
+        {loading ? (
+          <div className="bl-loading">
+            <Activity size={30} style={{ animation: 'spin 1s linear infinite' }} />
+            <span>{t('claims.loading')}</span>
+          </div>
+        ) : filteredClaims.length === 0 ? (
+          <div className="bl-empty">
+            <AlertTriangle size={34} />
+            <h3>{t('claims.emptyTitle')}</h3>
+            <p>{t('claims.emptyDescription')}</p>
+          </div>
+        ) : (
+          <div className="bl-table-wrap">
+            <table className="bl-table">
+              <thead>
+                <tr>
+                  <th>{t('claims.colClaimNumber')}</th>
+                  <th>{t('claims.colPatientName')}</th>
+                  <th>{t('claims.colPayerName')}</th>
+                  <th>{t('claims.colPayerType')}</th>
+                  <th className="bl-right">{t('claims.colBilled')}</th>
+                  <th className="bl-right">{t('claims.colAllowed')}</th>
+                  <th className="bl-right">{t('claims.colPaid')}</th>
+                  <th>{t('claims.colStatus')}</th>
+                  <th>{t('claims.colSubmittedDate')}</th>
+                  <th aria-label={t('claims.colActions')} />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClaims.map((claim) => (
+                  <tr key={claim._id}>
+                    <td style={{ fontWeight: 600 }}>{claim.claimNumber}</td>
+                    <td>
+                      {claim.patientId && !claim.patientId.startsWith('demo-') && !claim.patientId.includes('_demo') ? (
+                        <Link href={`/patients/${claim.patientId}`} onClick={e => e.stopPropagation()} className="bl-link">
+                          {claim.patientName}
+                        </Link>
+                      ) : (
+                        claim.patientName
+                      )}
+                    </td>
+                    <td>{claim.payerName}</td>
+                    <td className="bl-muted">{claim.payerType}</td>
+                    <td className="bl-num bl-right">{formatMoney(claim.totalBilled || 0)}</td>
+                    <td className="bl-num bl-right">{formatMoney(claim.totalAllowed || 0)}</td>
+                    <td className="bl-num bl-right">{formatMoney(claim.totalApproved || 0)}</td>
+                    <td>
+                      <span className={`bl-chip ${CLAIM_STATUS_CHIP[claim.status]}`}>{t(`claims.status_${claim.status}`)}</span>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{new Date(claim.submittedDate || '').toLocaleDateString()}</td>
+                    <td>
+                      <div style={{ display: 'inline-flex' }}>
+                        <RowActionsMenu
+                          actions={[
+                            ...((claim.status === 'submitted' || claim.status === 'draft') ? [{ key: 'adjudicate', label: t('claims.actionAdjudicate'), onClick: () => handleAdjudicate(claim) }] : []),
+                            ...(claim.status === 'denied' ? [{ key: 'appeal', label: 'Appeal denial', onClick: () => { setAppealNote(''); setAppealFor(claim); } }] : []),
+                            ...((claim.status === 'denied' || claim.status === 'appealed') ? [{ key: 'resubmit', label: 'Resubmit to payer', onClick: () => handleResubmit(claim) }] : []),
+                          ]}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      </div>
+
+      {/* Adjudication modal */}
+      {editingId && adjForm && (
+        <Modal onClose={handleCancel} width={480} labelledBy="adj-claim-title">
+          <div className="bl-root bl-modal-body">
+            <h3 className="bl-modal-title" id="adj-claim-title">{t('claims.modalTitle')}</h3>
+
+            <div className="bl-field">
+              <label htmlFor="adj-status-preview">{t('claims.colStatus')}</label>
               {/* Derived, not chosen: the same amount rule the service persists.
                   Paid amount 0 with an allowed amount = full denial. */}
               {adjPreview && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', borderRadius: '4px',
-                  border: '1px solid var(--border-light)', background: 'var(--overlay-subtle)',
-                }}>
-                  <span style={{
-                    display: 'inline-block', padding: '3px 10px', borderRadius: '4px',
-                    fontSize: '0.625rem', fontWeight: 700, textTransform: 'uppercase',
-                    backgroundColor: getStatusBgColor(adjPreview),
-                    color: getStatusTextColor(adjPreview),
-                    borderLeft: `2px solid ${getStatusBorderColor(adjPreview)}`,
-                  }}>{t(`claims.status_${adjPreview}`)}</span>
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                <div
+                  id="adj-status-preview"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 12px', borderRadius: 6,
+                    border: '1px solid var(--ehr-border, #D8E3EC)', background: 'var(--ehr-page-bg, #F8FBFD)',
+                  }}
+                >
+                  <span className={`bl-chip ${CLAIM_STATUS_CHIP[adjPreview]}`}>{t(`claims.status_${adjPreview}`)}</span>
+                  <span className="bl-muted" style={{ fontSize: 12.5 }}>
                     Derived from the amounts below — set paid to 0 to deny the full allowed amount.
                   </span>
                 </div>
               )}
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '0.625rem',
-                fontWeight: '600',
-                color: 'var(--text-primary)',
-                fontSize: '0.875rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                {t('claims.labelAllowedAmount')}
-              </label>
+            <div className="bl-field">
+              <label htmlFor="adj-allowed">{t('claims.labelAllowedAmount')}</label>
               <input
+                id="adj-allowed"
                 type="number"
                 value={adjForm.allowedAmount}
-                onChange={(e) =>
-                  setAdjForm({
-                    ...adjForm,
-                    allowedAmount: parseFloat(e.target.value),
-                  })
-                }
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: '4px',
-                  fontSize: '0.9375rem',
-                  color: 'var(--text-primary)',
-                  background: 'var(--bg-card)',
-                  boxSizing: 'border-box',
-                }}
+                onChange={(e) => setAdjForm({ ...adjForm, allowedAmount: parseFloat(e.target.value) })}
               />
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '0.625rem',
-                fontWeight: '600',
-                color: 'var(--text-primary)',
-                fontSize: '0.875rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                {t('claims.labelPaidAmount')}
-              </label>
+            <div className="bl-field">
+              <label htmlFor="adj-paid">{t('claims.labelPaidAmount')}</label>
               <input
+                id="adj-paid"
                 type="number"
                 value={adjForm.paidAmount}
-                onChange={(e) =>
-                  setAdjForm({
-                    ...adjForm,
-                    paidAmount: parseFloat(e.target.value),
-                  })
-                }
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: '4px',
-                  fontSize: '0.9375rem',
-                  color: 'var(--text-primary)',
-                  background: 'var(--bg-card)',
-                  boxSizing: 'border-box',
-                }}
+                onChange={(e) => setAdjForm({ ...adjForm, paidAmount: parseFloat(e.target.value) })}
               />
             </div>
 
             {(adjPreview === 'denied' || adjPreview === 'partial') && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.625rem',
-                  fontWeight: '600',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}>
-                  {t('claims.labelDenialReason')}
-                </label>
+              <div className="bl-field">
+                <label htmlFor="adj-denial">{t('claims.labelDenialReason')}</label>
                 <input
+                  id="adj-denial"
                   type="text"
                   value={adjForm.denialReason || ''}
-                  onChange={(e) =>
-                    setAdjForm({
-                      ...adjForm,
-                      denialReason: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setAdjForm({ ...adjForm, denialReason: e.target.value })}
                   placeholder={t('claims.denialReasonPlaceholder')}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: '4px',
-                    fontSize: '0.9375rem',
-                    color: 'var(--text-primary)',
-                    background: 'var(--bg-card)',
-                    boxSizing: 'border-box',
-                  }}
                 />
               </div>
             )}
 
-            <div style={{ marginBottom: '2rem' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '0.625rem',
-                fontWeight: '600',
-                color: 'var(--text-primary)',
-                fontSize: '0.875rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                {t('claims.labelNotes')}
-              </label>
+            <div className="bl-field">
+              <label htmlFor="adj-notes">{t('claims.labelNotes')}</label>
               <textarea
+                id="adj-notes"
+                rows={3}
                 value={adjForm.notes}
-                onChange={(e) =>
-                  setAdjForm({ ...adjForm, notes: e.target.value })
-                }
+                onChange={(e) => setAdjForm({ ...adjForm, notes: e.target.value })}
                 placeholder={t('claims.notesPlaceholder')}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: '4px',
-                  fontSize: '0.9375rem',
-                  color: 'var(--text-primary)',
-                  background: 'var(--bg-card)',
-                  boxSizing: 'border-box',
-                  fontFamily: 'inherit',
-                  minHeight: '100px',
-                  resize: 'vertical',
-                }}
               />
             </div>
 
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'flex-end',
-            }}>
-              <button
-                onClick={handleCancel}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: 'var(--overlay-subtle)',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '0.9375rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease-in-out',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--border-light)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--overlay-subtle)';
-                }}
-              >
-                {t('action.cancel')}
-              </button>
-              <button
-                onClick={handleSaveAdjudication}
-                style={{
-                  padding: '10px 24px',
-                  backgroundColor: 'var(--color-success)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '0.9375rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease-in-out',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = '0.9';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = '1';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                {t('claims.saveAdjudication')}
-              </button>
+            <div className="bl-modal-actions">
+              <button type="button" className="bl-btn bl-btn--ghost" onClick={handleCancel}>{t('action.cancel')}</button>
+              <button type="button" className="bl-btn bl-btn--primary" onClick={handleSaveAdjudication}>{t('claims.saveAdjudication')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Appeal modal — denied claim → appealed, with a note for the payer. */}
       {appealFor && (
         <Modal onClose={() => !lifecycleBusy && setAppealFor(null)} width={440} labelledBy="appeal-claim-title">
-          <div className="rounded-xl p-5 space-y-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center justify-between">
-              <h2 id="appeal-claim-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Appeal claim {appealFor.claimNumber}
-              </h2>
-              <button className="p-1 rounded" onClick={() => !lifecycleBusy && setAppealFor(null)} style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+          <div className="bl-root bl-modal-body">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 className="bl-modal-title" id="appeal-claim-title">Appeal claim {appealFor.claimNumber}</h3>
+              <button type="button" className="bl-row-menu-btn" onClick={() => !lifecycleBusy && setAppealFor(null)} aria-label="Close"><X size={16} /></button>
             </div>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="bl-modal-sub">
               Denied by {appealFor.payerName} · billed {formatMoney(appealFor.totalBilled || 0)}
               {appealFor.denialReasons?.length ? ` · reason: ${appealFor.denialReasons.join(', ')}` : ''}
             </p>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Appeal note</label>
+            <div className="bl-field">
+              <label htmlFor="appeal-note">Appeal note</label>
               <textarea
+                id="appeal-note"
                 rows={3}
                 value={appealNote}
                 onChange={e => setAppealNote(e.target.value)}
                 placeholder="Why the denial should be reconsidered…"
                 autoFocus
-                className="w-full p-2.5 rounded-md text-[13px]"
-                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', resize: 'vertical' }}
               />
             </div>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button className="btn btn-sm btn-secondary" disabled={lifecycleBusy} onClick={() => setAppealFor(null)}>Cancel</button>
-              <button className="btn btn-sm btn-primary" disabled={lifecycleBusy || !appealNote.trim()} onClick={handleAppeal}>
+            <div className="bl-modal-actions">
+              <button type="button" className="bl-btn bl-btn--ghost" disabled={lifecycleBusy} onClick={() => setAppealFor(null)}>Cancel</button>
+              <button type="button" className="bl-btn bl-btn--primary" disabled={lifecycleBusy || !appealNote.trim()} onClick={handleAppeal}>
                 {lifecycleBusy ? 'Submitting…' : 'Submit appeal'}
               </button>
             </div>
@@ -977,45 +628,44 @@ export default function ClaimsPage() {
           (or a manual amount), then submit through the real claims service. */}
       {newClaimOpen && (
         <Modal onClose={() => !submittingClaim && resetNewClaim()} width={480} labelledBy="new-claim-title">
-          <div className="rounded-xl p-5 space-y-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center justify-between">
-              <h2 id="new-claim-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>New insurance claim</h2>
-              <button className="p-1 rounded" onClick={() => !submittingClaim && resetNewClaim()} style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+          <div className="bl-root bl-modal-body">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 className="bl-modal-title" id="new-claim-title">New insurance claim</h3>
+              <button type="button" className="bl-row-menu-btn" onClick={() => !submittingClaim && resetNewClaim()} aria-label="Close"><X size={16} /></button>
             </div>
 
             {/* Patient picker */}
             {newClaim.patientId ? (
-              <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg" style={{ background: 'var(--accent-light)', border: '1px solid var(--border-accent)' }}>
-                <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {patientFullName(patients.find(p => p._id === newClaim.patientId) || { firstName: 'Unknown', surname: '' } as never)}
-                </div>
-                <button onClick={() => setNewClaim({ patientId: '', policyId: '', billingId: '', amount: '' })} className="text-xs font-semibold underline shrink-0" style={{ color: 'var(--accent-primary)' }}>Change</button>
+              <div className="bl-id-tag" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 12px' }}>
+                <strong>{patientFullName(patients.find(p => p._id === newClaim.patientId) || { firstName: 'Unknown', surname: '' } as never)}</strong>
+                <button type="button" className="bl-link" onClick={() => setNewClaim({ patientId: '', policyId: '', billingId: '', amount: '' })}>Change</button>
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Patient</label>
+              <div className="bl-field">
+                <label htmlFor="claim-patient-search">Patient</label>
                 <input
+                  id="claim-patient-search"
                   type="text"
                   value={patientSearch}
                   onChange={e => setPatientSearch(e.target.value)}
                   placeholder="Search by name or hospital number…"
                   autoFocus
-                  className="w-full p-2.5 rounded-md text-[13px]"
-                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                 />
                 {patientSearch.trim().length >= 2 && (
-                  <div className="rounded-md overflow-hidden" style={{ border: '1px solid var(--border-light)', maxHeight: 180, overflowY: 'auto' }}>
+                  <div className="bl-fee-list">
                     {patients
                       .filter(p => `${patientFullName(p)} ${p.hospitalNumber || ''}`.toLowerCase().includes(patientSearch.trim().toLowerCase()))
                       .slice(0, 6)
                       .map(p => (
                         <button
                           key={p._id}
+                          type="button"
+                          className="bl-fee-row"
                           onClick={() => setNewClaim(f => ({ ...f, patientId: p._id }))}
-                          className="w-full text-left px-3 py-2 text-[13px] hover:bg-[var(--overlay-subtle)]"
-                          style={{ color: 'var(--text-primary)', display: 'block' }}
+                          style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}
                         >
-                          {patientFullName(p)} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{p.hospitalNumber || ''}</span>
+                          <div className="bl-fee-name">{patientFullName(p)}</div>
+                          <span className="bl-fee-cat">{p.hospitalNumber || ''}</span>
                         </button>
                       ))}
                   </div>
@@ -1026,17 +676,16 @@ export default function ClaimsPage() {
             {/* Policy picker */}
             {newClaim.patientId && (
               patientPolicies.length === 0 ? (
-                <p className="text-xs px-3 py-2.5 rounded-md" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
+                <p className="bl-muted" style={{ fontSize: 12.5 }}>
                   This patient has no insurance policy on file — add one from their chart&rsquo;s Billing tab first.
                 </p>
               ) : (
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Insurance policy</label>
+                <div className="bl-field">
+                  <label htmlFor="claim-policy">Insurance policy</label>
                   <select
+                    id="claim-policy"
                     value={newClaim.policyId}
                     onChange={e => setNewClaim(f => ({ ...f, policyId: e.target.value }))}
-                    className="w-full p-2.5 rounded-md text-[13px]"
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                   >
                     <option value="">Select policy…</option>
                     {patientPolicies.map(pol => (
@@ -1052,13 +701,12 @@ export default function ClaimsPage() {
             {/* Bill or manual amount */}
             {newClaim.patientId && patientPolicies.length > 0 && (
               <>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Bill to claim against</label>
+                <div className="bl-field">
+                  <label htmlFor="claim-bill">Bill to claim against</label>
                   <select
+                    id="claim-bill"
                     value={newClaim.billingId}
                     onChange={e => setNewClaim(f => ({ ...f, billingId: e.target.value }))}
-                    className="w-full p-2.5 rounded-md text-[13px]"
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                   >
                     <option value="">No linked bill — enter amount manually</option>
                     {patientBills.map(b => (
@@ -1069,25 +717,25 @@ export default function ClaimsPage() {
                   </select>
                 </div>
                 {!newClaim.billingId && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Claim amount</label>
+                  <div className="bl-field">
+                    <label htmlFor="claim-amount">Claim amount</label>
                     <input
+                      id="claim-amount"
                       type="number"
                       min="0"
                       value={newClaim.amount}
                       onChange={e => setNewClaim(f => ({ ...f, amount: e.target.value }))}
-                      className="w-full p-2.5 rounded-md text-[13px]"
-                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                     />
                   </div>
                 )}
               </>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button className="btn btn-sm btn-secondary" disabled={submittingClaim} onClick={resetNewClaim}>Cancel</button>
+            <div className="bl-modal-actions">
+              <button type="button" className="bl-btn bl-btn--ghost" disabled={submittingClaim} onClick={resetNewClaim}>Cancel</button>
               <button
-                className="btn btn-sm btn-primary"
+                type="button"
+                className="bl-btn bl-btn--primary"
                 disabled={submittingClaim || !newClaim.patientId || !newClaim.policyId || (!newClaim.billingId && !newClaim.amount)}
                 onClick={handleSubmitNewClaim}
               >

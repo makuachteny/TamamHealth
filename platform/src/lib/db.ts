@@ -313,7 +313,10 @@ export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 // pharmacy inventory/prescriptions, blood bank stock and today's appointments
 // — instead of borrowed hosp-001 public data, so org.admin's dashboards show
 // a coherent Mercy-only dataset.
-export const SEED_VERSION = 57;
+// Bumped to 59: lab seed rows now carry accession numbers, specimen condition,
+// collection/receipt timestamps, and a rejection/recollection example so the
+// LIMS workflow additions are visible in fresh demo data.
+export const SEED_VERSION = 59;
 
 export async function isSeeded(): Promise<boolean> {
   try {

@@ -33,7 +33,9 @@ export default function Badge({ tone = 'neutral', size = 'sm', uppercase = false
   const sizing = size === 'sm' ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-1';
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full font-semibold whitespace-nowrap ${sizing} ${uppercase ? 'uppercase tracking-wide' : ''} ${className}`}
+      // `tamam-badge` is a styling hook, not a look: surfaces that carry no
+      // fills (the patient chart) restyle badges as outlines through it.
+      className={`tamam-badge inline-flex items-center gap-1 rounded-full font-semibold whitespace-nowrap ${sizing} ${uppercase ? 'uppercase tracking-wide' : ''} ${className}`}
       style={{ background: s.bg, color: s.color }}
     >
       {children}

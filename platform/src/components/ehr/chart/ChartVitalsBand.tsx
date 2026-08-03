@@ -84,8 +84,16 @@ export default function ChartVitalsBand({
           <Info />
         </span>
         <span className="omrs-vitals-spacer" />
-        <button type="button" className="omrs-vitals-record-link" onClick={onRecordVitals}>
-          Record vitals {canRecordVitals ? '→' : ''}
+        {/* The arrow used to double as the permission cue; the button now says
+            so directly by being disabled when vitals cannot be recorded. */}
+        <button
+          type="button"
+          className="omrs-vitals-record-link"
+          onClick={onRecordVitals}
+          disabled={!canRecordVitals}
+          title={canRecordVitals ? undefined : 'Requires vitals-recording permission'}
+        >
+          Record vitals
         </button>
       </div>
       <div className="omrs-vitals-grid">

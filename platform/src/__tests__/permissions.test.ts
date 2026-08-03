@@ -67,8 +67,18 @@ describe('permissions', () => {
       expect(isRouteAllowed('lab_tech', '/lab')).toBe(true);
     });
 
-    test('lab_tech cannot access /patients', () => {
-      expect(isRouteAllowed('lab_tech', '/patients')).toBe(false);
+    // Lab technicians work orders inside the patient chart (the bench steps
+    // live on /patients/<id>?tab=labs), so the route is open to them. The chart
+    // itself renders only the overview + labs tabs for this role — see
+    // LAB_TAB_IDS in the patient chart page — so the grant stays minimum
+    // necessary rather than opening notes, medications or the problem list.
+    test('lab_tech can access /patients to work orders in the chart', () => {
+      expect(isRouteAllowed('lab_tech', '/patients')).toBe(true);
+    });
+
+    test('lab_tech still has no access to clinical workspaces', () => {
+      expect(isRouteAllowed('lab_tech', '/consultation')).toBe(false);
+      expect(isRouteAllowed('lab_tech', '/pharmacy')).toBe(false);
     });
 
     test('all roles can access /settings', () => {

@@ -548,3 +548,144 @@
 .bl-muted { color: var(--ehr-muted, #8395A8); }
 .bl-danger { color: var(--color-danger, #DA1E28); }
 .bl-right { text-align: right; }
+
+/* ══════════════ Shared money-screen furniture ══════════════
+ *
+ * The bill detail view set the module's language; these are the pieces the
+ * other financial screens (cashier desk, claims, portal, the chart's billing
+ * tab) need to speak it too — a stat strip, a section card, a page head. All
+ * white surfaces with a 1px edge: the only colour on a money screen should be
+ * the money's state (unpaid, overdue, denied).
+ */
+
+/* Stat strip — the label-above-value row the bill header uses, reusable for
+   "today's collections", claim counts, A/R buckets. */
+.bl-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 28px;
+  padding: 16px 20px;
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+}
+
+.bl-stat-label {
+  display: block;
+  font-size: 12px;
+  color: var(--ehr-muted, #8395A8);
+  margin-bottom: 4px;
+}
+
+.bl-stat-value {
+  display: block;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ehr-text, #102634);
+  font-variant-numeric: tabular-nums;
+}
+
+.bl-stat-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--ehr-muted, #8395A8);
+  margin-top: 2px;
+}
+
+/* A stat that is itself the alarm — an overdue balance, a denied claim. */
+.bl-stat-value--danger { color: var(--color-danger, #DA1E28); }
+.bl-stat-value--good { color: #14713A; }
+
+/* Section card — the `bl-card` head treatment (teal underline under the title)
+   without assuming a table follows. */
+.bl-section {
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.bl-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.bl-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ehr-text, #102634);
+  margin: 0;
+}
+
+.bl-section-title::after {
+  content: '';
+  display: block;
+  width: 26px;
+  height: 3px;
+  margin-top: 6px;
+  background: var(--bl-teal);
+}
+
+/* Page head — title + the actions that belong to the whole screen. */
+.bl-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.bl-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Meter — payer mix, A/R aging: a proportion, not a chart. */
+.bl-meter { display: grid; gap: 10px; }
+
+.bl-meter-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 3fr) max-content;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.bl-meter-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--ehr-soft, #E9F0F5);
+  overflow: hidden;
+}
+
+.bl-meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--bl-teal);
+}
+
+.bl-meter-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--ehr-text-body, #39536B);
+  white-space: nowrap;
+}
+
+/* Empty states inside a money screen read as "nothing owed", which is
+   information — give them room rather than a one-line shrug. */
+.bl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.bl-empty strong { color: var(--ehr-text, #102634); font-size: 14px; }

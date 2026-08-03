@@ -7,11 +7,13 @@ import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { useRouter } from 'next/navigation';
-import { FlaskConical, AlertTriangle, X, Plus, Radio, CheckCircle2, Filter, Download } from '@/components/icons/lucide';
+import { FlaskConical, AlertTriangle, X, Plus, Radio, Filter, Download } from '@/components/icons/lucide';
 import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import LabOrderModal from '@/components/lab/order/LabOrderModal';
+import { LAB_WORKFLOW_STEP_LABEL, stepForStage } from '@/components/lab/workflow/lab-workflow-types';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { evaluateCritical } from '@/lib/services/lab-critical-flag';
-import { parseInstrumentPayload, type ParsedInstrumentResult } from '@/lib/services/instrument-intake-service';
+import { matchAnalyzerResult, parseInstrumentPayload, type ParsedInstrumentResult } from '@/lib/services/instrument-intake-service';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -20,6 +22,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { LabOrderStatus } from '@/lib/clinical-flow/order-lifecycles';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import PageInstructionCard from '@/components/PageInstructionCard';
+import type { LabResultDoc } from '@/lib/db-types';
 
 // Human labels for the granular diagnostics lifecycle (Stage 6).
 const ORDER_STAGE_LABEL: Record<LabOrderStatus, string> = {
@@ -42,40 +45,46 @@ function effOrderStatus(o: { orderStatus?: LabOrderStatus; status: 'pending' | '
   return 'ordered';
 }
 
-interface ResultDraft {
-  orderId: string;
-  patientName: string;
-  testName: string;
-  result: string;
-  unit: string;
-  referenceRange: string;
-  abnormal: boolean;
-  critical: boolean;
-  /** Whether the tech has manually toggled the critical checkbox; once true we
-   *  stop auto-deriving it from the QC critical-value table so the override sticks. */
-  criticalManual?: boolean;
+
+
+
+
+/**
+ * The two order attributes the wizard captured and nothing ever read back.
+ *
+ * A send-out leaves the building and is worked by a different set of hands; a
+ * future-dated draw is nobody's job until its date arrives. Both used to sit in
+ * the queue indistinguishable from a routine in-house draw-now order, which is
+ * the same as not recording them at all.
+ */
+function isOpenSendOut(o: LabResultDoc): boolean {
+  return o.processing === 'send_out' && o.status !== 'completed';
 }
 
-const LAB_TESTS_CATALOG = [
-  { name: 'Malaria RDT', specimen: 'Blood' },
-  { name: 'Full Blood Count', specimen: 'Blood' },
-  { name: 'Blood Glucose', specimen: 'Blood' },
-  { name: 'HIV Rapid Test', specimen: 'Blood' },
-  { name: 'CD4 Count', specimen: 'Blood' },
-  { name: 'Liver Function', specimen: 'Blood' },
-  { name: 'Renal Function', specimen: 'Blood' },
-  { name: 'Urinalysis', specimen: 'Urine' },
-  { name: 'Stool Microscopy', specimen: 'Stool' },
-  { name: 'Sputum AFB (TB)', specimen: 'Sputum' },
-  { name: 'Hepatitis B Surface Antigen', specimen: 'Blood' },
-  { name: 'Pregnancy Test (β-hCG)', specimen: 'Urine' },
-  { name: 'Syphilis (RPR)', specimen: 'Blood' },
-];
+/** A scheduled draw is "due" once its datetime has passed and it is still open. */
+function isScheduledCollection(o: LabResultDoc): boolean {
+  return o.collectionTiming === 'future'
+    && !!o.scheduledCollectionAt
+    && effOrderStatus(o) === 'ordered';
+}
+
+function isCollectionDue(o: LabResultDoc): boolean {
+  return isScheduledCollection(o) && new Date(o.scheduledCollectionAt!).getTime() <= Date.now();
+}
+
+function fallbackAccessionNumber(order: Pick<LabResultDoc, '_id' | 'accessionNumber' | 'orderedAt'>): string {
+  if (order.accessionNumber) return order.accessionNumber;
+  const ordered = new Date(order.orderedAt || Date.now());
+  const day = Number.isNaN(ordered.getTime())
+    ? new Date().toISOString().slice(2, 10).replace(/-/g, '')
+    : ordered.toISOString().slice(2, 10).replace(/-/g, '');
+  return `ACC-${day}-${order._id.replace(/^lab-/, '').slice(0, 5).toUpperCase()}`;
+}
 
 export default function LabPage() {
   // Per-column filters (replace the old search + status-tabs top bar).
   const searchParams = useSearchParams();
-  const [colFilters, setColFilters] = useState({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' });
+  const [colFilters, setColFilters] = useState({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '', worklist: '' });
   // Deep link from a patient chart: /lab?patient=<name> pre-filters the queue.
   useEffect(() => {
     const patientParam = searchParams?.get('patient');
@@ -87,12 +96,12 @@ export default function LabPage() {
   // existing per-column filter funnels below).
   const [quickSearch, setQuickSearch] = useState('');
   const anyFilterActive = anyColFilter || !!quickSearch;
-  const clearColFilters = () => { setColFilters({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' }); setQuickSearch(''); };
+  const clearColFilters = () => { setColFilters({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '', worklist: '' }); setQuickSearch(''); };
   // Header "Filters" popover (test type + status) — mirrors the patients
   // registry's Filters dropdown pattern, separate from the per-column funnels.
   const [showHeaderFilters, setShowHeaderFilters] = useState(false);
   const headerFilterRef = useRef<HTMLDivElement>(null);
-  const headerFilterCount = [colFilters.test, colFilters.status].filter(Boolean).length;
+  const headerFilterCount = [colFilters.test, colFilters.status, colFilters.worklist].filter(Boolean).length;
   useEffect(() => {
     if (!showHeaderFilters) return;
     const onDown = (e: MouseEvent) => { if (headerFilterRef.current && !headerFilterRef.current.contains(e.target as Node)) setShowHeaderFilters(false); };
@@ -101,8 +110,8 @@ export default function LabPage() {
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
   }, [showHeaderFilters]);
-  const { globalSearch, currentUser } = useApp();
-  const { results: labResults, update: updateLabResult, advance: advanceLabOrder, loading: labLoading, reload: reloadLabs } = useLabResults();
+  const { globalSearch } = useApp();
+  const { results: labResults, loading: labLoading, reload: reloadLabs } = useLabResults();
   const { patients } = usePatients();
   const patientById = useMemo(() => new Map(patients.map(patient => [patient._id, patient])), [patients]);
   const { canEnterLabResults, canOrderLabs } = usePermissions();
@@ -110,9 +119,6 @@ export default function LabPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { resultReviewSLA } = useSettings();
-  const [resultDraft, setResultDraft] = useState<ResultDraft | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
   // Analyzer import: paste a raw instrument payload (LIS-2A / HL7) and parse it
   // into structured results the tech can review before pre-filling an order.
   const [showImportModal, setShowImportModal] = useState(false);
@@ -136,189 +142,45 @@ export default function LabPage() {
     setImportProtocol(null);
   };
 
-  // Take one parsed analyzer result and open the standard result-entry modal
-  // pre-filled for review. We try to match it to a pending order by test name;
-  // otherwise the tech still reviews/edits before saving (never auto-saved).
-  const prefillFromAnalyzer = (parsed: ParsedInstrumentResult) => {
+  // Take one parsed analyzer reading to the bench workflow in the patient's
+  // chart, with the value carried in the URL so the tech reviews and files it
+  // there rather than in a popup. Never auto-saved.
+  const openAnalyzerResult = (parsed: ParsedInstrumentResult) => {
     const value = parsed.numericValue != null ? String(parsed.numericValue) : (parsed.textValue || '');
-    const matchOrder = labResults.find(o =>
-      o.status !== 'completed' &&
-      (o.testName || '').toLowerCase().includes((parsed.testName || '').toLowerCase().split(' (')[0])
-    ) || labResults.find(o =>
-      o.status !== 'completed' &&
-      (parsed.testName || '').toLowerCase().includes((o.testName || '').toLowerCase())
-    );
-    const crit = evaluateCritical(parsed.testName, value);
-    setResultDraft({
-      orderId: matchOrder?._id || '',
-      patientName: matchOrder?.patientName || '',
-      testName: parsed.testName || parsed.testCode,
-      result: value,
-      unit: parsed.unit || matchOrder?.unit || '',
-      referenceRange: parsed.referenceRange || matchOrder?.referenceRange || '',
-      abnormal: !!parsed.abnormalFlag && parsed.abnormalFlag.toUpperCase() !== 'N',
-      critical: crit.isCriticalValue,
-      criticalManual: false,
-    });
+    const match = matchAnalyzerResult(parsed, labResults);
+    if (!match?.patientId) {
+      showToast(t('labFlow.noMatchingOrder'), 'error');
+      return;
+    }
+    // Name-only matches are a guess: two patients can be waiting on the same
+    // test, and the tech is about to file a value against a chart. Say which
+    // one, and on what basis, before they land there.
+    if (!parsed.accession?.trim()) {
+      showToast(t('labFlow.matchedByNameWarning', { patient: match.patientName || '—', test: match.testName || '—' }), 'error');
+    }
+    const params = new URLSearchParams({ tab: 'labs', focus: match._id, value });
+    if (parsed.unit) params.set('unit', parsed.unit);
+    if (parsed.referenceRange) params.set('range', parsed.referenceRange);
     resetImport();
+    router.push(`/patients/${match.patientId}?${params.toString()}`);
   };
-
-  // Update the draft's result value and auto-derive the critical flag from the
-  // QC critical-value table — unless the tech has manually overridden it.
-  const updateDraftResult = (value: string) => {
-    setResultDraft(prev => {
-      if (!prev) return prev;
-      const crit = evaluateCritical(prev.testName, value);
-      const critical = prev.criticalManual ? prev.critical : crit.isCriticalValue;
-      return { ...prev, result: value, critical, abnormal: prev.abnormal || (critical && !prev.criticalManual ? true : prev.abnormal) };
-    });
-  };
-
-  // Live QC verdict for the open draft (for the in-modal banner).
-  const draftCritical = resultDraft ? evaluateCritical(resultDraft.testName, resultDraft.result) : { isCriticalValue: false };
 
   // Create-order modal state
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const [orderPatientId, setOrderPatientId] = useState('');
-  const [labOrderPatientSearch, setLabOrderPatientSearch] = useState('');
-  const [orderTests, setOrderTests] = useState<string[]>([]);
-  const [orderPriority, setOrderPriority] = useState<'routine' | 'urgent' | 'stat'>('routine');
-  const [orderNotes, setOrderNotes] = useState('');
-  const [orderSubmitting, setOrderSubmitting] = useState(false);
 
-  const handleCreateOrders = async () => {
-    const patient = patients.find(p => p._id === orderPatientId);
-    if (!patient) {
-      showToast(t('lab.choosePatient'), 'error');
-      return;
-    }
-    if (orderTests.length === 0) {
-      showToast(t('lab.selectAtLeastOneTest'), 'error');
-      return;
-    }
-    try {
-      setOrderSubmitting(true);
-      const hospitalId = currentUser?.hospitalId || patient.registrationHospital;
-      const patientName = `${patient.firstName} ${patient.surname}`;
-
-      // A walk-in lab order has no consultation behind it, so nothing used to
-      // anchor it: the LabResultDoc carried no encounterId and no charge was
-      // raised. Those tests were financially and clinically invisible — no
-      // bill, no invoice line, and not attributable to a facility encounter
-      // (KAN-72). Open a minimal encounter first so both have something to
-      // hang off.
-      let deskEncounterId: string | undefined;
-      try {
-        const { createEncounter } = await import('@/lib/services/encounter-service');
-        const encounter = await createEncounter({
-          patientId: patient._id,
-          patientName,
-          hospitalNumber: patient.hospitalNumber,
-          // The patient is physically at the lab and nowhere else in the
-          // journey — `awaiting_labs` is the honest stage for that.
-          status: 'awaiting_labs',
-          startedAt: new Date().toISOString(),
-          hospitalId,
-          hospitalName: currentUser?.hospitalName,
-          orgId: currentUser?.orgId,
-          clinicianId: currentUser?._id,
-          clinicianName: currentUser?.name,
-        } as never);
-        deskEncounterId = encounter._id;
-      } catch (err) {
-        // Never block the order on this. An unbilled test still beats a
-        // clinician unable to order one.
-        console.warn('[lab] could not open a desk encounter for this order:', err);
-      }
-
-      const { createLabResult } = await import('@/lib/services/lab-service');
-      const createdIds: string[] = [];
-      for (const testName of orderTests) {
-        const catalog = LAB_TESTS_CATALOG.find(t => t.name === testName);
-        const created = await createLabResult({
-          patientId: patient._id,
-          patientName,
-          hospitalNumber: patient.hospitalNumber,
-          encounterId: deskEncounterId,
-          testName,
-          specimen: catalog?.specimen || 'Blood',
-          status: orderPriority === 'stat' ? 'in_progress' : 'pending',
-          result: '',
-          unit: '',
-          referenceRange: '',
-          abnormal: false,
-          // `critical` describes the RESULT VALUE, not the order priority —
-          // nothing has come back yet, so it cannot be critical. It was
-          // previously set from `orderPriority === 'stat'`, which made every
-          // STAT order announce itself as a critical result once filed
-          // (and now would raise a spurious critical-result task, KAN-75).
-          // Urgency is carried by the in_progress status above.
-          critical: false,
-          orderedBy: currentUser?.name || 'Lab',
-          orderedAt: new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-          completedAt: '',
-          hospitalId,
-          hospitalName: currentUser?.hospitalName,
-          orgId: currentUser?.orgId,
-          clinicalNotes: orderNotes || undefined,
-        });
-        createdIds.push(created._id);
-      }
-
-      // Bill the tests against that encounter. Best-effort and price-driven:
-      // lines with no catalogued price are skipped and no bill is created when
-      // the org hasn't priced anything, so this is safe before pricing is set
-      // up — same contract the consultation path uses.
-      if (deskEncounterId) {
-        try {
-          const { chargeForServices } = await import('@/lib/services/fee-schedule-service');
-          await chargeForServices(
-            {
-              patientId: patient._id,
-              patientName,
-              hospitalNumber: patient.hospitalNumber,
-              facilityId: hospitalId,
-              facilityName: currentUser?.hospitalName || '',
-              facilityLevel: 'clinic',
-              state: patient.state || '',
-              county: patient.county,
-              orgId: currentUser?.orgId,
-              encounterId: deskEncounterId,
-              generatedBy: currentUser?._id || 'system',
-              generatedByName: currentUser?.name || 'Lab desk',
-              scope: { orgId: currentUser?.orgId, hospitalId, role: currentUser?.role || 'lab_tech' },
-            },
-            orderTests.map((testName, i) => ({
-              category: 'laboratory' as const,
-              serviceCode: testName,
-              description: testName,
-              referenceId: createdIds[i],
-              referenceType: 'lab_result',
-            })),
-          );
-        } catch (err) {
-          console.warn('[lab] could not bill desk lab order (tests were ordered):', err);
-        }
-      }
-      const { logAudit } = await import('@/lib/services/audit-service');
-      await logAudit('LAB_ORDER_CREATED', currentUser?._id, currentUser?.username,
-        `Ordered ${orderTests.length} test(s) for ${patient.firstName} ${patient.surname}: ${orderTests.join(', ')}`
-      ).catch(() => {});
-      showToast(t('lab.ordersCreated', { count: orderTests.length }), 'success');
-      setShowOrderModal(false);
-      setOrderPatientId('');
-      setLabOrderPatientSearch('');
-      setOrderTests([]);
-      setOrderNotes('');
-      setOrderPriority('routine');
-      await reloadLabs();
-    } catch (err) {
-      console.error(err);
-      showToast(t('lab.createOrderFailed'), 'error');
-    } finally {
-      setOrderSubmitting(false);
-    }
-  };
+  // Results back but not yet reviewed by a clinician past their SLA
+  // (24h critical / 7 days routine) — surfaced so they can't sit unseen.
+  // Computed before `filtered` because the worklist filter selects on it.
+  const overdueReviews = labResults.filter(o => {
+    if (effOrderStatus(o) !== 'resulted') return false;
+    const resultedAt = new Date(o.updatedAt || o.createdAt || '').getTime();
+    if (!Number.isFinite(resultedAt)) return false;
+    const slaHours = o.critical ? resultReviewSLA.criticalHours : resultReviewSLA.routineHours;
+    return (Date.now() - resultedAt) / 3_600_000 > slaHours;
+  });
+  // Rather than a banner above the table, the offending rows themselves glow
+  // red in the list — the alert stays attached to the patient it's about.
+  const overdueIds = new Set(overdueReviews.map(o => o._id));
 
   const filtered = labResults.filter(o => {
     const f = colFilters;
@@ -330,6 +192,10 @@ export default function LabPage() {
     if (f.status && o.status !== f.status) return false;
     if (f.result && !(o.result || '').toLowerCase().includes(f.result.toLowerCase())) return false;
     if (f.orderedBy && !(o.orderedBy || '').toLowerCase().includes(f.orderedBy.toLowerCase())) return false;
+    if (f.worklist === 'send_out' && !isOpenSendOut(o)) return false;
+    if (f.worklist === 'scheduled' && !isScheduledCollection(o)) return false;
+    if (f.worklist === 'due' && !isCollectionDue(o)) return false;
+    if (f.worklist === 'overdue_review' && !overdueIds.has(o._id)) return false;
     return true;
   });
 
@@ -342,6 +208,10 @@ export default function LabPage() {
     completed: labResults.filter(o => o.status === 'completed').length,
     critical: labResults.filter(o => o.critical).length,
     awaiting: labResults.filter(o => o.status === 'pending' || o.status === 'in_progress').length,
+    // Work that leaves the building, and draws that are already due. Both were
+    // recorded on the order and then invisible.
+    sendOut: labResults.filter(isOpenSendOut).length,
+    collectionDue: labResults.filter(isCollectionDue).length,
   };
 
   // Distinct test names present in the queue, for the header's "test type" filter.
@@ -395,84 +265,6 @@ export default function LabPage() {
   ];
   const labColTotal = labCols.reduce((sum, c) => sum + c.width, 0);
 
-  // Results back but not yet reviewed by a clinician past their SLA
-  // (24h critical / 7 days routine) — surfaced so they can't sit unseen.
-  const overdueReviews = labResults.filter(o => {
-    if (effOrderStatus(o) !== 'resulted') return false;
-    const resultedAt = new Date(o.updatedAt || o.createdAt || '').getTime();
-    if (!Number.isFinite(resultedAt)) return false;
-    const slaHours = o.critical ? resultReviewSLA.criticalHours : resultReviewSLA.routineHours;
-    return (Date.now() - resultedAt) / 3_600_000 > slaHours;
-  });
-  // Rather than a banner above the table, the offending rows themselves glow
-  // red in the list — the alert stays attached to the patient it's about.
-  const overdueIds = new Set(overdueReviews.map(o => o._id));
-
-  // When the user marks a result `critical`, we gate the submission through a
-  // confirmation modal — typoing a Hb of 4 g/dL into a critical result is the
-  // kind of mistake that triggers transfusions, so two-eyes confirmation
-  // before persisting is worth the extra click.
-  const [criticalConfirmOpen, setCriticalConfirmOpen] = useState(false);
-
-  const persistResult = async () => {
-    if (!resultDraft || !resultDraft.result.trim()) return;
-    setSubmitting(true);
-    try {
-      await updateLabResult(resultDraft.orderId, {
-        status: 'completed',
-        orderStatus: 'resulted',
-        result: resultDraft.result.trim(),
-        unit: resultDraft.unit.trim(),
-        referenceRange: resultDraft.referenceRange.trim(),
-        abnormal: resultDraft.abnormal,
-        critical: resultDraft.critical,
-        completedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      });
-
-      // If critical, fire-and-forget a high-priority message to the ordering
-      // doctor. We never block the lab worker on this — saving the result is
-      // the priority — but if notification fails we toast a clear "please
-      // call them" so the loop can still close manually.
-      if (resultDraft.critical) {
-        const order = labResults.find(r => r._id === resultDraft.orderId);
-        try {
-          const { createMessage } = await import('@/lib/services/message-service');
-          await createMessage({
-            recipientType: 'staff',
-            patientId: order?.patientId || '',
-            patientName: resultDraft.patientName,
-            patientPhone: '',
-            fromDoctorId: currentUser?._id || 'lab',
-            fromDoctorName: currentUser?.name || 'Laboratory',
-            fromHospitalName: currentUser?.hospitalName || order?.hospitalName || '',
-            subject: `CRITICAL: ${resultDraft.testName} for ${resultDraft.patientName}`,
-            body: `Critical lab result for ${resultDraft.patientName} — ${resultDraft.testName}: ${resultDraft.result.trim()}${resultDraft.unit.trim() ? ' ' + resultDraft.unit.trim() : ''}${resultDraft.referenceRange.trim() ? ` (reference range: ${resultDraft.referenceRange.trim()})` : ''}. Please review immediately.`,
-            channel: 'app',
-            sentAt: new Date().toISOString(),
-            orgId: currentUser?.orgId || order?.orgId,
-          });
-        } catch (err) {
-          console.error('[lab] failed to send critical-result alert', err);
-          showToast(t('lab.savedNotifyFailed'), 'error');
-        }
-      }
-
-      setResultDraft(null);
-      setCriticalConfirmOpen(false);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const submitResult = async () => {
-    if (!resultDraft || !resultDraft.result.trim()) return;
-    if (resultDraft.critical) {
-      setCriticalConfirmOpen(true);
-      return;
-    }
-    await persistResult();
-  };
-
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
@@ -485,201 +277,6 @@ export default function LabPage() {
             </div>
           )}
 
-          {/* Result Entry Modal */}
-          {resultDraft && (
-            <Modal onClose={() => !submitting && setResultDraft(null)} width={520}>
-              <div
-                className="card-elevated"
-                style={{
-                  width: '100%', padding: 28, borderRadius: 16,
-                  background: 'var(--bg-card)', position: 'relative',
-                  boxShadow: '0 24px 64px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.1)',
-                  maxHeight: '90vh', overflowY: 'auto',
-                }}
-              >
-                <button
-                  onClick={() => !submitting && setResultDraft(null)}
-                  className="absolute"
-                  style={{ top: 14, right: 14, width: 30, height: 30, borderRadius: 6, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}
-                  title={t('action.close')}
-                  disabled={submitting}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-                    <FlaskConical className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.enterLabResult')}</h3>
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{resultDraft.testName}{resultDraft.patientName ? ` · ${resultDraft.patientName}` : ''}</p>
-                  </div>
-                </div>
-
-                {!resultDraft.orderId && (
-                  <div className="mt-3 p-2.5 rounded-lg flex items-start gap-2" style={{ background: 'rgba(228,168,75,0.1)', border: '1px solid rgba(228,168,75,0.3)' }}>
-                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#8F6823' }} />
-                    <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                      This analyzer result could not be matched to a pending order. Review the values, then create or select the matching order to save against it.
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-3 mt-5">
-                  <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>{t('lab.resultRequired')}</label>
-                    <input
-                      type="text"
-                      autoFocus
-                      value={resultDraft.result}
-                      onChange={(e) => updateDraftResult(e.target.value)}
-                      placeholder={t('lab.resultExamplePlaceholder')}
-                      className="w-full p-2.5 rounded-lg outline-none text-sm"
-                      style={{
-                        background: 'var(--overlay-subtle)',
-                        border: '1px solid var(--border-light)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>{t('lab.unit')}</label>
-                      <input
-                        type="text"
-                        value={resultDraft.unit}
-                        onChange={(e) => setResultDraft({ ...resultDraft, unit: e.target.value })}
-                        placeholder={t('lab.unitExamplePlaceholder')}
-                        className="w-full p-2.5 rounded-lg outline-none text-sm"
-                        style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>{t('lab.referenceRange')}</label>
-                      <input
-                        type="text"
-                        value={resultDraft.referenceRange}
-                        onChange={(e) => setResultDraft({ ...resultDraft, referenceRange: e.target.value })}
-                        placeholder={t('lab.referenceExamplePlaceholder')}
-                        className="w-full p-2.5 rounded-lg outline-none text-sm"
-                        style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* QC critical-value banner — auto-derived from the qc-service
-                      DEFAULT_CRITICAL_VALUES table when the entered value breaches
-                      a critical threshold. Manual override remains available below. */}
-                  {draftCritical.isCriticalValue && draftCritical.rule ? (
-                    <div className="p-3 rounded-lg flex items-start gap-2.5" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid var(--color-danger)' }}>
-                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-danger)' }} />
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-danger)' }}>Critical value</p>
-                        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                          {resultDraft.result} breaches the critical range for {draftCritical.rule.testName}
-                          {draftCritical.rule.rationale ? ` — ${draftCritical.rule.rationale}.` : '.'} Flagged for urgent review.
-                        </p>
-                      </div>
-                    </div>
-                  ) : draftCritical.rule ? (
-                    <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
-                      <span>Within QC critical limits for {draftCritical.rule.testName}.</span>
-                    </div>
-                  ) : null}
-
-                  <div className="flex items-center gap-4 pt-1">
-                    <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                      <input
-                        type="checkbox"
-                        checked={resultDraft.abnormal}
-                        onChange={(e) => setResultDraft({ ...resultDraft, abnormal: e.target.checked, critical: e.target.checked ? resultDraft.critical : false })}
-                      />
-                      {t('lab.abnormal')}
-                    </label>
-                    <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)', opacity: resultDraft.abnormal ? 1 : 0.5 }}>
-                      <input
-                        type="checkbox"
-                        checked={resultDraft.critical}
-                        disabled={!resultDraft.abnormal}
-                        onChange={(e) => setResultDraft({ ...resultDraft, critical: e.target.checked, criticalManual: true })}
-                      />
-                      {t('lab.criticalLabel')}
-                    </label>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 mt-6 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
-                  <button
-                    onClick={() => setResultDraft(null)}
-                    disabled={submitting}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    {t('action.cancel')}
-                  </button>
-                  <button
-                    onClick={submitResult}
-                    disabled={submitting || !resultDraft.result.trim() || !resultDraft.orderId}
-                    className="btn btn-primary btn-sm"
-                    style={{ opacity: submitting || !resultDraft.result.trim() || !resultDraft.orderId ? 0.6 : 1 }}
-                  >
-                    {submitting ? t('lab.saving') : t('lab.saveResult')}
-                  </button>
-                </div>
-              </div>
-            </Modal>
-          )}
-
-          {/* Critical-Result Confirmation Modal */}
-          {resultDraft && criticalConfirmOpen && (
-            <Modal onClose={() => !submitting && setCriticalConfirmOpen(false)} width={460}>
-              <div
-                className="card-elevated"
-                style={{
-                  width: '100%', padding: 24, borderRadius: 16,
-                  background: 'var(--bg-card)',
-                  boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
-                  border: '1px solid var(--color-danger)',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-                    <AlertTriangle className="w-5 h-5" style={{ color: 'var(--color-danger)' }} />
-                  </div>
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--color-danger)' }}>{t('lab.confirmCriticalResult')}</h3>
-                </div>
-                <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
-                  {t('lab.confirmCriticalResultDesc')}
-                </p>
-                <div className="rounded-lg p-3 space-y-1.5 mb-4" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</span><span className="font-medium">{resultDraft.patientName}</span></div>
-                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>{t('lab.testName')}</span><span className="font-medium">{resultDraft.testName}</span></div>
-                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>{t('lab.value')}</span><span className="font-bold" style={{ color: 'var(--color-danger)' }}>{resultDraft.result}{resultDraft.unit ? ` ${resultDraft.unit}` : ''}</span></div>
-                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>{t('lab.referenceRange')}</span><span className="font-medium">{resultDraft.referenceRange || '—'}</span></div>
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => setCriticalConfirmOpen(false)}
-                    disabled={submitting}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    {t('action.cancel')}
-                  </button>
-                  <button
-                    onClick={persistResult}
-                    disabled={submitting}
-                    className="btn btn-sm"
-                    style={{ background: 'var(--color-danger)', color: 'white', opacity: submitting ? 0.6 : 1 }}
-                  >
-                    {submitting ? t('lab.saving') : t('lab.confirmCriticalResult')}
-                  </button>
-                </div>
-              </div>
-            </Modal>
-          )}
-
           {/* Lab Orders Table */}
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
             <EhrListHeader
@@ -690,6 +287,10 @@ export default function LabPage() {
                 { label: 'In progress', value: labStats.inProgress, color: LIST_STAT_COLORS.amber },
                 { label: 'Completed', value: labStats.completed, color: LIST_STAT_COLORS.green },
                 { label: 'Critical', value: labStats.critical, color: LIST_STAT_COLORS.bronze },
+                // Only shown when there is something to act on — a lab that
+                // never sends out should not carry a permanent "Send-outs 0".
+                ...(labStats.sendOut > 0 ? [{ label: 'Send-outs', value: labStats.sendOut, color: LIST_STAT_COLORS.muted }] : []),
+                ...(labStats.collectionDue > 0 ? [{ label: 'Draws due', value: labStats.collectionDue, color: LIST_STAT_COLORS.amber }] : []),
               ]}
               search={{ value: quickSearch, onChange: setQuickSearch, placeholder: 'Filter table', ariaLabel: 'Filter table' }}
               actions={
@@ -717,7 +318,7 @@ export default function LabPage() {
                           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('patients.filtersTitle')}</span>
                           <div className="flex items-center gap-2">
                             {headerFilterCount > 0 && (
-                              <button type="button" onClick={() => { setColFilter('test', ''); setColFilter('status', ''); }} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
+                              <button type="button" onClick={() => { setColFilter('test', ''); setColFilter('status', ''); setColFilter('worklist', ''); }} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
                             )}
                             <button type="button" onClick={() => setShowHeaderFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
                               <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -739,6 +340,18 @@ export default function LabPage() {
                               <option value="pending">{t('lab.filterPending')}</option>
                               <option value="in_progress">{t('lab.inProgress')}</option>
                               <option value="completed">{t('referral.completed')}</option>
+                            </select>
+                          </label>
+                          {/* The queue's own worklists — the same table, narrowed
+                              to one job, rather than four separate screens. */}
+                          <label className="flex flex-col gap-1 sm:col-span-2">
+                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('lab.worklist')}</span>
+                            <select value={colFilters.worklist} onChange={e => setColFilter('worklist', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                              <option value="">{t('lab.worklistAll')}</option>
+                              <option value="due">{t('lab.worklistDue')}</option>
+                              <option value="scheduled">{t('lab.worklistScheduled')}</option>
+                              <option value="send_out">{t('lab.worklistSendOut')}</option>
+                              <option value="overdue_review">{t('lab.worklistOverdueReview')}</option>
                             </select>
                           </label>
                         </div>
@@ -819,7 +432,15 @@ export default function LabPage() {
                         <Badge tone={order.tier === 'special' ? 'accent' : 'neutral'} uppercase className="ml-2 align-middle">{order.tier}</Badge>
                       )}
                     </td>
-                    <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{order.specimen}</td>
+                    <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      <div>{order.specimen}</div>
+                      <div className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {order.accessionNumber || fallbackAccessionNumber(order)}
+                      </div>
+                      {order.specimenRejectionReason && (
+                        <Badge tone="danger" className="mt-1">{order.specimenRejectionReason}</Badge>
+                      )}
+                    </td>
                     <td>
                       <Badge tone={order.status === 'pending' ? 'warning' : order.status === 'in_progress' ? 'info' : 'neutral'}>
                         {ORDER_STAGE_LABEL[effOrderStatus(order)]}
@@ -845,76 +466,25 @@ export default function LabPage() {
                     {canEnterLabResults && (
                       <td onClick={(e) => e.stopPropagation()}>
                         {(() => {
-                          const stage = effOrderStatus(order);
-                          const btn = { padding: '4px 12px', fontSize: '0.75rem' } as const;
-                          if (stage === 'ordered') {
-                            return (
-                              <button className="btn btn-primary btn-sm" style={btn}
-                                onClick={() => advanceLabOrder(order._id, 'specimen_collected')}>Collect specimen</button>
-                            );
-                          }
-                          if (stage === 'specimen_collected' || stage === 'rejected_needs_recollection') {
-                            return (
-                              <div className="flex flex-wrap gap-1.5">
-                                <button className="btn btn-primary btn-sm" style={btn}
-                                  onClick={() => advanceLabOrder(order._id, 'received_at_lab')}>Receive at lab</button>
-                                {stage === 'specimen_collected' && (
-                                  <button className="btn btn-secondary btn-sm" style={btn}
-                                    onClick={() => advanceLabOrder(order._id, 'rejected_needs_recollection')}>Reject</button>
-                                )}
-                                {stage === 'rejected_needs_recollection' && (
-                                  <button className="btn btn-secondary btn-sm" style={btn}
-                                    onClick={() => advanceLabOrder(order._id, 'specimen_collected')}>Re-collect</button>
-                                )}
-                              </div>
-                            );
-                          }
-                          if (stage === 'received_at_lab') {
-                            return (
-                              <button className="btn btn-primary btn-sm" style={btn}
-                                onClick={() => advanceLabOrder(order._id, 'in_process')}>Start processing</button>
-                            );
-                          }
-                          if (stage === 'in_process') {
-                            return (
-                              <button className="btn btn-primary btn-sm" style={{ ...btn, background: 'var(--accent-primary)' }}
-                                onClick={() => setResultDraft({
-                                  orderId: order._id,
-                                  patientName: order.patientName || '',
-                                  testName: order.testName || '',
-                                  result: '',
-                                  unit: order.unit || '',
-                                  referenceRange: order.referenceRange || '',
-                                  abnormal: false,
-                                  critical: false,
-                                })}
-                              >
-                                {t('lab.enterResult')}
-                              </button>
-                            );
-                          }
-                          // resulted and beyond — awaiting the clinician's review.
-                          // Allow correcting the entered result value (saved via the
-                          // raw update path, which does not advance the lifecycle).
+                          // Lab work happens in the chart, not in a popup: the
+                          // technician needs the patient around the result
+                          // (allergies, problems, the rest of the panel), and
+                          // the six bench steps live there. This column just
+                          // names the next step and links straight to it.
+                          const step = stepForStage(effOrderStatus(order));
+                          const openWorkflow = () => {
+                            if (!order.patientId) return;
+                            router.push(`/patients/${order.patientId}?tab=labs&focus=${order._id}`);
+                          };
                           return (
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Awaiting clinician review</span>
-                              <button className="btn btn-secondary btn-sm" style={btn}
-                                onClick={() => setResultDraft({
-                                  orderId: order._id,
-                                  patientName: order.patientName || '',
-                                  testName: order.testName || '',
-                                  result: order.result || '',
-                                  unit: order.unit || '',
-                                  referenceRange: order.referenceRange || '',
-                                  abnormal: !!order.abnormal,
-                                  critical: !!order.critical,
-                                  criticalManual: !!order.critical,
-                                })}
-                              >
-                                {t('action.edit')}
-                              </button>
-                            </div>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              style={{ padding: '4px 12px', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                              onClick={openWorkflow}
+                              disabled={!order.patientId}
+                            >
+                              {t(LAB_WORKFLOW_STEP_LABEL[step])}
+                            </button>
                           );
                         })()}
                       </td>
@@ -1015,7 +585,7 @@ export default function LabPage() {
                               </td>
                               <td>
                                 <button className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '0.7rem' }}
-                                  onClick={() => prefillFromAnalyzer(p)}>
+                                  onClick={() => openAnalyzerResult(p)}>
                                   Review &amp; enter
                                 </button>
                               </td>
@@ -1035,143 +605,12 @@ export default function LabPage() {
             </Modal>
           )}
 
-          {/* New Lab Order Modal */}
+          {/* Create Lab Order — compact dialog → six-step requisition wizard. */}
           {showOrderModal && (
-            <Modal onClose={() => !orderSubmitting && setShowOrderModal(false)}>
-              <div className="modal-content card-elevated p-6 max-w-xl w-full" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <FlaskConical className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-                    <h3 className="text-base font-semibold">{t('lab.newLabOrder')}</h3>
-                  </div>
-                  <button onClick={() => setShowOrderModal(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</label>
-                    {(() => {
-                      const selectedPatient = orderPatientId ? patients.find(p => p._id === orderPatientId) : null;
-                      if (selectedPatient) {
-                        return (
-                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                            <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                              {t('lab.selectedLabel')} <span className="font-medium">{selectedPatient.firstName} {selectedPatient.surname}</span>
-                              <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>({selectedPatient.hospitalNumber})</span>
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => { setOrderPatientId(''); setLabOrderPatientSearch(''); }}
-                              className="text-xs underline"
-                              style={{ color: 'var(--accent-primary)' }}
-                            >
-                              {t('lab.change')}
-                            </button>
-                          </div>
-                        );
-                      }
-                      const q = labOrderPatientSearch.trim().toLowerCase();
-                      const matches = q.length >= 1
-                        ? patients.filter(p => {
-                            const name = `${p.firstName || ''} ${p.surname || ''}`.toLowerCase();
-                            return name.includes(q)
-                              || (p.hospitalNumber || '').toLowerCase().includes(q)
-                              || (p.phone || '').toLowerCase().includes(q);
-                          }).slice(0, 8)
-                        : [];
-                      return (
-                        <div>
-                          <input
-                            type="search"
-                            value={labOrderPatientSearch}
-                            onChange={e => setLabOrderPatientSearch(e.target.value)}
-                            placeholder={t('lab.searchPatientPlaceholder')}
-                            className="w-full p-2.5 rounded-lg outline-none text-sm"
-                            style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-                          />
-                          {matches.length > 0 && (
-                            <div className="mt-1 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
-                              {matches.map(p => (
-                                <button
-                                  key={p._id}
-                                  type="button"
-                                  onClick={() => { setOrderPatientId(p._id); setLabOrderPatientSearch(''); }}
-                                  className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-white/5 transition-colors"
-                                  style={{ borderBottom: '1px solid var(--border-light)' }}
-                                >
-                                  <span className="text-sm font-medium truncate">{p.firstName} {p.surname}</span>
-                                  <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          {q.length >= 1 && matches.length === 0 && (
-                            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{t('lab.noPatientsMatch')}</p>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('lab.testsSelectedLabel', { count: orderTests.length })}</label>
-                      {orderTests.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setOrderTests([])}
-                          className="text-xs underline"
-                          style={{ color: 'var(--accent-primary)' }}
-                        >
-                          {t('action.clear')}
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 rounded-lg keep-cols" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      {LAB_TESTS_CATALOG.map(t => {
-                        const checked = orderTests.includes(t.name);
-                        return (
-                          <label key={t.name} className="flex items-center gap-2 p-2 rounded text-xs cursor-pointer" style={{ background: checked ? 'var(--accent-light)' : 'transparent' }}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={e => {
-                                if (e.target.checked) setOrderTests([...orderTests, t.name]);
-                                else setOrderTests(orderTests.filter(n => n !== t.name));
-                              }}
-                            />
-                            <span className="flex-1">
-                              <span className="font-medium">{t.name}</span>
-                              <span className="block text-[10px]" style={{ color: 'var(--text-muted)' }}>{t.specimen}</span>
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('lab.priority')}</label>
-                      <select value={orderPriority} onChange={e => setOrderPriority(e.target.value as 'routine' | 'urgent' | 'stat')}>
-                        <option value="routine">{t('appointments.priorityRoutine')}</option>
-                        <option value="urgent">{t('appointments.priorityUrgent')}</option>
-                        <option value="stat">{t('lab.priorityStat')}</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('referral.notes')}</label>
-                    <textarea rows={2} value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder={t('lab.clinicalNotesPlaceholder')} />
-                  </div>
-                </div>
-                <div className="flex gap-2 mt-5">
-                  <button onClick={() => setShowOrderModal(false)} className="btn btn-secondary flex-1" disabled={orderSubmitting}>{t('action.cancel')}</button>
-                  <button onClick={handleCreateOrders} className="btn btn-primary flex-1" disabled={orderSubmitting}>
-                    {orderSubmitting ? t('lab.creating') : t('dashboard.orderTests', { count: orderTests.length })}
-                  </button>
-                </div>
-              </div>
-            </Modal>
+            <LabOrderModal
+              onClose={() => setShowOrderModal(false)}
+              onPlaced={() => { void reloadLabs(); }}
+            />
           )}
       </main>
     </>

@@ -27,10 +27,9 @@ import {
   Calendar, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList,
   MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
-  Send, Stethoscope,
+  Send, Stethoscope, FileText, Ban, RotateCcw, type LucideIcon,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
-import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 
 /**
  * Front-desk operations workspace.
@@ -137,10 +136,6 @@ export default function FrontDeskDashboardPage() {
   const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered'>('all');
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  // The queue entry backing the open detail popup (carries triage/room context);
-  // null when a non-queue row (e.g. a registered patient) opened the popup.
-  const [selectedEntry, setSelectedEntry] = useState<QueueItem | null>(null);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
   const [checkInTarget, setCheckInTarget] = useState<AppointmentDoc | null>(null);
@@ -155,8 +150,6 @@ export default function FrontDeskDashboardPage() {
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [encounters, setEncounters] = useState<EncounterDoc[]>([]);
-  const [roomDraft, setRoomDraft] = useState('');
-  const [savingRoom, setSavingRoom] = useState(false);
 
   const [queueNowMs, setQueueNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -448,36 +441,16 @@ export default function FrontDeskDashboardPage() {
     });
   }, [patients, queueSearch]);
 
-  // ── Selected patient previous visit info (from real records) ──
-  const selectedPatient = useMemo(() =>
-    selectedPatientId ? patients.find(p => p._id === selectedPatientId) : null,
-    [selectedPatientId, patients]
-  );
-
-  // Open a row's detail popup. The popup reads the full patient doc, so if the
-  // patient isn't in this facility's loaded list (e.g. an appointment for a
-  // patient registered elsewhere), fall back to opening their chart — which
-  // loads the doc — instead of a click that silently does nothing.
-  const openPatientDetail = useCallback((patientId: string, entry: QueueItem | null) => {
-    if (patients.some(p => p._id === patientId)) {
-      setSelectedPatientId(patientId);
-      setSelectedEntry(entry);
-    } else {
-      router.push(`/patients/${patientId}`);
-    }
-  }, [patients, router]);
-
   // ── Room assignment (OPD rooming) for triage-sourced queue entries ──
+  // The saving flag now lives on RoomAssignmentControl itself (one control
+  // mounts per expanded row), so this just does the write + toast.
   const handleSaveRoom = useCallback(async (triageId: string, room: string) => {
-    setSavingRoom(true);
     try {
       await updateTriage(triageId, { assignedRoom: room || undefined });
       showToast(room ? `Room set to ${room}` : 'Room cleared', 'success');
       // Only assigning a room (not clearing one) counts as "roomed a walk-in".
     } catch {
       showToast('Failed to set room', 'error');
-    } finally {
-      setSavingRoom(false);
     }
   }, [updateTriage, showToast]);
 
@@ -727,15 +700,22 @@ export default function FrontDeskDashboardPage() {
         // show no priority pill rather than a free-text 'Appointment' label.
         priority: appointment.priority === 'emergency' ? 'RED' : appointment.priority === 'urgent' ? 'YELLOW' : undefined,
         date: isoDateKey(appointment.appointmentDate),
-        onClick: () => openPatientDetail(appointment.patientId, null),
-        actionLabel: 'Check in',
-        onAction: () => setCheckInTarget(appointment),
-        secondaryActionLabel: 'Record',
-        onSecondaryAction: () => router.push(`/patients/${appointment.patientId}`),
-        extraActions: [
-          { label: 'Reschedule', onClick: () => openReschedule(appointment) },
-          { label: 'No show', onClick: () => setNoShowTarget(appointment), tone: 'danger' as const },
-        ],
+        patientId: appointment.patientId,
+        popupDetail: (
+          <>
+            <FrontDeskDetailActions actions={[
+              { icon: LogIn, label: 'Check in', onClick: () => setCheckInTarget(appointment), primary: true },
+              { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${appointment.patientId}`) },
+              { icon: Calendar, label: 'Reschedule', onClick: () => openReschedule(appointment) },
+              { icon: Ban, label: 'No show', onClick: () => setNoShowTarget(appointment) },
+            ]} />
+            <FrontDeskDetailFacts facts={[
+              { label: 'Reason', value: appointment.reason || 'Scheduled visit' },
+              { label: t('patient.phone'), value: patient?.phone ? formatPhoneDisplay(patient.phone) : undefined },
+              { label: 'Hospital number', value: patient?.hospitalNumber },
+            ]} />
+          </>
+        ),
       };
     });
 
@@ -786,6 +766,50 @@ export default function FrontDeskDashboardPage() {
       // Wait column: actual queue/slot time on the first line; the shared
       // dashboard row renders hours/minutes underneath from `timeAt`.
       const waitTime = entry.time || entry.date || undefined;
+
+      // Icon actions for the row's inline panel. "Open chart" is always
+      // offered; the primary desk action (Checkout/Assign) and the secondary
+      // one (Undo/Start consultation) mirror the same state machine the old
+      // popup's buttons used — a plain "Record" fallback isn't needed here
+      // since Open chart already covers it.
+      const popupActions: { icon: LucideIcon; label: string; onClick: () => void; primary?: boolean }[] = [
+        { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${entry.patientId}`) },
+      ];
+      if (checkoutReady) {
+        popupActions.push({
+          icon: LogOut,
+          label: t('frontDesk.checkout'),
+          primary: true,
+          onClick: () => setCheckoutTarget({
+            patientId: entry.patientId,
+            patientName: entry.patientName,
+            hospitalNumber: patient?.hospitalNumber,
+            encounterId: entry.encounterId,
+            appointmentId: entry.id.startsWith('appt-') ? entry.sourceId : undefined,
+            triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
+          }),
+        });
+      } else if (activeForCare) {
+        popupActions.push({
+          icon: Stethoscope,
+          label: t('frontDesk.assign'),
+          primary: true,
+          onClick: () => setAssignTarget({
+            patientId: entry.patientId,
+            patientName: entry.patientName,
+            hospitalNumber: patient?.hospitalNumber,
+            triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
+            currentDoctorId: patient?.assignedDoctor,
+          }),
+        });
+      }
+      if (checkoutReady && entry.id.startsWith('appt-')) {
+        popupActions.push({ icon: RotateCcw, label: t('action.undo'), onClick: () => handleUndoCheckout(entry.sourceId, entry.patientName) });
+      } else if (canConsult && activeForCare) {
+        popupActions.push({ icon: Stethoscope, label: t('frontDesk.startConsultation'), onClick: () => router.push(`/consultation?patientId=${entry.patientId}`) });
+      }
+      const hasAllergies = Boolean(patient?.allergies?.length) && patient?.allergies[0] !== 'None known';
+
       return {
         id: entry.id,
         photoUrl: (patient as { photoUrl?: string } | undefined)?.photoUrl,
@@ -809,48 +833,28 @@ export default function FrontDeskDashboardPage() {
         locationSecondary: entry.stage ? entry.department : entry.location || entry.department,
         locationLabel: entry.stage ? 'Stage' : entry.type === 'appointment' ? 'Department' : 'Location',
         date: entry.calendarDate,
-        onClick: () => openPatientDetail(entry.patientId, entry),
-        actionLabel: checkoutReady ? t('frontDesk.checkout') : activeForCare ? t('frontDesk.assign') : 'Record',
-        onAction: () => {
-          if (checkoutReady) {
-            setCheckoutTarget({
-              patientId: entry.patientId,
-              patientName: entry.patientName,
-              hospitalNumber: patient?.hospitalNumber,
-              encounterId: entry.encounterId,
-              appointmentId: entry.id.startsWith('appt-') ? entry.sourceId : undefined,
-              triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
-            });
-            return;
-          }
-          if (!activeForCare) {
-            router.push(`/patients/${entry.patientId}`);
-            return;
-          }
-          setAssignTarget({
-            patientId: entry.patientId,
-            patientName: entry.patientName,
-            hospitalNumber: patient?.hospitalNumber,
-            triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
-            currentDoctorId: patient?.assignedDoctor,
-          });
-        },
-        secondaryActionLabel: checkoutReady && entry.id.startsWith('appt-')
-          ? t('action.undo')
-          : canConsult && activeForCare
-            ? t('frontDesk.startConsultation')
-            : 'Records',
-        onSecondaryAction: () => {
-          if (checkoutReady && entry.id.startsWith('appt-')) {
-            handleUndoCheckout(entry.sourceId, entry.patientName);
-            return;
-          }
-          if (canConsult && activeForCare) {
-            router.push(`/consultation?patientId=${entry.patientId}`);
-            return;
-          }
-          router.push(`/patients/${entry.patientId}`);
-        },
+        patientId: entry.patientId,
+        popupDetail: (
+          <>
+            <FrontDeskDetailActions actions={popupActions} />
+            <FrontDeskDetailFacts facts={[
+              { label: t('patient.phone'), value: patient?.phone ? formatPhoneDisplay(patient.phone) : undefined },
+              { label: 'Hospital number', value: patient?.hospitalNumber },
+            ]} />
+            {hasAllergies && (
+              <p className="ehr-care-alert">{t('frontDesk.allergiesLabel', { list: (patient?.allergies ?? []).join(', ') })}</p>
+            )}
+            {entry.id.startsWith('triage-') && (
+              <RoomAssignmentControl
+                triageId={entry.sourceId}
+                currentRoom={entry.assignedRoom}
+                priority={entry.priority}
+                roomOptions={roomOptions}
+                onSave={handleSaveRoom}
+              />
+            )}
+          </>
+        ),
       };
     });
 
@@ -883,9 +887,32 @@ export default function FrontDeskDashboardPage() {
               : 'Needs care team',
         statusTone: 'ready',
         date: isoDateKey(patientRegisteredAt(patient)),
-        onClick: () => openPatientDetail(patient._id, null),
-        actionLabel: 'Record',
-        onAction: () => router.push(`/patients/${patient._id}`),
+        patientId: patient._id,
+        popupDetail: (
+          <>
+            <FrontDeskDetailActions actions={[
+              { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${patient._id}`), primary: true },
+              {
+                icon: Stethoscope,
+                label: patient.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign'),
+                onClick: () => setAssignTarget({
+                  patientId: patient._id,
+                  patientName: patientFullName(patient),
+                  hospitalNumber: patient.hospitalNumber,
+                  currentDoctorId: patient.assignedDoctor,
+                }),
+              },
+            ]} />
+            <FrontDeskDetailFacts facts={[
+              { label: t('patient.phone'), value: patient.phone ? formatPhoneDisplay(patient.phone) : undefined },
+              { label: 'Assigned doctor', value: patient.assignedDoctorName },
+              {
+                label: t('frontDesk.lastVisit'),
+                value: patient.lastConsultedAt ? formatCompactDateTime(patient.lastConsultedAt) : (patient.lastVisitDate || t('frontDesk.firstVisit')),
+              },
+            ]} />
+          </>
+        ),
       };
     };
 
@@ -900,11 +927,12 @@ export default function FrontDeskDashboardPage() {
     currentUser?.hospitalName,
     filteredQueue,
     filteredRegisteredPatients,
+    handleSaveRoom,
     handleUndoCheckout,
-    openPatientDetail,
     patients,
     panelView,
     openReschedule,
+    roomOptions,
     router,
     t,
     visiblePendingAppointments,
@@ -1030,91 +1058,6 @@ export default function FrontDeskDashboardPage() {
             setRegisterOpen(true);
           }}
         />
-
-        {selectedPatient && (
-          <Modal onClose={() => { setSelectedPatientId(null); setSelectedEntry(null); }} width={480} labelledBy="fd-patient-detail-title">
-            <div className="modal-panel" style={{ padding: 0, overflow: 'hidden' }}>
-              <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <div className="min-w-0">
-                  <h3 id="fd-patient-detail-title" className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(selectedPatient)}</h3>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{selectedPatient.hospitalNumber || 'No hospital number'}</p>
-                </div>
-                <button type="button" onClick={() => { setSelectedPatientId(null); setSelectedEntry(null); }} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-5 flex flex-col gap-4">
-                <EhrWorkItemProgress
-                  status={selectedEntry?.stageLabel || selectedEntry?.status || 'Patient lookup'}
-                  owner={selectedEntry?.assignedDoctorName || selectedEntry?.assignedNurseName || 'Reception'}
-                  waiting={selectedEntry?.waitMinutes !== undefined ? waitLabel(selectedEntry.waitMinutes) : undefined}
-                  nextAction={selectedEntry?.status === 'DONE' ? 'Complete checkout' : canConsult ? 'Start consultation' : 'Open chart'}
-                />
-                <dl className="fd-detail-dl">
-                  <div><dt>{t('frontDesk.genderAge')}</dt><dd>{patientGenderAge(selectedPatient)}</dd></div>
-                  <div><dt>{t('patient.phone')}</dt><dd>{selectedPatient.phone ? formatPhoneDisplay(selectedPatient.phone) : 'N/A'}</dd></div>
-                  <div><dt>{t('patient.location')}</dt><dd>{selectedPatient.county}, {selectedPatient.state}</dd></div>
-                  <div><dt>{t('frontDesk.lastVisit')}</dt><dd>{selectedPatient.lastConsultedAt ? formatCompactDateTime(selectedPatient.lastConsultedAt) : selectedPatient.lastVisitDate || t('frontDesk.firstVisit')}</dd></div>
-                </dl>
-                {selectedPatient.allergies?.length > 0 && selectedPatient.allergies[0] !== 'None known' && (
-                  <p className="ehr-care-alert">{t('frontDesk.allergiesLabel', { list: selectedPatient.allergies.join(', ') })}</p>
-                )}
-                {selectedEntry?.id.startsWith('triage-') && (
-                  <div className="ehr-care-rooming">
-                    <MapPin className="w-4 h-4" />
-                    <span>Exam room</span>
-                    <select
-                      value={roomDraft || selectedEntry.assignedRoom || ''}
-                      onChange={(event) => setRoomDraft(event.target.value)}
-                    >
-                      <option value="">Unassigned</option>
-                      {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={savingRoom}
-                      onClick={() => { handleSaveRoom(selectedEntry.sourceId, roomDraft || selectedEntry.assignedRoom || ''); setRoomDraft(''); }}
-                    >
-                      {savingRoom ? 'Saving...' : selectedEntry.assignedRoom ? 'Update room' : 'Assign room'}
-                    </button>
-                    <span style={{ color: priorityColor(selectedEntry.priority) }}>
-                      {selectedEntry.priority === 'RED' ? t('appointments.priorityEmergency') : selectedEntry.priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      const target = {
-                        patientId: selectedPatient._id,
-                        patientName: patientFullName(selectedPatient),
-                        hospitalNumber: selectedPatient.hospitalNumber,
-                        triageId: selectedEntry?.id.startsWith('triage-') ? selectedEntry.sourceId : undefined,
-                        currentDoctorId: selectedPatient.assignedDoctor,
-                      };
-                      setSelectedPatientId(null);
-                      setSelectedEntry(null);
-                      setAssignTarget(target);
-                    }}
-                  >
-                    <Stethoscope className="w-3.5 h-3.5" />
-                    {selectedPatient.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign')}
-                  </button>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => { const pid = selectedPatient._id; setSelectedPatientId(null); setSelectedEntry(null); router.push(`/patients/${pid}`); }}>
-                    Open chart
-                  </button>
-                  {canConsult && (
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => { const pid = selectedPatient._id; setSelectedPatientId(null); setSelectedEntry(null); router.push(`/consultation?patientId=${pid}`); }}>
-                      {t('frontDesk.startConsultation')}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Modal>
-        )}
 
         {assignTarget && (
           <AssignDoctorModal
@@ -1257,6 +1200,99 @@ export default function FrontDeskDashboardPage() {
         )}
       </main>
     </>
+  );
+}
+
+/* ─── Row-detail panel pieces (inline expansion) ───
+   The queue row's popup used to be a Modal; it now drops open in place under
+   the row (EhrCareDashboard's shared inline-expansion shell). These three
+   pieces reproduce that popup's shape without the dialog chrome: an icon
+   action line matching the doctor worklist's ehr-visit-pop-* classes, a
+   label/value fact grid for what the row itself doesn't already show, and —
+   for triage-sourced rows — the exam-room control. */
+
+// Icon actions on the panel's first line (Open chart / Check in / Assign /
+// etc.), reusing EhrVisitPopup's classes so every role's inline panel reads
+// the same way. No tabs here — front desk has one view per row — so the
+// "tabs" row is just the flex/border-bottom line the icons sit on.
+function FrontDeskDetailActions({ actions }: {
+  actions: { icon: LucideIcon; label: string; onClick: () => void; primary?: boolean }[];
+}) {
+  return (
+    <div className="ehr-visit-pop-tabs">
+      <div className="ehr-visit-pop-actions">
+        {actions.map(action => (
+          <button
+            key={action.label}
+            type="button"
+            className={`ehr-visit-pop-icon${action.primary ? ' is-primary' : ''}`}
+            onClick={action.onClick}
+            aria-label={action.label}
+            title={action.label}
+          >
+            <action.icon className="w-4 h-4" aria-hidden />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Label/value facts unique to this row — never the name/time/status the row
+// above already shows. Empty values are dropped rather than rendered blank.
+function FrontDeskDetailFacts({ facts }: { facts: { label: string; value?: string }[] }) {
+  const visible = facts.filter((f): f is { label: string; value: string } => Boolean(f.value));
+  if (visible.length === 0) return null;
+  return (
+    <div className="ehr-row-detail__body">
+      {visible.map(f => (
+        <div className="appointment-detail-row" key={f.label}>
+          <dt>{f.label}</dt>
+          <dd>{f.value}</dd>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Exam-room assignment for a triage-sourced queue row. Saving state is local
+// to this component (not page-level) because it now mounts fresh each time
+// its row expands, rather than being the single target of a page-level modal.
+function RoomAssignmentControl({
+  triageId,
+  currentRoom,
+  priority,
+  roomOptions,
+  onSave,
+}: {
+  triageId: string;
+  currentRoom?: string;
+  priority: 'RED' | 'YELLOW' | 'GREEN' | 'normal';
+  roomOptions: string[];
+  onSave: (triageId: string, room: string) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(currentRoom || '');
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="ehr-care-rooming">
+      <MapPin className="w-4 h-4" />
+      <span>Exam room</span>
+      <select value={draft} onChange={(event) => setDraft(event.target.value)}>
+        <option value="">Unassigned</option>
+        {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
+      </select>
+      <button
+        type="button"
+        disabled={saving}
+        onClick={async () => { setSaving(true); try { await onSave(triageId, draft); } finally { setSaving(false); } }}
+      >
+        {saving ? 'Saving...' : currentRoom ? 'Update room' : 'Assign room'}
+      </button>
+      <span style={{ color: priorityColor(priority) }}>
+        {priority === 'RED' ? t('appointments.priorityEmergency') : priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
+      </span>
+    </div>
   );
 }
 

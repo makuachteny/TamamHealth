@@ -6,16 +6,20 @@
  * Each modal is self-contained: it pre-fills the current patient (shown
  * read-only at the top), calls the relevant create hook on submit, toasts the
  * outcome, and closes on success (staying open on error). They mirror the
- * field sets + required fields of the existing inline forms (referrals, lab,
- * consultation) so the service-layer validation passes.
+ * field sets + required fields of the existing inline forms (referrals,
+ * prescriptions) so the service-layer validation passes.
+ *
+ * Lab ordering is NOT here: the chart's "Order labs" opens the shared
+ * Create Lab Order flow (`@/components/lab/order/LabOrderModal`), so a lab
+ * order placed from a chart is the same order — AOEs, coded indications,
+ * requisition and all — as one placed from the lab queue.
  */
 
 import { useState } from 'react';
 import Modal from '@/components/Modal';
-import { FlaskConical, Pill, ArrowRightLeft, X, AlertTriangle } from '@/components/icons/lucide';
+import { Pill, ArrowRightLeft, X, AlertTriangle } from '@/components/icons/lucide';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useLabResults } from '@/lib/hooks/useLabResults';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -40,23 +44,6 @@ interface BaseModalProps {
   currentUser: ActionUser | null;
 }
 
-// Same catalog the lab page uses (Stage 6 diagnostics). Kept in sync here so
-// the modal can resolve a test's specimen without importing from the page.
-const LAB_TESTS_CATALOG = [
-  { name: 'Malaria RDT', specimen: 'Blood' },
-  { name: 'Full Blood Count', specimen: 'Blood' },
-  { name: 'Blood Glucose', specimen: 'Blood' },
-  { name: 'HIV Rapid Test', specimen: 'Blood' },
-  { name: 'CD4 Count', specimen: 'Blood' },
-  { name: 'Liver Function', specimen: 'Blood' },
-  { name: 'Renal Function', specimen: 'Blood' },
-  { name: 'Urinalysis', specimen: 'Urine' },
-  { name: 'Stool Microscopy', specimen: 'Stool' },
-  { name: 'Sputum AFB (TB)', specimen: 'Sputum' },
-  { name: 'Hepatitis B Surface Antigen', specimen: 'Blood' },
-  { name: 'Pregnancy Test (β-hCG)', specimen: 'Urine' },
-  { name: 'Syphilis (RPR)', specimen: 'Blood' },
-];
 
 // Fallback departments — used when the facility hasn't configured its own in
 // Facility Settings. Mirrors the referrals page fallback.
@@ -102,127 +89,6 @@ function ModalHeader({
 // ─────────────────────────────────────────────────────────────────────────
 // Order Lab — multi-select test catalog → one LabResultDoc per test
 // ─────────────────────────────────────────────────────────────────────────
-export function OrderLabModal({ isOpen, onClose, patient, currentUser }: BaseModalProps) {
-  const { t } = useTranslation();
-  const { showToast } = useToast();
-  const { create } = useLabResults();
-  const [tests, setTests] = useState<string[]>([]);
-  const [tier, setTier] = useState<'basic' | 'special'>('basic');
-  const [clinicalNotes, setClinicalNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const reset = () => { setTests([]); setTier('basic'); setClinicalNotes(''); };
-  const close = () => { if (!submitting) { reset(); onClose(); } };
-
-  const handleSubmit = async () => {
-    if (tests.length === 0) { showToast(t('lab.selectAtLeastOneTest'), 'error'); return; }
-    try {
-      setSubmitting(true);
-      for (const testName of tests) {
-        const catalog = LAB_TESTS_CATALOG.find(c => c.name === testName);
-        await create({
-          patientId: patient._id,
-          patientName: patientFullName(patient),
-          hospitalNumber: patient.hospitalNumber || '',
-          testName,
-          specimen: catalog?.specimen || 'Blood',
-          status: 'pending',
-          result: '',
-          unit: '',
-          referenceRange: '',
-          abnormal: false,
-          critical: false,
-          orderedBy: currentUser?.name || 'Lab',
-          orderedAt: new Date().toISOString(),
-          completedAt: '',
-          hospitalId: currentUser?.hospitalId || patient.registrationHospital,
-          hospitalName: currentUser?.hospitalName,
-          orgId: currentUser?.orgId,
-          clinicalNotes: clinicalNotes.trim() || undefined,
-          tier,
-        });
-      }
-      showToast(t('lab.ordersCreated', { count: tests.length }), 'success');
-      reset();
-      onClose();
-    } catch (err) {
-      console.error('Order lab failed', err);
-      showToast(t('lab.createOrderFailed'), 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <Modal onClose={close} width={560}>
-      <div className="modal-content card-elevated p-6 w-full" onClick={e => e.stopPropagation()}>
-        <ModalHeader
-          icon={<FlaskConical className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />}
-          title={t('lab.newLabOrder')}
-          patient={patient}
-          onClose={close}
-        />
-        <div className="space-y-3">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
-                {t('lab.testsSelectedLabel', { count: tests.length })}
-              </label>
-              {tests.length > 0 && (
-                <button type="button" onClick={() => setTests([])} className="text-xs underline" style={{ color: 'var(--accent-primary)' }}>
-                  {t('action.clear')}
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 rounded-lg keep-cols" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-              {LAB_TESTS_CATALOG.map(c => {
-                const checked = tests.includes(c.name);
-                return (
-                  <label key={c.name} className="flex items-center gap-2 p-2 rounded text-xs cursor-pointer" style={{ background: checked ? 'var(--accent-light)' : 'transparent' }}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={e => {
-                        if (e.target.checked) setTests([...tests, c.name]);
-                        else setTests(tests.filter(n => n !== c.name));
-                      }}
-                    />
-                    <span className="flex-1">
-                      <span className="font-medium">{c.name}</span>
-                      <span className="block text-[10px]" style={{ color: 'var(--text-muted)' }}>{c.specimen}</span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('lab.priority')}</label>
-              <select value={tier} onChange={e => setTier(e.target.value as 'basic' | 'special')}>
-                <option value="basic">Basic</option>
-                <option value="special">Special</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('referral.notes')}</label>
-            <textarea rows={2} value={clinicalNotes} onChange={e => setClinicalNotes(e.target.value)} placeholder={t('lab.clinicalNotesPlaceholder')} />
-          </div>
-        </div>
-        <div className="flex gap-2 mt-5">
-          <button onClick={close} className="btn btn-secondary flex-1" disabled={submitting}>{t('action.cancel')}</button>
-          <button onClick={handleSubmit} className="btn btn-primary flex-1" disabled={submitting || tests.length === 0}>
-            {submitting ? t('lab.creating') : t('dashboard.orderTests', { count: tests.length })}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────
 // Prescribe — mirrors consultation prescription entry → one PrescriptionDoc
 // ─────────────────────────────────────────────────────────────────────────

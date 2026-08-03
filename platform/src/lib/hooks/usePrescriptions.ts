@@ -52,9 +52,37 @@ export function usePrescriptions(patientId?: string) {
     return result;
   }, [loadPrescriptions]);
 
-  const dispense = useCallback(async (id: string) => {
-    const { dispensePrescription } = await import('../services/prescription-service');
-    const result = await dispensePrescription(id);
+  /**
+   * Dispense through the single guarded transaction (stock gate → FEFO
+   * decrement → controlled-substance register → prescription update, with
+   * rollback). Callers pass the whole prescription and quantity rather than
+   * an id, because the transaction needs the order's clearance state and
+   * facility to decide whether the dispense is legal at all.
+   *
+   * This calls the service directly rather than the API route so dispensing
+   * still works offline — the atomicity guarantee comes from the service
+   * being one compensating transaction, not from the HTTP hop. `/api/
+   * prescriptions/:id` runs the same function for server-side callers.
+   */
+  const dispense = useCallback(async (
+    input: import('../services/dispensing-service').DispenseInput,
+  ) => {
+    const { dispenseMedication } = await import('../services/dispensing-service');
+    const result = await dispenseMedication(input);
+    await loadPrescriptions();
+    return result;
+  }, [loadPrescriptions]);
+
+  /** Record a prescription that could not be filled (stock-out or held for
+   *  prescriber clarification). Both keep the order active. */
+  const markUnfilled = useCallback(async (
+    rx: import('../db-types').PrescriptionDoc,
+    reason: 'stock_out' | 'clarification_requested',
+    note: string,
+    actor: { id: string; name: string },
+  ) => {
+    const { recordUnfilled } = await import('../services/dispensing-service');
+    const result = await recordUnfilled(rx, reason, note, actor);
     await loadPrescriptions();
     return result;
   }, [loadPrescriptions]);
@@ -112,5 +140,5 @@ export function usePrescriptions(patientId?: string) {
     return result;
   }, [loadPrescriptions]);
 
-  return { prescriptions, loading, error, create, dispense, administer, voidAdministration, advance, discontinue, reload: loadPrescriptions };
+  return { prescriptions, loading, error, create, dispense, markUnfilled, administer, voidAdministration, advance, discontinue, reload: loadPrescriptions };
 }

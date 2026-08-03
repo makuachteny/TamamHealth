@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, Plus, Clock, Calendar, Activity, Wallet } from '@/components/icons/lucide';
+import { Users, Plus, Clock, Calendar, Activity, Wallet, Check, X } from '@/components/icons/lucide';
 import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
@@ -10,7 +10,6 @@ import { useToast } from '@/components/Toast';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
-import RowActionsMenu from '@/components/RowActionsMenu';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 import type { StaffScheduleDoc } from '@/lib/db-types';
 
@@ -148,29 +147,49 @@ export default function HRDashboardPage() {
     }
   };
 
-  // Per-row detail (leave window, role, reason) shown in the shared shell's
-  // row-click sidebar via `row.popupDetail` — clicking any row always opens
-  // that sidebar (see EhrCareDashboard's `activate`/`openDetail`), so the
-  // content lives there rather than behind a separate open/closed row state.
-  // Approvers get an inline approve/reject action for pending requests.
+  // Per-row detail shown inline via `row.popupDetail` (EhrCareDashboard's
+  // shared expand-in-place panel). Leave type, dates and role are already on
+  // the row above (subtitle / care-team / status columns), so this only adds
+  // what the row has no room for — the stated reason — plus the approve/
+  // reject actions for approvers, as top-right icon buttons matching the
+  // Clinical Officer visit panel (EhrVisitPopup).
   const renderLeaveDetail = (r: LeaveRequestDoc) => (
-    <div style={{ padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-semibold capitalize" style={{ color: 'var(--text-primary)' }}>{r.leaveType} · {r.days}d</span>
-        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{r.startDate} → {r.endDate}</span>
-      </div>
-      <p className="text-[11px] capitalize" style={{ color: 'var(--text-secondary)' }}>{r.role.replace(/_/g, ' ')}</p>
-      {r.reason && <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>“{r.reason}”</p>}
+    <div className="ehr-visit-pop ehr-visit-pop--inline">
       {isApprover && r.status === 'pending' && (
-        <div className="flex items-center justify-end mt-2">
-          <RowActionsMenu
-            actions={[
-              { key: 'approve', label: t('hr.approve'), tone: 'success', onClick: () => decideLeaveAction(r._id, 'approved') },
-              { key: 'reject', label: t('hr.reject'), tone: 'danger', onClick: () => decideLeaveAction(r._id, 'rejected') },
-            ]}
-          />
+        <div className="ehr-visit-pop-tabs">
+          <div className="ehr-visit-pop-actions">
+            <button
+              type="button"
+              className="ehr-visit-pop-icon is-primary"
+              aria-label={t('hr.approve')}
+              title={t('hr.approve')}
+              onClick={() => decideLeaveAction(r._id, 'approved')}
+            >
+              <Check className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              className="ehr-visit-pop-icon"
+              aria-label={t('hr.reject')}
+              title={t('hr.reject')}
+              onClick={() => decideLeaveAction(r._id, 'rejected')}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
+      <div className="ehr-visit-pop-body">
+        <div className="ehr-visit-pop-row">
+          {/* Not translated: this is the one field the row above has no room
+              for, and no i18n key exists for it yet — match the demo-string
+              precedent elsewhere on this page rather than add one everywhere. */}
+          <span className="ehr-visit-pop-label">Reason</span>
+          <div>
+            <p>{r.reason || 'No reason given'}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 

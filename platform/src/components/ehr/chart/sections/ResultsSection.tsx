@@ -5,14 +5,20 @@
  * `useLabResults()` collection the Order Basket drawer panel and
  * OrderLabModal already write to (switched from the legacy per-visit
  * `record.labResults` embed so newly-ordered labs actually show up here).
- * "Add" reuses the existing OrderLabModal via the page's
- * `setShowOrderLabModal` — no new add flow.
+ * "Add" opens the shared Create Lab Order flow via the page's
+ * `setShowOrderLabModal`. Picking a row hands off to the bench workflow panel
+ * (LabWorkspace) — the same six steps the lab queue links into — so a result
+ * is worked on in the chart rather than in a popup.
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { Icon as DuotoneIcon } from '@/components/icons';
 import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { formatDate , humanizeStatus } from '@/lib/format-utils';
+import { effectiveOrderStatus } from '@/lib/services/lab-service';
+import { LAB_WORKFLOW_STEP_LABEL, stepForStage } from '@/components/lab/workflow/lab-workflow-types';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const PAGE_SIZE = 8;
 
@@ -29,10 +35,13 @@ interface ResultsSectionProps {
   /** When set (e.g. deep-linked from the lab queue), the row with this result
    *  `_id` is paged-to, scrolled into view and highlighted. */
   focusId?: string;
+  /** Open one order in the bench workflow panel. */
+  onSelect?: (labId: string) => void;
 }
 
-export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId }: ResultsSectionProps) {
+export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId, onSelect }: ResultsSectionProps) {
   const { results } = useLabResults(patientId);
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
 
   const patientLabs = useMemo(
@@ -62,7 +71,11 @@ export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId
   return (
     <ChartSection
       title="Results"
-      addLabel="Add"
+      // The same flask the patient header's "Order labs" carries: this button
+      // opens that identical flow, so it should read as the same action rather
+      // than as a generic "add a row".
+      addLabel="Order labs"
+      addIcon={<DuotoneIcon name="flask" size={15} />}
       onAdd={canOrderLabs ? onAdd : undefined}
       pagination={{ page, pageSize: PAGE_SIZE, total: patientLabs.length, onPageChange: setPage }}
     >
@@ -76,6 +89,7 @@ export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId
               <th>Result</th>
               <th>Reference range</th>
               <th>Status</th>
+              <th>Next step</th>
               <th>Date</th>
             </tr>
           </thead>
@@ -84,7 +98,11 @@ export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId
               <tr
                 key={l._id}
                 id={`lab-row-${l._id}`}
-                style={l._id === focusId ? { background: 'var(--accent-light)', boxShadow: 'inset 3px 0 0 var(--accent-primary)' } : undefined}
+                onClick={onSelect ? () => onSelect(l._id) : undefined}
+                style={{
+                  cursor: onSelect ? 'pointer' : undefined,
+                  ...(l._id === focusId ? { background: 'var(--accent-light)', boxShadow: 'inset 3px 0 0 var(--accent-primary)' } : {}),
+                }}
               >
                 <td style={{ fontWeight: 600 }}>{l.testName}</td>
                 <td style={{ color: l.abnormal ? (l.critical ? 'var(--color-danger)' : 'var(--color-warning)') : 'inherit', fontWeight: l.abnormal ? 700 : 400 }}>
@@ -92,6 +110,7 @@ export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId
                 </td>
                 <td>{l.referenceRange || '—'}</td>
                 <td><span className={STATUS_BADGE[l.status] || 'omrs-panel-badge omrs-panel-badge--pending'}>{humanizeStatus(l.status)}</span></td>
+                <td>{t(LAB_WORKFLOW_STEP_LABEL[stepForStage(effectiveOrderStatus(l))])}</td>
                 <td>{formatDate(l.completedAt || l.orderedAt || l.createdAt)}</td>
               </tr>
             ))}
