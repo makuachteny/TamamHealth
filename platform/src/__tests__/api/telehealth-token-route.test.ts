@@ -86,8 +86,12 @@ function offsetTime(minutes: number): string {
 }
 
 function offsetSchedule(minutes: number): { scheduledDate: string; scheduledTime: string } {
+  // d's LOCAL fields carry Juba wall-clock (it derives from jubaNow), so the
+  // date must come from those same fields. jubaDate() expects a true instant
+  // and would shift the calendar day a second time.
   const d = new Date(jubaNow().getTime() + minutes * 60_000);
-  return { scheduledDate: jubaDate(d), scheduledTime: offsetTime(minutes) };
+  const scheduledDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return { scheduledDate, scheduledTime: offsetTime(minutes) };
 }
 
 async function makeSession(overrides: Record<string, unknown> = {}) {

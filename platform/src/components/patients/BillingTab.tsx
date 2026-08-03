@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Wallet, CreditCard, CalendarClock,
-  Shield, FileText,
-  Receipt, Printer, BarChart3,
-  Plus, Trash2, RotateCcw, RefreshCw, X,
+  Wallet, CalendarClock,
+  Receipt, Printer, Search,
+  Plus, RotateCcw, RefreshCw,
   Send, Copy, Check, ExternalLink,
 } from '@/components/icons/lucide';
-import { BalanceBanner, InsuranceSnapshot, PaymentHistoryTimeline, PaymentPanel, PaymentPlanWizard } from '@/components/payments';
+import { PaymentPanel, PaymentPlanWizard } from '@/components/payments';
+import '@/components/billing/billing.css';
 import InsurancePolicyModal from '@/components/payments/InsurancePolicyModal';
 import Modal from '@/components/Modal';
 import { getMethodConfig } from '@/lib/payment-method-config';
@@ -19,17 +19,25 @@ import { useToast } from '@/components/Toast';
 import { formatMoney } from '@/lib/format-utils';
 import type { PatientDoc } from '@/lib/db-types';
 import type {
-  PaymentDoc, ChargeDoc, PaymentPlanDoc, ClaimDoc, InsurancePolicyDoc,
-  SavedPaymentMethodDoc, SavedPaymentMethodType, AdjustmentType,
+  PaymentDoc, ChargeDoc, PaymentPlanDoc, InsurancePolicyDoc, RefundDoc, LedgerEntryDoc,
+  AdjustmentType,
 } from '@/lib/db-types-payments';
 
-const SAVED_METHOD_TYPES: SavedPaymentMethodType[] = ['mpesa', 'airtel', 'mtn_momo', 'm_gurush', 'card', 'bank'];
 const ADJUSTMENT_TYPES: AdjustmentType[] = ['write_off', 'bad_debt', 'charity', 'denial', 'contractual', 'correction'];
 const BILLING_ROLES = ['cashier', 'biller', 'org_admin', 'medical_superintendent', 'super_admin'];
-const METHOD_LABELS: Record<SavedPaymentMethodType, string> = {
-  mpesa: 'M-Pesa', airtel: 'Airtel Money', mtn_momo: 'MTN MoMo', m_gurush: 'm-Gurush', card: 'Card', bank: 'Bank',
+
+/**
+ * Maps ChargeStatus onto the billing module's chip colors (bl-chip--unpaid/
+ * partial/paid/waived/cancelled) so the Charges table reads with the same
+ * "what's owed" vocabulary as the bill detail page's line items.
+ */
+const CHARGE_CHIP_CLASS: Record<string, string> = {
+  pending: 'bl-chip--unpaid', submitted: 'bl-chip--partial', approved: 'bl-chip--paid',
+  denied: 'bl-chip--unpaid', appealed: 'bl-chip--partial', voided: 'bl-chip--cancelled',
 };
-const MOBILE_MONEY_METHODS: SavedPaymentMethodType[] = ['mpesa', 'airtel', 'mtn_momo', 'm_gurush'];
+function statusChipClass(status: string): string {
+  return `bl-chip ${CHARGE_CHIP_CLASS[status] || 'bl-chip--waived'}`;
+}
 
 interface BillingTabProps {
   patient: PatientDoc;
@@ -44,13 +52,13 @@ interface BillingTabProps {
 interface FinancialOverview {
   totalCharged: number;
   totalPaid: number;
+  totalDiscount: number;
+  totalRefunds: number;
   insurancePaid: number;
   selfPaid: number;
-  outstanding: number;
   payments: PaymentDoc[];
   charges: ChargeDoc[];
   plans: PaymentPlanDoc[];
-  claims: ClaimDoc[];
   policies: InsurancePolicyDoc[];
 }
 
@@ -200,91 +208,12 @@ export default function BillingTab({
   const { showToast } = useToast();
   const [data, setData] = useState<FinancialOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [chargeSearch, setChargeSearch] = useState('');
 
   const patientName = `${patient.firstName} ${patient.surname}`;
   const canManageBilling = BILLING_ROLES.includes(currentUser?.role ?? '');
   const facilityId = currentUser?.hospitalId ?? '';
   const orgId = currentUser?.orgId;
-
-  // ─── Saved payment methods ───
-  const [methods, setMethods] = useState<SavedPaymentMethodDoc[]>([]);
-  const [methodsLoading, setMethodsLoading] = useState(true);
-  const [showAddMethod, setShowAddMethod] = useState(false);
-  const [methodForm, setMethodForm] = useState<{
-    methodType: SavedPaymentMethodType;
-    phoneNumber: string;
-    cardLast4: string;
-    cardBrand: string;
-    bankName: string;
-    bankAccountLast4: string;
-    label: string;
-    isDefault: boolean;
-  }>({ methodType: 'mpesa', phoneNumber: '', cardLast4: '', cardBrand: '', bankName: '', bankAccountLast4: '', label: '', isDefault: false });
-  const [savingMethod, setSavingMethod] = useState(false);
-
-  const loadMethods = useCallback(async () => {
-    setMethodsLoading(true);
-    try {
-      const svc = await import('@/lib/services/payment-service');
-      const rows = await svc.getPatientPaymentMethods(patient._id);
-      setMethods(rows);
-    } catch (err) {
-      console.error('Failed to load saved payment methods:', err);
-      setMethods([]);
-    }
-    setMethodsLoading(false);
-  }, [patient._id]);
-
-  useEffect(() => { loadMethods(); }, [loadMethods]);
-
-  const handleSaveMethod = async () => {
-    if (!facilityId) { showToast(t('billing.noFacility') || 'No facility context', 'error'); return; }
-    setSavingMethod(true);
-    try {
-      const svc = await import('@/lib/services/payment-service');
-      const isMobile = MOBILE_MONEY_METHODS.includes(methodForm.methodType);
-      const isCard = methodForm.methodType === 'card';
-      const isBank = methodForm.methodType === 'bank';
-      await svc.savePaymentMethod({
-        patientId: patient._id,
-        methodType: methodForm.methodType,
-        phoneNumber: isMobile ? methodForm.phoneNumber.trim() || undefined : undefined,
-        cardLast4: isCard ? methodForm.cardLast4.trim() || undefined : undefined,
-        cardBrand: isCard ? methodForm.cardBrand.trim() || undefined : undefined,
-        bankName: isBank ? methodForm.bankName.trim() || undefined : undefined,
-        bankAccountLast4: isBank ? methodForm.bankAccountLast4.trim() || undefined : undefined,
-        label: methodForm.label.trim() || undefined,
-        isDefault: methodForm.isDefault,
-        facilityId,
-        orgId,
-      });
-      showToast(t('billing.methodSaved') || 'Payment method saved', 'success');
-      setShowAddMethod(false);
-      setMethodForm({ methodType: 'mpesa', phoneNumber: '', cardLast4: '', cardBrand: '', bankName: '', bankAccountLast4: '', label: '', isDefault: false });
-      await loadMethods();
-    } catch (err) {
-      console.error('Failed to save payment method:', err);
-      showToast(t('billing.methodSaveFailed') || 'Failed to save payment method', 'error');
-    }
-    setSavingMethod(false);
-  };
-
-  const handleDeleteMethod = async (id: string) => {
-    if (!window.confirm(t('billing.confirmDeleteMethod') || 'Remove this saved payment method?')) return;
-    try {
-      const svc = await import('@/lib/services/payment-service');
-      const ok = await svc.deletePaymentMethod(id);
-      if (ok) {
-        showToast(t('billing.methodDeleted') || 'Payment method removed', 'success');
-        await loadMethods();
-      } else {
-        showToast(t('billing.methodDeleteFailed') || 'Failed to remove payment method', 'error');
-      }
-    } catch (err) {
-      console.error('Failed to delete payment method:', err);
-      showToast(t('billing.methodDeleteFailed') || 'Failed to remove payment method', 'error');
-    }
-  };
 
   // ─── Refund ───
   const [showRefund, setShowRefund] = useState(false);
@@ -380,20 +309,14 @@ export default function BillingTab({
     setProcessingAdj(false);
   };
 
-  // ─── Insurance policy add / edit ───
-  const [insuranceModal, setInsuranceModal] = useState<
-    { mode: 'add' } | { mode: 'edit'; policy: InsurancePolicyDoc } | null
-  >(null);
-  const [insuranceReloadKey, setInsuranceReloadKey] = useState(0);
-
-  const openAddInsurance = () => setInsuranceModal({ mode: 'add' });
-  const openEditInsurance = (policyId: string) => {
-    const found = data?.policies.find(p => p._id === policyId);
-    if (found) setInsuranceModal({ mode: 'edit', policy: found });
-  };
+  // ─── Insurance policy add ───
+  // Editing/verifying individual policies used to live in a standalone
+  // "Insurance Coverage" card (InsuranceSnapshot). That card is gone —
+  // coverage is now a single stat in the money-summary strip — so only the
+  // "add a policy" action (surfaced in the action bar) still has a home here.
+  const [insuranceModalOpen, setInsuranceModalOpen] = useState(false);
   const handleInsuranceSaved = () => {
-    setInsuranceModal(null);
-    setInsuranceReloadKey(k => k + 1);
+    setInsuranceModalOpen(false);
     loadAll();
   };
 
@@ -482,17 +405,18 @@ export default function BillingTab({
 
   const loadAll = useCallback(async () => {
     try {
-      const [paymentSvc] = await Promise.all([
+      const [paymentSvc, ledgerSvc] = await Promise.all([
         import('@/lib/services/payment-service'),
         import('@/lib/services/ledger-service'),
       ]);
 
-      const [payments, charges, plans, claims, policies] = await Promise.all([
+      const [payments, charges, plans, policies, refunds, ledgerEntries] = await Promise.all([
         paymentSvc.getPaymentsByPatient(patient._id),
         paymentSvc.getChargesByPatient(patient._id).catch(() => [] as ChargeDoc[]),
         paymentSvc.getPaymentPlansByPatient(patient._id),
-        paymentSvc.getClaimsByPatient?.(patient._id).catch(() => [] as ClaimDoc[]) ?? Promise.resolve([] as ClaimDoc[]),
         paymentSvc.getPatientInsurancePolicies(patient._id),
+        paymentSvc.getRefundsByPatient(patient._id).catch(() => [] as RefundDoc[]),
+        ledgerSvc.getPatientLedger(patient._id).catch(() => [] as LedgerEntryDoc[]),
       ]);
 
       const totalCharged = charges.reduce((s: number, c: ChargeDoc) => s + c.billedAmount, 0);
@@ -502,39 +426,47 @@ export default function BillingTab({
         .filter((p: PaymentDoc) => p.method === 'insurance')
         .reduce((s: number, p: PaymentDoc) => s + p.amount, 0);
       const selfPaid = totalPaid - insurancePaid;
+      // Discount = adjustments/write-offs posted to the ledger (stored as
+      // negative "credit" entries there); folding the ledger in here — as a
+      // totals figure — instead of rendering it as its own list.
+      const totalDiscount = ledgerEntries
+        .filter((e: LedgerEntryDoc) => e.entryType === 'adjustment' || e.entryType === 'write_off')
+        .reduce((s: number, e: LedgerEntryDoc) => s + Math.abs(e.amount), 0);
+      const totalRefunds = refunds
+        .filter((r: RefundDoc) => r.status === 'processed')
+        .reduce((s: number, r: RefundDoc) => s + r.amount, 0);
 
       setData({
         totalCharged,
         totalPaid,
+        totalDiscount,
+        totalRefunds,
         insurancePaid,
         selfPaid,
-        outstanding: Math.max(0, patientBalance),
         payments: postedPayments.sort((a: PaymentDoc, b: PaymentDoc) =>
           new Date(b.processedAt).getTime() - new Date(a.processedAt).getTime()
         ),
         charges,
         plans,
-        claims,
         policies,
       });
     } catch (err) {
       console.error('Failed to load billing data:', err);
       setData({
-        totalCharged: 0, totalPaid: 0, insurancePaid: 0, selfPaid: 0,
-        outstanding: Math.max(0, patientBalance),
-        payments: [], charges: [], plans: [], claims: [], policies: [],
+        totalCharged: 0, totalPaid: 0, totalDiscount: 0, totalRefunds: 0, insurancePaid: 0, selfPaid: 0,
+        payments: [], charges: [], plans: [], policies: [],
       });
     }
     setLoading(false);
-  }, [patient._id, patientBalance]);
+  }, [patient._id]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16" style={{ color: 'var(--text-muted)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--border-light)', borderTopColor: 'var(--accent-primary)' }} />
+      <div className="bl-root">
+        <div className="bl-loading">
+          <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--ehr-border, #D8E3EC)', borderTopColor: 'var(--bl-teal)' }} />
           {t('billing.loadingBillingInfo')}
         </div>
       </div>
@@ -542,392 +474,195 @@ export default function BillingTab({
   }
 
   const d = data!;
-  const activePlans = d.plans.filter(p => p.status === 'active');
+  const activePlan = d.plans.find(p => p.status === 'active');
   const hasInsurance = d.policies.length > 0;
+  const primaryPolicy = d.policies.find(p => p.isPrimary) || d.policies[0];
+  const lastPayment = d.payments[0];
+
+  // "Search this table" — same client-side filter the bill detail page uses
+  // for its line items, scoped to description/category.
+  const chargeQuery = chargeSearch.trim().toLowerCase();
+  const visibleCharges = d.charges.filter(c => !chargeQuery
+    || c.description.toLowerCase().includes(chargeQuery)
+    || c.category.toLowerCase().includes(chargeQuery));
 
   return (
-    <div className="space-y-5">
-      {/* ─── Balance Alert Banner ─── */}
-      <BalanceBanner
-        patientId={patient._id}
-        onPayClick={() => setShowPaymentPanel(true)}
-      />
-
-      {/* ─── Quick Actions ─── */}
-      <div className="flex gap-3 flex-wrap">
-        <button
-          onClick={() => setShowPaymentPanel(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-          style={{ background: 'var(--color-success)' }}
-        >
-          <Wallet size={16} /> {t('billing.collectPayment')}
+    <div className="bl-root">
+      {/* ─── Action bar ───
+          Right-aligned, same bl-btn variants and ordering convention as the
+          bill detail page's action row: one filled primary, outlined actions
+          next, link-styled and danger-link actions last. */}
+      <div className="bl-actions-row">
+        <button type="button" className="bl-btn bl-btn--outline" onClick={() => setInsuranceModalOpen(true)}>
+          <Plus size={15} /> {t('insuranceSnapshot.addInsurance') || 'Add insurance'}
         </button>
-        <button
-          onClick={() => setShowPlanWizard(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-          style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-        >
-          <CalendarClock size={16} /> {t('billing.createPaymentPlan')}
+        <button type="button" className="bl-btn bl-btn--outline" onClick={() => setShowPlanWizard(true)}>
+          <CalendarClock size={15} /> {t('billing.createPaymentPlan')}
         </button>
-        <button
-          onClick={handlePrintStatement}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-          style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-        >
-          <Printer size={16} /> {t('billing.printStatement')}
+        <button type="button" className="bl-btn bl-btn--outline" onClick={handlePrintStatement}>
+          <Printer size={15} /> {t('billing.printStatement')}
         </button>
-        <button
-          onClick={openPaymentLink}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-          style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-        >
-          <Send size={16} /> {t('billing.sendPaymentLink') || 'Send payment link'}
+        <button type="button" className="bl-btn bl-btn--link" onClick={openPaymentLink}>
+          <Send size={15} /> {t('billing.sendPaymentLink')}
         </button>
         {canManageBilling && (
           <>
-            <button
-              onClick={openRefund}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-            >
-              <RotateCcw size={16} /> {t('billing.issueRefund') || 'Issue refund'}
+            <button type="button" className="bl-btn bl-btn--link" onClick={openRefund}>
+              <RotateCcw size={15} /> {t('billing.issueRefund')}
             </button>
-            <button
-              onClick={() => setShowAdjustment(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-            >
-              <RefreshCw size={16} /> {t('billing.adjustmentWriteOff') || 'Adjustment / write-off'}
+            <button type="button" className="bl-btn bl-btn--danger-link" onClick={() => setShowAdjustment(true)}>
+              <RefreshCw size={15} /> {t('billing.adjustmentWriteOff')}
             </button>
           </>
         )}
+        <button type="button" className="bl-btn bl-btn--primary" onClick={() => setShowPaymentPanel(true)}>
+          <Wallet size={15} /> {t('billing.collectPayment')}
+        </button>
       </div>
 
-      {/* ─── Two-Column: Insurance + Charges ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
-        {/* Insurance Coverage */}
-        <div className="card-elevated p-4 h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Shield size={16} style={{ color: 'var(--accent-primary)' }} />
-              {t('billing.insuranceCoverage')}
-            </h3>
-            {hasInsurance && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                {t('billing.badgeActive')}
-              </span>
-            )}
-          </div>
-          <InsuranceSnapshot
-            key={insuranceReloadKey}
-            patientId={patient._id}
-            editable
-            onAddInsurance={openAddInsurance}
-            onEditInsurance={openEditInsurance}
+      {/* ─── Money summary ───
+          The chart header (visible on every tab) already carries the
+          patient's live balance as a clickable chip, so this strip doesn't
+          repeat it as a second banner — it adds the account's other facts
+          (what's charged/paid, coverage, last payment, plan state) in the
+          flat label-above-value language the bill detail page uses. Insurance
+          and payment-plan progress used to be their own cards; now they're
+          one stat each here instead of a fourth and fifth retelling. */}
+      <div className="bl-stats">
+        <div>
+          <span className="bl-stat-label">{t('billing.totalBilled')}</span>
+          <span className="bl-stat-value">{formatMoney(d.totalCharged)}</span>
+        </div>
+        <div>
+          <span className="bl-stat-label">{t('billing.totalPaid')}</span>
+          <span className="bl-stat-value">{formatMoney(d.totalPaid)}</span>
+        </div>
+        <div>
+          <span className="bl-stat-label">{t('billing.outstandingBalance')}</span>
+          <span className={`bl-stat-value ${patientBalance > 0 ? 'bl-stat-value--danger' : 'bl-stat-value--good'}`}>
+            {formatMoney(patientBalance)}
+          </span>
+        </div>
+        <div>
+          <span className="bl-stat-label">{t('billing.insuranceCoverage')}</span>
+          <span className="bl-stat-value" style={{ fontSize: 16 }}>
+            {hasInsurance ? primaryPolicy.payerName : (t('billing.selfPayNoInsurance') || 'Self-pay')}
+          </span>
+        </div>
+        <div>
+          <span className="bl-stat-label">{t('billing.lastPayment')}</span>
+          <span className="bl-stat-value" style={{ fontSize: 16 }}>
+            {lastPayment ? new Date(lastPayment.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+          </span>
+        </div>
+        <div>
+          <span className="bl-stat-label">{t('billing.paymentPlanLabel')}</span>
+          <span className="bl-stat-value" style={{ fontSize: 16 }}>
+            {activePlan ? t('billing.monthPlan', { count: activePlan.termMonths }) : '—'}
+          </span>
+          {activePlan && (
+            <span className="bl-stat-sub">{t('billing.remaining', { amount: formatMoney(activePlan.remainingBalance) })}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Charges ─── */}
+      <div className="bl-card">
+        <div className="bl-card-head">
+          <h2 className="bl-card-title">Charges</h2>
+          <p className="bl-card-sub">Items billed to this patient across all encounters</p>
+          <span className="bl-underline" />
+        </div>
+        <div className="bl-search">
+          <Search size={16} />
+          <input
+            type="text"
+            value={chargeSearch}
+            onChange={e => setChargeSearch(e.target.value)}
+            placeholder="Search this table"
+            aria-label="Search charges"
           />
         </div>
-
-        {/* Recent Charges */}
-        <div className="card-elevated p-4 h-full">
-          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
-            <Receipt size={16} style={{ color: 'var(--accent-primary)' }} />
-            {t('billing.recentCharges')}
-            {d.charges.length > 0 && (
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
-                {d.charges.length}
-              </span>
-            )}
-          </h3>
-          {d.charges.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center" style={{ color: 'var(--text-muted)' }}>
-              <Receipt size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
-              <div className="text-xs">{t('billing.noChargesRecorded')}</div>
-            </div>
-          ) : (
-            <div className="space-y-0">
-              {d.charges.slice(0, 8).map(charge => (
-                <div key={charge._id} className="flex items-center justify-between py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{charge.description}</div>
-                    <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      {charge.category} &middot; {new Date(charge.serviceDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-3">
-                    <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(charge.billedAmount)}</div>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{
-                      background: charge.status === 'approved' ? 'var(--color-success-bg)' : charge.status === 'pending' ? 'var(--color-warning-bg)' : 'var(--overlay-subtle)',
-                      color: charge.status === 'approved' ? 'var(--color-success)' : charge.status === 'pending' ? 'var(--color-warning)' : 'var(--text-muted)',
-                    }}>
-                      {charge.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {d.charges.length > 8 && (
-                <div className="text-center pt-2">
-                  <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
-                    {t('billing.moreCharges', { count: d.charges.length - 8 })}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Saved Payment Methods */}
-        <div className="card-elevated p-4 h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <CreditCard size={16} style={{ color: 'var(--accent-primary)' }} />
-              {t('billing.savedPaymentMethods') || 'Saved payment methods'}
-              {methods.length > 0 && (
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
-                  {methods.length}
-                </span>
-              )}
-            </h3>
-            <button
-              onClick={() => setShowAddMethod(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-            >
-              <Plus size={14} /> {t('billing.addMethod') || 'Add method'}
-            </button>
+        {d.charges.length === 0 ? (
+          <div className="bl-empty">
+            <Receipt size={28} />
+            <p>{t('billing.noChargesRecorded')}</p>
           </div>
-          {methodsLoading ? (
-            <div className="text-xs py-4 text-center" style={{ color: 'var(--text-muted)' }}>{t('common.loading') || 'Loading…'}</div>
-          ) : methods.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center" style={{ color: 'var(--text-muted)' }}>
-              <CreditCard size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
-              <div className="text-xs">{t('billing.noSavedMethods') || 'No saved payment methods'}</div>
-            </div>
-          ) : (
-            <div className="space-y-0">
-              {methods.map(m => {
-                const detail = m.cardLast4 ? `•••• ${m.cardLast4}`
-                  : m.bankAccountLast4 ? `${m.bankName ?? ''} •••• ${m.bankAccountLast4}`.trim()
-                  : m.phoneNumber ?? '';
-                return (
-                  <div key={m._id} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'transparent' }}>
-                      <CreditCard size={14} style={{ color: 'var(--accent-primary)' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                        {m.label || METHOD_LABELS[m.methodType]}
-                        {m.isDefault && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                            {t('billing.default') || 'Default'}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        {METHOD_LABELS[m.methodType]}{detail ? ` · ${detail}` : ''}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteMethod(m._id)}
-                      aria-label={t('billing.removeMethod') || 'Remove method'}
-                      className="p-1.5 rounded-lg flex-shrink-0 transition-colors"
-                      style={{ background: 'var(--overlay-subtle)', color: 'var(--color-danger)' }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Full Ledger History */}
-        <div className="card-elevated p-4 h-full">
-          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
-            <BarChart3 size={16} style={{ color: 'var(--accent-primary)' }} />
-            {t('billing.transactionLedger')}
-          </h3>
-          <PaymentHistoryTimeline patientId={patient._id} limit={30} />
-        </div>
+        ) : (
+          <div className="bl-table-wrap">
+            <table className="bl-table">
+              <thead>
+                <tr>
+                  <th>Number</th><th>Charge</th><th>Category</th><th>Status</th><th>Date</th><th className="bl-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleCharges.length === 0 ? (
+                  <tr><td colSpan={6} className="bl-muted" style={{ textAlign: 'center', padding: 24 }}>No charges match your search.</td></tr>
+                ) : visibleCharges.map((charge, idx) => (
+                  <tr key={charge._id}>
+                    <td className="bl-num">{idx + 1}</td>
+                    <td>{charge.description}</td>
+                    <td className="bl-muted">{charge.category}</td>
+                    <td><span className={statusChipClass(charge.status)}>{charge.status}</span></td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{new Date(charge.serviceDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                    <td className="bl-num bl-right">{formatMoney(charge.billedAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* ─── Active Payment Plans ─── */}
-      {activePlans.length > 0 && (
-        <div className="card-elevated p-5">
-          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
-            <CalendarClock size={16} style={{ color: 'var(--accent-primary)' }} />
-            {t('billing.activePaymentPlans')}
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-              {activePlans.length}
-            </span>
-          </h3>
-          <div className="space-y-3">
-            {activePlans.map(plan => {
-              const progress = plan.totalBalance > 0 ? Math.min(100, (plan.paidToDate / plan.totalBalance) * 100) : 0;
-              return (
-                <div key={plan._id} className="rounded-xl p-4" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {t('billing.monthPlan', { count: plan.termMonths })}
-                      </div>
-                      <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        {t('billing.planMonthlyStarted', { amount: formatMoney(plan.monthlyAmount), date: new Date(plan.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) })}
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{
-                      background: plan.status === 'active' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
-                      color: plan.status === 'active' ? 'var(--color-success)' : 'var(--color-warning)',
-                    }}>
-                      {plan.status.toUpperCase()}
-                    </span>
-                  </div>
+      {/* ─── Payments + totals ───
+          Same two-column layout as the bill detail page: the payments list
+          on the left, a running totals column on the right. */}
+      <div className="bl-card">
+        <div className="bl-pay-layout">
+          <div className="bl-pay-main">
+            <h2 className="bl-card-title">Payments</h2>
+            <span className="bl-underline" />
 
-                  {/* Progress bar */}
-                  <div className="mb-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                        {t('billing.paidOfTotal', { paid: formatMoney(plan.paidToDate), total: formatMoney(plan.totalBalance) })}
-                      </span>
-                      <span className="text-[11px] font-bold" style={{ color: 'var(--color-success)' }}>
-                        {Math.round(progress)}%
-                      </span>
-                    </div>
-                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'var(--color-success)' }} />
-                    </div>
-                  </div>
-
-                  {/* Installment dots */}
-                  <div className="flex items-center gap-1.5 mb-2">
-                    {plan.installments.map((inst, i) => (
-                      <div
-                        key={i}
-                        className="w-2.5 h-2.5 rounded-full"
-                        title={`#${inst.number}: ${inst.status} — ${formatMoney(inst.amount)}`}
-                        style={{
-                          background:
-                            inst.status === 'paid' ? 'var(--color-success)' :
-                            inst.status === 'missed' ? 'var(--color-danger)' :
-                            inst.status === 'partial' ? 'var(--color-warning)' :
-                            'var(--border-light)',
-                        }}
-                      />
+            {d.payments.length === 0 ? (
+              <div className="bl-empty">
+                <h3>{t('billing.noPaymentsRecorded')}</h3>
+                <p>Payments recorded for this patient will appear here.</p>
+              </div>
+            ) : (
+              <div className="bl-table-wrap">
+                <table className="bl-table">
+                  <thead>
+                    <tr><th>Date</th><th>Method</th><th>Reference</th><th>Received by</th><th className="bl-right">Amount</th></tr>
+                  </thead>
+                  <tbody>
+                    {d.payments.map(pmt => (
+                      <tr key={pmt._id}>
+                        <td style={{ whiteSpace: 'nowrap' }}>{new Date(pmt.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                        <td>{getMethodConfig(pmt.method).label}</td>
+                        <td className="bl-muted">{pmt.reference || '—'}</td>
+                        <td>{pmt.processedByName}</td>
+                        <td className="bl-num bl-right">{formatMoney(pmt.amount)}</td>
+                      </tr>
                     ))}
-                  </div>
-
-                  {/* Next due */}
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                      {t('billing.nextDue', { date: plan.nextDueDate ? new Date(plan.nextDueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—' })}
-                    </div>
-                    <div className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                      {t('billing.remaining', { amount: formatMoney(plan.remainingBalance) })}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ─── Claims Overview ─── */}
-      {d.claims.length > 0 && (
-        <div className="card-elevated p-5">
-          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
-            <FileText size={16} style={{ color: 'var(--accent-primary)' }} />
-            {t('billing.insuranceClaims')}
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
-              {d.claims.length}
-            </span>
-          </h3>
-          <div className="space-y-0">
-            {d.claims.map(claim => (
-              <div key={claim._id} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {claim.payerName}
-                  </div>
-                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {claim.claimNumber || claim._id.slice(0, 10)} &middot; {claim.submittedDate ? new Date(claim.submittedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : t('billing.claimDraft')}
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(claim.totalBilled)}</div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{
-                    background:
-                      claim.status === 'paid' ? 'var(--color-success-bg)' :
-                      claim.status === 'denied' ? 'var(--color-danger-bg)' :
-                      claim.status === 'accepted' ? 'var(--color-info-bg)' :
-                      'var(--color-warning-bg)',
-                    color:
-                      claim.status === 'paid' ? 'var(--color-success)' :
-                      claim.status === 'denied' ? 'var(--color-danger)' :
-                      claim.status === 'accepted' ? 'var(--color-info)' :
-                      'var(--color-warning)',
-                  }}>
-                    {claim.status}
-                  </span>
-                </div>
+                  </tbody>
+                </table>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
 
-      {/* ─── Recent Payments (last 5) ─── */}
-      {d.payments.length > 0 && (
-        <div className="card-elevated p-5">
-          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
-            <CreditCard size={16} style={{ color: 'var(--accent-primary)' }} />
-            {t('billing.recentPayments')}
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
-              {d.payments.length}
-            </span>
-          </h3>
-          <div className="space-y-0">
-            {d.payments.slice(0, 5).map(pmt => {
-              const mc = getMethodConfig(pmt.method);
-              const MethodIcon = mc.icon;
-              return (
-                <div key={pmt._id} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'transparent' }}>
-                    <MethodIcon size={14} style={{ color: mc.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{mc.label}</div>
-                    <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      {pmt.reference || '—'} &middot; {new Date(pmt.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>{formatMoney(pmt.amount)}</div>
-                    <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{pmt.processedByName}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <aside className="bl-pay-aside">
+            <dl className="bl-totals">
+              <div className="bl-totals-row"><dt>Total charged:</dt><dd>{formatMoney(d.totalCharged)}</dd></div>
+              <div className="bl-totals-row"><dt>Total paid:</dt><dd>{formatMoney(d.totalPaid)}</dd></div>
+              <div className="bl-totals-row"><dt>Discount:</dt><dd>- {formatMoney(d.totalDiscount)}</dd></div>
+              <div className="bl-totals-row"><dt>Refunds:</dt><dd>- {formatMoney(d.totalRefunds)}</dd></div>
+              <hr className="bl-totals-rule" />
+              <div className="bl-totals-row bl-totals-row--due"><dt>Balance due:</dt><dd>{formatMoney(patientBalance)}</dd></div>
+            </dl>
+          </aside>
         </div>
-      )}
-
-      {/* ─── Empty State (no billing data at all) ─── */}
-      {d.totalCharged === 0 && d.payments.length === 0 && d.policies.length === 0 && (
-        <div className="card-elevated p-8 text-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center justify-center w-14 h-14 rounded-2xl" style={{ background: 'transparent' }}>
-              <Wallet size={56} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
-            </div>
-            <div>
-              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('billing.noBillingRecords')}</div>
-              <div className="text-xs" style={{ color: 'var(--text-muted)', maxWidth: 280, margin: '0 auto' }}>
-                {t('billing.noBillingRecordsDesc')}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* ─── Payment Panel Modal ─── */}
       {showPaymentPanel && (
@@ -952,110 +687,20 @@ export default function BillingTab({
         />
       )}
 
-      {/* ─── Add Saved Payment Method Modal ─── */}
-      {showAddMethod && (
-        <Modal onClose={() => setShowAddMethod(false)} width={460}>
-          <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="icon-box-sm">
-                  <CreditCard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                </div>
-                <h3 className="text-base font-semibold">{t('billing.addPaymentMethod') || 'Add payment method'}</h3>
-              </div>
-              <button onClick={() => setShowAddMethod(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.methodType') || 'Method type'}</label>
-                <select
-                  value={methodForm.methodType}
-                  onChange={e => setMethodForm({ ...methodForm, methodType: e.target.value as SavedPaymentMethodType })}
-                >
-                  {SAVED_METHOD_TYPES.map(mt => <option key={mt} value={mt}>{METHOD_LABELS[mt]}</option>)}
-                </select>
-              </div>
-
-              {MOBILE_MONEY_METHODS.includes(methodForm.methodType) && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.phoneNumber') || 'Phone number'}</label>
-                  <input type="tel" value={methodForm.phoneNumber} onChange={e => setMethodForm({ ...methodForm, phoneNumber: e.target.value })} placeholder="+211 9XX XXX XXX" />
-                </div>
-              )}
-
-              {methodForm.methodType === 'card' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.cardLast4') || 'Card last 4'}</label>
-                    <input type="text" maxLength={4} value={methodForm.cardLast4} onChange={e => setMethodForm({ ...methodForm, cardLast4: e.target.value })} placeholder="4242" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.cardBrand') || 'Card brand'}</label>
-                    <input type="text" value={methodForm.cardBrand} onChange={e => setMethodForm({ ...methodForm, cardBrand: e.target.value })} placeholder="visa" />
-                  </div>
-                </div>
-              )}
-
-              {methodForm.methodType === 'bank' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.bankName') || 'Bank name'}</label>
-                    <input type="text" value={methodForm.bankName} onChange={e => setMethodForm({ ...methodForm, bankName: e.target.value })} placeholder="KCB" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.accountLast4') || 'Account last 4'}</label>
-                    <input type="text" maxLength={4} value={methodForm.bankAccountLast4} onChange={e => setMethodForm({ ...methodForm, bankAccountLast4: e.target.value })} placeholder="0123" />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.label') || 'Label'}</label>
-                <input type="text" value={methodForm.label} onChange={e => setMethodForm({ ...methodForm, label: e.target.value })} placeholder={t('billing.labelPlaceholder') || 'Optional friendly name'} />
-              </div>
-
-              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-primary)' }}>
-                <input type="checkbox" checked={methodForm.isDefault} onChange={e => setMethodForm({ ...methodForm, isDefault: e.target.checked })} />
-                {t('billing.setAsDefault') || 'Set as default method'}
-              </label>
-            </div>
-            <hr className="section-divider" />
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setShowAddMethod(false)} className="btn btn-secondary flex-1">{t('common.cancel') || 'Cancel'}</button>
-              <button onClick={handleSaveMethod} disabled={savingMethod} className="btn btn-primary flex-1">
-                {savingMethod ? (t('common.saving') || 'Saving…') : (t('common.save') || 'Save')}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
       {/* ─── Issue Refund Modal ─── */}
       {showRefund && (
-        <Modal onClose={() => setShowRefund(false)} width={460}>
-          <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="icon-box-sm">
-                  <RotateCcw className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                </div>
-                <h3 className="text-base font-semibold">{t('billing.issueRefund') || 'Issue refund'}</h3>
-              </div>
-              <button onClick={() => setShowRefund(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+        <Modal onClose={() => setShowRefund(false)} width={460} labelledBy="bl-refund-title">
+          <div className="bl-root bl-modal-body">
+            <h3 className="bl-modal-title" id="bl-refund-title">{t('billing.issueRefund')}</h3>
             {refundablePayments.length === 0 ? (
-              <div className="text-sm py-4 text-center" style={{ color: 'var(--text-muted)' }}>
-                {t('billing.noRefundablePayments') || 'No refundable payments found for this patient.'}
+              <div className="bl-empty" style={{ padding: '20px 0' }}>
+                <p>{t('billing.noRefundablePayments')}</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.payment') || 'Payment'}</label>
-                  <select value={refundPaymentId} onChange={e => handleRefundPaymentChange(e.target.value)}>
+              <>
+                <div className="bl-field">
+                  <label htmlFor="bl-refund-payment">{t('billing.payment')}</label>
+                  <select id="bl-refund-payment" value={refundPaymentId} onChange={e => handleRefundPaymentChange(e.target.value)}>
                     {refundablePayments.map(p => (
                       <option key={p._id} value={p._id}>
                         {formatMoney(p.amount)} · {getMethodConfig(p.method).label} · {new Date(p.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -1063,9 +708,10 @@ export default function BillingTab({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.refundAmount') || 'Refund amount'}</label>
+                <div className="bl-field">
+                  <label htmlFor="bl-refund-amount">{t('billing.refundAmount')}</label>
                   <input
+                    id="bl-refund-amount"
                     type="number"
                     min={0}
                     max={selectedRefundPayment?.amount ?? 0}
@@ -1073,22 +719,21 @@ export default function BillingTab({
                     onChange={e => setRefundAmount(parseFloat(e.target.value) || 0)}
                   />
                   {selectedRefundPayment && (
-                    <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                      {t('billing.maxRefund', { amount: formatMoney(selectedRefundPayment.amount) }) || `Max ${formatMoney(selectedRefundPayment.amount)}`}
-                    </div>
+                    <span className="bl-muted" style={{ fontSize: 11 }}>
+                      {t('billing.maxRefund', { amount: formatMoney(selectedRefundPayment.amount) })}
+                    </span>
                   )}
                 </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.reason') || 'Reason'}</label>
-                  <textarea rows={2} value={refundReason} onChange={e => setRefundReason(e.target.value)} placeholder={t('billing.reasonPlaceholder') || 'Required'} />
+                <div className="bl-field">
+                  <label htmlFor="bl-refund-reason">{t('billing.reason')}</label>
+                  <textarea id="bl-refund-reason" rows={2} value={refundReason} onChange={e => setRefundReason(e.target.value)} placeholder={t('billing.reasonPlaceholder')} />
                 </div>
-              </div>
+              </>
             )}
-            <hr className="section-divider" />
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setShowRefund(false)} className="btn btn-secondary flex-1">{t('common.cancel') || 'Cancel'}</button>
-              <button onClick={handleIssueRefund} disabled={processingRefund || refundablePayments.length === 0} className="btn btn-primary flex-1">
-                {processingRefund ? (t('common.processing') || 'Processing…') : (t('billing.issueRefund') || 'Issue refund')}
+            <div className="bl-modal-actions">
+              <button type="button" className="bl-btn bl-btn--ghost" onClick={() => setShowRefund(false)}>{t('common.cancel')}</button>
+              <button type="button" className="bl-btn bl-btn--primary" onClick={handleIssueRefund} disabled={processingRefund || refundablePayments.length === 0}>
+                {processingRefund ? t('common.processing') : t('billing.issueRefund')}
               </button>
             </div>
           </div>
@@ -1097,148 +742,112 @@ export default function BillingTab({
 
       {/* ─── Adjustment / Write-off Modal ─── */}
       {showAdjustment && (
-        <Modal onClose={() => setShowAdjustment(false)} width={460}>
-          <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="icon-box-sm">
-                  <RefreshCw className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                </div>
-                <h3 className="text-base font-semibold">{t('billing.adjustmentWriteOff') || 'Adjustment / write-off'}</h3>
-              </div>
-              <button onClick={() => setShowAdjustment(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                <X className="w-4 h-4" />
-              </button>
+        <Modal onClose={() => setShowAdjustment(false)} width={460} labelledBy="bl-adj-title">
+          <div className="bl-root bl-modal-body">
+            <h3 className="bl-modal-title" id="bl-adj-title">{t('billing.adjustmentWriteOff')}</h3>
+            <div className="bl-field">
+              <label htmlFor="bl-adj-type">{t('billing.adjustmentType')}</label>
+              <select id="bl-adj-type" value={adjForm.adjustmentType} onChange={e => setAdjForm({ ...adjForm, adjustmentType: e.target.value as AdjustmentType })}>
+                {ADJUSTMENT_TYPES.map(at => <option key={at} value={at}>{at.replace(/_/g, ' ')}</option>)}
+              </select>
             </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.adjustmentType') || 'Adjustment type'}</label>
-                <select value={adjForm.adjustmentType} onChange={e => setAdjForm({ ...adjForm, adjustmentType: e.target.value as AdjustmentType })}>
-                  {ADJUSTMENT_TYPES.map(at => <option key={at} value={at}>{at.replace(/_/g, ' ')}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.amount') || 'Amount'}</label>
-                <input type="number" min={0} value={adjForm.amount || ''} onChange={e => setAdjForm({ ...adjForm, amount: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.reasonCode') || 'Reason code'}</label>
-                <input type="text" value={adjForm.reasonCode} onChange={e => setAdjForm({ ...adjForm, reasonCode: e.target.value })} placeholder={t('common.optional') || 'Optional'} />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.reason') || 'Reason'}</label>
-                <textarea rows={2} value={adjForm.reason} onChange={e => setAdjForm({ ...adjForm, reason: e.target.value })} placeholder={t('billing.reasonPlaceholder') || 'Required'} />
-              </div>
+            <div className="bl-field">
+              <label htmlFor="bl-adj-amount">{t('billing.amount')}</label>
+              <input id="bl-adj-amount" type="number" min={0} value={adjForm.amount || ''} onChange={e => setAdjForm({ ...adjForm, amount: parseFloat(e.target.value) || 0 })} />
             </div>
-            <hr className="section-divider" />
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setShowAdjustment(false)} className="btn btn-secondary flex-1">{t('common.cancel') || 'Cancel'}</button>
-              <button onClick={handleCreateAdjustment} disabled={processingAdj} className="btn btn-primary flex-1">
-                {processingAdj ? (t('common.processing') || 'Processing…') : (t('common.save') || 'Save')}
+            <div className="bl-field">
+              <label htmlFor="bl-adj-reasoncode">{t('billing.reasonCode')}</label>
+              <input id="bl-adj-reasoncode" type="text" value={adjForm.reasonCode} onChange={e => setAdjForm({ ...adjForm, reasonCode: e.target.value })} placeholder={t('common.optional')} />
+            </div>
+            <div className="bl-field">
+              <label htmlFor="bl-adj-reason">{t('billing.reason')}</label>
+              <textarea id="bl-adj-reason" rows={2} value={adjForm.reason} onChange={e => setAdjForm({ ...adjForm, reason: e.target.value })} placeholder={t('billing.reasonPlaceholder')} />
+            </div>
+            <div className="bl-modal-actions">
+              <button type="button" className="bl-btn bl-btn--ghost" onClick={() => setShowAdjustment(false)}>{t('common.cancel')}</button>
+              <button type="button" className="bl-btn bl-btn--primary" onClick={handleCreateAdjustment} disabled={processingAdj}>
+                {processingAdj ? t('common.processing') : t('common.save')}
               </button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* ─── Add / Edit Insurance Policy Modal ─── */}
-      {insuranceModal && (
+      {/* ─── Add Insurance Policy Modal ─── */}
+      {insuranceModalOpen && (
         <InsurancePolicyModal
           patientId={patient._id}
-          policy={insuranceModal.mode === 'edit' ? insuranceModal.policy : null}
+          policy={null}
           facilityId={facilityId}
           orgId={orgId}
           createdBy={currentUser?._id}
-          onClose={() => setInsuranceModal(null)}
+          onClose={() => setInsuranceModalOpen(false)}
           onSaved={handleInsuranceSaved}
         />
       )}
 
-      {/* ─── Send Payment Link Modal ─── */}
+      {/* ─── Send Payment Link Modal ───
+          billing.sendPaymentLink was missing from en.ts, so `t()` returned the
+          raw key verbatim (the `|| 'fallback'` guards never fire — t() only
+          returns falsy when the key itself is empty). That left this button,
+          and every string in this modal, showing dot-path keys on screen.
+          Key added to en.ts; the whole modal restyled to the bl- language
+          while fixing it. */}
       {showPaymentLink && (
-        <Modal onClose={() => setShowPaymentLink(false)} width={440}>
-          <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="icon-box-sm">
-                  <Send className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                </div>
-                <h3 className="text-base font-semibold">{t('billing.sendPaymentLink') || 'Send payment link'}</h3>
-              </div>
-              <button onClick={() => setShowPaymentLink(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+        <Modal onClose={() => setShowPaymentLink(false)} width={440} labelledBy="bl-link-title">
+          <div className="bl-root bl-modal-body">
+            <h3 className="bl-modal-title" id="bl-link-title">{t('billing.sendPaymentLink')}</h3>
 
             {!createdLink ? (
               <>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.amount') || 'Amount'}</label>
-                    <input
-                      type="number" min={0} value={linkAmount || ''}
-                      onChange={e => setLinkAmount(parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('billing.reason') || 'Description'}</label>
-                    <textarea
-                      rows={2} value={linkDescription} onChange={e => setLinkDescription(e.target.value)}
-                      placeholder={t('billing.paymentLinkDescPlaceholder') || 'e.g. Outstanding balance for July visit'}
-                    />
-                  </div>
-                  {linkError && (
-                    <div style={{ fontSize: 12, color: 'var(--color-danger)' }}>{linkError}</div>
-                  )}
+                <div className="bl-field">
+                  <label htmlFor="bl-link-amount">{t('billing.amount')}</label>
+                  <input
+                    id="bl-link-amount"
+                    type="number" min={0} value={linkAmount || ''}
+                    onChange={e => setLinkAmount(parseFloat(e.target.value) || 0)}
+                  />
                 </div>
-                <hr className="section-divider" />
-                <div className="flex gap-2 mt-2">
-                  <button onClick={() => setShowPaymentLink(false)} className="btn btn-secondary flex-1">{t('common.cancel') || 'Cancel'}</button>
-                  <button onClick={handleCreatePaymentLink} disabled={creatingLink} className="btn btn-primary flex-1">
-                    {creatingLink ? (t('common.processing') || 'Creating…') : (t('billing.generateLink') || 'Generate link')}
+                <div className="bl-field">
+                  <label htmlFor="bl-link-desc">{t('billing.reason')}</label>
+                  <textarea
+                    id="bl-link-desc"
+                    rows={2} value={linkDescription} onChange={e => setLinkDescription(e.target.value)}
+                    placeholder={t('billing.paymentLinkDescPlaceholder')}
+                  />
+                </div>
+                {linkError && <p className="bl-danger" style={{ fontSize: 12, margin: 0 }}>{linkError}</p>}
+                <div className="bl-modal-actions">
+                  <button type="button" className="bl-btn bl-btn--ghost" onClick={() => setShowPaymentLink(false)}>{t('common.cancel')}</button>
+                  <button type="button" className="bl-btn bl-btn--primary" onClick={handleCreatePaymentLink} disabled={creatingLink}>
+                    {creatingLink ? t('common.processing') : t('billing.generateLink')}
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <div style={{ padding: 14, borderRadius: 10, background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('billing.amount') || 'Amount'}</span>
-                    <span style={{ fontSize: 14, fontWeight: 700 }}>{formatMoney(createdLink.amount, { currency: createdLink.currency })}</span>
+                <dl className="bl-totals">
+                  <div className="bl-totals-row"><dt>{t('billing.amount')}</dt><dd>{formatMoney(createdLink.amount, { currency: createdLink.currency })}</dd></div>
+                  <div className="bl-totals-row">
+                    <dt>{t('billing.expires')}</dt>
+                    <dd>{new Date(createdLink.expiresAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</dd>
                   </div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('billing.expires') || 'Expires'}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600 }}>
-                      {new Date(createdLink.expiresAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8, marginTop: 10,
-                    padding: '8px 10px', borderRadius: 8, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)',
-                  }}>
-                    <ExternalLink size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                      {createdLink.url}
-                    </span>
-                    <button
-                      onClick={handleCopyPaymentLink}
-                      title={t('billing.copyLink') || 'Copy link'}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
-                        padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                        background: linkCopied ? 'var(--color-success-bg)' : 'var(--accent-light)',
-                        color: linkCopied ? 'var(--color-success)' : 'var(--accent-primary)',
-                        fontSize: 11, fontWeight: 700,
-                      }}
-                    >
-                      {linkCopied ? <Check size={12} /> : <Copy size={12} />}
-                      {linkCopied ? (t('billing.copied') || 'Copied') : (t('billing.copy') || 'Copy')}
-                    </button>
-                  </div>
+                </dl>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 10px', borderRadius: 6, background: 'var(--ehr-page-bg, #F8FBFD)', border: '1px solid var(--ehr-border, #D8E3EC)',
+                }}>
+                  <ExternalLink size={14} className="bl-muted" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: 'var(--ehr-text, #102634)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {createdLink.url}
+                  </span>
+                  <button type="button" className="bl-btn bl-btn--outline" style={{ padding: '4px 10px', fontSize: 11 }} onClick={handleCopyPaymentLink} title={t('billing.copyLink')}>
+                    {linkCopied ? <Check size={12} /> : <Copy size={12} />}
+                    {linkCopied ? t('billing.copied') : t('billing.copy')}
+                  </button>
                 </div>
-                <hr className="section-divider" />
-                <div className="flex gap-2 mt-2">
-                  <button onClick={() => setShowPaymentLink(false)} className="btn btn-primary flex-1">{t('common.done') || 'Done'}</button>
+                <div className="bl-modal-actions">
+                  <button type="button" className="bl-btn bl-btn--primary" onClick={() => setShowPaymentLink(false)}>{t('common.done')}</button>
                 </div>
               </>
             )}

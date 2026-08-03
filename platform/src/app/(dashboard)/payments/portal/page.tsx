@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import {
   CreditCard, Smartphone, Building2, CheckCircle,
-  Shield, Receipt,
+  Shield, Receipt, ChevronLeft,
   ArrowRight, Wallet, Copy, Check, Loader2, AlertCircle
 } from '@/components/icons/lucide';
 import { useAuth } from '@/lib/context';
@@ -12,6 +12,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { BillingDoc } from '@/lib/db-types-billing';
 import type { PaymentMethodType, PaymentStatus } from '@/lib/db-types-payments';
 import { formatMoney } from '@/lib/format-utils';
+import '@/components/billing/billing.css';
 
 // Demo gate. In production (NEXT_PUBLIC_DEMO_MODE=false) the portal never
 // shows fake invoices or the hardcoded Equity Bank account — empty state
@@ -117,7 +118,10 @@ const buildPaymentMethods = (bankDetails?: string): PaymentMethodDef[] => [
   { id: 'mtn', label: 'MTN Mobile Money', desc: 'Pay via MTN MoMo', icon: Smartphone, color: '#FFCB05', instructions: 'Dial *165# > Pay Bill\nMerchant Code: TamamHealth\nReference: Your Invoice #' },
   { id: 'airtel', label: 'Airtel Money', desc: 'Pay via Airtel Money', icon: Smartphone, color: '#ED1C24', instructions: 'Dial *185# > Pay Bill\nBusiness Name: TamamHealth HEALTH\nReference: Your Invoice #' },
   { id: 'card', label: 'Visa / Mastercard', desc: 'Card payment (manually verified)', icon: CreditCard, color: '#6366f1', instructions: 'Enter your card details with our billing team, or provide a transaction reference. The charge is recorded here and verified by finance before it posts.' },
-  { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: 'var(--accent-primary)', instructions: resolveBankInstructions(bankDetails) },
+  // Literal hex (the --accent-primary value), not the CSS var — the icon
+  // tint below concatenates a hex alpha suffix onto this string, which only
+  // works for a hex literal.
+  { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: '#2191D0', instructions: resolveBankInstructions(bankDetails) },
 ];
 
 export default function PatientPortalPage() {
@@ -292,177 +296,121 @@ export default function PatientPortalPage() {
   return (
     <>
       <main className="page-container page-enter">
+      <div className="bl-root">
 
         {usingDemo && realBills !== null && <DemoModeBanner />}
 
-        {/* ── Welcome Banner ───────────────────────────────── */}
-        <div style={{
-          background: 'linear-gradient(135deg, #015697 0%, #015697 50%, #2191D0 100%)',
-          borderRadius: 'var(--card-radius)', padding: '28px 32px', marginBottom: 24,
-          position: 'relative', overflow: 'hidden',
-        }}>
-          <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
-          <div style={{ position: 'absolute', bottom: -60, right: 80, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.03)' }} />
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>
-            <div>
-              <h2 style={{ fontSize: 'clamp(1.125rem, 2vw, 1.375rem)', fontWeight: 800, color: '#fff', margin: '0 0 6px' }}>
-                {t('portal.welcome', { name: currentUser?.name || t('portal.patient') })}
-              </h2>
-              <p style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.7)', margin: 0 }}>
-                {t('portal.welcomeSubtitle')}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <div style={{
-                background: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: '14px 20px',
-                border: '1px solid rgba(255,255,255,0.15)', textAlign: 'center', minWidth: 110,
-              }}>
-                <div style={{ fontSize: '0.625rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('billing.colBalanceDue')}</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: totalOwed > 0 ? 'var(--color-warning-400)' : '#4ade80' }}>{formatMoney(totalOwed)}</div>
-              </div>
-              <div style={{
-                background: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: '14px 20px',
-                border: '1px solid rgba(255,255,255,0.15)', textAlign: 'center', minWidth: 110,
-              }}>
-                <div style={{ fontSize: '0.625rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('portal.totalPaid')}</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#4ade80' }}>{formatMoney(totalPaid)}</div>
-              </div>
-            </div>
+        {/* ── Welcome + balance strip — plain, no gradient hero. Patient-facing
+             surfaces follow the same "white panel, 1px border" rule as staff
+             billing screens. ── */}
+        <div className="bl-page-head">
+          <div>
+            <h1 className="bl-title">{t('portal.welcome', { name: currentUser?.name || t('portal.patient') })}</h1>
+            <p className="bl-muted" style={{ margin: '2px 0 0', fontSize: 12.5 }}>{t('portal.welcomeSubtitle')}</p>
+          </div>
+        </div>
+
+        <div className="bl-stats">
+          <div>
+            <span className="bl-stat-label">{t('billing.colBalanceDue')}</span>
+            <span className={`bl-stat-value${totalOwed > 0 ? ' bl-stat-value--danger' : ' bl-stat-value--good'}`}>{formatMoney(totalOwed)}</span>
+          </div>
+          <div>
+            <span className="bl-stat-label">{t('portal.totalPaid')}</span>
+            <span className="bl-stat-value bl-stat-value--good">{formatMoney(totalPaid)}</span>
           </div>
         </div>
 
         {/* Main Content */}
         {paymentStep === 'select' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
-            {/* Bills List */}
-            <div>
-              <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 16px' }}>
-                {t('portal.yourBills')}
-              </h3>
-              <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {bills.length === 0 && realBills !== null && (
-                  <div
-                    style={{
-                      padding: '32px 20px',
-                      borderRadius: 'var(--card-radius)',
-                      background: 'var(--bg-card)',
-                      border: '1px dashed var(--border-medium)',
-                      color: 'var(--text-muted)',
-                      textAlign: 'center',
-                      fontSize: 13,
-                    }}
-                  >
-                    {t('portal.noBills')}
-                  </div>
-                )}
-                {bills.map(bill => {
-                  const remaining = bill.amount - bill.paid;
-                  const isPaid = bill.status === 'paid';
-                  return (
-                    <div key={bill.id} style={{
-                      background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-                      borderRadius: 'var(--card-radius)', boxShadow: 'var(--card-shadow)',
-                      overflow: 'hidden',
-                    }}>
-                      {/* Colored indicator */}
-                      <div style={{
-                        height: 3,
-                        background: isPaid ? 'var(--color-success)' : bill.status === 'partial' ? 'var(--color-warning)' : 'var(--color-danger)',
-                      }} />
-                      <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                        {/* Icon */}
-                        <div className="icon-box-sm" style={{
-                          flexShrink: 0,
-                        }}>
-                          {isPaid
-                            ? <CheckCircle size={34} style={{ color: 'var(--color-success)' }} />
-                            : <Receipt size={34} style={{ color: 'var(--accent-primary)' }} />
-                          }
-                        </div>
-
-                        {/* Info */}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{bill.description}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-platform-mono)' }}>{bill.id}</span>
-                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{new Date(bill.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                          </div>
-                        </div>
-
-                        {/* Amount + Action */}
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '1rem', fontWeight: 800, color: isPaid ? 'var(--color-success)' : 'var(--text-primary)', marginBottom: 4 }}>
-                            {formatMoney(bill.amount)}
-                          </div>
-                          {isPaid ? (
-                            <span style={{
-                              fontSize: '0.625rem', fontWeight: 700, padding: '3px 10px', borderRadius: 10,
-                              background: 'var(--color-success-bg)', color: 'var(--color-success)',
-                              textTransform: 'uppercase',
-                            }}>{t('telehealth.payment_paid')}</span>
-                          ) : bill.status === 'partial' ? (
-                            <div>
-                              <span style={{ fontSize: '0.6875rem', color: 'var(--color-warning)', fontWeight: 600 }}>
-                                {t('portal.remaining', { amount: formatMoney(remaining) })}
-                              </span>
-                            </div>
-                          ) : (
-                            <span style={{
-                              fontSize: '0.625rem', fontWeight: 700, padding: '3px 10px', borderRadius: 10,
-                              background: 'var(--color-danger-bg)', color: 'var(--color-danger)',
-                              textTransform: 'uppercase',
-                            }}>{t('portal.unpaid')}</span>
-                          )}
-                        </div>
-
-                        {/* Pay button */}
-                        {!isPaid && (
-                          <button
-                            onClick={() => handlePayBill(bill)}
-                            style={{
-                              padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                              background: 'var(--accent-primary)', color: '#fff',
-                              fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
-                              transition: 'opacity 0.15s',
-                            }}
-                          >
-                            {t('portal.pay')} <ArrowRight size={12} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* Bills list */}
+            <div className="bl-card">
+              <div className="bl-card-head">
+                <h2 className="bl-card-title">{t('portal.yourBills')}</h2>
+                <span className="bl-underline" />
               </div>
+              {bills.length === 0 && realBills !== null ? (
+                <div className="bl-empty">
+                  <Receipt size={34} />
+                  <h3>{t('portal.noBills')}</h3>
+                </div>
+              ) : (
+                <div className="bl-table-wrap">
+                  <table className="bl-table">
+                    <thead>
+                      <tr>
+                        <th>Bill</th>
+                        <th>Date</th>
+                        <th className="bl-right">Amount</th>
+                        <th>Status</th>
+                        <th aria-label="Pay" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bills.map(bill => {
+                        const remaining = bill.amount - bill.paid;
+                        const isPaid = bill.status === 'paid';
+                        return (
+                          <tr key={bill.id}>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{bill.description}</div>
+                              <div className="bl-muted" style={{ fontSize: 11.5 }}>{bill.id}</div>
+                            </td>
+                            <td className="bl-muted" style={{ whiteSpace: 'nowrap' }}>
+                              {new Date(bill.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+                            <td className="bl-num bl-right">{formatMoney(bill.amount)}</td>
+                            <td>
+                              <span className={`bl-chip bl-chip--${bill.status}`}>
+                                {isPaid ? t('telehealth.payment_paid') : bill.status === 'partial' ? t('claims.status_partial') : t('portal.unpaid')}
+                              </span>
+                              {bill.status === 'partial' && (
+                                <div className="bl-muted" style={{ fontSize: 11, marginTop: 3 }}>
+                                  {t('portal.remaining', { amount: formatMoney(remaining) })}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              {!isPaid && (
+                                <button type="button" className="bl-btn bl-btn--primary" onClick={() => handlePayBill(bill)}>
+                                  {t('portal.pay')} <ArrowRight size={13} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
-            {/* Right Sidebar — Payment Summary + Quick Pay */}
+            {/* Right sidebar — payment summary + quick pay */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Quick Pay All */}
+              {/* Quick pay all */}
               {totalOwed > 0 && (
-                <div style={{
-                  background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-                  borderRadius: 'var(--card-radius)', padding: '22px 24px', boxShadow: 'var(--card-shadow)',
-                }}>
-                  <h4 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px' }}>
-                    {t('portal.payOutstandingBalance')}
-                  </h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+                <div className="bl-section">
+                  <div className="bl-section-head" style={{ marginBottom: 4 }}>
+                    <h2 className="bl-section-title">{t('portal.payOutstandingBalance')}</h2>
+                  </div>
+                  <p className="bl-muted" style={{ fontSize: 12, margin: '10px 0 16px' }}>
                     {unpaidBills.length > 1
                       ? t('portal.payAllBillsPlural', { count: unpaidBills.length })
                       : t('portal.payAllBills', { count: unpaidBills.length })}
                   </p>
                   <div style={{
-                    background: 'var(--overlay-subtle)', borderRadius: 10, padding: '16px 20px',
-                    textAlign: 'center', marginBottom: 16, border: '1px solid var(--border-light)',
+                    background: 'var(--ehr-page-bg, #F8FBFD)', border: '1px solid var(--ehr-border, #D8E3EC)',
+                    borderRadius: 6, padding: '14px 18px', textAlign: 'center', marginBottom: 16,
                   }}>
-                    <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('portal.totalDue')}</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{formatMoney(totalOwed)}</div>
+                    <span className="bl-stat-label">{t('portal.totalDue')}</span>
+                    <span className="bl-stat-value" style={{ fontSize: 22 }}>{formatMoney(totalOwed)}</span>
                   </div>
-                  <hr className="section-divider" />
                   <button
+                    type="button"
+                    className="bl-btn bl-btn--primary"
+                    style={{ width: '100%' }}
                     onClick={() => {
                       // All bills in this portal session belong to the same
                       // patient (they came from one getBillsByPatient query),
@@ -479,39 +427,39 @@ export default function PatientPortalPage() {
                       setPaymentAmount(String(totalOwed));
                       setPaymentStep('method');
                     }}
-                    style={{
-                      width: '100%', padding: '12px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: 'linear-gradient(135deg, #2191D0, #369FDA)', color: '#fff',
-                      fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    }}
                   >
                     <Wallet size={16} /> {t('portal.payAllNow')}
                   </button>
                 </div>
               )}
 
-              {/* Accepted Payment Methods */}
-              <div style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-                borderRadius: 'var(--card-radius)', padding: '22px 24px', boxShadow: 'var(--card-shadow)',
-              }}>
-                <h4 style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}>
-                  {t('portal.acceptedPaymentMethods')}
-                </h4>
-                <hr className="section-divider" />
-                <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Accepted payment methods */}
+              <div className="bl-section">
+                <div className="bl-section-head">
+                  <h2 className="bl-section-title">{t('portal.acceptedPaymentMethods')}</h2>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {PAYMENT_METHODS.map(m => {
                     const Icon = m.icon;
                     return (
                       <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div className="icon-box-sm" style={{
-                          flexShrink: 0,
+                        {/* globals.css force-strips `background`/`box-shadow` (both
+                            !important) on any div/span whose only child is a lone
+                            svg — an icon-wrapper reset. Wrapping the icon in a span
+                            defeats that :has(>svg:only-child) match so this tint
+                            survives; the span itself is a harmless no-op for layout. */}
+                        <div style={{
+                          width: 30, height: 30, borderRadius: 7, flexShrink: 0,
+                          background: `${m.color}14`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>
-                          <Icon size={14} style={{ color: m.color }} />
+                          {/* The Icon shim reads a `color` prop, not inherited CSS
+                              color — a wrapping div's `color` style has no effect. */}
+                          <span><Icon size={14} color={m.color} /></span>
                         </div>
                         <div>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{m.label}</div>
-                          <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>{m.desc}</div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--ehr-text-title, #132C44)' }}>{m.label}</div>
+                          <div className="bl-muted" style={{ fontSize: '0.625rem' }}>{m.desc}</div>
                         </div>
                       </div>
                     );
@@ -519,16 +467,12 @@ export default function PatientPortalPage() {
                 </div>
               </div>
 
-              {/* Security Badge */}
-              <div style={{
-                background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-                borderRadius: 'var(--card-radius)', padding: '16px 20px',
-                display: 'flex', alignItems: 'center', gap: 12,
-              }}>
-                <Shield size={34} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              {/* Security note */}
+              <div className="bl-section" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Shield size={30} color="var(--ehr-muted, #8395A8)" style={{ flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{t('portal.securePayments')}</div>
-                  <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>{t('portal.securePaymentsDesc')}</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--ehr-text-title, #132C44)' }}>{t('portal.securePayments')}</div>
+                  <div className="bl-muted" style={{ fontSize: '0.625rem' }}>{t('portal.securePaymentsDesc')}</div>
                 </div>
               </div>
             </div>
@@ -538,84 +482,74 @@ export default function PatientPortalPage() {
         {/* ══════════════ PAYMENT METHOD SELECTION ══════════════ */}
         {paymentStep === 'method' && selectedBill && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
-            <button onClick={resetPayment} style={{
-              background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-              fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 20, padding: 0,
-            }}>
-              ← {t('portal.backToBills')}
+            <button type="button" className="bl-btn bl-btn--link" onClick={resetPayment} style={{ marginBottom: 16, padding: '0 0 4px' }}>
+              <ChevronLeft size={15} /> {t('portal.backToBills')}
             </button>
 
-            {/* Bill summary card */}
-            <div style={{
-              background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-              borderRadius: 'var(--card-radius)', padding: '20px 24px', marginBottom: 20,
-              boxShadow: 'var(--card-shadow)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Bill summary */}
+            <div className="bl-card" style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px' }}>
                 <div>
-                  <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: 4 }}>{selectedBill.id}</div>
-                  <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedBill.description}</div>
+                  <div className="bl-muted" style={{ fontSize: 11.5, marginBottom: 4 }}>{selectedBill.id}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ehr-text-title, #132C44)' }}>{selectedBill.description}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('portal.amountToPay')}</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-primary)' }}>{formatMoney(Number(paymentAmount))}</div>
+                  <span className="bl-stat-label">{t('portal.amountToPay')}</span>
+                  <span className="bl-stat-value" style={{ fontSize: 20 }}>{formatMoney(Number(paymentAmount))}</span>
                 </div>
               </div>
             </div>
 
             {/* Custom amount */}
-            <div style={{
-              background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-              borderRadius: 'var(--card-radius)', padding: '16px 24px', marginBottom: 20,
-              boxShadow: 'var(--card-shadow)',
-            }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>
-                {t('portal.paymentAmountSsp')}
-              </label>
-              <input
-                type="number"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                style={{
-                  width: '100%', padding: '12px 16px', fontSize: '1.125rem', fontWeight: 700,
-                  borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--overlay-subtle)',
-                  color: 'var(--text-primary)', boxSizing: 'border-box',
-                }}
-              />
+            <div className="bl-card" style={{ marginBottom: 16, padding: '16px 20px' }}>
+              <div className="bl-field">
+                <label htmlFor="portal-amount">{t('portal.paymentAmountSsp')}</label>
+                <input
+                  id="portal-amount"
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  style={{ fontSize: 16, fontWeight: 700 }}
+                />
+              </div>
             </div>
 
-            {/* Payment method cards */}
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 14px' }}>
-              {t('portal.choosePaymentMethod')}
-            </h3>
-            <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+            {/* Payment method cards — selection shown by border, not a fill,
+                so the "no fills on surfaces" rule holds even mid-selection. */}
+            <h3 className="bl-card-title" style={{ marginBottom: 12 }}>{t('portal.choosePaymentMethod')}</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
               {PAYMENT_METHODS.map(m => {
                 const Icon = m.icon;
                 const isSelected = paymentMethod === m.id;
                 return (
                   <button
                     key={m.id}
+                    type="button"
                     onClick={() => setPaymentMethod(m.id)}
+                    className="bl-card"
                     style={{
                       display: 'flex', alignItems: 'center', gap: 14,
-                      padding: '16px 20px', borderRadius: 'var(--card-radius)',
-                      background: isSelected ? `${m.color}0A` : 'var(--bg-card)',
-                      border: isSelected ? `2px solid ${m.color}` : '1px solid var(--border-light)',
+                      padding: '14px 18px',
+                      borderColor: isSelected ? m.color : undefined,
+                      borderWidth: isSelected ? 2 : 1,
                       cursor: 'pointer', textAlign: 'left', width: '100%',
-                      boxShadow: isSelected ? `0 0 0 3px ${m.color}14` : 'var(--card-shadow)',
-                      transition: 'all 0.15s',
                     }}
                   >
-                    <div className="icon-box-sm">
-                      <Icon size={16} style={{ color: m.color }} />
+                    {/* Icon wrapped in a span — see the globals.css note above. */}
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                      background: `${m.color}14`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span><Icon size={16} color={m.color} /></span>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{m.label}</div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{m.desc}</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--ehr-text-title, #132C44)' }}>{m.label}</div>
+                      <div className="bl-muted" style={{ fontSize: '0.6875rem' }}>{m.desc}</div>
                     </div>
                     {isSelected && (
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check size={12} color="#fff" />
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span><Check size={12} color="#fff" /></span>
                       </div>
                     )}
                   </button>
@@ -624,14 +558,11 @@ export default function PatientPortalPage() {
             </div>
 
             <button
+              type="button"
+              className="bl-btn bl-btn--primary"
+              style={{ width: '100%' }}
               onClick={handleConfirmPayment}
               disabled={!paymentMethod || !paymentAmount}
-              style={{
-                width: '100%', padding: '14px 24px', borderRadius: 10, border: 'none', cursor: paymentMethod ? 'pointer' : 'not-allowed',
-                background: paymentMethod ? 'linear-gradient(135deg, #2191D0, #369FDA)' : 'var(--border-light)',
-                color: paymentMethod ? '#fff' : 'var(--text-muted)',
-                fontSize: '0.9375rem', fontWeight: 700, transition: 'all 0.15s',
-              }}
             >
               {t('portal.continueToPayment')}
             </button>
@@ -641,56 +572,48 @@ export default function PatientPortalPage() {
         {/* ══════════════ PAYMENT CONFIRMATION ══════════════ */}
         {paymentStep === 'confirm' && selectedBill && paymentMethod && (
           <div style={{ maxWidth: 560, margin: '0 auto' }}>
-            <button onClick={() => setPaymentStep('method')} style={{
-              background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-              fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 20, padding: 0,
-            }}>
-              ← {t('portal.backToMethodSelection')}
+            <button type="button" className="bl-btn bl-btn--link" onClick={() => setPaymentStep('method')} style={{ marginBottom: 16, padding: '0 0 4px' }}>
+              <ChevronLeft size={15} /> {t('portal.backToMethodSelection')}
             </button>
 
             {(() => {
               const method = PAYMENT_METHODS.find(m => m.id === paymentMethod)!;
               const Icon = method.icon;
               return (
-                <div style={{
-                  background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-                  borderRadius: 'var(--card-radius)', overflow: 'hidden', boxShadow: 'var(--card-shadow)',
-                }}>
-                  {/* Header */}
-                  <div style={{
-                    background: `${method.color}0A`, padding: '24px 28px',
-                    borderBottom: `2px solid ${method.color}20`,
-                  }}>
+                <div className="bl-card">
+                  {/* Header — plain surface; the method's colour lives only in
+                      the small icon chip (the bl-home-icon convention), not a
+                      full-width tint. */}
+                  <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--ehr-border, #D8E3EC)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
                       <div style={{
-                        width: 48, height: 48, borderRadius: 14,
-                        background: `${method.color}1A`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                        background: `${method.color}14`, // icon wrapped in a span — see globals.css note above
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
-                        <Icon size={56} style={{ color: method.color }} />
+                        <span><Icon size={22} color={method.color} /></span>
                       </div>
                       <div>
-                        <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{t('portal.payWith', { method: method.label })}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{method.desc}</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ehr-text-title, #132C44)' }}>{t('portal.payWith', { method: method.label })}</div>
+                        <div className="bl-muted" style={{ fontSize: 12 }}>{method.desc}</div>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                      <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{t('portal.amount')}</div>
-                      <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{formatMoney(Number(paymentAmount))}</div>
+                    <div style={{ textAlign: 'center', padding: '10px 0 2px' }}>
+                      <span className="bl-stat-label">{t('portal.amount')}</span>
+                      <span className="bl-stat-value" style={{ fontSize: 26 }}>{formatMoney(Number(paymentAmount))}</span>
                     </div>
                   </div>
 
                   {/* Instructions */}
-                  <div style={{ padding: '24px 28px' }}>
-                    <h4 style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
-                      {t('portal.paymentInstructions')}
-                    </h4>
+                  <div style={{ padding: '20px 24px' }}>
+                    <h4 className="bl-card-title" style={{ marginBottom: 10 }}>{t('portal.paymentInstructions')}</h4>
                     <div style={{
-                      background: 'var(--overlay-subtle)', borderRadius: 10, padding: '16px 18px',
-                      border: '1px solid var(--border-light)', marginBottom: 20,
+                      background: 'var(--ehr-page-bg, #F8FBFD)', borderRadius: 6, padding: '14px 16px',
+                      border: '1px solid var(--ehr-border, #D8E3EC)', marginBottom: 18,
                     }}>
                       {method.instructions.split('\n').map((line, i) => (
                         <div key={i} style={{
-                          fontSize: '0.8125rem', color: 'var(--text-primary)', lineHeight: 1.8,
+                          fontSize: 13, color: 'var(--ehr-text, #102634)', lineHeight: 1.8,
                           fontFamily: line.includes(':') ? 'var(--font-platform-mono)' : 'inherit',
                         }}>
                           {line}
@@ -698,28 +621,19 @@ export default function PatientPortalPage() {
                       ))}
                     </div>
 
-                    <hr className="section-divider" />
                     {/* Reference to copy */}
                     <div style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      background: 'var(--overlay-subtle)', borderRadius: 8, padding: '10px 14px',
-                      border: '1px solid var(--border-light)', marginBottom: 24,
+                      background: 'var(--ehr-page-bg, #F8FBFD)', borderRadius: 6, padding: '10px 14px',
+                      border: '1px solid var(--ehr-border, #D8E3EC)', marginBottom: 20,
                     }}>
                       <div>
-                        <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginBottom: 2 }}>{t('lab.reference')}</div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>
+                        <div className="bl-muted" style={{ fontSize: 11, marginBottom: 2 }}>{t('lab.reference')}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ehr-text-title, #132C44)', fontFamily: 'var(--font-platform-mono)' }}>
                           {selectedBill.id}
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleCopyRef(selectedBill.id)}
-                        style={{
-                          background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-                          borderRadius: 6, padding: '6px 12px', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 4,
-                          fontSize: '0.6875rem', fontWeight: 600, color: copied ? 'var(--color-success)' : 'var(--text-secondary)',
-                        }}
-                      >
+                      <button type="button" className="bl-btn bl-btn--outline" onClick={() => handleCopyRef(selectedBill.id)} style={{ padding: '6px 12px', fontSize: 11.5 }}>
                         {copied ? <><Check size={12} /> {t('portal.copied')}</> : <><Copy size={12} /> {t('portal.copy')}</>}
                       </button>
                     </div>
@@ -727,24 +641,20 @@ export default function PatientPortalPage() {
                     {completeError && (
                       <div style={{
                         display: 'flex', alignItems: 'center', gap: 8,
-                        background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger-500)',
-                        borderRadius: 8, padding: '10px 14px', marginBottom: 14,
+                        background: 'var(--ehr-panel, #fff)', border: '1px solid var(--color-danger, #DA1E28)',
+                        borderRadius: 6, padding: '10px 14px', marginBottom: 14,
                       }}>
-                        <AlertCircle size={16} style={{ color: 'var(--color-danger-500)', flexShrink: 0 }} />
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-danger-text)' }}>{completeError}</span>
+                        <AlertCircle size={16} color="var(--color-danger, #DA1E28)" style={{ flexShrink: 0 }} />
+                        <span className="bl-danger" style={{ fontSize: 12.5 }}>{completeError}</span>
                       </div>
                     )}
 
                     <button
+                      type="button"
+                      className="bl-btn bl-btn--primary"
+                      style={{ width: '100%' }}
                       onClick={handleCompletePayment}
                       disabled={completing}
-                      style={{
-                        width: '100%', padding: '14px 24px', borderRadius: 10, border: 'none',
-                        cursor: completing ? 'not-allowed' : 'pointer',
-                        background: `linear-gradient(135deg, ${method.color}, ${method.color}CC)`,
-                        color: '#fff', fontSize: '0.9375rem', fontWeight: 700, opacity: completing ? 0.75 : 1,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      }}
                     >
                       {completing && <Loader2 size={16} className="animate-spin" />}
                       {completing
@@ -752,7 +662,7 @@ export default function PatientPortalPage() {
                         : (paymentMethod === 'card' ? 'Record card payment (pending verification)' : t('portal.sentPayment'))}
                     </button>
 
-                    <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: 12 }}>
+                    <p className="bl-muted" style={{ fontSize: 11, textAlign: 'center', marginTop: 12 }}>
                       {t('portal.confirmTiming')}
                     </p>
                   </div>
@@ -765,57 +675,38 @@ export default function PatientPortalPage() {
         {/* ══════════════ SUCCESS ══════════════ */}
         {paymentStep === 'success' && (
           <div style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-            <div style={{
-              background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-              borderRadius: 'var(--card-radius)', padding: '48px 40px', boxShadow: 'var(--card-shadow)',
-            }}>
+            <div className="bl-card" style={{ padding: '40px 36px' }}>
               <div style={{
-                width: 64, height: 64, borderRadius: '50%', margin: '0 auto 20px',
-                background: 'var(--color-success-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 56, height: 56, borderRadius: '50%', margin: '0 auto 18px',
+                background: 'rgba(25, 128, 56, 0.10)', // icon wrapped in a span — see globals.css note above
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <CheckCircle size={44} style={{ color: 'var(--color-success)' }} />
+                <span><CheckCircle size={32} color="#14713A" /></span>
               </div>
-              <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 8px' }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ehr-text-title, #132C44)', margin: '0 0 8px' }}>
                 {t('portal.paymentSubmitted')}
               </h2>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>
+              <p className="bl-muted" style={{ fontSize: 13, margin: '0 0 22px', lineHeight: 1.6 }}>
                 {t('portal.paymentSubmittedDescPre')}<strong>{formatMoney(Number(paymentAmount))}</strong>{t('portal.paymentSubmittedDescPost')}
               </p>
 
-              <div className="data-row-divider-sm" style={{
-                background: 'var(--overlay-subtle)', borderRadius: 10, padding: '16px 20px',
-                marginBottom: 24, border: '1px solid var(--border-light)',
+              <dl className="bl-totals" style={{
+                background: 'var(--ehr-page-bg, #F8FBFD)', borderRadius: 6, padding: '14px 18px',
+                marginBottom: 22, border: '1px solid var(--ehr-border, #D8E3EC)', textAlign: 'left',
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('lab.reference')}</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>{selectedBill?.id}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('portal.amount')}</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{formatMoney(Number(paymentAmount))}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('portal.method')}</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {PAYMENT_METHODS.find(m => m.id === paymentMethod)?.label}
-                  </span>
-                </div>
-              </div>
+                <div className="bl-totals-row"><dt>{t('lab.reference')}</dt><dd style={{ fontFamily: 'var(--font-platform-mono)' }}>{selectedBill?.id}</dd></div>
+                <div className="bl-totals-row"><dt>{t('portal.amount')}</dt><dd>{formatMoney(Number(paymentAmount))}</dd></div>
+                <div className="bl-totals-row"><dt>{t('portal.method')}</dt><dd>{PAYMENT_METHODS.find(m => m.id === paymentMethod)?.label}</dd></div>
+              </dl>
 
-              <button
-                onClick={resetPayment}
-                style={{
-                  padding: '12px 32px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                  background: 'var(--accent-primary)', color: '#fff',
-                  fontSize: '0.875rem', fontWeight: 700,
-                }}
-              >
+              <button type="button" className="bl-btn bl-btn--primary" onClick={resetPayment}>
                 {t('portal.backToBillsBtn')}
               </button>
             </div>
           </div>
         )}
 
+      </div>
       </main>
     </>
   );

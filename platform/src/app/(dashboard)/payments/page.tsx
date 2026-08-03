@@ -4,21 +4,19 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   X, Wallet, Activity, AlertCircle, ChevronRight, ChevronDown, ExternalLink, Receipt, Shield, Clock, Banknote,
-  RotateCcw, Ban, AlertTriangle,
+  RotateCcw, Ban, AlertTriangle, Search,
 } from '@/components/icons/lucide';
 import {
-  BarChart, Bar, ComposedChart, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer,
 } from 'recharts';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SearchInput } from '@/components/filters';
 import { computePlanKpis } from '@/components/payments/PlanKpiCards';
-import DataTile from '@/components/DataTile';
 import Modal from '@/components/Modal';
-import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
-import ChartCard, { tooltipStyle, axisTick } from '@/components/ChartCard';
+import { tooltipStyle, axisTick } from '@/components/ChartCard';
 import { toIsoDate, addDays } from '@/components/ehr/EhrMiniCalendar';
 import PaymentPanel from '@/components/payments/PaymentPanel';
 import { getMethodConfig } from '@/lib/payment-method-config';
@@ -26,13 +24,7 @@ import type { PaymentDoc, ClaimDoc, PaymentPlanDoc, PaymentMethodType } from '@/
 import type { BillingDoc, ChargeCategory } from '@/lib/db-types-billing';
 import type { EncounterDoc } from '@/lib/db-types';
 import { formatMoney } from '@/lib/format-utils';
-
-// Shared grid template for the patient-account list so the column header row and
-// every data row line up: Patient | Payments | Claims | Plans | Last activity | Balance | ›
-const PAYMENTS_COLS = 'minmax(0, 1fr) 120px 90px 80px 80px 130px 120px 110px 24px';
-
-// Compact stat-tile sizing shared by the small KPI grids on this page.
-const COMPACT_TILE_STYLE = { minHeight: 56, padding: '7px 12px' } as const;
+import '@/components/billing/billing.css';
 
 // Encounter statuses that represent a clinically-finished visit — used to spot
 // visits that closed out without ever generating a bill (see `unbilledEncounters`).
@@ -92,8 +84,7 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Text search comes from the shared global search state, surfaced as the
-  // list header's own search box (the TopBar's search row is hidden on this
-  // page in favor of the title + primary action layout).
+  // patient-accounts table's own search box.
   const search = globalSearch;
   // Balance filter retained for the bills list logic; the header filter UI was
   // removed, so it stays at 'all'.
@@ -104,7 +95,9 @@ export default function PaymentsPage() {
   // and choosing a patient drops straight into the record-payment panel.
   const [collectPickerOpen, setCollectPickerOpen] = useState(false);
   const [collectSearch, setCollectSearch] = useState('');
-  // Deeper financial analytics (service-line Pareto, plans, A/R aging) live
+  // Line/bar toggle for the daily-collections chart.
+  const [collectionsChartType, setCollectionsChartType] = useState<'line' | 'bar'>('line');
+  // Deeper financial analytics (service-line breakdown, plans, A/R aging) live
   // behind a toggle so the bill queue — the page's actual work — keeps the
   // viewport. Collapsed by default.
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -296,16 +289,6 @@ export default function PaymentsPage() {
     return buckets;
   }, [data.bills]);
 
-  // A/R aging, reshaped for the bar chart — same buckets/amounts as `aging`
-  // above (d91 + d120 folded into a single >90d bucket), colored by how
-  // urgent the receivable is (blue → amber → red).
-  const arAgingChartData = useMemo(() => ([
-    { bucket: '0–30d', amount: aging.current, fill: '#2a78d6' },
-    { bucket: '31–60d', amount: aging.d31, fill: '#eda100' },
-    { bucket: '61–90d', amount: aging.d61, fill: '#eda100' },
-    { bucket: '>90d', amount: aging.d91 + aging.d120, fill: '#e34948' },
-  ]), [aging]);
-
   // ── Today's collections by payment method ──────────────────────────
   // Real posted payments only, grouped by method, for the local calendar day
   // (matches the cashier's shift, not UTC — see date-conventions memory).
@@ -340,9 +323,9 @@ export default function PaymentsPage() {
     return days;
   }, [data.payments]);
 
-  // Revenue by service line (Pareto) — sum of every bill line item's
-  // totalPrice, grouped by charge category, sorted descending, with a
-  // running cumulative-% series for the Pareto reference line.
+  // Revenue by service line — sum of every bill line item's totalPrice,
+  // grouped by charge category, sorted descending, with a running
+  // cumulative-% series (rendered as a Pareto-style meter list below).
   const revenueByCategory = useMemo(() => {
     const byCategory = new Map<string, number>();
     for (const b of data.bills) {
@@ -463,393 +446,432 @@ export default function PaymentsPage() {
 
   if (loading) {
     return (
-      <>
-        <main className="page-container page-enter">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, color: 'var(--text-muted)' }}>
-            <Activity size={44} style={{ marginRight: 8, animation: 'spin 1s linear infinite' }} />
+      <main className="page-container page-enter">
+        <div className="bl-root">
+          <div className="bl-loading">
+            <Activity size={30} style={{ animation: 'spin 1s linear infinite' }} />
             <span>{t('payments.loading')}</span>
           </div>
-        </main>
-      </>
+        </div>
+      </main>
     );
   }
 
   return (
     <>
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        {error && (
-          <div style={{
-            background: 'var(--color-danger-bg)', borderLeft: '4px solid var(--color-danger-500)',
-            borderRadius: 'var(--card-radius)', padding: '14px 18px', marginBottom: 20,
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <AlertCircle size={16} style={{ color: 'var(--color-danger-500)', flexShrink: 0 }} />
-            <span style={{ color: 'var(--color-danger-text)', fontSize: '0.8125rem' }}>{error}</span>
-          </div>
-        )}
+      {/* The page scrolls rather than pinning itself to the viewport: the
+          accounts table used to be squeezed to nothing whenever the analytics
+          panel was expanded on a short screen, with no way to scroll it back. */}
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' }}>
+        <div className="bl-root" style={{ flex: 1, minHeight: 0 }}>
+          {error && (
+            <div className="bl-card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <AlertCircle size={16} style={{ color: 'var(--color-danger, #DA1E28)', flexShrink: 0 }} />
+              <span className="bl-danger" style={{ fontSize: 13 }}>{error}</span>
+            </div>
+          )}
 
-        {/* Today's Collections — posted payments broken down by method, plus a
-            14-day daily trend so the cashier/finance lead can see today in
-            context. Unbilled encounters (a revenue-leakage signal) rides
-            along in the same tile grid. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4 lg:items-stretch">
-          <div className="dash-card p-2.5 flex flex-col">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Today&rsquo;s Collections</h3>
-            {todayCollections.total === 0 && unbilledEncounters === 0 ? (
-              <p className="text-[12px] py-2 flex-1" style={{ color: 'var(--text-muted)' }}>No payments posted yet today</p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                <DataTile
-                  style={COMPACT_TILE_STYLE}
-                  label="Total Today"
-                  value={formatMoney(todayCollections.total)}
-                  tone={todayCollections.total > 0 ? 'ok' : 'default'}
-                />
-                {Array.from(todayCollections.byMethod.entries())
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([method, amount]) => (
-                    <DataTile key={method} style={COMPACT_TILE_STYLE} label={getMethodConfig(method).shortLabel} value={formatMoney(amount)} />
-                  ))}
-                <DataTile
-                  style={COMPACT_TILE_STYLE}
-                  label="Unbilled Encounters (30d)"
-                  value={unbilledEncounters}
-                  tone={unbilledEncounters > 0 ? 'warning' : 'default'}
-                />
+          {/* ── Page head ── */}
+          <div className="bl-home-head" style={{ justifyContent: 'space-between' }}>
+            <div className="flex items-center gap-3.5">
+              <div className="bl-home-icon"><Wallet size={24} /></div>
+              <div>
+                <p className="bl-eyebrow">Payments</p>
+                <h1 className="bl-title">{t('payments.title')}</h1>
               </div>
+            </div>
+            <div className="bl-actions">
+              <button
+                type="button"
+                onClick={() => { setCollectSearch(''); setCollectPickerOpen(true); }}
+                className="bl-btn bl-btn--primary"
+              >
+                <Banknote size={16} /> {t('billing.collectPayment')}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Stat strip — today's collections by method, unbilled encounters,
+              and the invoice counts that used to live in the header. Label
+              above value, no fills: every figure that was on the old grey
+              tiles/dot-chips is still here. ── */}
+          <div className="bl-stats">
+            <div>
+              <span className="bl-stat-label">Total collected today</span>
+              <span className={`bl-stat-value${todayCollections.total > 0 ? ' bl-stat-value--good' : ''}`}>
+                {formatMoney(todayCollections.total)}
+              </span>
+            </div>
+            {Array.from(todayCollections.byMethod.entries())
+              .sort((a, b) => b[1] - a[1])
+              .map(([method, amount]) => (
+                <div key={method}>
+                  <span className="bl-stat-label">{getMethodConfig(method).shortLabel}</span>
+                  <span className="bl-stat-value">{formatMoney(amount)}</span>
+                </div>
+              ))}
+            <div>
+              <span className="bl-stat-label">Unbilled encounters (30d)</span>
+              <span className={`bl-stat-value${unbilledEncounters > 0 ? ' bl-stat-value--danger' : ''}`}>{unbilledEncounters}</span>
+            </div>
+            <div>
+              <span className="bl-stat-label">Invoices</span>
+              <span className="bl-stat-value">{invoiceStats.total}</span>
+            </div>
+            <div>
+              <span className="bl-stat-label">Pending</span>
+              <span className="bl-stat-value">{invoiceStats.pending}</span>
+            </div>
+            <div>
+              <span className="bl-stat-label">Paid</span>
+              <span className={`bl-stat-value${invoiceStats.paid > 0 ? ' bl-stat-value--good' : ''}`}>{invoiceStats.paid}</span>
+            </div>
+            <div>
+              <span className="bl-stat-label">Outstanding patients</span>
+              <span className={`bl-stat-value${invoiceStats.outstandingPatients > 0 ? ' bl-stat-value--danger' : ''}`}>
+                {invoiceStats.outstandingPatients}
+              </span>
+            </div>
+          </div>
+
+          {/* ── Daily collections — real posted-payment data, so it stays a
+              chart (per the restyle brief) rather than becoming a meter. ── */}
+          <div className="bl-section">
+            <div className="bl-section-head">
+              <div>
+                <h2 className="bl-section-title">Daily collections</h2>
+                <p className="bl-card-sub" style={{ margin: '2px 0 0' }}>Posted payments · last 14 days</p>
+              </div>
+              <div className="bl-actions">
+                {(['line', 'bar'] as const).map(ct => (
+                  <button
+                    key={ct}
+                    type="button"
+                    onClick={() => setCollectionsChartType(ct)}
+                    className="bl-btn bl-btn--ghost"
+                    style={{
+                      padding: '5px 12px', fontSize: 12,
+                      ...(collectionsChartType === ct ? { borderColor: 'var(--bl-teal)', color: 'var(--bl-teal)' } : {}),
+                    }}
+                  >
+                    {ct === 'line' ? 'Line' : 'Bar'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {dailyCollections.every(d => d.amount === 0) ? (
+              <p className="bl-muted" style={{ fontSize: 13, margin: 0 }}>No collections in the last 14 days</p>
+            ) : collectionsChartType === 'bar' ? (
+              <ResponsiveContainer width="100%" height={190}>
+                <BarChart data={dailyCollections} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--ehr-border-soft, #E7EEF5)" vertical={false} />
+                  <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={44} />
+                  <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Collected']} />
+                  <Bar dataKey="amount" fill="var(--bl-teal)" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <ResponsiveContainer width="100%" height={190}>
+                <LineChart data={dailyCollections} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--ehr-border-soft, #E7EEF5)" vertical={false} />
+                  <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={44} />
+                  <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Collected']} />
+                  <Line type="monotone" dataKey="amount" stroke="var(--bl-teal)" strokeWidth={2} dot={{ r: 2.5 }} />
+                </LineChart>
+              </ResponsiveContainer>
             )}
           </div>
 
-          <ChartCard
-            title="Daily Collections"
-            subtitle="Posted payments · last 14 days"
-            chartTypes={['line', 'bar']}
-            periods={[]}
-            defaultType="line"
-          >
-            {({ chartType }) => {
-              if (dailyCollections.every(d => d.amount === 0)) {
-                return (
-                  <div style={{ padding: '10px 4px', color: 'var(--text-muted)', fontSize: 13 }}>
-                    No collections in the last 14 days
-                  </div>
-                );
-              }
-              const commonProps = { data: dailyCollections, margin: { top: 8, right: 8, left: 0, bottom: 0 } };
-              if (chartType === 'bar') {
-                return (
-                  <ResponsiveContainer width="100%" height={190}>
-                    <BarChart {...commonProps}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                      <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                      <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={44} />
-                      <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Collected']} />
-                      <Bar dataKey="amount" fill="#2a78d6" radius={[3, 3, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                );
-              }
-              return (
-                <ResponsiveContainer width="100%" height={190}>
-                  <LineChart {...commonProps}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                    <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={44} />
-                    <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Collected']} />
-                    <Line type="monotone" dataKey="amount" stroke="#2a78d6" strokeWidth={2} dot={{ r: 2.5 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              );
+          {/* Deeper analytics, collapsed by default so the bill queue below gets
+              the viewport. */}
+          <button
+            type="button"
+            onClick={() => setShowAnalytics(s => !s)}
+            aria-expanded={showAnalytics}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+              fontSize: 12.5, fontWeight: 600, color: 'var(--ehr-text-body, #39536B)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
             }}
-          </ChartCard>
-        </div>
+          >
+            {showAnalytics ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            Financial analytics
+            <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--ehr-muted, #8395A8)' }}>
+              Revenue by service line · payment plans · A/R aging
+            </span>
+          </button>
 
-        {/* Deeper analytics, collapsed by default so the bill queue below gets
-            the viewport. */}
-        <button
-          type="button"
-          onClick={() => setShowAnalytics(s => !s)}
-          aria-expanded={showAnalytics}
-          className="flex items-center gap-1.5 mb-3 self-start"
-          style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-        >
-          {showAnalytics ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          Financial analytics
-          <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>
-            Revenue by service line · payment plans · A/R aging
-          </span>
-        </button>
-
-        {/* Revenue by Service Line (Pareto) — sum of billed line items grouped
-            by charge category, sorted descending. Single value axis; the
-            cumulative share rides in the tooltip instead of a second y-scale. */}
-        {showAnalytics && (
-        <ChartCard
-          title="Revenue by Service Line"
-          subtitle="All bills · sorted by total billed"
-          chartTypes={['bar']}
-          periods={[]}
-          defaultType="bar"
-          className="mb-4"
-        >
-          {() => {
-            if (revenueByCategory.length === 0) {
-              return (
-                <div style={{ padding: '10px 4px', color: 'var(--text-muted)', fontSize: 13 }}>
-                  No billed service lines yet
-                </div>
-              );
-            }
+          {/* Revenue by service line — a proportion of total billed, so it
+              becomes a meter rather than a bar chart. */}
+          {showAnalytics && (() => {
+            const revenueTotal = revenueByCategory.reduce((sum, r) => sum + r.amount, 0);
             return (
-              <ResponsiveContainer width="100%" height={240}>
-                <ComposedChart data={revenueByCategory} margin={{ top: 8, right: 24, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                  <XAxis dataKey="category" tick={axisTick} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={48} />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(value: number | undefined, _name: string | undefined, entry: { payload?: { cumulativePct?: number } }) =>
-                      [`${formatMoney(value ?? 0)} · ${entry?.payload?.cumulativePct ?? 0}% cumulative`, 'Revenue']}
-                  />
-                  <Bar dataKey="amount" name="Revenue" fill="#2a78d6" radius={[4, 4, 0, 0]} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            );
-          }}
-        </ChartCard>
-        )}
-
-        {/* Payment Plans + A/R Aging — side by side, styled like the front-desk
-            Quick Actions / Appointments cards (dash-card + uppercase header). */}
-        {showAnalytics && (() => {
-          const k = computePlanKpis(data.plans);
-          // Compact, neutral tiles (no colour tints) so the two cards stay short.
-          const tile = { minHeight: 56, padding: '7px 12px' } as const;
-          return (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4 lg:items-start">
-              {/* Payment plans */}
-              <div className="dash-card p-2.5 flex flex-col lg:self-start">
-                <h3 className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('plans.title')}</h3>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <DataTile style={tile} label={t('plans.kpiActivePlans')} value={k.activePlans} />
-                  <DataTile style={tile} label={t('plans.kpiTotalOutstanding')} value={formatMoney(k.totalOutstanding)} />
-                  <DataTile style={tile} label={t('plans.kpiDelinquentPlans')} value={k.delinquentPlans} />
-                  <DataTile style={tile} label={t('plans.kpiCompletedThisMonth')} value={k.completedThisMonth} />
-                </div>
-              </div>
-
-              {/* A/R aging — how old the outstanding receivables are. */}
-              <div className="dash-card p-2.5 flex flex-col lg:self-start">
-                <h3 className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('billing.arAging')}</h3>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <DataTile style={tile} label={t('billing.agingCurrent')} value={formatMoney(aging.current)} />
-                  <DataTile style={tile} label={t('billing.agingFollowUp')} value={formatMoney(aging.d61)} />
-                  <DataTile style={tile} label={t('billing.agingAtRisk')} value={formatMoney(aging.d91)} />
-                  <DataTile style={tile} label={t('billing.agingCollections')} value={formatMoney(aging.d120)} />
-                </div>
-                {arAgingChartData.some(d => d.amount > 0) && (
-                  <div style={{ marginTop: 10 }}>
-                    <ResponsiveContainer width="100%" height={130}>
-                      <BarChart data={arAgingChartData} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
-                        <XAxis dataKey="bucket" tick={axisTick} axisLine={false} tickLine={false} />
-                        <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={48} />
-                        <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Balance due']} />
-                        <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                          {arAgingChartData.map((d, i) => (
-                            <Cell key={i} fill={d.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+              <div className="bl-section">
+                <h2 className="bl-section-title">Revenue by service line</h2>
+                <p className="bl-card-sub" style={{ margin: '2px 0 12px' }}>All bills · sorted by total billed</p>
+                {revenueByCategory.length === 0 ? (
+                  <p className="bl-muted" style={{ fontSize: 13, margin: 0 }}>No billed service lines yet</p>
+                ) : (
+                  <div className="bl-meter">
+                    {revenueByCategory.map(r => (
+                      <div className="bl-meter-row" key={r.category}>
+                        <span>{r.category}</span>
+                        <span className="bl-meter-track">
+                          <span
+                            className="bl-meter-fill"
+                            style={{ width: `${revenueTotal > 0 ? Math.round((r.amount / revenueTotal) * 100) : 0}%` }}
+                          />
+                        </span>
+                        <span className="bl-meter-value">{formatMoney(r.amount)} · {r.cumulativePct}%</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
 
-        {/* Pending verification queue — payments awaiting a finance decision.
-            Rendered only when something needs review, so the page stays clean. */}
-        {pendingPayments.length > 0 && (
-          <div className="dash-card overflow-hidden mb-3" style={{ border: '1px solid rgba(184,116,28,0.35)' }}>
-            <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(184,116,28,0.06)' }}>
-              <Clock className="w-4 h-4" style={{ color: '#B8741C' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Pending verification</span>
-              <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full text-[11px] font-bold" style={{ background: '#B8741C', color: '#fff' }}>
-                {pendingPayments.length}
-              </span>
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Approving posts the payment and credits the patient&rsquo;s balance.
-              </span>
-            </div>
-            {pendingPayments.map(p => (
-              <div key={p._id} className="px-4 py-2.5 flex items-center gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <div style={{ minWidth: 180 }}>
-                  <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{p.patientName}</div>
-                  <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{p.reference}</div>
+          {/* Payment plans + A/R aging — side by side, both flat bl-section
+              cards now: plan KPIs as a stat strip, aging buckets as a meter. */}
+          {showAnalytics && (() => {
+            const k = computePlanKpis(data.plans);
+            const agingRows: { label: string; value: number; tone?: 'warn' | 'danger' }[] = [
+              { label: t('billing.agingCurrent'), value: aging.current },
+              { label: t('billing.agingFollowUp'), value: aging.d61, tone: 'warn' },
+              { label: t('billing.agingAtRisk'), value: aging.d91, tone: 'danger' },
+              { label: t('billing.agingCollections'), value: aging.d120, tone: 'danger' },
+            ];
+            const agingTotal = agingRows.reduce((sum, r) => sum + r.value, 0);
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="bl-section">
+                  <h2 className="bl-section-title">{t('plans.title')}</h2>
+                  <div className="bl-stats" style={{ border: 'none', padding: '14px 0 0' }}>
+                    <div>
+                      <span className="bl-stat-label">{t('plans.kpiActivePlans')}</span>
+                      <span className="bl-stat-value">{k.activePlans}</span>
+                    </div>
+                    <div>
+                      <span className="bl-stat-label">{t('plans.kpiTotalOutstanding')}</span>
+                      <span className="bl-stat-value bl-stat-value--danger">{formatMoney(k.totalOutstanding)}</span>
+                    </div>
+                    <div>
+                      <span className="bl-stat-label">{t('plans.kpiDelinquentPlans')}</span>
+                      <span className={`bl-stat-value${k.delinquentPlans > 0 ? ' bl-stat-value--danger' : ''}`}>{k.delinquentPlans}</span>
+                    </div>
+                    <div>
+                      <span className="bl-stat-label">{t('plans.kpiCompletedThisMonth')}</span>
+                      <span className="bl-stat-value bl-stat-value--good">{k.completedThisMonth}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm font-bold" style={{ color: 'var(--text-primary)', minWidth: 110 }}>
-                  {formatMoney(p.amount)} {p.currency}
-                </div>
-                <span className="text-xs px-2 py-0.5 rounded-md" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
-                  {getMethodConfig(p.method).label}
-                </span>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {p.createdAt ? new Date(p.createdAt).toLocaleString() : ''}
-                </span>
-                <div className="flex items-center gap-2 ml-auto">
-                  <button
-                    onClick={() => resolvePending(p, true)}
-                    disabled={pendingBusy === p._id}
-                    className="btn btn-primary btn-sm"
-                    style={{ gap: 6 }}
-                  >
-                    <Banknote className="w-3.5 h-3.5" /> {pendingBusy === p._id ? 'Working…' : 'Approve'}
-                  </button>
-                  <button
-                    onClick={() => resolvePending(p, false)}
-                    disabled={pendingBusy === p._id}
-                    className="btn btn-secondary btn-sm"
-                    style={{ gap: 6, color: 'var(--color-danger)' }}
-                  >
-                    <Ban className="w-3.5 h-3.5" /> Reject
-                  </button>
+
+                <div className="bl-section">
+                  <h2 className="bl-section-title">{t('billing.arAging')}</h2>
+                  {agingTotal === 0 ? (
+                    <p className="bl-muted" style={{ fontSize: 13, marginTop: 12 }}>No outstanding receivables</p>
+                  ) : (
+                    <div className="bl-meter" style={{ marginTop: 12 }}>
+                      {agingRows.map(r => (
+                        <div className="bl-meter-row" key={r.label}>
+                          <span>{r.label}</span>
+                          <span className="bl-meter-track">
+                            <span
+                              className="bl-meter-fill"
+                              style={{
+                                width: `${agingTotal > 0 ? Math.round((r.value / agingTotal) * 100) : 0}%`,
+                                background: r.tone === 'danger' ? '#B3251E' : r.tone === 'warn' ? '#8A5A00' : undefined,
+                              }}
+                            />
+                          </span>
+                          <span className="bl-meter-value">{formatMoney(r.value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })()}
 
-        {/* People list — fills the remaining viewport height; rows scroll inside. */}
-        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <EhrListHeader
-            title={t('payments.title')}
-            stats={[
-              { label: 'Invoices', value: invoiceStats.total, color: LIST_STAT_COLORS.muted },
-              { label: 'Pending', value: invoiceStats.pending, color: LIST_STAT_COLORS.blue },
-              { label: 'Paid', value: invoiceStats.paid, color: LIST_STAT_COLORS.amber },
-              { label: 'Outstanding', value: invoiceStats.outstandingPatients, color: LIST_STAT_COLORS.green },
-            ]}
-            search={{ value: search, onChange: setGlobalSearch, placeholder: t('payments.searchPlaceholder'), ariaLabel: t('payments.searchPlaceholder') }}
-            actions={
-              <button onClick={() => { setCollectSearch(''); setCollectPickerOpen(true); }} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
-                <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
-              </button>
-            }
-          />
-          {filtered.length === 0 ? (
-            <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
-              <Wallet className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-              {search ? t('payments.noPatientsMatch') : t('payments.noBillingActivity')}
-            </div>
-          ) : (
-            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-              <div style={{ minWidth: 900 }}>
-                {/* Column headers */}
-                <div
-                  className="grid items-center gap-3 px-4 py-2.5"
-                  style={{
-                    gridTemplateColumns: PAYMENTS_COLS,
-                    position: 'sticky', top: 0, zIndex: 1,
-                    background: 'var(--bg-card-solid)',
-                    borderBottom: '1px solid var(--border-light)',
-                  }}
-                >
-                  {[
-                    { label: t('payments.colPatient'), align: 'left' as const },
-                    { label: 'Patient ID', align: 'left' as const },
-                    { label: t('payments.colPayments'), align: 'right' as const },
-                    { label: t('payments.colClaims'), align: 'right' as const },
-                    { label: t('payments.colPlans'), align: 'right' as const },
-                    { label: t('payments.colLastActivity'), align: 'left' as const },
-                    { label: t('payments.colBalance'), align: 'right' as const },
-                    { label: 'Status', align: 'right' as const },
-                    { label: '', align: 'left' as const },
-                  ].map((h, i) => (
-                    <span
-                      key={i}
-                      className="text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap"
-                      style={{ color: 'var(--text-muted)', textAlign: h.align }}
-                    >
-                      {h.label}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Rows */}
-                {filtered.map(line => {
-                  const owing = line.outstanding > 0;
-                  return (
-                    <button
-                      key={line.patientId}
-                      onClick={() => setSelectedPatientId(line.patientId)}
-                      className="w-full text-left grid items-center gap-3 px-4 py-3 border-b hover:opacity-95 transition-opacity"
-                      style={{
-                        gridTemplateColumns: PAYMENTS_COLS,
-                        borderColor: 'var(--border-light)',
-                        ...(owing ? { background: 'rgba(196, 69, 54, 0.04)' } : {}),
-                      }}
-                    >
-                      {/* Patient */}
-                      <div className="min-w-0">
-                        {line.patientId && !line.patientId.startsWith('demo-') && !line.patientId.includes('_demo') ? (
-                          <span
-                            role="link"
-                            tabIndex={0}
-                            onClick={e => { e.stopPropagation(); router.push(`/patients/${line.patientId}`); }}
-                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); router.push(`/patients/${line.patientId}`); } }}
-                            className="font-semibold text-sm truncate block hover:underline"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            {line.patientName}
-                          </span>
-                        ) : (
-                          <div className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
-                        )}
-                      </div>
-
-                      {/* Patient ID */}
-                      <div className="font-mono text-[12px] truncate" style={{ color: line.hospitalNumber ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: 600 }}>
-                        {line.hospitalNumber || '—'}
-                      </div>
-
-                      {/* Payments */}
-                      <div className="text-right text-[13px]" style={{ color: line.paymentCount > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                        {line.paymentCount > 0 ? line.paymentCount : '—'}
-                      </div>
-
-                      {/* Open claims */}
-                      <div className="text-right text-[13px]" style={{ color: line.openClaims > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                        {line.openClaims > 0 ? line.openClaims : '—'}
-                      </div>
-
-                      {/* Active plans */}
-                      <div className="text-right text-[13px]" style={{ color: line.activePlans > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                        {line.activePlans > 0 ? line.activePlans : '—'}
-                      </div>
-
-                      {/* Last activity */}
-                      <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        {line.lastActivity ? new Date(line.lastActivity).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                      </div>
-
-                      {/* Balance */}
-                      <div className="text-right font-bold text-sm" style={{ color: owing ? 'var(--color-danger-text)' : 'var(--color-success-text)', fontVariantNumeric: 'tabular-nums' }}>
-                        {formatMoney(owing ? line.outstanding : line.totalCollected)}
-                      </div>
-
-                      {/* Status */}
-                      <div className="text-right text-[10px] font-bold uppercase tracking-wider" style={{ color: owing ? 'var(--color-danger-500)' : 'var(--color-success-text)' }}>
-                        {owing ? t('billing.kpiOutstanding') : t('payments.paid')}
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 flex-shrink-0 justify-self-end" style={{ color: 'var(--text-muted)' }} />
-                    </button>
-                  );
-                })}
+          {/* Pending verification queue — payments awaiting a finance decision.
+              Rendered only when something needs review, so the page stays clean. */}
+          {pendingPayments.length > 0 && (
+            <div className="bl-card">
+              <div className="bl-card-head">
+                <h2 className="bl-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Clock size={16} style={{ color: '#8A5A00' }} />
+                  Pending verification
+                  <span className="bl-chip bl-chip--partial">{pendingPayments.length}</span>
+                </h2>
+                <p className="bl-card-sub">Approving posts the payment and credits the patient&rsquo;s balance.</p>
+                <span className="bl-underline" />
+              </div>
+              <div className="bl-table-wrap">
+                <table className="bl-table">
+                  <thead>
+                    <tr>
+                      <th>Patient</th>
+                      <th>Reference</th>
+                      <th>Method</th>
+                      <th>Submitted</th>
+                      <th className="bl-right">Amount</th>
+                      <th aria-label="Actions" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingPayments.map(p => (
+                      <tr key={p._id}>
+                        <td style={{ fontWeight: 600 }}>{p.patientName}</td>
+                        <td className="bl-muted" style={{ fontFamily: 'monospace' }}>{p.reference}</td>
+                        <td>{getMethodConfig(p.method).label}</td>
+                        <td className="bl-muted" style={{ whiteSpace: 'nowrap' }}>
+                          {p.createdAt ? new Date(p.createdAt).toLocaleString() : ''}
+                        </td>
+                        <td className="bl-num bl-right" style={{ fontWeight: 700 }}>{formatMoney(p.amount)} {p.currency}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => resolvePending(p, true)}
+                              disabled={pendingBusy === p._id}
+                              className="bl-btn bl-btn--primary"
+                              style={{ padding: '5px 12px', fontSize: 12 }}
+                            >
+                              <Banknote size={14} /> {pendingBusy === p._id ? 'Working…' : 'Approve'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => resolvePending(p, false)}
+                              disabled={pendingBusy === p._id}
+                              className="bl-btn bl-btn--outline"
+                              style={{ padding: '5px 12px', fontSize: 12, borderColor: '#B3251E', color: '#B3251E' }}
+                            >
+                              <Ban size={14} /> Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
+
+          {/* ── Patient accounts — fills the remaining viewport height; rows
+              scroll inside the card. ── */}
+          {/* A floor rather than a share of the viewport — the table always has
+              room for a useful number of rows, and the page scrolls past it. */}
+          <div className="bl-card" style={{ flex: 1, minHeight: 320, display: 'flex', flexDirection: 'column' }}>
+            <div className="bl-card-head">
+              <h2 className="bl-card-title">Patient accounts</h2>
+              <span className="bl-underline" />
+            </div>
+            <div className="bl-search">
+              <Search size={16} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setGlobalSearch(e.target.value)}
+                placeholder={t('payments.searchPlaceholder')}
+                aria-label={t('payments.searchPlaceholder')}
+              />
+            </div>
+            {filtered.length === 0 ? (
+              <div className="bl-empty">
+                <Wallet size={34} />
+                <h3>{search ? t('payments.noPatientsMatch') : t('payments.noBillingActivity')}</h3>
+              </div>
+            ) : (
+              <div style={{ overflow: 'auto', flex: 1, minHeight: 0, marginTop: 12 }}>
+                <table className="bl-table" style={{ minWidth: 880 }}>
+                  <thead>
+                    <tr>
+                      {[
+                        { label: t('payments.colPatient'), align: 'left' as const },
+                        { label: 'Patient ID', align: 'left' as const },
+                        { label: t('payments.colPayments'), align: 'right' as const },
+                        { label: t('payments.colClaims'), align: 'right' as const },
+                        { label: t('payments.colPlans'), align: 'right' as const },
+                        { label: t('payments.colLastActivity'), align: 'left' as const },
+                        { label: t('payments.colBalance'), align: 'right' as const },
+                        { label: 'Status', align: 'left' as const },
+                      ].map(h => (
+                        <th
+                          key={h.label}
+                          className={h.align === 'right' ? 'bl-right' : undefined}
+                          style={{ position: 'sticky', top: 0, zIndex: 1 }}
+                        >
+                          {h.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(line => {
+                      const owing = line.outstanding > 0;
+                      const isRealPatient = line.patientId && !line.patientId.startsWith('demo-') && !line.patientId.includes('_demo');
+                      return (
+                        <tr
+                          key={line.patientId}
+                          onClick={() => setSelectedPatientId(line.patientId)}
+                          tabIndex={0}
+                          aria-label={`Open account for ${line.patientName}`}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPatientId(line.patientId); } }}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <td>
+                            {isRealPatient ? (
+                              <button
+                                type="button"
+                                onClick={e => { e.stopPropagation(); router.push(`/patients/${line.patientId}`); }}
+                                className="bl-link"
+                                style={{ fontWeight: 600 }}
+                              >
+                                {line.patientName}
+                              </button>
+                            ) : (
+                              <span style={{ fontWeight: 600 }}>{line.patientName}</span>
+                            )}
+                          </td>
+                          <td>
+                            {isRealPatient && line.hospitalNumber ? (
+                              <button
+                                type="button"
+                                onClick={e => { e.stopPropagation(); router.push(`/patients/${line.patientId}`); }}
+                                className="bl-link"
+                              >
+                                {line.hospitalNumber}
+                              </button>
+                            ) : (
+                              <span className="bl-muted">{line.hospitalNumber || '—'}</span>
+                            )}
+                          </td>
+                          <td className="bl-num bl-right">{line.paymentCount > 0 ? line.paymentCount : '—'}</td>
+                          <td className="bl-num bl-right">{line.openClaims > 0 ? line.openClaims : '—'}</td>
+                          <td className="bl-num bl-right">{line.activePlans > 0 ? line.activePlans : '—'}</td>
+                          <td className="bl-muted" style={{ whiteSpace: 'nowrap' }}>
+                            {line.lastActivity ? new Date(line.lastActivity).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          </td>
+                          <td className="bl-num bl-right" style={{ fontWeight: 700, color: owing ? '#B3251E' : '#14713A' }}>
+                            {formatMoney(owing ? line.outstanding : line.totalCollected)}
+                          </td>
+                          <td>
+                            <span className={`bl-chip ${owing ? 'bl-chip--unpaid' : 'bl-chip--paid'}`}>
+                              {owing ? t('billing.kpiOutstanding') : t('payments.paid')}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
@@ -871,48 +893,44 @@ export default function PaymentsPage() {
       {/* Confirm a payment reversal (Void or Refund) — money is sensitive, so the
           biller must state a reason; the action runs through the audited service. */}
       {reverseFor && (
-        <Modal onClose={() => { if (!reversing) setReverseFor(null); }} width={420}>
-          <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
-            <div className="px-5 py-4 border-b flex items-center gap-2.5" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-                <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger-500)' }} />
-              </div>
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                {reverseFor.mode === 'void' ? t('action.reverse') : t('action.undo')}
-              </h2>
-            </div>
-            <div className="p-5 space-y-3">
-              <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+        <Modal onClose={() => { if (!reversing) setReverseFor(null); }} width={420} labelledBy="bl-reverse-title">
+          <div className="bl-root bl-modal-body">
+            <h3 className="bl-modal-title" id="bl-reverse-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertTriangle size={16} style={{ color: '#B3251E' }} />
+              {reverseFor.mode === 'void' ? t('action.reverse') : t('action.undo')}
+            </h3>
+            <div className="bl-fee-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
+              <div className="bl-fee-row">
                 <div className="min-w-0">
-                  <div className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{reverseFor.payment.patientName}</div>
-                  <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                  <div className="bl-fee-name">{reverseFor.payment.patientName}</div>
+                  <div className="bl-fee-cat">
                     {getMethodConfig(reverseFor.payment.method).label}
-                    {reverseFor.payment.reference && <span className="font-mono"> · {reverseFor.payment.reference}</span>}
+                    {reverseFor.payment.reference && <span style={{ fontFamily: 'monospace' }}> · {reverseFor.payment.reference}</span>}
                   </div>
                 </div>
-                <div className="text-[14px] font-bold font-mono" style={{ color: 'var(--color-danger-text)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(reverseFor.payment.amount)}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('billing.reason')}</label>
-                <textarea
-                  value={reverseReason}
-                  onChange={(e) => setReverseReason(e.target.value)}
-                  rows={2}
-                  autoFocus
-                  className="w-full resize-none rounded-lg border px-3 py-2.5 text-sm"
-                  style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
-                />
+                <span className="bl-num" style={{ fontWeight: 700, color: '#B3251E' }}>{formatMoney(reverseFor.payment.amount)}</span>
               </div>
             </div>
-            <div className="px-5 py-3 border-t flex items-center justify-end gap-2" style={{ borderColor: 'var(--border-light)' }}>
-              <button onClick={() => setReverseFor(null)} disabled={reversing} className="btn btn-secondary">{t('action.cancel')}</button>
+            <div className="bl-field">
+              <label htmlFor="bl-reverse-reason">{t('billing.reason')}</label>
+              <textarea
+                id="bl-reverse-reason"
+                value={reverseReason}
+                onChange={(e) => setReverseReason(e.target.value)}
+                rows={2}
+                autoFocus
+              />
+            </div>
+            <div className="bl-modal-actions">
+              <button type="button" onClick={() => setReverseFor(null)} disabled={reversing} className="bl-btn bl-btn--ghost">{t('action.cancel')}</button>
               <button
+                type="button"
                 onClick={handleConfirmReverse}
                 disabled={!reverseReason.trim() || reversing}
-                className="btn inline-flex items-center gap-1.5 text-white"
-                style={{ background: 'var(--color-danger-500)' }}
+                className="bl-btn bl-btn--dark"
+                style={{ background: '#DA1E28' }}
               >
-                {reverseFor.mode === 'void' ? <Ban className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                {reverseFor.mode === 'void' ? <Ban size={16} /> : <RotateCcw size={16} />}
                 {t('action.confirm')}
               </button>
             </div>
@@ -923,19 +941,27 @@ export default function PaymentsPage() {
       {/* Collect-payment patient picker (opened from the header button) */}
       {collectPickerOpen && (
         <Modal onClose={() => setCollectPickerOpen(false)} width={460}>
-          <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
-            <div className="px-5 py-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
+          <div className="bl-root" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--ehr-border, #D8E3EC)' }}>
               <div className="flex items-center gap-2">
-                <Banknote className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('billing.collectPayment')}</h2>
+                <Banknote size={18} style={{ color: 'var(--bl-teal)' }} />
+                <h2 className="bl-modal-title">{t('billing.collectPayment')}</h2>
               </div>
-              <button onClick={() => setCollectPickerOpen(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                <X className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setCollectPickerOpen(false)}
+                aria-label="Close"
+                style={{
+                  background: 'transparent', border: '1px solid var(--ehr-border, #D8E3EC)', borderRadius: 6,
+                  width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                }}
+              >
+                <X size={16} />
               </button>
             </div>
             <div className="p-3">
               <SearchInput value={collectSearch} onChange={setCollectSearch} placeholder={t('payments.searchPlaceholder')} />
-              <div className="mt-2 space-y-1" style={{ maxHeight: 360, overflowY: 'auto' }}>
+              <div className="mt-2" style={{ maxHeight: 360, overflowY: 'auto' }}>
                 {(() => {
                   const q = collectSearch.trim().toLowerCase();
                   const list = patientLines
@@ -943,22 +969,27 @@ export default function PaymentsPage() {
                     .filter(l => !q || l.patientName.toLowerCase().includes(q) || (l.hospitalNumber || '').toLowerCase().includes(q))
                     .sort((a, b) => b.outstanding - a.outstanding);
                   if (list.length === 0) {
-                    return <p className="text-center text-[12px] py-8" style={{ color: 'var(--text-muted)' }}>{t('payments.noOutstanding')}</p>;
+                    return <p className="bl-muted" style={{ textAlign: 'center', fontSize: 12.5, padding: '32px 0' }}>{t('payments.noOutstanding')}</p>;
                   }
-                  return list.map(line => (
-                    <button
-                      key={line.patientId}
-                      onClick={() => { setPayingLine(line); setCollectPickerOpen(false); }}
-                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-[var(--overlay-subtle)]"
-                      style={{ border: '1px solid var(--border-light)' }}
-                    >
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
-                        {line.hospitalNumber && <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{line.hospitalNumber}</div>}
-                      </div>
-                      <div className="text-[13px] font-bold flex-shrink-0" style={{ color: 'var(--color-danger-text)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(line.outstanding)}</div>
-                    </button>
-                  ));
+                  return (
+                    <div className="bl-fee-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
+                      {list.map(line => (
+                        <button
+                          key={line.patientId}
+                          type="button"
+                          onClick={() => { setPayingLine(line); setCollectPickerOpen(false); }}
+                          className="bl-fee-row"
+                          style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}
+                        >
+                          <div className="min-w-0">
+                            <div className="bl-fee-name">{line.patientName}</div>
+                            {line.hospitalNumber && <div className="bl-fee-cat" style={{ fontFamily: 'monospace' }}>{line.hospitalNumber}</div>}
+                          </div>
+                          <span className="bl-num" style={{ fontWeight: 700, color: '#B3251E' }}>{formatMoney(line.outstanding)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
                 })()}
               </div>
             </div>
@@ -980,52 +1011,57 @@ export default function PaymentsPage() {
       {/* Record an installment against a payment plan */}
       {recordPlanFor && (
         <Modal onClose={() => setRecordPlanFor(null)} width={440}>
-          <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
-            <div className="px-5 py-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
+          <div className="bl-root bl-modal-body">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Receipt className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                <Receipt size={18} style={{ color: 'var(--bl-teal)' }} />
                 <div>
-                  <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('plans.recordPayment')}</h2>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{recordPlanFor.patientName}</p>
+                  <h3 className="bl-modal-title">{t('plans.recordPayment')}</h3>
+                  <p className="bl-card-sub" style={{ margin: '2px 0 0' }}>{recordPlanFor.patientName}</p>
                 </div>
               </div>
-              <button onClick={() => setRecordPlanFor(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                <X className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setRecordPlanFor(null)}
+                aria-label="Close"
+                style={{
+                  background: 'transparent', border: '1px solid var(--ehr-border, #D8E3EC)', borderRadius: 6,
+                  width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <X size={16} />
               </button>
             </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('plans.paymentAmountLabel')}</label>
-                <input
-                  type="number"
-                  value={planAmount}
-                  onChange={(e) => setPlanAmount(e.target.value)}
-                  placeholder={t('plans.paymentAmountPlaceholder')}
-                  autoFocus
-                  className="w-full rounded-lg border px-3 py-2.5 text-sm"
-                  style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('plans.notesLabel')}</label>
-                <textarea
-                  value={planNotes}
-                  onChange={(e) => setPlanNotes(e.target.value)}
-                  placeholder={t('plans.notesPlaceholder')}
-                  rows={3}
-                  className="w-full resize-none rounded-lg border px-3 py-2.5 text-sm"
-                  style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
-                />
-              </div>
+            <div className="bl-field">
+              <label htmlFor="bl-plan-amount">{t('plans.paymentAmountLabel')}</label>
+              <input
+                id="bl-plan-amount"
+                type="number"
+                value={planAmount}
+                onChange={(e) => setPlanAmount(e.target.value)}
+                placeholder={t('plans.paymentAmountPlaceholder')}
+                autoFocus
+              />
             </div>
-            <div className="px-5 py-3 border-t flex items-center justify-end gap-2" style={{ borderColor: 'var(--border-light)' }}>
-              <button onClick={() => setRecordPlanFor(null)} className="btn btn-secondary">{t('action.cancel')}</button>
+            <div className="bl-field">
+              <label htmlFor="bl-plan-notes">{t('plans.notesLabel')}</label>
+              <textarea
+                id="bl-plan-notes"
+                value={planNotes}
+                onChange={(e) => setPlanNotes(e.target.value)}
+                placeholder={t('plans.notesPlaceholder')}
+                rows={3}
+              />
+            </div>
+            <div className="bl-modal-actions">
+              <button type="button" onClick={() => setRecordPlanFor(null)} className="bl-btn bl-btn--ghost">{t('action.cancel')}</button>
               <button
+                type="button"
                 onClick={handleRecordPlanPayment}
                 disabled={!planAmount || savingPlan}
-                className="btn btn-primary inline-flex items-center gap-1.5"
+                className="bl-btn bl-btn--primary"
               >
-                <Receipt className="w-4 h-4" />
+                <Receipt size={16} />
                 {t('plans.recordPayment')}
               </button>
             </div>
@@ -1085,59 +1121,56 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
   return (
     <Modal onClose={onClose} width={600} labelledBy="billing-detail-name">
       <div
-        className="card-elevated"
+        className="bl-root"
         style={{
-          background: 'var(--bg-card-solid)',
-          overflow: 'hidden',
-          borderRadius: 16,
-          padding: 0,
           display: 'flex',
           flexDirection: 'column',
+          gap: 0,
+          overflow: 'hidden',
           maxHeight: 'calc(100vh - 32px)',
         }}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b flex items-start justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
-          <div className="flex items-center gap-3">
-            <div>
-              <button
-                onClick={() => router.push(`/patients/${line.patientId}`)}
-                className="text-left hover:underline"
-                title={t('payments.openPatientRecord')}
-              >
-                <h2 id="billing-detail-name" className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
-              </button>
-              {line.hospitalNumber && (
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'var(--overlay-light)', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                  {line.hospitalNumber}
-                </span>
-              )}
-            </div>
+        <div className="px-5 py-4 border-b flex items-start justify-between gap-3" style={{ borderColor: 'var(--ehr-border, #D8E3EC)' }}>
+          <div>
+            <button
+              onClick={() => router.push(`/patients/${line.patientId}`)}
+              className="bl-link"
+              style={{ fontSize: 16 }}
+              title={t('payments.openPatientRecord')}
+            >
+              <span id="billing-detail-name">{line.patientName}</span>
+            </button>
+            {line.hospitalNumber && (
+              <div className="bl-id-tag" style={{ marginTop: 4, display: 'inline-block' }}>{line.hospitalNumber}</div>
+            )}
           </div>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: 'transparent', border: '1px solid var(--ehr-border, #D8E3EC)', borderRadius: 6,
+              width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+            }}
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Balance hero */}
-        <div className="px-5 py-4" style={{
-          background: owing
-            ? 'linear-gradient(135deg, rgba(196, 69, 54, 0.08) 0%, rgba(228, 168, 75, 0.06) 100%)'
-            : 'linear-gradient(135deg, rgba(27, 158, 119, 0.08) 0%, rgba(33, 145, 208, 0.04) 100%)',
-          borderBottom: '1px solid var(--border-light)',
-        }}>
+        {/* Balance summary — flat, no gradient tint; colour carries the state. */}
+        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--ehr-border, #D8E3EC)' }}>
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: owing ? 'var(--color-danger-text)' : 'var(--color-success-text)' }}>
+              <span className="bl-stat-label" style={{ color: owing ? '#B3251E' : '#14713A' }}>
                 {owing ? t('billing.outstandingBalance') : t('billing.accountStatus')}
-              </div>
-              <div className="text-2xl font-extrabold" style={{ letterSpacing: -0.5, color: owing ? 'var(--color-danger-text)' : 'var(--color-success-text)', fontVariantNumeric: 'tabular-nums' }}>
+              </span>
+              <span className="bl-stat-value" style={{ fontSize: 22, color: owing ? '#B3251E' : '#14713A' }}>
                 {owing ? formatMoney(line.outstanding) : t('billing.paidInFull')}
-              </div>
+              </span>
             </div>
-            <div className="text-right text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              <div>{t('payments.charged')}: <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{formatMoney(line.totalCharged)}</span></div>
-              <div>{t('payments.collected')}: <span className="font-mono" style={{ color: 'var(--color-success-text)' }}>{formatMoney(line.totalCollected)}</span></div>
+            <div className="bl-muted" style={{ fontSize: 11, textAlign: 'right' }}>
+              <div>{t('payments.charged')}: <span style={{ color: 'var(--ehr-text, #102634)', fontFamily: 'monospace' }}>{formatMoney(line.totalCharged)}</span></div>
+              <div>{t('payments.collected')}: <span style={{ color: '#14713A', fontFamily: 'monospace' }}>{formatMoney(line.totalCollected)}</span></div>
             </div>
           </div>
         </div>
@@ -1150,27 +1183,23 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
           {methods.length === 0 ? (
             <Empty>{t('payments.noSavedMethods')}</Empty>
           ) : (
-            <div className="space-y-2">
-              {methods.map(m => (
-                <div key={m.id} className="data-row" style={{ borderBottom: 'none', background: 'var(--overlay-subtle)', borderRadius: 8, padding: '10px 12px' }}>
-                  <div className="data-row__icon" style={{ width: 30, height: 30 }}>
-                    {(() => {
-                      const cfg = getMethodConfig(m.type as Parameters<typeof getMethodConfig>[0]);
-                      const MIcon = cfg.icon;
-                      return <MIcon size={16} style={{ color: cfg.color }} />;
-                    })()}
+            <div className="bl-fee-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
+              {methods.map(m => {
+                const cfg = getMethodConfig(m.type as Parameters<typeof getMethodConfig>[0]);
+                const MIcon = cfg.icon;
+                return (
+                  <div key={m.id} className="bl-fee-row">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <MIcon size={16} style={{ color: cfg.color, flexShrink: 0 }} />
+                      <div className="min-w-0">
+                        <div className="bl-fee-name">{m.label}</div>
+                        {m.brand && <div className="bl-fee-cat">{m.brand}</div>}
+                      </div>
+                    </div>
+                    {m.isDefault && <span className="bl-chip bl-chip--ontime">{t('payments.default')}</span>}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="data-row__value">{m.label}</div>
-                    {m.brand && <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{m.brand}</div>}
-                  </div>
-                  {m.isDefault && (
-                    <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.14)', color: 'var(--color-success-text)', border: '1px solid rgba(33, 145, 208, 0.30)' }}>
-                      {t('payments.default')}
-                    </span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Section>
@@ -1180,18 +1209,16 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
           {bills.length === 0 ? (
             <Empty>{t('payments.noInvoices')}</Empty>
           ) : (
-            <div className="space-y-1.5">
+            <div className="bl-fee-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
               {bills.map(b => (
-                <div key={b._id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>{b.invoiceNumber || b._id.slice(-8)}</div>
-                    <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                      {(b.encounterDate || b.createdAt).slice(0, 10)} · {b.facilityName}
-                    </div>
+                <div key={b._id} className="bl-fee-row">
+                  <div className="min-w-0">
+                    <div className="bl-fee-name">{b.invoiceNumber || b._id.slice(-8)}</div>
+                    <div className="bl-fee-cat">{(b.encounterDate || b.createdAt).slice(0, 10)} · {b.facilityName}</div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-[12px] font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(b.totalAmount)}</div>
-                    <div className="text-[10px]" style={{ color: b.balanceDue > 0 ? 'var(--color-danger-500)' : 'var(--color-success-text)' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="bl-num" style={{ fontWeight: 600, color: 'var(--ehr-text, #102634)' }}>{formatMoney(b.totalAmount)}</div>
+                    <div style={{ fontSize: 10.5, color: b.balanceDue > 0 ? '#B3251E' : '#14713A' }}>
                       {b.balanceDue > 0 ? t('payments.amountDue', { amount: formatMoney(b.balanceDue) }) : t('payments.paid')}
                     </div>
                   </div>
@@ -1206,54 +1233,54 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
           {sortedPayments.length === 0 ? (
             <Empty>{t('payments.noPaymentsYet')}</Empty>
           ) : (
-            <div className="space-y-1.5">
+            <div className="bl-fee-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
               {sortedPayments.map(p => {
                 const cfg = getMethodConfig(p.method);
                 const MIcon = cfg.icon;
                 const reversed = p.status === 'reversed' || p.status === 'refunded';
                 return (
-                  <div key={p._id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg" style={{
-                    background: reversed ? 'rgba(196, 69, 54, 0.06)' : 'var(--overlay-subtle)',
-                    border: reversed ? '1px solid rgba(196, 69, 54, 0.25)' : 'none',
-                  }}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
-                      <MIcon size={15} style={{ color: cfg.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[12px] font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                        {cfg.label}
-                        {reversed && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(196, 69, 54, 0.14)', color: 'var(--color-danger-text)' }}>{p.status}</span>}
-                      </div>
-                      <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                        {p.reference && <span className="font-mono">{p.reference} · </span>}
-                        {new Date(p.processedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      {(p.mobileMoneyPhone || p.cardLast4) && (
-                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {p.mobileMoneyPhone && <span>{p.mobileMoneyPhone}</span>}
-                          {p.cardLast4 && <span>•••• {p.cardLast4}</span>}
+                  <div key={p._id} className="bl-fee-row" style={{ alignItems: 'flex-start' }}>
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <MIcon size={15} style={{ color: cfg.color, marginTop: 2, flexShrink: 0 }} />
+                      <div className="min-w-0">
+                        <div className="bl-fee-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {cfg.label}
+                          {reversed && <span className="bl-chip bl-chip--cancelled">{p.status}</span>}
                         </div>
-                      )}
+                        <div className="bl-fee-cat">
+                          {p.reference && <span style={{ fontFamily: 'monospace' }}>{p.reference} · </span>}
+                          {new Date(p.processedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        {(p.mobileMoneyPhone || p.cardLast4) && (
+                          <div className="bl-fee-cat">
+                            {p.mobileMoneyPhone && <span>{p.mobileMoneyPhone}</span>}
+                            {p.cardLast4 && <span>•••• {p.cardLast4}</span>}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
-                      <div className={`text-[13px] font-bold font-mono`} style={{ color: reversed ? 'var(--color-danger-text)' : 'var(--color-success-text)', fontVariantNumeric: 'tabular-nums', textDecoration: reversed ? 'line-through' : 'none' }}>
+                      <span
+                        className="bl-num"
+                        style={{ fontWeight: 700, color: reversed ? '#B3251E' : '#14713A', textDecoration: reversed ? 'line-through' : 'none' }}
+                      >
                         {formatMoney(p.amount)}
-                      </div>
+                      </span>
                       {/* Undo a recorded payment — Void reverses it, Refund gives money
                           back. Both go through a confirm dialog + audited service. */}
                       {!reversed && p.status === 'posted' && (
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => onReversePayment(p, 'void')}
-                            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-opacity hover:opacity-80"
-                            style={{ border: '1px solid var(--border-medium)', color: 'var(--text-secondary)' }}
+                            className="bl-btn bl-btn--ghost"
+                            style={{ padding: '3px 8px', fontSize: 11 }}
                           >
                             <Ban className="w-3 h-3" /> {t('action.reverse')}
                           </button>
                           <button
                             onClick={() => onReversePayment(p, 'refund')}
-                            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-opacity hover:opacity-80"
-                            style={{ border: '1px solid rgba(196, 69, 54, 0.30)', color: 'var(--color-danger-500)' }}
+                            className="bl-btn bl-btn--outline"
+                            style={{ padding: '3px 8px', fontSize: 11, borderColor: '#B3251E', color: '#B3251E' }}
                           >
                             <RotateCcw className="w-3 h-3" /> {t('action.undo')}
                           </button>
@@ -1272,21 +1299,17 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
           {claims.length === 0 ? (
             <Empty>{t('payments.noClaims')}</Empty>
           ) : (
-            <div className="space-y-1.5">
+            <div className="bl-fee-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
               {claims.map(c => (
-                <div key={c._id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>{c.payerName}</div>
-                    <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                      {c.claimNumber && <span className="font-mono">{c.claimNumber} · </span>}
+                <div key={c._id} className="bl-fee-row">
+                  <div className="min-w-0">
+                    <div className="bl-fee-name">{c.payerName}</div>
+                    <div className="bl-fee-cat">
+                      {c.claimNumber && <span style={{ fontFamily: 'monospace' }}>{c.claimNumber} · </span>}
                       {c.submittedDate ? t('payments.submittedOn', { date: c.submittedDate.slice(0, 10) }) : t('payments.draft')}
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
-                    background: c.status === 'paid' ? 'rgba(33, 145, 208, 0.14)' : c.status === 'denied' ? 'rgba(196, 69, 54, 0.14)' : 'rgba(228, 168, 75, 0.14)',
-                    color: c.status === 'paid' ? 'var(--color-success-text)' : c.status === 'denied' ? 'var(--color-danger-text)' : 'var(--color-warning-text)',
-                    border: c.status === 'paid' ? '1px solid rgba(33, 145, 208, 0.30)' : c.status === 'denied' ? '1px solid rgba(196, 69, 54, 0.30)' : '1px solid rgba(228, 168, 75, 0.30)',
-                  }}>
+                  <span className={`bl-chip ${c.status === 'paid' ? 'bl-chip--paid' : c.status === 'denied' ? 'bl-chip--unpaid' : 'bl-chip--partial'}`}>
                     {c.status}
                   </span>
                 </div>
@@ -1300,37 +1323,37 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
           {plans.length === 0 ? (
             <Empty>{t('payments.noPaymentPlans')}</Empty>
           ) : (
-            <div className="space-y-1.5">
-              {plans.map(p => {
+            <div className="bl-fee-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
+              {plans.map((p, idx) => {
                 const planOutstanding = Math.max(0, p.totalBalance - p.paidToDate);
                 return (
-                  <div key={p._id} className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                  <div
+                    key={p._id}
+                    style={{ padding: '9px 12px', borderBottom: idx === plans.length - 1 ? 'none' : '1px solid var(--ehr-border-soft, #E7EEF5)' }}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <div className="bl-fee-name">
                           {t('payments.planMonthly', { amount: formatMoney(p.monthlyAmount), months: p.termMonths })}
                         </div>
-                        <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                        <div className="bl-fee-cat">
                           {p.startDate.slice(0, 10)} → {p.endDate.slice(0, 10)} · {p.apr === 0 ? t('payments.interestFree') : t('payments.aprValue', { apr: p.apr })}
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
-                        background: p.status === 'active' ? 'rgba(33, 145, 208, 0.14)' : p.status === 'completed' ? 'rgba(33, 145, 208, 0.14)' : 'rgba(228, 168, 75, 0.14)',
-                        color: p.status === 'active' ? 'var(--color-success-text)' : p.status === 'completed' ? 'var(--accent-primary)' : 'var(--color-warning-text)',
-                      }}>
+                      <span className={`bl-chip ${p.status === 'completed' ? 'bl-chip--paid' : p.status === 'active' ? 'bl-chip--partial' : 'bl-chip--unpaid'}`}>
                         {p.status}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 mt-2 pt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
-                      <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                        {t('payments.paid')}: <span className="font-mono" style={{ color: 'var(--color-success-text)' }}>{formatMoney(p.paidToDate)}</span>
-                        {' · '}{t('billing.kpiOutstanding')}: <span className="font-mono" style={{ color: planOutstanding > 0 ? 'var(--color-danger-500)' : 'var(--text-secondary)' }}>{formatMoney(planOutstanding)}</span>
+                    <div className="flex items-center justify-between gap-3 mt-2 pt-2" style={{ borderTop: '1px solid var(--ehr-border-soft, #E7EEF5)' }}>
+                      <div className="bl-fee-cat">
+                        {t('payments.paid')}: <span style={{ color: '#14713A' }}>{formatMoney(p.paidToDate)}</span>
+                        {' · '}{t('billing.kpiOutstanding')}: <span style={{ color: planOutstanding > 0 ? '#B3251E' : 'var(--ehr-text-body, #39536B)' }}>{formatMoney(planOutstanding)}</span>
                       </div>
                       {p.status === 'active' && (
                         <button
                           onClick={() => onRecordPlanPayment(p)}
-                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap transition-opacity hover:opacity-90 text-white"
-                          style={{ background: 'var(--accent-primary)' }}
+                          className="bl-btn bl-btn--outline"
+                          style={{ padding: '4px 10px', fontSize: 11.5 }}
                         >
                           <Receipt className="w-3.5 h-3.5" />
                           {t('plans.recordPayment')}
@@ -1347,13 +1370,14 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
         </div>{/* /scrollable account sections */}
 
         {/* Footer actions */}
-        <div className="px-5 py-3 border-t flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-          <button onClick={() => router.push(`/patients/${line.patientId}`)} className="btn btn-secondary flex-1 inline-flex items-center justify-center gap-2">
+        <div className="px-5 py-3 border-t flex items-center gap-2" style={{ borderColor: 'var(--ehr-border, #D8E3EC)' }}>
+          <button onClick={() => router.push(`/patients/${line.patientId}`)} className="bl-btn bl-btn--outline" style={{ flex: 1 }}>
             {t('payments.openPatientRecord')} <ExternalLink className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onRecordPayment}
-            className="btn btn-primary flex-1 inline-flex items-center justify-center gap-2"
+            className="bl-btn bl-btn--primary"
+            style={{ flex: 1 }}
           >
             <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
           </button>
@@ -1365,15 +1389,15 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
 
 function Section({ title, icon, count, children }: { title: string; icon: React.ReactNode; count: number; children: React.ReactNode }) {
   return (
-    <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
+    <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--ehr-border, #D8E3EC)' }}>
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'transparent', color: 'var(--accent-primary)' }}>
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'transparent', color: 'var(--bl-teal)' }}>
             {icon}
           </div>
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--ehr-text-title, #132C44)' }}>{title}</h3>
         </div>
-        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{count}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--ehr-muted, #8395A8)' }}>{count}</span>
       </div>
       {children}
     </div>
@@ -1382,6 +1406,6 @@ function Section({ title, icon, count, children }: { title: string; icon: React.
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[12px] py-3 px-2" style={{ color: 'var(--text-muted)' }}>{children}</div>
+    <div className="text-[12px] py-3 px-2" style={{ color: 'var(--ehr-muted, #8395A8)' }}>{children}</div>
   );
 }

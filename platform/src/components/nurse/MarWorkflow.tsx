@@ -6,7 +6,6 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/context';
 import { useWards } from '@/lib/hooks/useWards';
 import { usePatients } from '@/lib/hooks/usePatients';
-import Modal from '@/components/Modal';
 import { Pill, X, CheckCircle2, RotateCcw, Filter } from '@/components/icons/lucide';
 import type { MedicationAdministration } from '@/lib/db-types';
 import { useMarEntries, type MAREntry } from './shared';
@@ -153,6 +152,140 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
     }
   };
 
+  /**
+   * The record-administration form. It unfolds under the dose it belongs to
+   * rather than opening over the round — a nurse working down a med list
+   * keeps the list, and the row above it already carries the identification
+   * the dialog had to repeat in its own header.
+   */
+  const renderAdministrationForm = (modalEntry: MAREntry) => (
+    <>
+      <div className="px-5 py-4 space-y-4">
+        <div>
+          <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
+            color: 'var(--text-muted)', letterSpacing: '0.06em',
+          }}>{t('nurse.marStatusLabel')}</label>
+          <div className="grid grid-cols-4 gap-1.5 keep-cols">
+            {(['given', 'held', 'refused', 'missed'] as const).map(s => {
+              const on = modalStatus === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setModalStatus(s)}
+                  className="px-2 py-2 text-[11px] font-bold uppercase rounded transition-all"
+                  style={{
+                    background: on ? 'rgba(33,145,208,0.12)' : 'transparent',
+                    color: on ? '#015697' : 'var(--text-secondary)',
+                    border: `1px solid ${on ? 'rgba(33,145,208,0.30)' : 'var(--border-light)'}`,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {STATUS_LABEL[s]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {modalStatus !== 'given' && (
+          <div>
+            <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
+              color: 'var(--text-muted)', letterSpacing: '0.06em',
+            }}>{t('nurse.marReason')}</label>
+            <input
+              type="text"
+              value={modalReason}
+              onChange={(e) => setModalReason(e.target.value)}
+              className="w-full"
+              placeholder={t('nurse.marReasonRequired')}
+            />
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
+              color: 'var(--text-muted)', letterSpacing: '0.06em',
+            }}>{t('nurse.marActualDose')}</label>
+            <input
+              type="text"
+              value={modalDose}
+              onChange={(e) => setModalDose(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
+              color: 'var(--text-muted)', letterSpacing: '0.06em',
+            }}>{t('nurse.marRoute')}</label>
+            <input
+              type="text"
+              value={modalRoute}
+              onChange={(e) => setModalRoute(e.target.value)}
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
+            color: 'var(--text-muted)', letterSpacing: '0.06em',
+          }}>
+            {t('nurse.marWitness')} <span style={{ color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>
+              {t('nurse.marWitnessHint')}
+            </span>
+          </label>
+          <input
+            type="text"
+            value={modalWitness}
+            onChange={(e) => setModalWitness(e.target.value)}
+            className="w-full"
+            placeholder={t('nurse.marWitnessName')}
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
+            color: 'var(--text-muted)', letterSpacing: '0.06em',
+          }}>{t('nurse.marNotes')}</label>
+          <textarea
+            value={modalNotes}
+            onChange={(e) => setModalNotes(e.target.value)}
+            rows={2}
+            className="w-full"
+            placeholder={t('nurse.marNotesPlaceholder')}
+          />
+        </div>
+      </div>
+
+      <footer
+        className="px-5 py-3 border-t flex items-center justify-between gap-2"
+        style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
+      >
+        <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+          {t('nurse.marRecordedAs')} <strong style={{ color: 'var(--text-primary)' }}>{currentUser?.name}</strong>
+        </p>
+        <div className="flex items-center gap-2">
+          {modalEntry.status === 'given' && modalEntry.administrationId && (
+            <button onClick={() => handleUndo(modalEntry)} className="btn btn-secondary inline-flex items-center gap-1.5">
+              <RotateCcw className="w-4 h-4" />
+              {t('action.undo')}
+            </button>
+          )}
+          <button onClick={closeModal} className="btn btn-secondary">{t('nurse.marCancel')}</button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || (modalStatus !== 'given' && !modalReason.trim())}
+            className="btn btn-primary inline-flex items-center gap-1.5"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {submitting ? t('nurse.marSaving') : t('nurse.marRecord')}
+          </button>
+        </div>
+      </footer>
+    </>
+  );
+
   return (
     // No card chrome of its own — like the ward board, the MAR sits directly
     // on the centre panel's white body; the rows are the only cards.
@@ -285,17 +418,20 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
               // A not-yet-due dose must not read like an administered one —
               // neutral (upcoming) keeps the grey avatar instead of green.
               const avatarPlate = tone === 'neutral' ? AVATAR_TINT_NEUTRAL : stateTint(tone.toUpperCase());
+              const isExpanded = modalEntry?.id === entry.id;
+              const toggle = () => (isExpanded ? closeModal() : openModal(entry));
               return (
+                <div key={entry.id} className={isExpanded ? 'ehr-appointment-group is-expanded' : 'ehr-appointment-group'}>
                 <div
-                  key={entry.id}
                   className="ehr-appointment-row appointment-card-row"
                   role="button"
                   tabIndex={0}
-                  onClick={() => openModal(entry)}
+                  aria-expanded={isExpanded}
+                  onClick={toggle}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      openModal(entry);
+                      toggle();
                     }
                   }}
                 >
@@ -334,6 +470,12 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
                     <small>{entry.status === 'given' ? 'Recorded' : 'Tap to record'}</small>
                   </div>
                 </div>
+                {isExpanded && (
+                  <div className="ehr-row-detail ehr-row-detail--form" role="region" aria-label={`Record ${entry.medication} for ${entry.patientName}`}>
+                    {renderAdministrationForm(entry)}
+                  </div>
+                )}
+                </div>
               );
             })}
           </div>
@@ -341,165 +483,6 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
         )}
       </div>
 
-      {/* Record-administration modal */}
-      {modalEntry && (
-        <Modal onClose={closeModal} width={448}>
-          <div
-            className="modal-content card-elevated overflow-hidden"
-            style={{ width: '100%' }}
-          >
-            <header
-              className="px-5 py-3 border-b flex items-start justify-between gap-3"
-              style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
-            >
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="icon-box">
-                  <Pill className="w-4 h-4" style={{ color: '#015697' }} />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10.5px] font-bold uppercase" style={{
-                    color: 'var(--text-muted)', letterSpacing: '0.06em',
-                  }}>{t('nurse.marAdminister')}</div>
-                  <h3 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                    {modalEntry.medication}
-                  </h3>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {modalEntry.patientName} · {modalEntry.dose} · {modalEntry.route} · {t('nurse.marScheduled')}{' '}
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{modalEntry.time}</span>
-                  </p>
-                </div>
-              </div>
-              <button onClick={closeModal} aria-label={t('nurse.marClose')} className="p-1 rounded hover:bg-gray-100 shrink-0">
-                <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-              </button>
-            </header>
-
-            <div className="px-5 py-4 space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
-                  color: 'var(--text-muted)', letterSpacing: '0.06em',
-                }}>{t('nurse.marStatusLabel')}</label>
-                <div className="grid grid-cols-4 gap-1.5 keep-cols">
-                  {(['given', 'held', 'refused', 'missed'] as const).map(s => {
-                    const on = modalStatus === s;
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => setModalStatus(s)}
-                        className="px-2 py-2 text-[11px] font-bold uppercase rounded transition-all"
-                        style={{
-                          background: on ? 'rgba(33,145,208,0.12)' : 'transparent',
-                          color: on ? '#015697' : 'var(--text-secondary)',
-                          border: `1px solid ${on ? 'rgba(33,145,208,0.30)' : 'var(--border-light)'}`,
-                          letterSpacing: '0.04em',
-                        }}
-                      >
-                        {STATUS_LABEL[s]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {modalStatus !== 'given' && (
-                <div>
-                  <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
-                    color: 'var(--text-muted)', letterSpacing: '0.06em',
-                  }}>{t('nurse.marReason')}</label>
-                  <input
-                    type="text"
-                    value={modalReason}
-                    onChange={(e) => setModalReason(e.target.value)}
-                    className="w-full"
-                    placeholder={t('nurse.marReasonRequired')}
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
-                    color: 'var(--text-muted)', letterSpacing: '0.06em',
-                  }}>{t('nurse.marActualDose')}</label>
-                  <input
-                    type="text"
-                    value={modalDose}
-                    onChange={(e) => setModalDose(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
-                    color: 'var(--text-muted)', letterSpacing: '0.06em',
-                  }}>{t('nurse.marRoute')}</label>
-                  <input
-                    type="text"
-                    value={modalRoute}
-                    onChange={(e) => setModalRoute(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
-                  color: 'var(--text-muted)', letterSpacing: '0.06em',
-                }}>
-                  {t('nurse.marWitness')} <span style={{ color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>
-                    {t('nurse.marWitnessHint')}
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={modalWitness}
-                  onChange={(e) => setModalWitness(e.target.value)}
-                  className="w-full"
-                  placeholder={t('nurse.marWitnessName')}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
-                  color: 'var(--text-muted)', letterSpacing: '0.06em',
-                }}>{t('nurse.marNotes')}</label>
-                <textarea
-                  value={modalNotes}
-                  onChange={(e) => setModalNotes(e.target.value)}
-                  rows={2}
-                  className="w-full"
-                  placeholder={t('nurse.marNotesPlaceholder')}
-                />
-              </div>
-            </div>
-
-            <footer
-              className="px-5 py-3 border-t flex items-center justify-between gap-2"
-              style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
-            >
-              <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                {t('nurse.marRecordedAs')} <strong style={{ color: 'var(--text-primary)' }}>{currentUser?.name}</strong>
-              </p>
-              <div className="flex items-center gap-2">
-                {modalEntry.status === 'given' && modalEntry.administrationId && (
-                  <button onClick={() => handleUndo(modalEntry)} className="btn btn-secondary inline-flex items-center gap-1.5">
-                    <RotateCcw className="w-4 h-4" />
-                    {t('action.undo')}
-                  </button>
-                )}
-                <button onClick={closeModal} className="btn btn-secondary">{t('nurse.marCancel')}</button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting || (modalStatus !== 'given' && !modalReason.trim())}
-                  className="btn btn-primary inline-flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  {submitting ? t('nurse.marSaving') : t('nurse.marRecord')}
-                </button>
-              </div>
-            </footer>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }

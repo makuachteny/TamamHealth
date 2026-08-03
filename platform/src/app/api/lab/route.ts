@@ -27,14 +27,18 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const patientId = url.searchParams.get('patientId');
     const status = url.searchParams.get('status');
+    // One scope for every branch. The `status=pending` branch used to call
+    // getPendingLabResults() bare, which reads the whole database — the local
+    // store holds every organisation's rows, so that returned other tenants'
+    // orders (decrypted, with clinical notes) to any caller holding a lab role.
+    const scope = buildScopeFromAuth(auth);
     let results;
     if (patientId) {
       const rows = await getLabResultsByPatient(patientId);
-      results = filterByScope(rows, buildScopeFromAuth(auth));
+      results = filterByScope(rows, scope);
     } else if (status === 'pending') {
-      results = await getPendingLabResults();
+      results = await getPendingLabResults(scope);
     } else {
-      const scope = buildScopeFromAuth(auth);
       results = await getAllLabResults(scope);
     }
     // PHI read audit (KAN-97). Fire-and-forget: a failed audit write

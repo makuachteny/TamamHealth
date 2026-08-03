@@ -123,14 +123,23 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   lab_tech: {
     allowed: [
-      '/dashboard/lab', '/lab', '/blood-bank', '/messages', '/settings',
+      // `/patients` is here because lab work now happens in the chart: the
+      // queue links a technician to /patients/<id>?tab=labs to walk the bench
+      // steps. The chart itself only renders the lab-side tabs for this role
+      // (see LAB_TAB_IDS in the chart page), so route access does not widen
+      // what they can read.
+      '/dashboard/lab', '/lab', '/patients', '/blood-bank', '/messages', '/settings',
     ],
     defaultDashboard: '/dashboard/lab',
   },
 
   pharmacist: {
     allowed: [
-      '/dashboard/pharmacy', '/pharmacy', '/controlled-substances', '/messages', '/settings',
+      // `/patients` is here so a pharmacist can open the chart from the name in
+      // their queue. The chart renders only the medication-safety tabs for this
+      // role (see PHARMACY_TAB_IDS in the chart page), so route access does not
+      // widen what they can read.
+      '/dashboard/pharmacy', '/pharmacy', '/patients', '/controlled-substances', '/messages', '/settings',
     ],
     defaultDashboard: '/dashboard/pharmacy',
   },

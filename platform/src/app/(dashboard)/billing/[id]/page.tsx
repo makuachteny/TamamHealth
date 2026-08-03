@@ -378,7 +378,11 @@ export default function BillDetailPage() {
   const displayName = patient ? patientFullName(patient) : bill.patientName;
   const genderSymbol = patient?.gender === 'Male' ? '♂' : patient?.gender === 'Female' ? '♀' : null;
   const genderClass = patient?.gender === 'Male' ? 'male' : patient?.gender === 'Female' ? 'female' : '';
-  const serviceStatus = bill.status === 'paid' ? 'PAID' : bill.status === 'cancelled' ? 'CANCELLED' : 'PENDING';
+  // The line-item column reports the BILL's settlement state — line items carry
+  // no state of their own — so it has to name every state the bill can be in.
+  // It used to collapse everything except paid/cancelled into "PENDING", which
+  // told a cashier looking at a half-settled bill that nothing had been paid.
+  const serviceStatus = invoiceStatusLabel(bill);
 
   return (
     <main className="page-container page-enter">

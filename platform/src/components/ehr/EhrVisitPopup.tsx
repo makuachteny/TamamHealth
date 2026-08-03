@@ -1,14 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, Clock, X } from '@/components/icons/lucide';
+import { ArrowRight, ArrowRightLeft, Clock, FileText, Stethoscope, X } from '@/components/icons/lucide';
 import Modal from '@/components/Modal';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { STAGE_LABELS, type QueueEntry, type QueueStage } from '@/lib/services/patient-queue-service';
 import { formatClockTime } from '@/lib/format-utils';
 import { initials, stateTint } from '@/lib/patient-utils';
 import type { AppointmentDoc, TriageDoc } from '@/lib/db-types';
-import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 
 /* ─── Visit popup + move dialog (clinician worklist) ───
    Row click on "Patients assigned to you" opens this popup: the current
@@ -65,9 +64,6 @@ export default function EhrVisitPopup({
   name,
   detail,
   acuity,
-  statusLabel,
-  comingFrom,
-  queueLabel,
   wait,
   appointment,
   triage,
@@ -76,15 +72,13 @@ export default function EhrVisitPopup({
   onCall,
   onMove,
   onOpenChart,
+  inline = false,
 }: {
   patientId?: string;
   name: string;
   /** Age/gender or reason line under the name. */
   detail?: string;
   acuity: 'RED' | 'YELLOW' | 'GREEN';
-  statusLabel: string;
-  comingFrom: string;
-  queueLabel: string;
   wait: string;
   appointment: AppointmentDoc | null;
   triage: TriageDoc | null;
@@ -95,6 +89,10 @@ export default function EhrVisitPopup({
   /** Opens the Move dialog (only offered while a queue entry exists). */
   onMove?: () => void;
   onOpenChart?: () => void;
+  /** Render the panel in the flow of the list, under the row it belongs to,
+   *  rather than as an overlay. The content is identical — only the frame
+   *  differs — so a queue keeps its context while one visit is read. */
+  inline?: boolean;
 }) {
   const [tab, setTab] = useState<'current' | 'previous'>('current');
   const { records } = useMedicalRecords(patientId);
@@ -111,31 +109,38 @@ export default function EhrVisitPopup({
   const previousNote = consultations.find(record => !(record.consultedAt || record.visitDate).startsWith(todayIso));
 
   const vitals = triage ? triageVitals(triage) : [];
+  const callLabel = entry && !entry.assignedToId
+    ? 'Call patient'
+    : todaysNote ? 'Resume consultation' : 'Start consultation';
 
-  return (
-    <Modal onClose={onClose} width={500} labelledBy="ehr-visit-pop-title">
-      <div className="modal-content card-elevated ehr-visit-pop">
-        <div className="ehr-visit-pop-head">
-          <span className="ehr-patient-icon" style={stateTint(acuity)} aria-hidden>
-            {initials(name)}
-          </span>
-          <div className="ehr-visit-pop-head-text">
-            <h3 id="ehr-visit-pop-title">{name}</h3>
-            {detail && <p className="ehr-visit-pop-detail">{detail}</p>}
+  const body = (
+      <div className={inline ? 'ehr-visit-pop ehr-visit-pop--inline' : 'modal-content card-elevated ehr-visit-pop'}>
+        {/* Inline, the queue row directly above already names the patient and
+            shows acuity and wait — the header would just say it twice. It stays
+            for the dialog, which has no row above it. */}
+        {!inline && (
+          <div className="ehr-visit-pop-head">
+            <span className="ehr-patient-icon" style={stateTint(acuity)} aria-hidden>
+              {initials(name)}
+            </span>
+            <div className="ehr-visit-pop-head-text">
+              <h3 id="ehr-visit-pop-title">{name}</h3>
+              {detail && <p className="ehr-visit-pop-detail">{detail}</p>}
+            </div>
+            {/* The header carries only what reception triages on at a glance —
+             *  acuity and how long they've waited. Everything else (stage, care
+             *  team, where they came from) lives in the card body below. */}
+            <div className="ehr-visit-pop-tags">
+              <span className="ehr-queue-pill" data-tone={PRIORITY_META[acuity].tone}>{PRIORITY_META[acuity].label}</span>
+              {wait !== '—' && (
+                <span className="ehr-visit-pop-chip is-wait">
+                  <Clock className="w-3 h-3" aria-hidden /> {wait}
+                </span>
+              )}
+            </div>
+            <button type="button" className="ehr-visit-pop-close" aria-label="Close" onClick={onClose}><X className="w-4 h-4" /></button>
           </div>
-          {/* The header carries only what reception triages on at a glance —
-           *  acuity and how long they've waited. Everything else (stage, care
-           *  team, where they came from) lives in the card body below. */}
-          <div className="ehr-visit-pop-tags">
-            <span className="ehr-queue-pill" data-tone={PRIORITY_META[acuity].tone}>{PRIORITY_META[acuity].label}</span>
-            {wait !== '—' && (
-              <span className="ehr-visit-pop-chip is-wait">
-                <Clock className="w-3 h-3" aria-hidden /> {wait}
-              </span>
-            )}
-          </div>
-          <button type="button" className="ehr-visit-pop-close" aria-label="Close" onClick={onClose}><X className="w-4 h-4" /></button>
-        </div>
+        )}
 
         <div className="ehr-visit-pop-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'current'} className={tab === 'current' ? 'active' : ''} onClick={() => setTab('current')}>
@@ -144,25 +149,35 @@ export default function EhrVisitPopup({
           <button type="button" role="tab" aria-selected={tab === 'previous'} className={tab === 'previous' ? 'active' : ''} onClick={() => setTab('previous')}>
             Previous visit
           </button>
+          {/* Open chart / Move / Start consultation sit on the tab line: the
+              one row that is always visible, however far the visit scrolls. */}
+          <div className="ehr-visit-pop-actions">
+            {onOpenChart && (
+              <button type="button" className="ehr-visit-pop-icon" onClick={onOpenChart} aria-label="Open chart" title="Open chart">
+                <FileText className="w-4 h-4" aria-hidden />
+              </button>
+            )}
+            {onMove && entry && (
+              <button type="button" className="ehr-visit-pop-icon" onClick={onMove} aria-label="Move to another queue" title="Move…">
+                <ArrowRightLeft className="w-4 h-4" aria-hidden />
+              </button>
+            )}
+            <button
+              type="button"
+              className="ehr-visit-pop-icon is-primary"
+              onClick={onCall}
+              aria-label={callLabel}
+              title={callLabel}
+            >
+              <Stethoscope className="w-4 h-4" aria-hidden />
+            </button>
+          </div>
         </div>
 
         {tab === 'current' ? (
           <div className="ehr-visit-pop-body">
-            <EhrWorkItemProgress
-              status={statusLabel}
-              owner={entry?.assignedToName || comingFrom}
-              waiting={wait}
-              nextAction={entry && !entry.assignedToId ? 'Call patient' : todaysNote ? 'Resume consultation' : 'Start consultation'}
-            />
-            <div className="ehr-visit-pop-row">
-              <span className="ehr-visit-pop-label">Status</span>
-              <div className="ehr-visit-pop-chips">
-                {[statusLabel, queueLabel, comingFrom]
-                  .filter(value => value && value !== '—')
-                  .map(value => <span key={value} className="ehr-visit-pop-chip">{value}</span>)}
-              </div>
-            </div>
-
+            {/* No Status row here: the queue row this panel drops out of already
+                carries the status, the queue and where the patient came from. */}
             <div className="ehr-visit-pop-row">
               <span className="ehr-visit-pop-label">Visit</span>
               <div>
@@ -257,14 +272,14 @@ export default function EhrVisitPopup({
           </div>
         )}
 
-        <div className="ehr-queue-move-footer ehr-visit-pop-footer">
-          {onOpenChart && <button type="button" onClick={onOpenChart}>Open chart</button>}
-          {onMove && entry && <button type="button" onClick={onMove}>Move…</button>}
-          <button type="button" className="primary" onClick={onCall}>
-            {entry && !entry.assignedToId ? 'Call patient' : todaysNote ? 'Resume consultation' : 'Start consultation'}
-          </button>
-        </div>
       </div>
+  );
+
+  if (inline) return body;
+
+  return (
+    <Modal onClose={onClose} width={500} labelledBy="ehr-visit-pop-title">
+      {body}
     </Modal>
   );
 }

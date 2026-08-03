@@ -34,111 +34,117 @@
 
 /* ══════════════════ LEFT NAV RAIL ══════════════════ */
 
-.omrs-left-rail {
-  flex: 0 0 230px;
-  width: 230px;
-  background: var(--ehr-panel, #fff);
+/* The rail is navigation, not content, so it sits on the page tint rather than
+   on panel white — the boundary between "where am I" and "what am I reading"
+   is then a change of surface, not a single hairline. The surface belongs to
+   the column, which is the shell's full height; the nav inside it is only as
+   tall as its list, so painting it there left the tint and the divider
+   stopping in mid-air part-way down a long chart. */
+.omrs-rail-col {
+  /* Wide enough for the longest label — "Appointments & follow-up" — to sit on
+     one line; below this it ellipsises and the rail looks broken. */
+  flex: 0 0 234px;
+  width: 234px;
+  align-self: stretch;
+  background: var(--ehr-page-bg, #F8FBFD);
   border-right: 1px solid var(--ehr-border, #D8E3EC);
+}
+
+/* One flat list — no groups, no collapsed "More sections". With nothing to
+   break the column, the active row is the only landmark, so it does the work
+   the section headers used to: a solid teal edge, a tint, and the only
+   coloured icon on the rail. */
+.omrs-left-rail {
+  width: 100%;
   position: sticky;
   top: 0;
-  align-self: flex-start;
   max-height: 100vh;
   overflow-y: auto;
-  padding: 8px 0 16px;
-}
-
-.omrs-rail-section-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--ehr-muted, #8395A8);
-  padding: 14px 16px 6px;
-}
-
-.omrs-rail-section-toggle {
+  /* The pills' inset lives here, not on each row. A `<button>` is a form
+     control: it shrink-to-fits even at `display: flex`, so sizing the rows
+     themselves gave every pill the width of its own label. Laying them out as
+     a stretched flex column makes all of them one width. */
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: calc(100% - 16px);
-  margin: 4px 8px 6px;
-  padding: 8px;
-  border: 1px solid var(--ehr-border-soft, #E7EEF5);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ehr-muted, #8395A8);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-align: left;
-  text-transform: uppercase;
-  cursor: pointer;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 8px 22px;
 }
 
-.omrs-rail-section-toggle:hover,
-.omrs-rail-section-toggle:focus-visible {
-  border-color: var(--omrs-teal);
-  color: var(--ehr-text-title, #132C44);
-}
-
-.omrs-rail-section-toggle svg {
-  width: 14px;
-  height: 14px;
-  transition: transform .16s ease;
-}
-
-.omrs-rail-section-toggle svg.rotate-180 {
-  transform: rotate(180deg);
-}
-
+/* Rows are the top rail's modules dropdown: inset pills, 6px radius, filling
+   solid blue with white ink. Hover and selection share that one treatment
+   exactly as they do in the dropdown — no teal edge on the side, no separate
+   selected style. */
 .omrs-rail-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  flex: 0 0 auto;
   width: 100%;
-  padding: 9px 16px;
-  background: transparent;
+  margin: 0;
+  padding: 9px 10px;
   border: none;
-  border-left: 3px solid transparent;
+  border-radius: 6px;
+  background: transparent;
   text-align: left;
   font-size: 13px;
+  line-height: 1.35;
   font-weight: 500;
   color: var(--ehr-text-body, #39536B);
   cursor: pointer;
 }
 
-.omrs-rail-item:hover {
-  background: var(--ehr-hover, #FAFCFE);
-}
-
+/* Hover and selection are one treatment, down to the weight — the dropdown
+   makes no distinction between them either. */
+.omrs-rail-item:hover,
 .omrs-rail-item.is-active {
-  background: var(--omrs-teal-soft);
-  border-left-color: var(--omrs-teal);
-  color: var(--ehr-text-title, #132C44);
-  font-weight: 700;
+  /* --tb-blue-900 rather than --nav-active-bg, for the reason the dropdown's
+     own rule gives: org branding rewrites the latter at runtime, and a light
+     org primary renders white-on-white. */
+  background: var(--tb-blue-900);
+  color: #fff;
 }
 
-.omrs-rail-item svg {
+/* Keep the focus ring inside the row — at the global +2px offset it overlaps
+   the rows above and below in a list this tight. */
+.omrs-rail-item:focus-visible {
+  outline-offset: -2px;
+}
+
+/* The icons are the rail's biggest problem: the shared Icon component paints
+   every glyph brand-blue via a `stroke` presentation attribute, so nineteen
+   identical blue marks ran down the column and the teal "you are here" cue had
+   to compete with them. Neutral ink here, teal only on the active row, so the
+   colour in this column means something. `stroke` — not just `color` — is what
+   beats the attribute. */
+/* 20px, the same glyph the app's top rail uses, so the two navigation surfaces
+   read as one set rather than the chart's looking like a shrunken copy. */
+.omrs-left-rail .omrs-rail-item svg {
   flex-shrink: 0;
-  width: 17px;
-  height: 17px;
-  color: inherit;
+  width: 20px;
+  height: 20px;
+  color: var(--ehr-muted, #8395A8);
+  stroke: currentColor;
 }
 
-.omrs-rail-item.is-active svg {
-  color: var(--omrs-teal);
+/* On the filled hover pill the glyph goes white with the label. The Icon
+   component writes its colour out as a `stroke` attribute, so `color` alone
+   would leave a blue glyph on a blue fill — the same trap the top rail's own
+   icon rules document. The active row is NOT filled, so its glyph takes the
+   teal ink; white there would erase it against the rail. */
+.omrs-left-rail .omrs-rail-item:hover svg {
+  color: #fff;
+  stroke: currentColor;
+}
+
+.omrs-left-rail .omrs-rail-item.is-active svg {
+  color: #fff;
+  stroke: currentColor;
 }
 
 .omrs-rail-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.omrs-rail-divider {
-  height: 1px;
-  background: var(--ehr-border-soft, #E7EEF5);
-  margin: 10px 16px;
 }
 
 /* ══════════════════ MAIN COLUMN ══════════════════ */
@@ -408,14 +414,26 @@
   margin: 0;
 }
 
+/* Symbol AND word, as the O3 banner writes it — the glyph alone is a guess for
+   anyone who has not learned it. */
+.omrs-gender {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ehr-text-body, #39536B);
+}
+
 .omrs-gender-symbol {
   font-size: 15px;
   font-weight: 700;
   color: var(--ehr-muted, #8395A8);
 }
 
-.omrs-gender-symbol.male { color: var(--accent-primary); }
-.omrs-gender-symbol.female { color: #C2408A; }
+.omrs-gender.male .omrs-gender-symbol { color: var(--accent-primary); }
+.omrs-gender.female .omrs-gender-symbol { color: #C2408A; }
+
 
 .omrs-chip {
   display: inline-flex;
@@ -434,51 +452,159 @@
   color: #fff;
 }
 
-.omrs-chip--ontime {
-  background: var(--ehr-soft, #E9F0F5);
-  color: var(--ehr-text-body, #39536B);
-}
-
 .omrs-header-meta {
   margin-top: 4px;
   font-size: 12.5px;
   color: var(--ehr-muted, #8395A8);
 }
 
-.omrs-sync-chip {
+/* ── Allergies ──────────────────────────────────────────────────────────────
+   Its own line, always visible. Red only when there is something to react to;
+   an assessed-and-clear patient should not wear an alarm colour, or the colour
+   stops meaning anything on the charts that need it. */
+/* Shares its metrics with .omrs-header-balance so the two chips sitting side
+   by side on the name row are the same height and ride the same centre line. */
+.omrs-allergy-banner {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.omrs-sync-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.omrs-header-more {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--ehr-border-soft, #E7EEF5);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  font-size: 12.5px;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 5px;
+  background: var(--ehr-page-bg, #F8FBFD);
+  font-family: inherit;
+  font-size: 12px;
   color: var(--ehr-text-body, #39536B);
+  text-align: left;
 }
 
-.omrs-header-more strong {
+.omrs-allergy-banner svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--ehr-muted, #8395A8);
+  stroke: currentColor;
+}
+
+.omrs-allergy-label {
+  font-weight: 700;
   color: var(--ehr-text-title, #132C44);
 }
 
-.omrs-header-actions {
+.omrs-allergy-label::after { content: ':'; }
+
+/* No ellipsis: the list is shown in full, and wraps inside the chip rather
+   than hiding its tail behind a "+N more". */
+.omrs-allergy-value {
+  min-width: 0;
+}
+
+.omrs-allergy-banner--alert {
+  border-color: #E8B4AE;
+  background: #FDECEA;
+  color: #8B2E24;
+}
+
+.omrs-allergy-banner--alert .omrs-allergy-label,
+.omrs-allergy-banner--alert svg {
+  color: var(--color-danger, #C22B2B);
+}
+
+.omrs-allergy-banner--alert .omrs-allergy-value {
+  font-weight: 700;
+}
+
+/* Never assessed is not the same as assessed-and-clear, and reading it as the
+   latter is how a known allergy gets prescribed around. */
+.omrs-allergy-banner--unknown {
+  border-style: dashed;
+}
+
+.omrs-allergy-banner--unknown .omrs-allergy-value {
+  font-style: italic;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.omrs-allergy-banner--link {
+  cursor: pointer;
+}
+
+.omrs-allergy-banner--link:hover {
+  border-color: var(--tb-blue-900);
+}
+
+/* Balance sits on the name row beside allergies, in the same chip shape so the
+   top line reads as one row of facts rather than a chip next to a stray link.
+   Neutral when settled; only an outstanding balance takes the danger colour. */
+.omrs-header-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 5px;
+  background: var(--ehr-page-bg, #F8FBFD);
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ehr-text-body, #39536B);
+  cursor: pointer;
+}
+
+.omrs-header-balance svg {
   flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  color: var(--ehr-muted, #8395A8);
+  stroke: currentColor;
+}
+
+.omrs-header-balance:hover {
+  border-color: var(--tb-blue-900);
+}
+
+.omrs-header-balance--due {
+  border-color: #E8B4AE;
+  background: #FDECEA;
+  color: #8B2E24;
+  font-weight: 700;
+}
+
+.omrs-header-balance--due svg,
+.omrs-header-balance--due .omrs-allergy-label {
+  color: var(--color-danger, #C22B2B);
+}
+
+/* The expandable contact line. Its labels are muted to match the age/DOB/ID
+   line directly above it — in body ink they read heavier than the identity
+   they sit under, which inverts the hierarchy. Only the values carry weight. */
+.omrs-header-details {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  font-size: 12.5px;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.omrs-header-details strong {
+  font-weight: 600;
+  color: var(--ehr-text-body, #39536B);
+}
+
+/* The banner's right column: actions on the first line, the show-more toggle
+   on its own beneath them, both flush right. */
+.omrs-header-aside {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 540px;
+}
+
+.omrs-header-actions {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -487,7 +613,27 @@
      width so they wrap into rows instead of squeezing the patient name. */
   flex-wrap: wrap;
   justify-content: flex-end;
-  max-width: 540px;
+}
+
+.omrs-header-showmore {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 2px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.omrs-header-showmore:hover { text-decoration: underline; }
+
+.omrs-header-showmore-caret {
+  font-size: 13px;
+  line-height: 1;
 }
 
 /* Icons are the duotone set (brand-blue stroke baked in); just keep them
@@ -1333,23 +1479,16 @@
 }
 
 @media (max-width: 900px) {
-  .omrs-left-rail {
+  .omrs-rail-col {
     flex-basis: 56px;
     width: 56px;
   }
-  .omrs-rail-label,
-  .omrs-rail-section-label,
-  .omrs-rail-section-toggle span {
+  .omrs-rail-label {
     display: none;
-  }
-  .omrs-rail-section-toggle {
-    justify-content: center;
-    width: 40px;
-    margin-inline: auto;
   }
   .omrs-rail-item {
     justify-content: center;
-    padding: 10px 0;
+    padding: 9px 0;
   }
   .omrs-drawer {
     width: 100vw;
@@ -1392,3 +1531,205 @@
 .omrs-header-overflow .omrs-actions-menu {
   width: 210px;
 }
+
+/* ══════════════════ FLAT SURFACES ══════════════════
+ *
+ * The chart carries no fills. Every surface in here is white; structure comes
+ * from a 1px edge and a low shadow instead of a tint, so the only colour on the
+ * page is the clinical signal — an abnormal value, a critical flag, an action.
+ *
+ * Implemented by re-pointing the tint tokens at white inside the chart root:
+ * every rule that fills a surface (including the `!important` ones in
+ * globals.css) resolves to white here without each one being restated. Literal
+ * hex fills that bypass the tokens are neutralised individually below.
+ */
+
+.omrs-root {
+  --ehr-page-bg: #fff;
+  --ehr-panel: #fff;
+  --ehr-panel-soft: #fff;
+  --ehr-soft: #fff;
+  --ehr-hover: #fff;
+  --ehr-table-head: #fff;
+  --ehr-table-head-strong: #fff;
+  --ehr-blue-light: #fff;
+  --ehr-ledger-soft: #fff;
+  --bg-secondary: #fff;
+  --overlay-subtle: transparent;
+  --overlay-medium: transparent;
+  /* The edge does the work the fill used to, so it is a shade darker than the
+     page's hairline — and the shadow is the only lift on the page. */
+  --ehr-border: #C6D5E2;
+  --ehr-border-soft: #D8E3EC;
+  --omrs-card-shadow: 0 1px 2px rgba(16, 42, 67, 0.06);
+  --omrs-teal-soft: transparent;
+}
+
+/* Literal fills that never went through a token. */
+.omrs-root .tebra-panel,
+.omrs-root .tebra-facesheet .tebra-panel,
+.omrs-root .omrs-content,
+.omrs-root .omrs-sticky-zone,
+.omrs-root .omrs-main-col,
+.omrs-root .omrs-vitals-band,
+.omrs-root .omrs-vitals-cell,
+.omrs-root .omrs-section,
+.omrs-root .omrs-section-body,
+.omrs-root .omrs-table thead th,
+.omrs-root .omrs-table tbody tr:nth-child(even),
+.omrs-root .omrs-panel-card {
+  background: #fff;
+}
+
+/* Cards keep their shape without a fill: edge + a barely-there lift. */
+.omrs-root .tebra-panel,
+.omrs-root .omrs-section,
+.omrs-root .omrs-panel-card {
+  border: 1px solid var(--ehr-border);
+  box-shadow: var(--omrs-card-shadow);
+}
+
+/* A table head with no fill still needs to read as a head — give it a rule. */
+.omrs-root .omrs-table thead th,
+.omrs-root .tebra-panel table thead th {
+  border-bottom: 1px solid var(--ehr-border);
+}
+
+/* Hover was a tint; make it an edge so rows still answer the pointer. */
+.omrs-root .omrs-table tbody tr:hover,
+.omrs-root .tebra-panel table tbody tr:hover {
+  background: #fff;
+  box-shadow: inset 2px 0 0 var(--omrs-teal);
+}
+
+/* Selected states: the accent moves from the fill to the edge and the ink.
+   The left nav rail is deliberately exempt — it follows the top rail's modules
+   dropdown instead, where the selected row is a solid blue pill. */
+.omrs-root .omrs-right-rail-btn.is-active {
+  background: transparent;
+  border-color: var(--omrs-teal);
+  color: var(--omrs-teal);
+}
+
+.omrs-root .tamam-activity-filters button:hover,
+.omrs-root .tamam-activity-filters button.is-active {
+  background: transparent;
+  border-color: var(--omrs-teal);
+  color: var(--omrs-teal);
+}
+
+/* Status pills stay legible as outlines — the colour is the signal, the fill
+   was only decoration. */
+.omrs-root .omrs-panel-badge {
+  background: transparent !important;
+  border: 1px solid currentColor;
+}
+
+.omrs-root .omrs-panel-badge--pending { color: var(--ehr-warning-text, #9C5E16); }
+.omrs-root .omrs-panel-badge--active { color: var(--accent-primary); }
+.omrs-root .omrs-panel-badge--done { color: var(--ehr-success-text, #0E7155); }
+.omrs-root .omrs-panel-badge--muted { color: var(--ehr-muted, #8395A8); }
+
+/* Exceptions — these are not surfaces:
+ *   · buttons and chips that ARE the action (primary, active-visit)
+ *   · the drawer footer bar, which is a deliberate dark panel
+ *   · the danger tint behind a hard clinical warning
+ * They keep their fills on purpose. */
+
+/* `.ehr-chart-content` re-declares the ledger tints for its own subtree, so
+   they are re-pointed there too — a token set on the root alone never reaches
+   past a descendant that redefines it. */
+.omrs-root .ehr-chart-content {
+  --ehr-ledger-soft: #fff;
+  --ehr-ledger-softer: #fff;
+  --ehr-table-head: #fff;
+  --ehr-table-head-strong: #fff;
+  --ehr-panel-soft: #fff;
+  --ehr-page-bg: #fff;
+}
+
+/* The title strips are painted by `!important` rules in globals.css, which
+   loads after this file — the repeated class outweighs them on specificity
+   rather than relying on source order. */
+.omrs-root .tebra-section-title.tebra-section-title,
+.omrs-root .tebra-demo-title.tebra-demo-title,
+.omrs-root .tebra-demo-tabs.tebra-demo-tabs {
+  background: transparent !important;
+}
+
+/* The avatar disc loses its tint plate; the initials carry identity, and the
+   edge gives the disc its shape. (`avatarTint` still colours list avatars,
+   where a wall of rows needs the extra separation.) */
+.omrs-root .omrs-avatar {
+  background: #fff;
+  border: 1px solid var(--ehr-border);
+  color: var(--ehr-text-title, #132C44);
+}
+
+/* Shared <Badge> sets its fill inline, so the chart's outline treatment has to
+   override it. The tone colour survives as the ink and the edge — the signal
+   is kept, the plate is not. */
+.omrs-root .tamam-badge {
+  background: transparent !important;
+  border: 1px solid currentColor;
+}
+
+/* ══════════════ Conditions: the status badge is the control ══════════════
+ *
+ * A native <select> laid transparently over the badge: the row keeps the chip
+ * everyone recognises, and changing a condition's status is one click on the
+ * thing that states it — no edit screen, no second column of buttons. The
+ * select stays a real form control, so keyboard and screen readers get the
+ * behaviour they expect for free.
+ */
+
+.omrs-status-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 16px;
+  cursor: pointer;
+}
+
+/* The caret that says "this can change". */
+.omrs-status-picker::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.omrs-status-picker select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.omrs-status-picker select:disabled { cursor: progress; }
+
+.omrs-status-picker:hover { filter: brightness(0.97); }
+
+/* Keyboard focus has to land on the badge, since the control behind it is
+   invisible. */
+.omrs-status-picker:focus-within {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+/* Columns are sized by colgroup; keep the cells from re-negotiating it. */
+.omrs-table--conditions { table-layout: fixed; }
+.omrs-table--conditions td:first-child { white-space: normal; }

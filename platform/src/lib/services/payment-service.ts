@@ -803,6 +803,10 @@ export function computeAdjudicatedStatus(approved: number, denied: number): Clai
 export interface AdjudicateClaimOptions {
   denialReasons?: string[];
   notes?: string;
+  /** What the payer allowed for the claim (the ERA's allowed amount). The
+   *  adjudication form has always collected this; it was never written, so the
+   *  claims table's "Allowed" column stayed at zero after adjudication. */
+  totalAllowed?: number;
 }
 
 export async function adjudicateClaim(
@@ -821,6 +825,10 @@ export async function adjudicateClaim(
     const status = computeAdjudicatedStatus(approved, denied);
 
     claim.totalApproved = approved;
+    // Fall back to approved + denied when the caller doesn't state an allowed
+    // amount: for a fully paid claim those are the same number, and a stale
+    // zero reads as "the payer allowed nothing", which is a different claim.
+    claim.totalAllowed = opts?.totalAllowed ?? (approved + denied);
     claim.totalDenied = denied;
     claim.totalWriteOff = writeOff;
     claim.patientResponsibility = patientResponsibility;

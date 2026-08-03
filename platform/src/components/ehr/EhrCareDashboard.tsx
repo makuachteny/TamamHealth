@@ -2,12 +2,11 @@
 
 import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { ChevronDown, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
-import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 import { initials, stateTint } from '@/lib/patient-utils';
 import { formatAppointmentTimeUntil } from '@/lib/format-utils';
 
@@ -49,6 +48,14 @@ export type EhrCareDashboardRow = {
    *  it falls back to initials — never a stand-in face, since the avatar is an
    *  identification cue. */
   photoUrl?: string;
+  /** Opening this row navigates somewhere instead of showing the detail popup.
+   *  Used where the work itself lives on another screen — a lab order opens the
+   *  bench workflow in the patient's chart rather than a read-only summary. */
+  onOpen?: () => void;
+  /** The patient this row is about. When set, their NAME opens the chart while
+   *  the rest of the row still expands the detail — the two things a queue row
+   *  is asked to do, without one stealing the other's click. */
+  patientId?: string;
   /** First line in the Wait column, usually the slot time or the time the
    *  patient entered the queue. Omit for rows with no time and the column reads
    *  "—". */
@@ -71,7 +78,9 @@ export type EhrCareDashboardRow = {
   statusTone?: 'scheduled' | 'ready' | 'active' | 'done' | 'warning' | 'danger';
   priority?: string;
   room?: string;
-  onClick?: () => void;
+  // No row-level `onClick`: the shell owns what a row click does (expand, or
+  // navigate via `onOpen`). The prop used to exist and was never read, so two
+  // dashboards quietly wired handlers that could not fire.
   actionLabel?: string;
   onAction?: () => void;
   secondaryActionLabel?: string;
@@ -261,10 +270,17 @@ export default function EhrCareDashboard({
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   // Clicking a row opens a right-side detail slider where the actions live,
   // keeping the row itself clean (avatar · time · name).
-  const [openRow, setOpenRow] = useState<EhrCareDashboardRow | null>(null);
+  // Row details expand in place rather than opening a dialog: the queue stays
+  // on screen, so a clinician can read one patient's visit without losing the
+  // list they are working down.
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<'visit' | 'financial'>('visit');
   const lastAutoOpenRowId = useRef<string | null>(null);
-  const openDetail = (row: EhrCareDashboardRow) => { setDetailTab('visit'); setOpenRow(row); };
+  const openDetail = (row: EhrCareDashboardRow) => {
+    if (row.onOpen) { row.onOpen(); return; }
+    setDetailTab('visit');
+    setExpandedRowId(current => (current === row.id ? null : row.id));
+  };
   const rowEventDates = useMemo(() => rows.map(row => row.date).filter((date): date is string => Boolean(date)), [rows]);
   const eventDates = calendarEventDates || rowEventDates;
   // The left rail runs the same "Day statistics" widget as the Clinical Officer
@@ -296,18 +312,12 @@ export default function EhrCareDashboard({
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, [hasCountdown]);
+  // An expanded row that scrolls out of the filtered list closes itself, so a
+  // panel never lingers over a patient the list no longer shows.
   useEffect(() => {
-    if (!openRow) return;
-    const latest = visibleRows.find(row => row.id === openRow.id);
-    const changed = latest && (
-      latest.status !== openRow.status ||
-      latest.priority !== openRow.priority ||
-      latest.subtitle !== openRow.subtitle ||
-      latest.meta !== openRow.meta ||
-      latest.actionLabel !== openRow.actionLabel
-    );
-    if (latest && changed) setOpenRow(latest);
-  }, [openRow, visibleRows]);
+    if (!expandedRowId) return;
+    if (!visibleRows.some(row => row.id === expandedRowId)) setExpandedRowId(null);
+  }, [expandedRowId, visibleRows]);
   useEffect(() => {
     if (!autoOpenRowId || lastAutoOpenRowId.current === autoOpenRowId) return;
     const row = visibleRows.find(item => item.id === autoOpenRowId);
@@ -329,7 +339,12 @@ export default function EhrCareDashboard({
       <section className="ehr-schedule-header ehr-clinical-dashboard-header ehr-care-dashboard-header">
         <div className="ehr-clinical-dashboard-tabs">
           {primaryAction && (
-            <div className="ehr-segmented ehr-segmented-single">
+            // `station-primary-action` is a tour anchor. The primary action is
+            // promoted out of `station-actions` into this slot, so a dashboard
+            // passing exactly one action leaves `station-actions` rendered but
+            // empty and zero-sized — a tour step pointing there would attach to
+            // nothing visible.
+            <div className="ehr-segmented ehr-segmented-single" data-tour="station-primary-action">
               <button type="button" className="active" aria-label={primaryAction.label} onClick={primaryAction.onClick}>
                 <primaryAction.icon className="w-4 h-4" /> {primaryAction.label}
               </button>
@@ -485,6 +500,7 @@ export default function EhrCareDashboard({
                     const contextSubtext = row.locationSecondary || row.locationLabel || (row.room ? 'Room' : 'Location');
                     const statusText = row.statusLabel || (row.status ? titleCase(row.status) : '');
                     const activate = () => openDetail(row);
+                    const isExpanded = expandedRowId === row.id;
                     const countdown = (() => {
                       if (!now || !row.timeAt) return null;
                       const target = new Date(row.timeAt);
@@ -515,16 +531,26 @@ export default function EhrCareDashboard({
                       ? PRIORITY_META[priorityCode].label
                       : countdown?.label || '';
                     return (
-                      <div key={row.id}>
+                      <div key={row.id} className={isExpanded ? 'ehr-appointment-group is-expanded' : 'ehr-appointment-group'}>
                         <div
                           className="ehr-appointment-row appointment-card-row"
                           data-triage={priorityCode || undefined}
                           role="button"
                           tabIndex={0}
+                          aria-expanded={row.onOpen ? undefined : isExpanded}
                           onClick={activate}
                           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); } }}
                         >
                           <div className="ehr-appointment-identity">
+                            {/* The caret is the row's own affordance: details
+                                open underneath, they do not fly in over the
+                                list. Rows that navigate elsewhere (onOpen) get
+                                no caret, because nothing expands. */}
+                            {!row.onOpen && (
+                              <span className="ehr-row-caret" aria-hidden>
+                                <ChevronDown className="w-4 h-4" />
+                              </span>
+                            )}
                             <div className="ehr-patient-icon" style={stateTint(avatarAcuity)}>
                               {row.photoUrl
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -532,7 +558,18 @@ export default function EhrCareDashboard({
                                 : initials(row.title)}
                             </div>
                             <div className="ehr-appointment-main appointment-card-patient">
-                              <button type="button" className="print-visible" onClick={(event) => { event.stopPropagation(); activate(); }}>
+                              {/* The name is the way into the chart; the rest of
+                                  the row expands the details underneath. */}
+                              <button
+                                type="button"
+                                className={row.patientId ? 'print-visible ehr-row-name-link' : 'print-visible'}
+                                title={row.patientId ? `Open ${row.title}'s chart` : undefined}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (row.patientId) router.push(`/patients/${row.patientId}`);
+                                  else activate();
+                                }}
+                              >
                                 {row.title}
                               </button>
                               <p>{row.subtitle}</p>
@@ -560,6 +597,13 @@ export default function EhrCareDashboard({
                           </div>
                         </div>
                         {row.detail}
+                        {isExpanded && !row.onOpen && (
+                          <EhrRowDetail
+                            row={row}
+                            detailTab={detailTab}
+                            onCollapse={() => setExpandedRowId(null)}
+                          />
+                        )}
                       </div>
                     );
                   })}
@@ -638,107 +682,91 @@ export default function EhrCareDashboard({
         )}
       </div>
 
-      {openRow && (
-        <>
+    </div>
+  );
+}
+
+/**
+ * The row's details, expanded in place under it.
+ *
+ * Same content the slide-over used to carry — visit fields, work-item
+ * progress, the row's actions — but inline, so the queue above it stays
+ * readable and a second row can be opened without dismissing the first.
+ */
+function EhrRowDetail({
+  row,
+  detailTab,
+  onCollapse,
+}: {
+  row: EhrCareDashboardRow;
+  detailTab: 'visit' | 'financial';
+  onCollapse: () => void;
+}) {
+  const fields = (detailTab === 'visit'
+    ? [
+        { label: 'Time', value: detailPair(row.time || row.compactMeta, row.timeSecondary) },
+        { label: 'Reason', value: row.subtitle },
+        // Raw triage codes (YELLOW/RED/GREEN) read like debug output — surface
+        // the clinical label instead.
+        { label: 'Priority', value: isTriageCode(row.priority) ? PRIORITY_META[row.priority].label : row.priority },
+        { label: 'Status', value: detailPair(row.statusLabel || (row.status ? titleCase(row.status) : undefined), row.statusSecondary) },
+        { label: 'Room', value: row.room },
+        { label: row.careTeamLabel || 'Care team', value: row.careTeamSecondary ? `${row.careTeam || 'Unassigned'} · ${row.careTeamSecondary}` : row.careTeam },
+        { label: row.locationLabel || 'Context', value: detailPair(row.location, row.locationSecondary) },
+        { label: 'Details', value: row.meta },
+      ]
+    : [
+        // The Financial tab is intentionally not offered: no role's data layer
+        // feeds it yet, so every field rendered the same placeholder no matter
+        // who opened it. The branch stays so wiring real billing data back in
+        // is a small diff, not a rebuild.
+        { label: 'Balance', value: '—' },
+        { label: 'Charge', value: 'Not started' },
+        { label: 'Payment Responsibility', value: 'Not recorded' },
+        { label: 'Insurance', value: 'Not recorded' },
+        { label: 'Claim Status', value: 'Not started' },
+      ]
+  ).filter((item): item is { label: string; value: string } => Boolean(item.value));
+
+  return (
+    <div className="ehr-row-detail" role="region" aria-label={`${row.title} details`}>
+      {row.popupDetail ? (
+        <div className="ehr-row-detail__custom">{row.popupDetail}</div>
+      ) : (
+        <div className="ehr-row-detail__body">
+          {fields.map(item => (
+            <div className="appointment-detail-row" key={item.label}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!row.popupDetail && (
+      <div className="ehr-row-detail__actions">
+        {row.actionLabel && row.onAction && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => { row.onAction?.(); onCollapse(); }}>
+            {row.actionLabel}
+          </button>
+        )}
+        {row.secondaryActionLabel && row.onSecondaryAction && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => { row.onSecondaryAction?.(); onCollapse(); }}>
+            {row.secondaryActionLabel}
+          </button>
+        )}
+        {(row.extraActions ?? []).map(action => (
           <button
+            key={action.label}
             type="button"
-            className="appointment-detail-backdrop"
-            aria-label="Close details"
-            onClick={() => setOpenRow(null)}
-          />
-          <aside className="appointment-detail-sidebar" role="dialog" aria-modal="true" aria-label="Details">
-            <div className="appointment-detail-sidebar__header">
-              <div className="appointment-detail-sidebar__title">
-                <h2>{openRow.title}</h2>
-                {openRow.subtitle && <p>{openRow.subtitle}</p>}
-              </div>
-              {/* Close sits on the right so the title (and everything under it)
-                  shares the body's left edge. Time and status stay in the Visit
-                  Information rows only. */}
-              <div className="appointment-detail-sidebar__header-icons">
-                <button type="button" className="appointment-detail-sidebar__close" onClick={() => setOpenRow(null)} aria-label="Close">
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            {openRow.popupDetail ? (
-              <div className="appointment-detail-sidebar__body" role="tabpanel">
-                {openRow.popupDetail}
-              </div>
-            ) : (
-              // The Financial tab is intentionally not offered: no role's data
-              // layer feeds it yet, so every field rendered the same "—" /
-              // "Not started" placeholders no matter who opened the slider —
-              // that read as a broken feature, not an empty one. Visit
-              // Information renders unconditionally instead. `detailTab` and
-              // the 'financial' branch below are left in place (rather than
-              // deleted) so wiring real billing data back in is a small diff,
-              // not a rebuild — `detailTab` just never becomes 'financial'
-              // without a control that sets it.
-              <div className="appointment-detail-sidebar__body" role="tabpanel">
-                {(detailTab === 'visit'
-                  ? [
-                      { label: 'Time', value: detailPair(openRow.time || openRow.compactMeta, openRow.timeSecondary) },
-                      { label: 'Reason', value: openRow.subtitle },
-                      // Raw triage codes (YELLOW/RED/GREEN) read like debug
-                      // output — surface the clinical label instead.
-                      { label: 'Priority', value: isTriageCode(openRow.priority) ? PRIORITY_META[openRow.priority].label : openRow.priority },
-                      { label: 'Status', value: detailPair(openRow.statusLabel || (openRow.status ? titleCase(openRow.status) : undefined), openRow.statusSecondary) },
-                      { label: 'Room', value: openRow.room },
-                      { label: openRow.careTeamLabel || 'Care team', value: openRow.careTeamSecondary ? `${openRow.careTeam || 'Unassigned'} · ${openRow.careTeamSecondary}` : openRow.careTeam },
-                      { label: openRow.locationLabel || 'Context', value: detailPair(openRow.location, openRow.locationSecondary) },
-                      { label: 'Details', value: openRow.meta },
-                    ]
-                  : [
-                      { label: 'Balance', value: '—' },
-                      { label: 'Charge', value: 'Not started' },
-                      { label: 'Payment Responsibility', value: 'Not recorded' },
-                      { label: 'Insurance', value: 'Not recorded' },
-                      { label: 'Claim Status', value: 'Not started' },
-                    ]
-                ).filter((item): item is { label: string; value: string } => Boolean(item.value))
-                  .map(item => (
-                    <div className="appointment-detail-row" key={item.label}>
-                      <dt>{item.label}</dt>
-                      <dd>{item.value}</dd>
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            <EhrWorkItemProgress
-              status={openRow.statusLabel || (openRow.status ? titleCase(openRow.status) : undefined)}
-              owner={openRow.careTeam}
-              waiting={openRow.time || openRow.timeSecondary}
-              nextAction={openRow.actionLabel}
-            />
-
-            <div className="appointment-detail-sidebar__actions">
-              {openRow.actionLabel && openRow.onAction && (
-                <button type="button" className="btn btn-primary btn-sm" onClick={() => { openRow.onAction?.(); setOpenRow(null); }}>
-                  {openRow.actionLabel}
-                </button>
-              )}
-              {openRow.secondaryActionLabel && openRow.onSecondaryAction && (
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { openRow.onSecondaryAction?.(); setOpenRow(null); }}>
-                  {openRow.secondaryActionLabel}
-                </button>
-              )}
-              {(openRow.extraActions ?? []).map(action => (
-                <button
-                  key={action.label}
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  style={action.tone === 'danger' ? { color: 'var(--color-danger)', borderColor: 'var(--color-danger)' } : undefined}
-                  onClick={() => { action.onClick(); setOpenRow(null); }}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          </aside>
-        </>
+            className="btn btn-secondary btn-sm"
+            style={action.tone === 'danger' ? { color: 'var(--color-danger)', borderColor: 'var(--color-danger)' } : undefined}
+            onClick={() => { action.onClick(); onCollapse(); }}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
       )}
     </div>
   );

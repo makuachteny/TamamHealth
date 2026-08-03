@@ -208,3 +208,43 @@ function parseHL7(payload: string): IntakeOutcome {
 
   return { protocol: 'hl7', results, warnings };
 }
+
+/**
+ * Match one parsed analyzer reading to the order it belongs to.
+ *
+ * Accession first. Analyzers echo the specimen/accession id they were given
+ * (`O|1|ACC-7788|…` in LIS-2A, OBR-3 in HL7), and that id identifies exactly
+ * one order. Matching on the test name instead — which is what this used to do
+ * — picks the first open order whose name overlaps, so with two patients both
+ * waiting on a Hemoglobin the reading lands on whichever happens to sort first.
+ * That files a result against the wrong chart.
+ *
+ * Name matching is kept only as a fallback for instruments that report no
+ * accession at all, and callers are expected to tell the operator when it is
+ * what produced the match.
+ */
+export function matchAnalyzerResult<
+  T extends { _id: string; status?: string; testName?: string; accessionNumber?: string },
+>(parsed: Pick<ParsedInstrumentResult, 'accession' | 'testName'>, orders: T[]): T | undefined {
+  const open = orders.filter(o => o.status !== 'completed');
+  const accession = parsed.accession?.trim().toLowerCase();
+
+  if (accession) {
+    const exact = open.find(o => (o.accessionNumber || '').trim().toLowerCase() === accession);
+    if (exact) return exact;
+    // A closed order still matching the accession means the value belongs to an
+    // already-reported test — an amendment, not a new filing. Return it so the
+    // caller opens the right order rather than silently falling through to a
+    // name match on somebody else's specimen.
+    const closed = orders.find(o => (o.accessionNumber || '').trim().toLowerCase() === accession);
+    if (closed) return closed;
+    // The instrument named an accession we do not hold. Refuse rather than
+    // guess — this is the case where guessing puts a result on a stranger.
+    return undefined;
+  }
+
+  const name = (parsed.testName || '').toLowerCase().split(' (')[0].trim();
+  if (!name) return undefined;
+  return open.find(o => (o.testName || '').toLowerCase().includes(name))
+    || open.find(o => name.includes((o.testName || '').toLowerCase()));
+}

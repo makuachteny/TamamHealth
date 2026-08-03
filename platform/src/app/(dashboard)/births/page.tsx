@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import Link from 'next/link';
 import { useBirths } from '@/lib/hooks/useBirths';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -11,7 +11,6 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
-import Modal from '@/components/Modal';
 import PopupSelect from '@/components/PopupSelect';
 import {
   Baby, Plus, X, ChevronDown,
@@ -56,10 +55,6 @@ export default function BirthsPage() {
     (!search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
     (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase()))
   );
-  const selectedBirth = useMemo(
-    () => (selectedBirthId ? (births || []).find(b => b._id === selectedBirthId) || null : null),
-    [births, selectedBirthId],
-  );
 
   // Header stat chips — computed from data already loaded on this page,
   // unaffected by the search box (same as the patients header).
@@ -93,6 +88,34 @@ export default function BirthsPage() {
       showToast(t('births.registerFailed'), 'error');
     }
   };
+
+  /**
+   * The certificate detail, unfolded under its own row. It used to open in a
+   * dialog whose header repeated the certificate number and child name that
+   * the row it came from already shows.
+   */
+  const renderBirthDetail = (selectedBirth: NonNullable<typeof births>[number]) => (
+    <div className="grid gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Certificate #</span>{selectedBirth.certificateNumber}</div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Birth Type</span><span className="capitalize">{selectedBirth.birthType}</span></div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Delivery Type</span><span className="capitalize">{selectedBirth.deliveryType}</span></div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Birth Weight</span>{selectedBirth.birthWeight}g</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Mother</span>{selectedBirth.motherName} (Age: {selectedBirth.motherAge || 'N/A'})</div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Mother Nationality</span>{selectedBirth.motherNationality || 'N/A'}</div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Father</span>{selectedBirth.fatherName || 'N/A'}</div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Father Nationality</span>{selectedBirth.fatherNationality || 'N/A'}</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Place of Birth</span>{selectedBirth.placeOfBirth || selectedBirth.facilityName}</div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Attended By</span>{selectedBirth.attendedBy || 'N/A'}</div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Registered By</span>{selectedBirth.registeredBy || 'N/A'}</div>
+          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>County</span>{selectedBirth.county || 'N/A'}, {selectedBirth.state}</div>
+        </div>
+    </div>
+  );
 
   return (
     <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
@@ -146,7 +169,12 @@ export default function BirthsPage() {
               </thead>
               <tbody>
                 {filtered.map(b => (
-                  <tr key={b._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setSelectedBirthId(b._id)}>
+                  <Fragment key={b._id}>
+                  <tr
+                    className="cursor-pointer hover:bg-[var(--table-row-hover)]"
+                    aria-expanded={selectedBirthId === b._id}
+                    onClick={() => setSelectedBirthId(current => (current === b._id ? null : b._id))}
+                  >
                     <td className="font-mono text-xs">{b.certificateNumber}</td>
                     <td className="font-medium text-sm">{b.childFirstName} {b.childSurname}</td>
                     <td><span className="badge text-[10px]" style={{ background: b.childGender === 'Male' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(229,46,66,0.12)', color: b.childGender === 'Male' ? 'var(--accent-primary)' : 'var(--color-danger)' }}>{b.childGender}</span></td>
@@ -175,6 +203,16 @@ export default function BirthsPage() {
                       </div>
                     </td>
                   </tr>
+                  {selectedBirthId === b._id && (
+                    <tr className="ehr-table-detail-row">
+                      <td colSpan={9}>
+                        <div className="ehr-row-detail ehr-row-detail--table" role="region" aria-label={`Certificate ${b.certificateNumber} details`}>
+                          {renderBirthDetail(b)}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -182,45 +220,6 @@ export default function BirthsPage() {
           </div>
         </div>
 
-        {selectedBirth && (
-          <Modal onClose={() => setSelectedBirthId(null)} width={720} labelledBy="birth-certificate-details-title">
-            <div className="modal-content card-elevated w-full overflow-hidden">
-              <div className="flex items-start justify-between gap-4 p-5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <div className="min-w-0">
-                  <h3 id="birth-certificate-details-title" className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                    Birth Certificate · {selectedBirth.certificateNumber}
-                  </h3>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                    {selectedBirth.childFirstName} {selectedBirth.childSurname} · {selectedBirth.dateOfBirth}
-                  </p>
-                </div>
-                <button onClick={() => setSelectedBirthId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label="Close birth certificate details">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-5 space-y-5">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Certificate #</span>{selectedBirth.certificateNumber}</div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Birth Type</span><span className="capitalize">{selectedBirth.birthType}</span></div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Delivery Type</span><span className="capitalize">{selectedBirth.deliveryType}</span></div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Birth Weight</span>{selectedBirth.birthWeight}g</div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Mother</span>{selectedBirth.motherName} (Age: {selectedBirth.motherAge || 'N/A'})</div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Mother Nationality</span>{selectedBirth.motherNationality || 'N/A'}</div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Father</span>{selectedBirth.fatherName || 'N/A'}</div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Father Nationality</span>{selectedBirth.fatherNationality || 'N/A'}</div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Place of Birth</span>{selectedBirth.placeOfBirth || selectedBirth.facilityName}</div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Attended By</span>{selectedBirth.attendedBy || 'N/A'}</div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Registered By</span>{selectedBirth.registeredBy || 'N/A'}</div>
-                  <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>County</span>{selectedBirth.county || 'N/A'}, {selectedBirth.state}</div>
-                </div>
-              </div>
-            </div>
-          </Modal>
-        )}
 
         {/* Registration Form Modal */}
         {showForm && (

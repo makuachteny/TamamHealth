@@ -116,9 +116,6 @@ export default function DataEntryDashboard() {
   const [census, setCensus] = useState<CensusData>(() => emptyCensus(today));
   const [savedReports, setSavedReports] = useState<SavedCensusReport[]>([]);
   const [saving, setSaving] = useState(false);
-  // Which saved report row is expanded to show its full census breakdown,
-  // rendered inline via EhrCareDashboard's `row.detail` slot.
-  const [selectedReport, setSelectedReport] = useState<string | null>(null);
   // Free-text filter over the saved-report worklist (search by date).
   const [reportSearch, setReportSearch] = useState('');
 
@@ -271,8 +268,10 @@ export default function DataEntryDashboard() {
   const dateLabel = formatDateTitle(toIsoDate(new Date()));
 
   // Expandable per-report breakdown (patient census / beds & staff / equipment
-  // & supplies). Rendered inline beneath the row via EhrCareDashboard's
-  // `row.detail` slot when the report is selected.
+  // & supplies), rendered inline via `row.popupDetail` (EhrCareDashboard's
+  // shared expand-in-place panel). Inpatients/OPD/general-bed occupancy are
+  // already on the row above, so those are left out here — everything below
+  // is data the row has no column for.
   const renderReportDetail = (r: CensusData) => {
     const medAvail = r.tracerMedicinesTotal > 0 ? Math.round((r.tracerMedicinesInStock / r.tracerMedicinesTotal) * 100) : 0;
     const handwash = r.handwashStations > 0 ? Math.round((r.handwashFunctional / r.handwashStations) * 100) : 0;
@@ -285,12 +284,9 @@ export default function DataEntryDashboard() {
               <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.patientCensus')}</span>
             </div>
-            <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{r.date}</span>
           </div>
           <div className="p-4 space-y-2">
             {[
-              { label: t('dataEntry.inpatients'), value: r.inpatientsTotal, color: 'var(--accent-primary)' },
-              { label: t('dataEntry.opdVisits'), value: r.opdVisitsToday, color: 'var(--accent-primary)' },
               { label: t('encounters.emergency'), value: r.emergencyVisits, color: 'var(--color-danger)' },
               { label: t('dashboard.bedMaternity'), value: r.maternityAdmissions, color: 'var(--accent-primary)' },
               { label: t('dataEntry.newborns'), value: r.newborns, color: 'var(--accent-primary)' },
@@ -316,7 +312,6 @@ export default function DataEntryDashboard() {
           </div>
           <div className="p-4 space-y-3">
             {[
-              { label: t('dataEntry.generalBeds'), occupied: r.occupiedBeds, total: r.totalBeds, color: 'var(--accent-primary)' },
               { label: t('dashboard.bedIcu'), occupied: r.icuOccupied, total: r.icuBeds, color: 'var(--color-danger)' },
               { label: t('dashboard.bedMaternity'), occupied: r.maternityOccupied, total: r.maternityBeds, color: '#EC4899' },
               { label: t('dashboard.bedPediatric'), occupied: r.pediatricOccupied, total: r.pediatricBeds, color: 'var(--color-brand-500)' },
@@ -446,11 +441,9 @@ export default function DataEntryDashboard() {
         // matching the done→series1 default for everything else.
         chartSeriesNames={['High Occupancy', 'Normal']}
         rows={filteredReports.map((r, i): EhrCareDashboardRow => {
-          const id = `${r.date}-${i}`;
-          const isOpen = selectedReport === id;
           const occ = r.totalBeds > 0 ? Math.round((r.occupiedBeds / r.totalBeds) * 100) : 0;
           return {
-            id,
+            id: `${r.date}-${i}`,
             title: r.date,
             subtitle: `${t('dataEntry.inpatientsCount', { count: r.inpatientsTotal })} · ${t('dataEntry.opdCount', { count: r.opdVisitsToday })}`,
             compactMeta: t('dataEntry.bedsCount', { occupied: r.occupiedBeds, total: r.totalBeds }),
@@ -464,8 +457,7 @@ export default function DataEntryDashboard() {
             statusLabel: r.totalBeds > 0 ? `${occ}% occupied` : undefined,
             statusSecondary: occ > 90 ? 'Critical capacity' : occ > 70 ? 'High occupancy' : 'Normal capacity',
             statusTone: occ > 90 ? 'danger' : occ > 70 ? 'warning' : 'done',
-            onClick: () => setSelectedReport(isOpen ? null : id),
-            detail: isOpen ? renderReportDetail(r) : undefined,
+            popupDetail: renderReportDetail(r),
           };
         })}
         metrics={[

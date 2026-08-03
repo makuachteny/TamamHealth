@@ -112,10 +112,14 @@ async function postHandler(request: NextRequest) {
       patientId: body.patientId as string,
       patientName: body.patientName as string,
       hospitalNumber: body.hospitalNumber as string | undefined,
-      airway: (body.airway as TriageDoc['airway']) || 'clear',
-      breathing: (body.breathing as TriageDoc['breathing']) || 'normal',
-      circulation: (body.circulation as TriageDoc['circulation']) || 'normal',
-      consciousness: (body.consciousness as TriageDoc['consciousness']) || 'alert',
+      // A missing ABCC dimension is recorded as exactly that — defaulting to a
+      // normal-looking value would fabricate a finding no clinician made
+      // (KAN-100).
+      airway: (body.airway as TriageDoc['airway']) || 'not_assessed',
+      breathing: (body.breathing as TriageDoc['breathing']) || 'not_assessed',
+      circulation: (body.circulation as TriageDoc['circulation']) || 'not_assessed',
+      consciousness: (body.consciousness as TriageDoc['consciousness']) || 'not_assessed',
+      assessmentSource: body.assessmentSource === 'clerical_checkin' ? 'clerical_checkin' : 'clinician',
       priority: body.priority as TriagePriority,
       temperature: body.temperature as string | undefined,
       pulse: body.pulse as string | undefined,

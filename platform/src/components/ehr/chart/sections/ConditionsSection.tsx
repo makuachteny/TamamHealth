@@ -2,11 +2,14 @@
 
 /**
  * Conditions tab content — OpenMRS-style table (Condition / Date of onset /
- * Status) with a "Show: Active/Inactive/All" filter. Reuses the SAME
- * `useProblems` hook + `create()` service call ProblemList uses internally,
- * and the SAME ICD-11 coded-search add pattern (CodedSearchField +
- * COMMON_ICD11_CODES) — no new data layer. The full ProblemList widget still
- * lives on the Facesheet view; this tab is the OpenMRS-shaped read+add view.
+ * Status). Reuses the SAME `useProblems` hook and service calls ProblemList
+ * uses internally, and the SAME ICD-11 coded-search add pattern
+ * (CodedSearchField + COMMON_ICD11_CODES) — no new data layer.
+ *
+ * Every condition is listed: the old "Show: Active/Inactive/All" filter
+ * defaulted to Active, which quietly hid resolved conditions from a list short
+ * enough to read whole. Status is set from the row instead, so retiring a
+ * condition is one click where it is written rather than a trip elsewhere.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -21,14 +24,14 @@ import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
 import { formatDate , humanizeStatus } from '@/lib/format-utils';
 import type { ProblemStatus } from '@/lib/db-types';
 
-type ShowFilter = 'active' | 'inactive' | 'all';
-
 const STATUS_BADGE: Record<ProblemStatus, string> = {
   active: 'omrs-panel-badge omrs-panel-badge--active',
   chronic: 'omrs-panel-badge omrs-panel-badge--active',
   resolved: 'omrs-panel-badge omrs-panel-badge--done',
   inactive: 'omrs-panel-badge omrs-panel-badge--muted',
 };
+
+const STATUS_OPTIONS: ProblemStatus[] = ['active', 'chronic', 'inactive', 'resolved'];
 
 interface ConditionsSectionProps {
   patientId: string;
@@ -42,9 +45,10 @@ interface ConditionsSectionProps {
 export default function ConditionsSection({ patientId, patientName, autoOpenAdd, onAutoOpenHandled }: ConditionsSectionProps) {
   const { currentUser } = useAuth();
   const { showToast } = useToast();
-  const { problems, create } = useProblems(patientId);
-  const [show, setShow] = useState<ShowFilter>('active');
+  const { problems, create, setStatus } = useProblems(patientId);
   const [adding, setAdding] = useState(false);
+  /** The row mid-save, so a slow write can't be fired twice. */
+  const [savingStatus, setSavingStatus] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [pickedCode, setPickedCode] = useState<{ code: string; title: string; chapter: string } | null>(null);
   const [onsetDate, setOnsetDate] = useState('');
@@ -59,11 +63,27 @@ export default function ConditionsSection({ patientId, patientName, autoOpenAdd,
 
   const icdOptions = useMemo(() => COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title, meta: c.chapter, keywords: c.keywords })), []);
 
-  const filtered = useMemo(() => {
-    if (show === 'active') return problems.filter(p => p.status === 'active' || p.status === 'chronic');
-    if (show === 'inactive') return problems.filter(p => p.status === 'resolved' || p.status === 'inactive');
-    return problems;
-  }, [problems, show]);
+  // Open problems first — a resolved condition is history, not the day's work —
+  // then most recent onset within each group.
+  const ordered = useMemo(() => {
+    const openFirst = (s: ProblemStatus) => (s === 'active' || s === 'chronic' ? 0 : 1);
+    return [...problems].sort((a, b) =>
+      openFirst(a.status) - openFirst(b.status) ||
+      (b.onsetDate || '').localeCompare(a.onsetDate || ''));
+  }, [problems]);
+
+  const handleStatusChange = async (id: string, status: ProblemStatus) => {
+    setSavingStatus(id);
+    try {
+      await setStatus(id, status);
+      showToast(`Condition marked ${humanizeStatus(status).toLowerCase()}`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Could not update this condition. Please try again.', 'error');
+    } finally {
+      setSavingStatus(null);
+    }
+  };
 
   const resetForm = () => { setSearch(''); setPickedCode(null); setOnsetDate(''); setAdding(false); };
 
@@ -94,24 +114,21 @@ export default function ConditionsSection({ patientId, patientName, autoOpenAdd,
     }
   };
 
-  const filterSlot = (
-    <label className="omrs-section-filter">
-      Show:
-      <select value={show} onChange={e => setShow(e.target.value as ShowFilter)}>
-        <option value="active">Active</option>
-        <option value="inactive">Inactive</option>
-        <option value="all">All</option>
-      </select>
-    </label>
-  );
-
   return (
     <>
-      <ChartSection title="Problems" addLabel="Add" onAdd={() => setAdding(true)} filterSlot={filterSlot}>
-        {filtered.length === 0 ? (
+      <ChartSection title="Conditions" addLabel="Add" onAdd={() => setAdding(true)}>
+        {ordered.length === 0 ? (
           <OmrsEmptyState itemLabel="conditions" actionLabel="Record conditions" onAction={() => setAdding(true)} />
         ) : (
-          <table className="omrs-table">
+          <table className="omrs-table omrs-table--conditions">
+            {/* Explicit widths: the three columns used to be sized by their
+                content, which left the condition name hard against a date and
+                the status stranded off at the right edge. */}
+            <colgroup>
+              <col style={{ width: '50%' }} />
+              <col style={{ width: '25%' }} />
+              <col style={{ width: '25%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>Condition</th>
@@ -120,11 +137,27 @@ export default function ConditionsSection({ patientId, patientName, autoOpenAdd,
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
+              {ordered.map(p => (
                 <tr key={p._id}>
                   <td style={{ fontWeight: 600 }}>{p.name}{p.icd11Code ? <span style={{ color: 'var(--ehr-muted, #8395A8)', fontWeight: 400 }}> · {p.icd11Code}</span> : null}</td>
                   <td>{p.onsetDate ? formatDate(p.onsetDate) : '—'}</td>
-                  <td><span className={STATUS_BADGE[p.status]}>{humanizeStatus(p.status)}</span></td>
+                  <td>
+                    {/* The badge IS the control: a condition is retired from the
+                        row that records it, not from a separate edit screen. */}
+                    <span className={`omrs-status-picker ${STATUS_BADGE[p.status]}`}>
+                      {humanizeStatus(p.status)}
+                      <select
+                        aria-label={`Status for ${p.name}`}
+                        value={p.status}
+                        disabled={savingStatus === p._id}
+                        onChange={e => handleStatusChange(p._id, e.target.value as ProblemStatus)}
+                      >
+                        {STATUS_OPTIONS.map(option => (
+                          <option key={option} value={option}>{humanizeStatus(option)}</option>
+                        ))}
+                      </select>
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

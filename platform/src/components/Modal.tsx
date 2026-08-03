@@ -19,6 +19,15 @@ interface ModalProps {
   disableBackdropClose?: boolean;
   /** id of the element labelling the dialog (for a11y). */
   labelledBy?: string;
+  /**
+   * Keeps the panel this far clear of the top of the viewport — a number of px
+   * or any CSS length, e.g. `var(--app-overlay-top-inset)` to start it below
+   * the app's top rail on the shells that have one. The backdrop still covers
+   * the whole screen, so the modal
+   * stays modal; only the panel moves down, and it centres in what is left.
+   * Default 0 (the panel uses the full viewport height).
+   */
+  topOffset?: number | string;
 }
 
 /**
@@ -40,8 +49,11 @@ export default function Modal({
   variant = 'dialog',
   disableBackdropClose = false,
   labelledBy,
+  topOffset = 0,
 }: ModalProps) {
   const isDrawer = variant === 'drawer';
+  // A drawer is flush to the screen edges, so an offset never applies to one.
+  const offset = isDrawer ? '0px' : typeof topOffset === 'number' ? `${topOffset}px` : topOffset;
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -78,7 +90,7 @@ export default function Modal({
         display: 'flex',
         alignItems: isDrawer ? 'stretch' : align === 'top' ? 'flex-start' : 'center',
         justifyContent: isDrawer ? 'flex-end' : 'center',
-        padding: isDrawer ? 0 : 16,
+        padding: isDrawer ? 0 : `calc(16px + ${offset}) 16px 16px`,
         background: 'rgba(15, 31, 29, 0.70)',
         animation: 'modalFadeIn 0.2s ease-out',
         overflowY: isDrawer ? 'hidden' : 'auto',
@@ -94,7 +106,7 @@ export default function Modal({
         style={{
           width: '100%',
           maxWidth: width,
-          maxHeight: isDrawer ? '100vh' : 'calc(100vh - 32px)',
+          maxHeight: isDrawer ? '100vh' : `calc(100vh - 32px - ${offset})`,
           height: isDrawer ? '100vh' : undefined,
           display: 'flex',
           flexDirection: 'column',

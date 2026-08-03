@@ -135,6 +135,18 @@ describe('tour step anchors', () => {
           problems.push(`${role}/${step.id}: ${step.route} does not render EhrCareDashboard`);
         } else if (m[1] === 'station-body' && !body.includes('</EhrCareDashboard>')) {
           problems.push(`${role}/${step.id}: ${step.route} self-closes the shell, so station-body never renders`);
+        } else if (m[1] === 'station-actions') {
+          // Second trap, same shape as the first: the shell promotes actions[0]
+          // into the primary slot and renders only the REST inside
+          // station-actions. A page passing a single action therefore leaves
+          // station-actions in the DOM but empty and zero-sized, so a step
+          // anchored there attaches to nothing you can see. Point such a step
+          // at station-primary-action instead.
+          const block = src.match(/actions=\{\[([\s\S]*?)\]\}/);
+          const count = block ? (block[1].match(/\blabel:/g) || []).length : 0;
+          if (count <= 1) {
+            problems.push(`${role}/${step.id}: ${step.route} passes ${count} action(s), so station-actions renders empty`);
+          }
         }
       }
     }
@@ -147,7 +159,7 @@ describe('tour step anchors', () => {
     // the build for a stray attribute — it only covers the ones this file
     // deliberately added to the shared shell, which are the ones a reader is
     // most likely to mistake for a styling hook and "clean up".
-    const shellAnchors = ['station-tabs', 'station-body', 'station-queue', 'rail-search', 'station-actions', 'side-cards'];
+    const shellAnchors = ['station-tabs', 'station-body', 'station-queue', 'rail-search', 'station-actions', 'side-cards', 'station-primary-action'];
     const shell = readFileSync(join(SRC, 'components/ehr/EhrCareDashboard.tsx'), 'utf8');
     for (const a of shellAnchors) {
       expect(shell).toContain(`data-tour="${a}"`);

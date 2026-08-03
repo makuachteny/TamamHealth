@@ -12,8 +12,8 @@ import type { ReactNode } from 'react';
 import { Icon as DuotoneIcon } from '@/components/icons';
 import { Stethoscope } from '@/components/icons/lucide';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { useApp } from '@/lib/context';
-import { patientFullName, patientInitials, patientAgeLabel, avatarTint } from '@/lib/patient-utils';
+import { isNoAllergySentinel } from '@/lib/clinical-roles';
+import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
 import type { PatientDoc } from '@/lib/db-types';
 
 /** dd-MMM-yyyy, e.g. "17-Jun-1990" — the OpenMRS convention, distinct from
@@ -29,9 +29,7 @@ function formatDobOmrs(iso?: string | null): string {
 
 interface ChartHeaderProps {
   patient: PatientDoc;
-  triageBadge?: ReactNode;
   pregnancyPill?: ReactNode;
-  hasActiveVisit: boolean;
   patientBalance: number;
   onCollectPayment: () => void;
   onMessage: () => void;
@@ -44,11 +42,64 @@ interface ChartHeaderProps {
   onEdit: () => void;
   onStickyNote: () => void;
   onAssignProvider?: () => void;
+  /** Open the Allergies section. The banner names the allergens; the section
+   *  carries severity, reaction and comments. */
+  onShowAllergies?: () => void;
+}
+
+/** Active allergens for the banner, from the same source AllergiesSection and
+ *  AllergyList read: `structuredAllergies` when the patient has been migrated,
+ *  the legacy string list otherwise. `undefined` means the record has never
+ *  been assessed, which is NOT the same claim as "no known allergies" — the
+ *  banner says so rather than implying the patient is safe. */
+function activeAllergens(patient: PatientDoc): string[] | undefined {
+  if (patient.structuredAllergies !== undefined) {
+    return patient.structuredAllergies.filter(a => a.status === 'active').map(a => a.substance);
+  }
+  if (!patient.allergies) return undefined;
+  return patient.allergies.filter(a => a && !isNoAllergySentinel(a));
+}
+
+/** The banner's allergy line. Three states, deliberately distinct: allergies
+ *  on record, an assessment that found none, and no assessment at all. */
+function AllergyBanner({ allergens, onShow }: { allergens?: string[]; onShow?: () => void }) {
+  const has = !!allergens && allergens.length > 0;
+
+  // Every allergen, not a truncated head with a "+N more" — the one the
+  // clinician needs is as likely to be fourth as first, and a count is not
+  // something you can check a prescription against.
+  const label = has
+    ? allergens!.join(', ')
+    : allergens === undefined
+      ? 'Not recorded'
+      : 'No known allergies';
+
+  const cls = [
+    'omrs-allergy-banner',
+    has ? 'omrs-allergy-banner--alert' : allergens === undefined ? 'omrs-allergy-banner--unknown' : '',
+    onShow ? 'omrs-allergy-banner--link' : '',
+  ].filter(Boolean).join(' ');
+
+  const body = (
+    <>
+      <DuotoneIcon name={has ? 'alert' : 'shield'} size={14} />
+      <span className="omrs-allergy-label">Allergies</span>
+      <span className="omrs-allergy-value">{label}</span>
+    </>
+  );
+
+  if (!onShow) return <div className={cls}>{body}</div>;
+  return (
+    <button type="button" className={cls} onClick={onShow}>
+      {body}
+    </button>
+  );
 }
 
 export default function ChartHeader({
-  patient, triageBadge, pregnancyPill, hasActiveVisit, patientBalance,
+  patient, pregnancyPill, patientBalance,
   onCollectPayment, onMessage, onPrint, onPatientEd, onNote, onScripts, onOrders, onExchange, onEdit, onStickyNote, onAssignProvider,
+  onShowAllergies,
 }: ChartHeaderProps) {
   const [showMore, setShowMore] = useState(true);
   // Secondary actions live behind one ⋯ menu — the header previously stacked
@@ -63,9 +114,7 @@ export default function ChartHeader({
     canSendMessages, canViewClinical, canPrescribe, canDispense,
     canOrderLabs, canEnterLabResults, canManageReferrals, canRegisterPatients,
   } = usePermissions();
-  const { isOnline, syncPaused, syncStatus, lastSync } = useApp();
-  const syncLabel = syncPaused ? 'Sync paused' : !isOnline ? 'Offline' : syncStatus?.state === 'error' ? 'Sync error' : syncStatus?.state === 'syncing' ? 'Syncing' : 'Synced';
-  const syncColor = syncPaused || !isOnline || syncStatus?.state === 'error' ? 'var(--color-warning)' : syncStatus?.state === 'syncing' ? 'var(--accent-primary)' : 'var(--color-success)';
+  const allergens = activeAllergens(patient);
 
   const initials = patientInitials(patient);
   const photoUrl = (patient as { photoUrl?: string }).photoUrl;
@@ -75,11 +124,11 @@ export default function ChartHeader({
 
   return (
     <div className="omrs-header">
-      <div
-        className="omrs-avatar"
-        style={avatarTint(patientFullName(patient))}
-        aria-hidden
-      >
+      {/* No tint plate here: the chart's surfaces are white, so the disc is an
+          outline and the initials carry the identification cue on their own.
+          `avatarTint` still colours avatars in the lists, where a wall of rows
+          needs the extra separation. */}
+      <div className="omrs-avatar" aria-hidden>
         {photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={photoUrl} alt="" />
@@ -91,39 +140,46 @@ export default function ChartHeader({
       <div className="omrs-header-body">
         <div className="omrs-header-name-row">
           <h1 className="omrs-header-name">{patientFullName(patient)}</h1>
-          {genderSymbol && <span className={`omrs-gender-symbol ${genderClass}`} aria-label={patient.gender}>{genderSymbol}</span>}
-          {triageBadge}
-          {pregnancyPill}
-          {hasActiveVisit && (
-            <>
-              <span className="omrs-chip omrs-chip--active-visit">Active Visit</span>
-              <span className="omrs-chip omrs-chip--ontime">On time</span>
-            </>
+          {genderSymbol && (
+            <span className={`omrs-gender ${genderClass}`}>
+              <span className="omrs-gender-symbol" aria-hidden>{genderSymbol}</span>
+              {patient.gender}
+            </span>
           )}
+          {pregnancyPill}
+          {/* Top line, beside the name: allergies are the first thing read
+              about a patient and the one item here that changes what is safe
+              to prescribe; the balance rides with them so the decision-changing
+              facts are one group. */}
+          <AllergyBanner allergens={allergens} onShow={onShowAllergies} />
+          <button
+            type="button"
+            className={patientBalance > 0 ? 'omrs-header-balance omrs-header-balance--due' : 'omrs-header-balance'}
+            onClick={onCollectPayment}
+          >
+            <DuotoneIcon name="dollarSign" size={13} />
+            <span className="omrs-allergy-label">Balance</span>
+            <span>${patientBalance.toFixed(2)} due</span>
+          </button>
         </div>
         <div className="omrs-header-meta">
           {patientAgeLabel(patient)} &middot; {formatDobOmrs(patient.dateOfBirth)} &middot; Facility ID: {patientIdDisplay}
-          <span className="omrs-sync-chip" title={lastSync ? `Last sync ${new Date(lastSync).toLocaleString()}` : 'No completed sync recorded'} style={{ color: syncColor }}>
-            <span className="omrs-sync-dot" style={{ background: syncColor }} /> {syncLabel}
-          </span>
         </div>
 
         {showMore && (
-          <div className="omrs-header-more">
+          <div className="omrs-header-details">
             <span>Phone: <strong>{patient.phone || '—'}</strong></span>
-            <span>Caregiver: <strong>{patient.nokName || '—'}</strong></span>
             <span>Location: <strong>{patient.state || '—'}{patient.county ? `, ${patient.county}` : ''}</strong></span>
-            <button type="button" className="omrs-vitals-link" onClick={onCollectPayment}>
-              Balance: <strong style={{ color: patientBalance > 0 ? 'var(--color-danger)' : 'inherit' }}>${patientBalance.toFixed(2)} due</strong>
-            </button>
           </div>
         )}
       </div>
 
-      <div className="omrs-header-actions no-print">
-        <button type="button" className="omrs-header-actions-btn omrs-link" onClick={() => setShowMore(v => !v)}>
-          {showMore ? 'Show less ▲' : 'Show more ▼'}
-        </button>
+      {/* Right column, stacked and right-aligned like the O3 banner: the
+          actions on the first line, the show-more toggle beneath them on its
+          own. It used to sit inline at the head of the button row, which put a
+          text link and five bordered buttons on one baseline. */}
+      <div className="omrs-header-aside no-print">
+      <div className="omrs-header-actions">
 
         {/* Primary clinical actions — one clear verb each. */}
         {canViewClinical && (
@@ -188,6 +244,12 @@ export default function ChartHeader({
             </>
           )}
         </div>
+      </div>
+
+        <button type="button" className="omrs-header-showmore" onClick={() => setShowMore(v => !v)}>
+          {showMore ? 'Show less' : 'Show more'}
+          <span className="omrs-header-showmore-caret" aria-hidden>{showMore ? '⌃' : '⌄'}</span>
+        </button>
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import { addPatientDocument } from '@/lib/services/patient-document-service';
 import {
-  Upload, CheckCircle2, FileText, BarChart3, TrendingUp,
+  Upload, CheckCircle2, FileText, BarChart3, TrendingUp, Play, RotateCcw,
 } from '@/components/icons/lucide';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
@@ -185,7 +185,7 @@ export default function RadiologyDashboard() {
       ...(IS_DEMO ? SAMPLE_STUDIES : []).map(s => {
         const override = submittedFindings[s.id];
         const statusOverride = studyStatusOverrides[s.id];
-        const base = { ...s, orderedAt: undefined as string | undefined, completedAt: undefined as string | undefined, isReal: false as const };
+        const base = { ...s, patientId: undefined as string | undefined, orderedAt: undefined as string | undefined, completedAt: undefined as string | undefined, isReal: false as const };
         return override
           ? { ...base, status: 'completed', findings: override }
           : { ...base, status: statusOverride || s.status };
@@ -269,68 +269,86 @@ export default function RadiologyDashboard() {
     const isPending = study.status === 'pending';
     const isProcessing = study.status === 'in_progress';
     const isComplete = study.status === 'completed';
-    const steps = [
-      { label: 'Imaging Order Received', note: study.orderedBy ? `${t('radiology.orderedBy')}: ${study.orderedBy}` : study.notes || study.bodyPart, done: true },
-      { label: 'Protocol And Patient Scheduled', note: `${study.modality} · ${study.bodyPart}`, done: true, current: isPending },
-      { label: 'Image Acquisition In Progress', note: 'Perform the study using the correct protocol and patient identifiers.', done: isProcessing || isComplete, current: isProcessing },
-      { label: 'Image Quality Checked', note: (attachments[study.id] || []).length ? `${(attachments[study.id] || []).length} image(s) attached` : 'Attach images or confirm acquisition quality.', done: (attachments[study.id] || []).length > 0 || isComplete },
-      { label: 'Radiologist Interpretation Entered', note: study.findings || 'Waiting for findings.', done: isComplete },
-      { label: 'Report Verified And Sent', note: isComplete ? 'Report available to the clinical team.' : 'Pending verification.', done: isComplete },
-      { label: 'Complete', note: isComplete ? 'Imaging order closed.' : 'Close after verified reporting.', done: isComplete },
-    ];
+    const attachmentCount = (attachments[study.id] || []).length;
+    const canUndo = !!submittedFindings[study.id];
+    // Replaces the old 7-step checklist strip: one line of plain-language
+    // progress instead of a receipt of every stage the order has moved through.
+    const reportState = isComplete
+      ? 'Findings recorded — report complete.'
+      : isProcessing
+        ? (attachmentCount > 0 ? `${attachmentCount} image(s) attached — awaiting interpretation.` : 'Acquisition in progress.')
+        : 'Awaiting image acquisition.';
 
     return (
-    <div className="space-y-4">
-      <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('radiology.modality')}</span><strong>{study.modality}</strong></div>
-          <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Body part</span><strong>{study.bodyPart}</strong></div>
-          <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Status</span><strong>{radiologyStatusLabel(study.status)}</strong></div>
-          <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Priority</span><strong>{radiologyPriorityLabel(study.priority)}</strong></div>
+    <div className="space-y-3">
+      {/* First line: the study itself, with the actions this radiographer can
+          actually take right now as icon buttons. */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="block font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--text-muted)' }}>Study</span>
+          <strong className="text-sm" style={{ color: 'var(--text-primary)' }}>{study.modality} — {study.bodyPart}</strong>
+          {study.orderedBy && (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('radiology.orderedBy')}: {study.orderedBy}</p>
+          )}
+        </div>
+        <div className="ehr-visit-pop-actions">
+          {isPending && (
+            <button
+              type="button"
+              className="ehr-visit-pop-icon is-primary"
+              onClick={() => handleStartStudy(study.id)}
+              aria-label="Start study"
+              title="Start study"
+            >
+              <Play className="w-4 h-4" aria-hidden />
+            </button>
+          )}
+          {!isComplete && (
+            <button
+              type="button"
+              className="ehr-visit-pop-icon"
+              onClick={(e) => { e.stopPropagation(); openAttachDialog(study.id); }}
+              aria-label={t('radiology.attachImage')}
+              title={t('radiology.attachImageTitle')}
+            >
+              <Upload className="w-4 h-4" aria-hidden />
+            </button>
+          )}
+          {canUndo && (
+            <button
+              type="button"
+              className="ehr-visit-pop-icon"
+              onClick={(e) => { e.stopPropagation(); handleUndoReport(study.id); }}
+              aria-label={t('action.undo')}
+              title={t('action.undo')}
+            >
+              <RotateCcw className="w-4 h-4" aria-hidden />
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="space-y-2">
-        {steps.map((step, index) => (
-          <div key={step.label} className="flex items-start gap-3 rounded-xl p-3" style={{
-            background: step.current ? 'var(--bg-card)' : 'var(--overlay-subtle)',
-            border: `1px solid ${step.current ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-          }}>
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{
-              background: step.done ? 'var(--color-success)' : step.current ? 'var(--accent-primary)' : 'var(--overlay-medium)',
-              color: step.done || step.current ? '#fff' : 'var(--text-muted)',
-            }}>
-              {step.done ? <CheckCircle2 className="w-3.5 h-3.5" /> : index + 1}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{step.note}</p>
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+          <span className="block font-semibold uppercase tracking-wider text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Priority</span>
+          <strong style={{ color: 'var(--text-primary)' }}>{radiologyPriorityLabel(study.priority)}</strong>
+        </div>
+        <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+          <span className="block font-semibold uppercase tracking-wider text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Report state</span>
+          <p style={{ color: 'var(--text-primary)' }}>{reportState}</p>
+        </div>
       </div>
 
-      <div style={{ padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.orderedBy')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.orderedBy}</p></div>
-        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.modality')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.modality}</p></div>
-      </div>
-      <div className="mb-3"><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.clinicalNotes')}</span><p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{study.notes}</p></div>
+      {study.notes && (
+        <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+          <span className="block font-semibold uppercase tracking-wider text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('radiology.clinicalNotes')}</span>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{study.notes}</p>
+        </div>
+      )}
 
       {study.findings && (
-        <div className="mb-3 p-3 rounded-lg" style={{ background: '#05966908', border: '1px solid #05966920' }}>
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
-            {submittedFindings[study.id] && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleUndoReport(study.id); }}
-                className="text-[10px] font-semibold underline"
-                style={{ color: ACCENT }}
-              >
-                {t('action.undo')}
-              </button>
-            )}
-          </div>
+        <div className="p-3 rounded-lg" style={{ background: '#05966908', border: '1px solid #05966920' }}>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
           <p className="text-xs mt-1" style={{ color: 'var(--text-primary)' }}>{study.findings}</p>
         </div>
       )}
@@ -342,41 +360,26 @@ export default function RadiologyDashboard() {
             placeholder={t('radiology.findingsPlaceholder')}
             className="w-full p-3 rounded-lg text-xs" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', resize: 'vertical' }}
           />
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => handleSubmitReport(study.id)}
-              disabled={!findings.trim()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold"
-              style={{
-                background: findings.trim() ? ACCENT : 'var(--overlay-subtle)',
-                color: findings.trim() ? '#fff' : 'var(--text-muted)',
-                border: 'none',
-                cursor: findings.trim() ? 'pointer' : 'not-allowed',
-                opacity: findings.trim() ? 1 : 0.7,
-              }}
-            >
-              <CheckCircle2 className="w-3 h-3" /> {t('radiology.submitReport')}
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); openAttachDialog(study.id); }}
-              title={t('radiology.attachImageTitle')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold"
-              style={{
-                background: 'var(--bg-card-solid)',
-                color: 'var(--text-secondary)',
-                border: '1px solid var(--border-medium)',
-                cursor: 'pointer',
-              }}
-            >
-              <Upload className="w-3 h-3" /> {t('radiology.attachImage')}
-            </button>
-          </div>
+          <button
+            onClick={() => handleSubmitReport(study.id)}
+            disabled={!findings.trim()}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold mt-2"
+            style={{
+              background: findings.trim() ? ACCENT : 'var(--overlay-subtle)',
+              color: findings.trim() ? '#fff' : 'var(--text-muted)',
+              border: 'none',
+              cursor: findings.trim() ? 'pointer' : 'not-allowed',
+              opacity: findings.trim() ? 1 : 0.7,
+            }}
+          >
+            <CheckCircle2 className="w-3 h-3" /> {t('radiology.submitReport')}
+          </button>
         </div>
       )}
 
       {/* Attached imaging files */}
-      {(attachments[study.id] || []).length > 0 && (
-        <div className="mt-3">
+      {attachmentCount > 0 && (
+        <div>
           <span className="text-[9px] font-bold uppercase block mb-1.5" style={{ color: 'var(--text-muted)' }}>
             {t('radiology.attachedImages')}
           </span>
@@ -398,13 +401,6 @@ export default function RadiologyDashboard() {
             ))}
           </div>
         </div>
-      )}
-      </div>
-
-      {isPending && (
-        <button type="button" className="btn btn-primary w-full" onClick={() => handleStartStudy(study.id)}>
-          Start study
-        </button>
       )}
     </div>
     );
@@ -469,6 +465,7 @@ export default function RadiologyDashboard() {
           return {
             id: study.id,
             title: study.patientName,
+            patientId: study.patientId,
             subtitle: `${study.modality} · ${study.bodyPart}`,
             compactMeta: study.date,
             date: study.date,

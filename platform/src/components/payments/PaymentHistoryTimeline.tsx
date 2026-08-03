@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import '@/components/billing/billing.css';
 
 interface PaymentHistoryTimelineProps {
   patientId: string;
@@ -36,40 +37,45 @@ export default function PaymentHistoryTimeline({ patientId, limit = 20 }: Paymen
     })();
   }, [patientId, limit]);
 
-  if (loading) return <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>{t('payments.loadingHistory')}</div>;
-  if (entries.length === 0) return <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>{t('payments.noFinancialHistory')}</div>;
+  // Restyled onto the billing module's bl-table — this timeline only ever
+  // renders inside BillingTab's "Transaction Ledger" bl-card, so it should
+  // read as one more row-striped table, not a bespoke card-free list.
+  if (loading) return <div className="bl-muted" style={{ padding: 16, fontSize: 13 }}>{t('payments.loadingHistory')}</div>;
+  if (entries.length === 0) {
+    return (
+      <div className="bl-empty">
+        <p>{t('payments.noFinancialHistory')}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {entries.map((entry, i) => {
-        const isCredit = entry.amount < 0;
-        const color = entry.entryType === 'refund' ? 'var(--warning)' : isCredit ? 'var(--success)' : 'var(--text-primary)';
-        const date = new Date(entry.createdAt);
-        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    <div className="bl-table-wrap">
+      <table className="bl-table">
+        <thead>
+          <tr><th>Entry</th><th>Date</th><th className="bl-right">Amount</th><th className="bl-right">Balance</th></tr>
+        </thead>
+        <tbody>
+          {entries.map(entry => {
+            const isCredit = entry.amount < 0;
+            const valueClass = entry.entryType === 'refund' ? '' : isCredit ? 'bl-stat-value--good' : '';
+            const date = new Date(entry.createdAt);
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-        return (
-          <div key={entry._id} style={{
-            display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0',
-            borderBottom: i < entries.length - 1 ? '1px solid var(--border-medium)' : 'none',
-          }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                {entry.description}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('payments.dateAtTime', { date: dateStr, time: timeStr })}</div>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color }}>
-                {isCredit ? '-' : '+'}{Math.abs(entry.amount).toLocaleString()} {entry.currency}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                {t('payments.balanceShort', { amount: entry.runningBalance.toLocaleString() })}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+            return (
+              <tr key={entry._id}>
+                <td>{entry.description}</td>
+                <td className="bl-muted" style={{ whiteSpace: 'nowrap' }}>{t('payments.dateAtTime', { date: dateStr, time: timeStr })}</td>
+                <td className={`bl-num bl-right ${valueClass}`}>
+                  {isCredit ? '-' : '+'}{Math.abs(entry.amount).toLocaleString()} {entry.currency}
+                </td>
+                <td className="bl-num bl-right bl-muted">{entry.runningBalance.toLocaleString()}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
