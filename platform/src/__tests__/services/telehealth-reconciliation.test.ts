@@ -183,7 +183,10 @@ describe('reconcileTelehealth (KAN-143)', () => {
 
   it('cancels a live session whose appointment was cancelled', async () => {
     const s = await createSession(session({ appointmentId: 'appt-1' }));
-    const report = await reconcileTelehealth([appointment({ status: 'cancelled' })]);
+    // Pin `now` just after the slot so expireStaleSessions does not treat a
+    // late-in-the-day CI run as an abandoned/no-show before this check runs.
+    const now = Date.parse(`${s.scheduledDate}T${s.scheduledTime}`) + 60_000;
+    const report = await reconcileTelehealth([appointment({ status: 'cancelled' })], { now });
 
     expect(report.findings.map(f => f.kind)).toContain('cancelled_appointment_live_session');
     expect((await getSessionById(s._id))?.status).toBe('cancelled');

@@ -237,6 +237,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Liveness/readiness probe — intentionally unauthenticated (see health route).
+  if (pathname === '/api/health') {
+    return NextResponse.next();
+  }
+
   // Terminology registry — shared CodeSystems / ValueSets. Reference data,
   // no PHI; public so external tooling can bind forms to our vocabularies.
   if (pathname.startsWith('/api/terminology/')) {

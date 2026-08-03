@@ -193,7 +193,8 @@ export default function FrontDeskDashboardPage() {
   const todaysAppointments = useMemo(() =>
     appointments
       .filter(a => a.appointmentDate === today && a.status !== 'cancelled')
-      .sort((a, b) => a.appointmentTime.localeCompare(b.appointmentTime)),
+      // appointmentTime can be missing on seeded/synced rows — guard before sort
+      .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || '')),
     [appointments, today]
   );
 
@@ -398,7 +399,7 @@ export default function FrontDeskDashboardPage() {
     // Order by the queue-stage service's acuity+wait score (desc) — highest
     // priority, longest-waiting patients surface first. Same-score rows keep
     // a stable time-based tiebreak.
-    items.sort((a, b) => (b.score - a.score) || a.time.localeCompare(b.time));
+    items.sort((a, b) => (b.score - a.score) || (a.time || '').localeCompare(b.time || ''));
 
     return items;
   }, [currentUser?.hospitalName, encounters, patients, queueNowMs, today, todaysAppointments, triages]);
@@ -418,8 +419,8 @@ export default function FrontDeskDashboardPage() {
     if (queueSort !== 'priority') {
       const statusOrder: Record<string, number> = { 'WAITING': 0, 'IN CONSULT': 1, 'DONE': 2, 'ADMITTED': 3, 'REFERRED': 4 };
       items = [...items].sort((a, b) => {
-        if (queueSort === 'name') return a.patientName.localeCompare(b.patientName);
-        if (queueSort === 'time') return a.time.localeCompare(b.time);
+        if (queueSort === 'name') return (a.patientName || '').localeCompare(b.patientName || '');
+        if (queueSort === 'time') return (a.time || '').localeCompare(b.time || '');
         return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
       });
     }
