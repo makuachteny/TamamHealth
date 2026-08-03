@@ -12,6 +12,7 @@ import { teardownTestDBs } from '../helpers/test-db';
 import { getMCHAnalytics } from '@/lib/services/mch-analytics-service';
 import { ancDB, birthsDB, deathsDB, immunizationsDB } from '@/lib/db';
 import type { ANCVisitDoc, BirthRegistrationDoc, DeathRegistrationDoc, ImmunizationDoc } from '@/lib/db-types';
+import { todayIsoDate } from '@/lib/date-utils';
 
 const makeANCVisit = (overrides: Partial<ANCVisitDoc> = {}): ANCVisitDoc => {
   uuidCounter++;
@@ -465,27 +466,27 @@ describe('mch-analytics-service', () => {
     await db.put(makeDeath({
       maternalDeath: true,
       ageAtDeath: 17, // <18
-      dateOfDeath: new Date().toISOString().slice(0, 10)
+      dateOfDeath: todayIsoDate()
     }));
     await db.put(makeDeath({
       maternalDeath: true,
       ageAtDeath: 22, // 18-24
-      dateOfDeath: new Date().toISOString().slice(0, 10)
+      dateOfDeath: todayIsoDate()
     }));
     await db.put(makeDeath({
       maternalDeath: true,
       ageAtDeath: 30, // 25-34
-      dateOfDeath: new Date().toISOString().slice(0, 10)
+      dateOfDeath: todayIsoDate()
     }));
     await db.put(makeDeath({
       maternalDeath: true,
       ageAtDeath: 40, // 35-44
-      dateOfDeath: new Date().toISOString().slice(0, 10)
+      dateOfDeath: todayIsoDate()
     }));
     await db.put(makeDeath({
       maternalDeath: true,
       ageAtDeath: 50, // 45+ (this hits line 198)
-      dateOfDeath: new Date().toISOString().slice(0, 10)
+      dateOfDeath: todayIsoDate()
     }));
 
     const analytics = await getMCHAnalytics();
@@ -542,12 +543,12 @@ describe('mch-analytics-service', () => {
     await db.put(makeDeath({
       maternalDeath: true,
       state: 'Central Equatoria',
-      dateOfDeath: new Date().toISOString().slice(0, 10)
+      dateOfDeath: todayIsoDate()
     }));
     await db.put(makeDeath({
       maternalDeath: true,
       state: 'Eastern Equatoria',
-      dateOfDeath: new Date().toISOString().slice(0, 10)
+      dateOfDeath: todayIsoDate()
     }));
 
     const analytics = await getMCHAnalytics();

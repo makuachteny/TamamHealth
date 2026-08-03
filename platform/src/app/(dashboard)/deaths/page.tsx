@@ -14,6 +14,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterBar } from '@/components/filters';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
 import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
+import { todayIsoDate } from '@/lib/date-utils';
 
 export default function DeathsPage() {
   const { t } = useTranslation();
@@ -35,7 +36,7 @@ export default function DeathsPage() {
   const [linkedPatientId, setLinkedPatientId] = useState<string | undefined>(undefined);
   const [form, setForm] = useState({
     deceasedFirstName: '', deceasedSurname: '', deceasedGender: 'Male' as 'Male' | 'Female',
-    dateOfBirth: '', dateOfDeath: new Date().toISOString().slice(0, 10), ageAtDeath: 0,
+    dateOfBirth: '', dateOfDeath: todayIsoDate(), ageAtDeath: 0,
     placeOfDeath: '', facilityId: '', facilityName: '',
     immediateCause: '', immediateICD11: '', antecedentCause1: '', antecedentICD11_1: '',
     antecedentCause2: '', antecedentICD11_2: '', underlyingCause: '', underlyingICD11: '',

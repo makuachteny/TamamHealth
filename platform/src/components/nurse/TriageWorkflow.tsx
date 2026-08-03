@@ -18,6 +18,7 @@ import {
 } from './shared';
 import ListSearch from './ListSearch';
 import RowActionsMenu, { type RowAction } from '@/components/referrals/RowActionsMenu';
+import { isoDateOf, todayIsoDate } from '@/lib/date-utils';
 
 export default function TriageWorkflow({ initialPatientId }: { initialPatientId?: string }) {
   const { t } = useTranslation();
@@ -251,7 +252,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.etatTriageAssessment')}</h3>
           </div>
           <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            {t('nurse.triageHeaderSummary', { today: triageHistory.filter(ti => (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length, red: triageHistory.filter(ti => ti.priority === 'RED' && ti.status === 'pending').length })}
+            {t('nurse.triageHeaderSummary', { today: triageHistory.filter(ti => isoDateOf(ti.triagedAt) === todayIsoDate()).length, red: triageHistory.filter(ti => ti.priority === 'RED' && ti.status === 'pending').length })}
           </span>
         </div>
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">

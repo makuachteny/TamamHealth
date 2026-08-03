@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
+import { toIsoDate } from '@/lib/date-utils';
 
 const billingDB = () => getDB('tamamhealth_billing');
 
@@ -26,7 +27,7 @@ const billingDB = () => getDB('tamamhealth_billing');
  */
 async function generateInvoiceNumber(): Promise<string> {
   const date = new Date();
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+  const dateStr = toIsoDate(date).replace(/-/g, '');
   const db = billingDB();
   const count = (await db.allDocs()).total_rows;
   const seq = String(count + 1).padStart(4, '0');

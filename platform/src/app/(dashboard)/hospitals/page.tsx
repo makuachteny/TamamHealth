@@ -19,6 +19,7 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterSelect } from '@/components/filters';
 import type { HospitalDoc, UserRole } from '@/lib/db-types';
+import { todayIsoDate } from '@/lib/date-utils';
 
 // Roles that can open the per-hospital management dashboard. The route itself
 // gates again (defence-in-depth), but hiding the button for unauthorized
@@ -204,7 +205,7 @@ function HospitalsPageInner() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `facility-performance-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `facility-performance-${todayIsoDate()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }, [filteredHospitals, t]);

@@ -17,6 +17,7 @@ import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { isoDateOf } from '@/lib/date-utils';
 
 export interface RecordMovementInput {
   inventoryId: string;
@@ -136,7 +137,7 @@ export interface ReconciliationSummary {
 
 export async function dailyReconciliation(date: string, scope?: DataScope): Promise<ReconciliationSummary> {
   const all = await getAllMovements(scope);
-  const sameDay = all.filter(m => (m.createdAt || '').slice(0, 10) === date);
+  const sameDay = all.filter(m => isoDateOf(m.createdAt) === date);
   const byMed: ReconciliationSummary['movementsByMedication'] = {};
   for (const m of sameDay) {
     const key = m.inventoryId;

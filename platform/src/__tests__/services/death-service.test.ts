@@ -19,6 +19,7 @@ import {
   getDeathStats,
 } from '@/lib/services/death-service';
 import type { DataScope } from '@/lib/services/data-scope';
+import { todayIsoDate } from '@/lib/date-utils';
 
 type CreateDeathInput = Parameters<typeof createDeath>[0];
 
@@ -27,7 +28,7 @@ const makeDeathData = (overrides: Partial<CreateDeathInput> = {}): CreateDeathIn
   deceasedSurname: 'Garang',
   deceasedGender: 'Male' as const,
   dateOfBirth: '1960-01-01',
-  dateOfDeath: new Date().toISOString().slice(0, 10),
+  dateOfDeath: todayIsoDate(),
   ageAtDeath: 65,
   placeOfDeath: 'Juba Teaching Hospital',
   facilityId: 'hosp-001',

@@ -16,9 +16,10 @@ import type { PatientReminderDoc, ReminderChannel } from '../db-types';
 import { findByType } from './db-query';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { todayIsoDate } from '@/lib/date-utils';
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDate();
 }
 
 /** Queued first (earliest send date), then the rest newest-first. */

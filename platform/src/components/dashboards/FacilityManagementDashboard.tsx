@@ -23,6 +23,7 @@ import {
 } from '@/components/icons/lucide';
 import { formatMoney } from '@/lib/format-utils';
 import type { MessageDoc } from '@/lib/db-types';
+import { todayIsoDate } from '@/lib/date-utils';
 
 const TEAL = '#06B6D4';
 const PURPLE = 'var(--accent-primary)';
@@ -72,7 +73,7 @@ export default function FacilityManagementDashboard() {
       try {
         const { getAllAvailability } = await import('@/lib/services/availability-service');
         const av = await getAllAvailability(scope);
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayIsoDate();
         const now = new Date().toTimeString().slice(0, 5);
         const ids = new Set(
           av.filter(a => a.status !== 'cancelled' && a.date === today && a.startTime <= now && a.endTime >= now)
@@ -128,7 +129,7 @@ export default function FacilityManagementDashboard() {
   }, [patients]);
 
   const upcoming = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
     return appointments
       .filter(a => (a.appointmentDate || '') >= today && a.status !== 'cancelled' && a.status !== 'completed')
       .sort((x, y) => (x.appointmentDate + x.appointmentTime).localeCompare(y.appointmentDate + y.appointmentTime))

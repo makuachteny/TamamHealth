@@ -18,6 +18,7 @@ import {
 import type { PatientDoc, AppointmentDoc, LabResultDoc, MedicalRecordDoc, PrescriptionDoc, ImmunizationDoc } from '@/lib/db-types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { formatMoney } from '@/lib/format-utils';
+import { todayIsoDate } from '@/lib/date-utils';
 
 type Tab = 'overview' | 'appointments' | 'records' | 'lab' | 'prescriptions' | 'radiology' | 'documents' | 'immunizations' | 'messages' | 'chat' | 'billing' | 'insurance' | 'forms' | 'uploads' | 'statements' | 'profile';
 
@@ -657,7 +658,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
   }, [onLogout, patient._id]);
 
   const upcomingApts = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
     return appointments.filter(a => a.appointmentDate >= today && a.status !== 'cancelled' && a.status !== 'no_show');
   }, [appointments]);
 
@@ -1627,7 +1628,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 <Building2 size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.bookingAt', { facility: patient.registrationHospital })}</span>
               </div>
-              <div><label>{t('patientPortal.preferredDate')}</label><input type="date" defaultValue={new Date().toISOString().slice(0, 10)} /></div>
+              <div><label>{t('patientPortal.preferredDate')}</label><input type="date" defaultValue={todayIsoDate()} /></div>
               <div><label>{t('patientPortal.preferredTime')}</label>
                 <select><option>{t('patientPortal.timeMorning')}</option><option>{t('patientPortal.timeAfternoon')}</option><option>{t('patientPortal.timeAnyTime')}</option></select>
               </div>

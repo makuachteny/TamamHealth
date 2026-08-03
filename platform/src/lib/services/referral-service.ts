@@ -8,6 +8,7 @@ import { assembleTransferPackage } from './transfer-service';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
+import { todayIsoDate } from '@/lib/date-utils';
 
 /* istanbul ignore next -- private utility: org ID inference from hospital IDs */
 async function inferOrgId(fromHospitalId?: string, toHospitalId?: string): Promise<string | undefined> {
@@ -248,7 +249,7 @@ export async function recordReferralIntake(
     hospitalId: referral.toHospitalId,
     hospitalName: referral.toHospital,
     orgId: toOrgId,
-    visitDate: referral.referralDate || now.slice(0, 10),
+    visitDate: referral.referralDate || todayIsoDate(),
     consultedAt: now,
     visitType: 'referral',
     providerName: referral.referringDoctor || 'Referral intake',

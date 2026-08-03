@@ -62,6 +62,7 @@ import {
 } from '@/lib/consultation-options';
 import { saveDraft, loadDraft, dropDraft } from '@/lib/draft-storage';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { isoDateOf, todayIsoDate } from '@/lib/date-utils';
 
 // Adapt ICD-11 entries to the {code, name} shape this page consumes.
 const icdCodes = COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title }));
@@ -536,8 +537,8 @@ export default function ConsultationPage() {
   // to link the encounter, warn when triage was skipped, and prefill vitals.
   const todaysTriage = useMemo(() => {
     if (!selectedPatient) return null;
-    const today = new Date().toISOString().slice(0, 10);
-    return triages.find(tr => tr.patientId === selectedPatient && (tr.triagedAt || '').startsWith(today)) || null;
+    const today = todayIsoDate();
+    return triages.find(tr => tr.patientId === selectedPatient && isoDateOf(tr.triagedAt) === today) || null;
   }, [selectedPatient, triages]);
 
   // Prefill vitals from triage once per patient, only while still untouched, so
@@ -1499,10 +1500,10 @@ export default function ConsultationPage() {
       // downstream modules.
       try {
         const { updateTriage } = await import('@/lib/services/triage-service');
-        const todayStr = now.slice(0, 10);
+        const todayStr = todayIsoDate();
         const patientTriage = triages.find(t =>
           t.patientId === selectedPatient &&
-          (t.triagedAt || '').startsWith(todayStr) &&
+          isoDateOf(t.triagedAt) === todayStr &&
           (t.status === 'pending' || t.status === 'seen')
         );
         if (patientTriage) {

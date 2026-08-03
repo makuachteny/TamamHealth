@@ -12,6 +12,7 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { enrollFingerprint } from '@/lib/services/fingerprint-service';
 import { isValidPhone, isValidNationalId, normalizePhone, normalizeNationalId } from '@/lib/field-formats';
+import { todayIsoDate } from '@/lib/date-utils';
 
 interface PatientRegistrationFormProps {
   embedded?: boolean;
@@ -366,7 +367,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                   </div>
                   <div>
                     <label htmlFor="pt-dob">{t('patientNew.dateOfBirth')} {!form.estimatedAge && '*'}</label>
-                    <input id="pt-dob" type="date" max={new Date().toISOString().slice(0, 10)} value={form.dateOfBirth} onChange={e => update('dateOfBirth', e.target.value)} aria-invalid={!!errors.dateOfBirth} style={errors.dateOfBirth ? { borderColor: 'var(--color-danger)' } : {}} />
+                    <input id="pt-dob" type="date" max={todayIsoDate()} value={form.dateOfBirth} onChange={e => update('dateOfBirth', e.target.value)} aria-invalid={!!errors.dateOfBirth} style={errors.dateOfBirth ? { borderColor: 'var(--color-danger)' } : {}} />
                     {errors.dateOfBirth && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.dateOfBirth}</p>}
                   </div>
                   <div>

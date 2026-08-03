@@ -15,6 +15,7 @@ import {
   X, Save, Table, List, BarChart3, Timer, BellOff, Users,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
+import { isoDateOf, todayIsoDate, toIsoDate } from '@/lib/date-utils';
 
 const ACCENT = 'var(--accent-primary)';
 
@@ -151,8 +152,8 @@ export default function LabDashboardPage() {
   const kpis = useMemo(() => {
     const pending = results.filter(r => r.status === 'pending').length;
     const inProgress = results.filter(r => r.status === 'in_progress').length;
-    const today = new Date().toISOString().slice(0, 10);
-    const completedToday = results.filter(r => r.status === 'completed' && r.completedAt?.startsWith(today)).length;
+    const today = todayIsoDate();
+    const completedToday = results.filter(r => r.status === 'completed' && isoDateOf(r.completedAt) === today).length;
     const critical = results.filter(r => r.critical).length;
     const abnormal = results.filter(r => r.abnormal).length;
     const completed = results.filter(r => r.status === 'completed' && r.completedAt && r.orderedAt);
@@ -167,8 +168,8 @@ export default function LabDashboardPage() {
   // Feature 4: TAT Dashboard data
   const tatData = useMemo(() => {
     const completed = results.filter(r => r.status === 'completed' && r.completedAt && r.orderedAt);
-    const today = new Date().toISOString().slice(0, 10);
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 3600000).toISOString().slice(0, 10);
+    const today = todayIsoDate();
+    const oneWeekAgo = toIsoDate(new Date(Date.now() - 7 * 24 * 3600000));
 
     // By test type
     const byTest: Record<string, { totalHrs: number; count: number; todayHrs: number; todayCount: number }> = {};
@@ -179,7 +180,7 @@ export default function LabDashboardPage() {
         byTest[r.testName].totalHrs += hrs;
         byTest[r.testName].count += 1;
       }
-      if (r.completedAt.startsWith(today)) {
+      if (isoDateOf(r.completedAt) === today) {
         byTest[r.testName].todayHrs += hrs;
         byTest[r.testName].todayCount += 1;
       }
@@ -193,7 +194,7 @@ export default function LabDashboardPage() {
     })).sort((a, b) => b.todayCount - a.todayCount).slice(0, 8);
 
     // Overall today average
-    const todayCompleted = completed.filter(r => r.completedAt.startsWith(today));
+    const todayCompleted = completed.filter(r => isoDateOf(r.completedAt) === today);
     const overallTodayAvg = todayCompleted.length > 0
       ? todayCompleted.reduce((s, r) => s + (new Date(r.completedAt).getTime() - new Date(r.orderedAt).getTime()) / 3600000, 0) / todayCompleted.length
       : 0;

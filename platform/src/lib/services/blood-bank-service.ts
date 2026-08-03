@@ -6,6 +6,7 @@ import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { toIsoDate, todayIsoDate } from '@/lib/date-utils';
 
 function emitBloodBank(doc: BloodBankDoc, operation: 'create' | 'update'): void {
   emitSyncEvent({
@@ -187,10 +188,12 @@ export async function getBloodInventorySummary(facilityId?: string): Promise<{
 }> {
   const all = await getAllUnits();
   const filtered = !facilityId ? all : all.filter(u => u.facilityId === facilityId);
-  const now = new Date();
+  // expiryDate is a local-calendar YYYY-MM-DD; string-compare against local
+  // today rather than parsing to a UTC-midnight instant (see getExpiringUnits).
+  const today = todayIsoDate();
 
-  const expired = filtered.filter(u => new Date(u.expiryDate) <= now);
-  const available = filtered.filter(u => u.status === 'available' && new Date(u.expiryDate) > now);
+  const expired = filtered.filter(u => u.expiryDate <= today);
+  const available = filtered.filter(u => u.status === 'available' && u.expiryDate > today);
   const reserved = filtered.filter(u => u.status === 'reserved');
   const crossmatched = filtered.filter(u => u.status === 'crossmatched');
   const transfused = filtered.filter(u => u.status === 'transfused');
@@ -201,7 +204,7 @@ export async function getBloodInventorySummary(facilityId?: string): Promise<{
       byBloodGroup[unit.bloodGroup] = { total: 0, available: 0 };
     }
     byBloodGroup[unit.bloodGroup].total++;
-    if (unit.status === 'available' && new Date(unit.expiryDate) > now) {
+    if (unit.status === 'available' && unit.expiryDate > today) {
       byBloodGroup[unit.bloodGroup].available++;
     }
   }
@@ -221,14 +224,17 @@ export async function getExpiringUnits(daysThreshold?: number, facilityId?: stri
   /* istanbul ignore next -- defensive default */
   const effectiveThreshold = daysThreshold ?? 7;
   const all = await getAllUnits();
-  const now = new Date();
-  const threshold = new Date(now.getTime() + effectiveThreshold * 24 * 60 * 60 * 1000);
+  // expiryDate is a local-calendar YYYY-MM-DD (see lib/date-utils), so compare
+  // date strings rather than parsing to instants — new Date('YYYY-MM-DD') is
+  // UTC midnight, which misclassifies units near the local/UTC day boundary.
+  const today = todayIsoDate();
+  const limit = toIsoDate(new Date(Date.now() + effectiveThreshold * 24 * 60 * 60 * 1000));
 
   /* istanbul ignore next -- facilityId filter: defensive short-circuit */
   return all.filter(u =>
     u.status === 'available' &&
-    new Date(u.expiryDate) <= threshold &&
-    new Date(u.expiryDate) > now &&
+    u.expiryDate <= limit &&
+    u.expiryDate > today &&
     (!facilityId || u.facilityId === facilityId)
   );
 }

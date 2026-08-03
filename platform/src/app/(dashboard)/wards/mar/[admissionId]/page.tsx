@@ -28,6 +28,7 @@ import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { PrescriptionDoc, MedicationAdministration } from '@/lib/db-types';
+import { todayIsoDate } from '@/lib/date-utils';
 
 /**
  * Parse a free-text frequency string into scheduled clock times for one
@@ -62,7 +63,7 @@ function scheduleForFrequency(freq: string): string[] {
 }
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDate();
 }
 
 function buildScheduledFor(day: string, time: string): string {

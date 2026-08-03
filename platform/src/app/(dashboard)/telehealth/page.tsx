@@ -21,6 +21,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterBar, SearchInput } from '@/components/filters';
 import type { TelehealthType, TelehealthStatus, TelehealthSessionDoc } from '@/lib/db-types';
 import { formatMoney } from '@/lib/format-utils';
+import { todayIsoDate } from '@/lib/date-utils';
 
 /* ─── Config ─── */
 const statusConfig: Record<TelehealthStatus, { color: string; bg: string; label: string; icon: typeof Video }> = {
@@ -81,7 +82,7 @@ export default function TelehealthPage() {
 
   // Form
   const [formPatient, setFormPatient] = useState('');
-  const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
+  const [formDate, setFormDate] = useState(todayIsoDate());
   const [formTime, setFormTime] = useState('09:00');
   const [formType, setFormType] = useState<TelehealthType>('video');
   const [formComplaint, setFormComplaint] = useState('');
@@ -97,7 +98,7 @@ export default function TelehealthPage() {
   const [ratingVal, setRatingVal] = useState(5);
   const [ratingFb, setRatingFb] = useState('');
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
 
   // Telehealth appointments (type === 'telehealth')
   const telehealthAppointments = useMemo(() => appointments.filter(a => a.appointmentType === 'telehealth'), [appointments]);
@@ -159,7 +160,7 @@ export default function TelehealthPage() {
     return telehealthAppointments.filter(a => a.appointmentDate === selectedDate);
   }, [telehealthAppointments, selectedDate]);
 
-  const resetForm = () => { setFormPatient(''); setFormComplaint(''); setFormFee(''); setFormDate(new Date().toISOString().slice(0, 10)); setFormTime('09:00'); setFormType('video'); };
+  const resetForm = () => { setFormPatient(''); setFormComplaint(''); setFormFee(''); setFormDate(todayIsoDate()); setFormTime('09:00'); setFormType('video'); };
 
   const handleCreate = async () => {
     if (!formPatient || !formDate || !formTime || !formComplaint) { showToast(t('telehealth.toastFillRequired'), 'error'); return; }

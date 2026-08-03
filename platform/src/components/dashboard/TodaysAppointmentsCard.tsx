@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { ArrowUpRight } from '@/components/icons/lucide';
+import { todayIsoDate } from '@/lib/date-utils';
 
 /**
  * Today's Appointments — gradient feature card for front-desk / facility roles
@@ -12,7 +13,7 @@ import { ArrowUpRight } from '@/components/icons/lucide';
 export default function TodaysAppointmentsCard({ className = '' }: { className?: string }) {
   const router = useRouter();
   const { appointments } = useAppointments();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
 
   const todays = (appointments || []).filter(a => a.appointmentDate === today && a.status !== 'cancelled');
   const arrived = todays.filter(a => a.status === 'checked_in' || a.status === 'in_progress' || a.status === 'completed').length;

@@ -41,6 +41,7 @@ import { emitSyncEvent } from './sync-event-service';
 import { createLedgerEntry, getPatientBalance } from './ledger-service';
 import { jubaDate } from '../time-juba';
 import { getSettings } from '../settings/settings-store';
+import { toIsoDate, todayIsoDate } from '@/lib/date-utils';
 
 const COLLECTION_STAGE_DAYS = {
   followUp: Number(process.env.COLLECTION_STAGE_FOLLOWUP_DAYS) || 30,
@@ -949,7 +950,7 @@ export async function createPaymentPlan(input: {
       : monthlyAmount;
     installments.push({
       number: i + 1,
-      dueDate: dueDate.toISOString().slice(0, 10),
+      dueDate: toIsoDate(dueDate),
       amount: amt,
       status: 'pending',
     });
@@ -967,8 +968,8 @@ export async function createPaymentPlan(input: {
     termMonths: input.termMonths,
     monthlyAmount,
     apr,
-    startDate: now.slice(0, 10),
-    endDate: endDate.toISOString().slice(0, 10),
+    startDate: todayIsoDate(),
+    endDate: toIsoDate(endDate),
     status: 'active',
     nextDueDate: installments[0]?.dueDate,
     paidToDate: 0,
@@ -1026,7 +1027,7 @@ export async function recordPlanPayment(planId: string, installmentNumber: numbe
     if (installment) {
       installment.status = amount >= installment.amount ? 'paid' : 'partial';
       installment.paidAmount = amount;
-      installment.paidDate = new Date().toISOString().slice(0, 10);
+      installment.paidDate = todayIsoDate();
       installment.paymentId = paymentId;
     }
 
@@ -1106,8 +1107,8 @@ export async function generateInvoice(input: {
     priorPayments,
     totalDue,
     currency: input.currency || 'SSP',
-    issuedDate: now.slice(0, 10),
-    dueDate: dueDate.toISOString().slice(0, 10),
+    issuedDate: todayIsoDate(),
+    dueDate: toIsoDate(dueDate),
     status: 'draft' as InvoiceStatus,
     paymentLinkToken: uuidv4().slice(0, 16),
     facilityId: input.facilityId,

@@ -16,6 +16,7 @@ import { createLabResult, updateLabResult } from '@/lib/services/lab-service';
 import { createWard, admitPatient, dischargePatient, getOccupancyStats } from '@/lib/services/ward-service';
 import { createFollowUp } from '@/lib/services/follow-up-service';
 import { getRecentAuditLogs } from '@/lib/services/audit-service';
+import { todayIsoDate, toIsoDate } from '@/lib/date-utils';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
@@ -104,7 +105,7 @@ describe('Full Inpatient Journey: Triage → Discharge', () => {
       patientId: 'patient-001',
       hospitalId: 'hosp-001',
       hospitalName: 'TamamHealth Hospital',
-      visitDate: new Date().toISOString().slice(0, 10),
+      visitDate: todayIsoDate(),
       consultedAt: new Date().toISOString(),
       visitType: 'emergency',
       providerName: 'Dr. Kuol',
@@ -183,7 +184,7 @@ describe('Full Inpatient Journey: Triage → Discharge', () => {
       dischargedBy: 'dr-001',
       dischargedByName: 'Dr. Kuol',
       followUpRequired: true,
-      followUpDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      followUpDate: toIsoDate(new Date(Date.now() + 7 * 86400000)),
       followUpInstructions: 'Return in 1 week for repeat blood smear. Complete oral ACT course.',
     });
     expect(discharged).not.toBeNull();
@@ -202,7 +203,7 @@ describe('Full Inpatient Journey: Triage → Discharge', () => {
       status: 'active',
       condition: 'Post-severe malaria follow-up',
       facilityLevel: 'boma',
-      scheduledDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      scheduledDate: toIsoDate(new Date(Date.now() + 7 * 86400000)),
       state: 'Central Equatoria',
       county: 'Juba',
       sourceVisitId: consultation._id,

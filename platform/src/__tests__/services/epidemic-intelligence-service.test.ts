@@ -12,6 +12,7 @@ import { teardownTestDBs } from '../helpers/test-db';
 import { getEpidemicIntelligence } from '@/lib/services/epidemic-intelligence-service';
 import { diseaseAlertsDB } from '@/lib/db';
 import type { DiseaseAlertDoc } from '@/lib/db-types';
+import { todayIsoDate, toIsoDate } from '@/lib/date-utils';
 
 const makeDiseaseAlert = (overrides: Record<string, unknown> = {}): DiseaseAlertDoc => {
   uuidCounter++;
@@ -24,7 +25,7 @@ const makeDiseaseAlert = (overrides: Record<string, unknown> = {}): DiseaseAlert
     cases: 50,
     deaths: 5,
     alertLevel: 'warning' as const,
-    reportDate: new Date().toISOString().slice(0, 10),
+    reportDate: todayIsoDate(),
     trend: 'stable' as const,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -560,7 +561,7 @@ describe('epidemic-intelligence-service', () => {
     await db.put(makeDiseaseAlert({
       disease: 'Malaria',
       cases: 10,
-      reportDate: sundayDate.toISOString().slice(0, 10)
+      reportDate: toIsoDate(sundayDate)
     }));
 
     const data = await getEpidemicIntelligence();

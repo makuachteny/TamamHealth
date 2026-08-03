@@ -28,12 +28,13 @@ import {
   getExpiringUnits,
   getCompatibleGroups,
 } from '@/lib/services/blood-bank-service';
+import { toIsoDate } from '@/lib/date-utils';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
 // Expiry well in the future so "available" fixtures stay non-expired regardless
 // of the wall clock when the suite runs (avoids time-dependent flakiness).
-const FUTURE = new Date(Date.now() + 120 * 86_400_000).toISOString().slice(0, 10);
+const FUTURE = toIsoDate(new Date(Date.now() + 120 * 86_400_000));
 
 type AddUnitInput = Parameters<typeof addUnit>[0];
 type BloodGroup = AddUnitInput['bloodGroup'];
@@ -123,9 +124,9 @@ describe('Blood Bank Workflow Integration', () => {
   });
 
   test('expiry monitoring and waste prevention', async () => {
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-    const nextWeek = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
-    const nextMonth = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const tomorrow = toIsoDate(new Date(Date.now() + 86400000));
+    const nextWeek = toIsoDate(new Date(Date.now() + 5 * 86400000));
+    const nextMonth = toIsoDate(new Date(Date.now() + 30 * 86400000));
 
     // Register units with different expiry dates
     await addUnit(makeUnit('O+', { expiryDate: tomorrow }));       // Expiring soon

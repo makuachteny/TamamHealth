@@ -7,6 +7,7 @@ import { getStockAlerts, getSupplyChainSummary, getConsumptionTrend, ESSENTIAL_M
 import { teardownTestDBs, putDoc } from '../helpers/test-db';
 import { pharmacyInventoryDB } from '@/lib/db';
 import type { PharmacyInventoryDoc } from '@/lib/db-types';
+import { toIsoDate } from '@/lib/date-utils';
 
 afterEach(async () => {
   await teardownTestDBs();
@@ -15,15 +16,15 @@ afterEach(async () => {
 
 describe('supply-chain-service', () => {
   const now = new Date().toISOString();
-  const in15Days = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const in60Days = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const in90Days = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const in15Days = toIsoDate(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000));
+  const in60Days = toIsoDate(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000));
+  const in90Days = toIsoDate(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
+  const yesterday = toIsoDate(new Date(Date.now() - 1 * 24 * 60 * 60 * 1000));
 
   describe('getStockAlerts', () => {
     it('should return no alerts when inventory is adequate and not expiring soon', async () => {
       const db = pharmacyInventoryDB();
-      const farFuture = new Date(Date.now() + 150 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const farFuture = toIsoDate(new Date(Date.now() + 150 * 24 * 60 * 60 * 1000));
       await putDoc(db, {
         _id: 'inv-1',
         type: 'pharmacy_inventory',
@@ -47,7 +48,7 @@ describe('supply-chain-service', () => {
 
     it('should create stockout alert when stock is zero', async () => {
       const db = pharmacyInventoryDB();
-      const farFuture = new Date(Date.now() + 150 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const farFuture = toIsoDate(new Date(Date.now() + 150 * 24 * 60 * 60 * 1000));
       await putDoc(db, {
         _id: 'inv-1',
         type: 'pharmacy_inventory',
@@ -75,7 +76,7 @@ describe('supply-chain-service', () => {
 
     it('should create critical alert for essential medicine at low stock', async () => {
       const db = pharmacyInventoryDB();
-      const farFuture = new Date(Date.now() + 150 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const farFuture = toIsoDate(new Date(Date.now() + 150 * 24 * 60 * 60 * 1000));
       await putDoc(db, {
         _id: 'inv-1',
         type: 'pharmacy_inventory',
@@ -101,7 +102,7 @@ describe('supply-chain-service', () => {
 
     it('should create low stock alert', async () => {
       const db = pharmacyInventoryDB();
-      const farFuture = new Date(Date.now() + 150 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const farFuture = toIsoDate(new Date(Date.now() + 150 * 24 * 60 * 60 * 1000));
       await putDoc(db, {
         _id: 'inv-1',
         type: 'pharmacy_inventory',
@@ -270,7 +271,7 @@ describe('supply-chain-service', () => {
 
     it('should filter alerts by facilityId when provided', async () => {
       const db = pharmacyInventoryDB();
-      const farFuture = new Date(Date.now() + 150 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const farFuture = toIsoDate(new Date(Date.now() + 150 * 24 * 60 * 60 * 1000));
       await putDoc(db, {
         _id: 'inv-1',
         type: 'pharmacy_inventory',
@@ -855,7 +856,7 @@ describe('supply-chain-service', () => {
       const db = pharmacyInventoryDB();
       // Stock level that doesn't trigger alerts but if it did, would use default return
       // This tests the fallback 'low' return value on line 103
-      const farFuture = new Date(Date.now() + 150 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const farFuture = toIsoDate(new Date(Date.now() + 150 * 24 * 60 * 60 * 1000));
       await putDoc(db, {
         _id: 'inv-1',
         type: 'pharmacy_inventory',

@@ -25,6 +25,7 @@ import { useUsers } from '@/lib/hooks/useUsers';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
+import { todayIsoDate } from '@/lib/date-utils';
 
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
@@ -55,7 +56,7 @@ export default function SuperintendentDashboard() {
 
   const facilityId = currentUser?.hospitalId;
   const facilityName = currentUser?.hospitalName || currentUser?.hospital?.name || t('common.facility');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
 
   useEffect(() => {
     let cancelled = false;

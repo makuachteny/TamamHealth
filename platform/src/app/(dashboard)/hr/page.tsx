@@ -17,6 +17,7 @@ import type { LeaveSummary } from '@/lib/services/leave-service';
 import type { PayrollSummary } from '@/lib/services/payroll-service';
 import type { StaffScheduleDoc } from '@/lib/db-types';
 import { formatMoney } from '@/lib/format-utils';
+import { todayIsoDate, toIsoDate } from '@/lib/date-utils';
 
 const LEAVE_TYPES: { id: LeaveType; label: string }[] = [
   { id: 'annual', label: 'Annual' },
@@ -78,19 +79,19 @@ export default function HRPage() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaveForm, setLeaveForm] = useState({
     userId: '', leaveType: 'annual' as LeaveType,
-    startDate: new Date().toISOString().slice(0, 10),
-    endDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    startDate: todayIsoDate(),
+    endDate: toIsoDate(new Date(Date.now() + 86400000)),
     reason: '',
   });
 
   // ── Schedule state ──────────────────────────────────────────────────
   const [schedules, setSchedules] = useState<StaffScheduleDoc[]>([]);
-  const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().slice(0, 10));
+  const [scheduleDate, setScheduleDate] = useState(todayIsoDate());
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
     userId: '',
     shiftType: 'morning' as StaffScheduleDoc['shiftType'],
-    shiftDate: new Date().toISOString().slice(0, 10),
+    shiftDate: todayIsoDate(),
     startTime: '08:00',
     endTime: '16:00',
     department: '',
@@ -182,7 +183,7 @@ export default function HRPage() {
       });
       showToast(t('hr.leaveSubmittedFor', { name: user.name }), 'success');
       setLeaveOpen(false);
-      setLeaveForm({ userId: '', leaveType: 'annual', startDate: new Date().toISOString().slice(0, 10), endDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10), reason: '' });
+      setLeaveForm({ userId: '', leaveType: 'annual', startDate: todayIsoDate(), endDate: toIsoDate(new Date(Date.now() + 86400000)), reason: '' });
       reloadLeave();
     } catch (err) {
       console.error(err);

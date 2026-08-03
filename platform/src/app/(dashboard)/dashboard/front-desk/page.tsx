@@ -27,6 +27,7 @@ import {
   MapPin, LogOut, Wallet, CheckCircle, X, Maximize2,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
+import { isoDateOf, todayIsoDate } from '@/lib/date-utils';
 
 /**
  * Front-desk operations workspace.
@@ -79,10 +80,9 @@ function patientDob(patient: { dateOfBirth?: string; dob?: string }): string {
 }
 
 function isoDateKey(value?: string | null): string {
-  if (!value) return new Date().toISOString().slice(0, 10);
+  if (!value) return todayIsoDate();
   if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? new Date().toISOString().slice(0, 10) : date.toISOString().slice(0, 10);
+  return isoDateOf(value) || todayIsoDate();
 }
 
 // Final-checkout target: closing out a completed visit at the front desk.
@@ -124,7 +124,7 @@ export default function FrontDeskDashboardPage() {
   const [roomDraft, setRoomDraft] = useState('');
   const [savingRoom, setSavingRoom] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
 
   useEffect(() => {
     if (!currentUser) return;
@@ -167,7 +167,7 @@ export default function FrontDeskDashboardPage() {
   // ── Real today's triages (pending/seen = still in queue) ──
   const todaysTriages = useMemo(() =>
     triages
-      .filter(t => (t.triagedAt || '').startsWith(today))
+      .filter(t => isoDateOf(t.triagedAt) === today)
       .sort((a, b) => {
         const pOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
         return (pOrder[a.priority] ?? 3) - (pOrder[b.priority] ?? 3);

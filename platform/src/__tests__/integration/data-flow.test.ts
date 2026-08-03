@@ -36,6 +36,7 @@ import {
   getByPatient,
 } from '@/lib/services/immunization-service';
 import { generateDHIS2Export } from '@/lib/services/dhis2-export-service';
+import { todayIsoDate } from '@/lib/date-utils';
 
 const makePatientData = (overrides: Record<string, unknown> = {}) => ({
   firstName: 'Achol',
@@ -119,7 +120,7 @@ describe('Integration: data-flow', () => {
   });
 
   test('Birth registration creates proper records with stats', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
 
     await createBirth({
       childFirstName: 'Baby',
@@ -176,7 +177,7 @@ describe('Integration: data-flow', () => {
   });
 
   test('Death stats correctly count neonatal deaths', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
     const baseDeathData = {
       facilityId: 'hosp-001',
       facilityName: 'Juba Teaching Hospital',
@@ -371,7 +372,7 @@ describe('Integration: data-flow', () => {
     // Seed some data across modules
     await createPatient(makePatientData());
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
     await createBirth({
       childFirstName: 'Export',
       childSurname: 'Baby',

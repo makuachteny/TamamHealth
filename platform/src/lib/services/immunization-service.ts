@@ -5,6 +5,7 @@ import { emitSyncEvent } from './sync-event-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { findByType } from './db-query';
+import { parseIsoDate, todayIsoDate } from '@/lib/date-utils';
 
 export async function getAllImmunizations(scope?: DataScope): Promise<ImmunizationDoc[]> {
   const db = immunizationsDB();
@@ -160,6 +161,9 @@ export async function getDefaulters(scope?: DataScope): Promise<ImmunizationDefa
   // Scope-aware: hospital users only see their slice.
   const all = await getAllImmunizations(scope);
   const now = new Date();
+  // Due dates are local-calendar YYYY-MM-DD strings; compare them as dates,
+  // not as UTC-midnight instants, so "due today" isn't overdue near midnight.
+  const today = todayIsoDate();
   const defaulters: ImmunizationDefaulter[] = [];
 
   // Group by child
@@ -173,13 +177,14 @@ export async function getDefaulters(scope?: DataScope): Promise<ImmunizationDefa
   for (const [, records] of byChild) {
     // Find records that are overdue or have a past nextDueDate with no completed follow-up
     const overdueRecords = records.filter(r => r.status === 'overdue' || r.status === 'missed');
-    const scheduledRecords = records.filter(r => r.status === 'scheduled' && r.nextDueDate && new Date(r.nextDueDate) < now);
+    const scheduledRecords = records.filter(r => r.status === 'scheduled' && r.nextDueDate && r.nextDueDate.slice(0, 10) < today);
 
     const allOverdue = [...overdueRecords, ...scheduledRecords];
 
     for (const rec of allOverdue) {
-      const dueDate = new Date(rec.nextDueDate || rec.dateGiven);
-      const daysOverdue = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / 86400000));
+      const dueDate = parseIsoDate((rec.nextDueDate || rec.dateGiven).slice(0, 10));
+      // Round, not floor: local midnights can sit ±1h apart across a DST change.
+      const daysOverdue = Math.max(0, Math.round((parseIsoDate(today).getTime() - dueDate.getTime()) / 86400000));
 
       /* istanbul ignore next -- defensive: daysOverdue is always > 0 for overdue records */
       if (daysOverdue <= 0) continue;

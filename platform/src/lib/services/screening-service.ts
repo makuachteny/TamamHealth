@@ -13,10 +13,11 @@ import type { ScreeningEntry } from '../../data/mock';
 import type { PatientDoc } from '../db-types';
 import { getPatientById } from './patient-service';
 import { mutatePatientListField } from './patient-list-field';
+import { todayIsoDate } from '@/lib/date-utils';
 
 /** yyyy-mm-dd for today. */
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDate();
 }
 
 /** Add `months` to a yyyy-mm-dd date, returning yyyy-mm-dd. */

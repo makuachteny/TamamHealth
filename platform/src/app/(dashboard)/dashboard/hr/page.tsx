@@ -15,6 +15,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 import type { StaffScheduleDoc } from '@/lib/db-types';
+import { todayIsoDate } from '@/lib/date-utils';
 
 /**
  * HR home — Records & people-ops landing page for HRIO and medical
@@ -30,7 +31,7 @@ export default function HRDashboardPage() {
   const [schedules, setSchedules] = useState<StaffScheduleDoc[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   const facilityId = currentUser?.hospitalId;
   const facilityName = currentUser?.hospitalName || t('common.facility');
 

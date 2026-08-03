@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useApp } from '@/lib/context';
 import type { AvailabilityModality } from '@/lib/db-types';
 import { Calendar, Clock, X, Loader2, Check, AlertCircle } from '@/components/icons/lucide';
+import { todayIsoDate } from '@/lib/date-utils';
 
 const SLOT_OPTIONS = [15, 20, 30, 45, 60];
 const MODALITIES: { value: AvailabilityModality; label: string }[] = [
@@ -26,7 +27,7 @@ function nowTimePlus(hours: number): string {
 
 export default function AvailabilityModal({ onClose, onCreated }: { onClose: () => void; onCreated?: () => void }) {
   const { currentUser } = useApp();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
 
   const [date, setDate] = useState(today);
   const [startTime, setStartTime] = useState(nowTimePlus(0));

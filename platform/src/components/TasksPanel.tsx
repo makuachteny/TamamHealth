@@ -9,9 +9,10 @@ import { useState } from 'react';
 import Modal from '@/components/Modal';
 import { CheckCircle2, Check, Clock, Calendar, Plus, Trash2, X } from '@/components/icons/lucide';
 import { useTasks } from '@/lib/hooks/useTasks';
+import { todayIsoDate } from '@/lib/date-utils';
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDate();
 }
 
 function dueLabel(due?: string): { text: string; overdue: boolean } | null {

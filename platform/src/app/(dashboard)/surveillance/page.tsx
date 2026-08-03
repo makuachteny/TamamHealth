@@ -28,6 +28,7 @@ import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, Legend
 } from 'recharts';
 import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
+import { todayIsoDate } from '@/lib/date-utils';
 
 // Chart colors
 const COLORS = {
@@ -223,7 +224,7 @@ export default function SurveillancePage() {
         cases: alertForm.cases,
         deaths: alertForm.deaths,
         alertLevel: alertForm.alertLevel,
-        reportDate: new Date().toISOString().slice(0, 10),
+        reportDate: todayIsoDate(),
         trend: alertForm.trend,
         orgId: currentUser?.orgId,
       });
@@ -326,7 +327,7 @@ export default function SurveillancePage() {
       .map(a => a.reportDate)
       .filter((d): d is string => Boolean(d))
       .sort();
-    const latest = dated.length > 0 ? dated[dated.length - 1] : new Date().toISOString().slice(0, 10);
+    const latest = dated.length > 0 ? dated[dated.length - 1] : todayIsoDate();
     const w = isoWeek(latest);
     if (!w) return t('surveillance.currentWeek');
     const monday = (() => {

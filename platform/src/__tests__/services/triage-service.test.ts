@@ -18,6 +18,7 @@ import {
   updateTriage,
   getTriageStats,
 } from '@/lib/services/triage-service';
+import { todayIsoDate } from '@/lib/date-utils';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
@@ -377,7 +378,7 @@ describe('Triage Service', () => {
 
     // ---- Line 121: Test filter with missing triagedAt in getTriageStats ----
     test('getTriageStats handles missing triagedAt (line 121)', async () => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayIsoDate();
       await createTriage(validTriage({ triagedAt: today + 'T10:00:00.000Z' }));
 
       // Manually insert triage without triagedAt

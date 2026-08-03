@@ -18,6 +18,7 @@ import {
   HeartPulse, Plus, X, Users,
   Calendar, ChevronRight, ExternalLink, Edit3,
 } from '@/components/icons/lucide';
+import { todayIsoDate } from '@/lib/date-utils';
 
 const RISK_FACTOR_OPTIONS = [
   'hypertension', 'anemia', 'previous_csection', 'multiple_pregnancy',
@@ -57,7 +58,7 @@ export default function ANCPage() {
 
   const [form, setForm] = useState({
     motherId: '', motherName: '', motherAge: 25, gravida: 1, parity: 0,
-    visitNumber: 1, visitDate: new Date().toISOString().slice(0, 10), gestationalAge: 12,
+    visitNumber: 1, visitDate: todayIsoDate(), gestationalAge: 12,
     bloodPressure: '', weight: 0, fundalHeight: 0, fetalHeartRate: 0,
     hemoglobin: 0, urineProtein: 'Negative', bloodGroup: 'O', rhFactor: '+',
     hivStatus: 'Not tested', malariaTest: 'Negative', syphilisTest: 'Non-reactive',

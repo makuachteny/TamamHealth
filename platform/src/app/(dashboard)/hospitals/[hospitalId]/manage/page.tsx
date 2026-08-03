@@ -48,6 +48,7 @@ import type { AssetDoc } from '@/lib/db-types-asset';
 import type { DataScope } from '@/lib/services/data-scope';
 import { useToast } from '@/components/Toast';
 import { isValidPhone, isValidEmail, normalizePhone, normalizeEmail } from '@/lib/field-formats';
+import { isoDateOf, todayIsoDate } from '@/lib/date-utils';
 
 // ── Permission ───────────────────────────────────────────────────────────────
 const MANAGE_ROLES: UserRole[] = [
@@ -807,7 +808,7 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
         <tbody>
           {items.map(i => {
             const ratio = i.reorderLevel ? i.stockLevel / i.reorderLevel : 1;
-            const expired = i.expiryDate && i.expiryDate < new Date().toISOString().slice(0, 10);
+            const expired = i.expiryDate && i.expiryDate < todayIsoDate();
             const status: { label: string; bg: string; color: string } = expired
               ? { label: t('hospitals.stockExpired'), bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }
               : i.stockLevel <= 0
@@ -844,7 +845,7 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
 // ═══════════════════════════════════════════════════════════════════════════
 function SchedulesTab({ hospitalId }: { hospitalId: string }) {
   const { t } = useTranslation();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   const [date, setDate] = useState(today);
   const [schedules, setSchedules] = useState<StaffScheduleDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -952,7 +953,7 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
     setError(null);
     (async () => {
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayIsoDate();
         const [
           { getTodaysAppointments },
           { getAllAdmissions },
@@ -984,9 +985,9 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
         );
 
         // Discharges today: admissions whose dischargeDate is today
-        const dischargesToday = hereAdmns.filter(a => (a.dischargeDate || '').slice(0, 10) === today).length;
+        const dischargesToday = hereAdmns.filter(a => isoDateOf(a.dischargeDate) === today).length;
         const transfersToday = hereAdmns.filter(a =>
-          a.dischargeType === 'transfer' && (a.dischargeDate || '').slice(0, 10) === today,
+          a.dischargeType === 'transfer' && isoDateOf(a.dischargeDate) === today,
         ).length;
         const activeAdmissions = hereAdmns.filter(a => a.status === 'admitted').length;
 
@@ -1001,13 +1002,13 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
           : 0;
 
         const dispensedToday = hereRx.filter(p =>
-          p.status === 'dispensed' && (p.dispensedAt || '').slice(0, 10) === today,
+          p.status === 'dispensed' && isoDateOf(p.dispensedAt) === today,
         ).length;
 
         const immunsToday = hereImmuns.filter(i => {
           const when = (i as unknown as { administeredAt?: string; date?: string }).administeredAt
             || (i as unknown as { date?: string }).date;
-          return when && when.slice(0, 10) === today;
+          return when ? isoDateOf(when) === today : false;
         }).length;
 
         if (alive) {

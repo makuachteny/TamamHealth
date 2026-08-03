@@ -18,12 +18,13 @@ import {
   updateFollowUp,
   getFollowUpStats,
 } from '@/lib/services/follow-up-service';
+import { todayIsoDate, toIsoDate } from '@/lib/date-utils';
 
 type CreateFollowUpInput = Parameters<typeof createFollowUp>[0];
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
-const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+const tomorrow = toIsoDate(new Date(Date.now() + 86400000));
 
 function validFollowUp(overrides: Partial<CreateFollowUpInput> = {}): CreateFollowUpInput {
   return {
@@ -120,7 +121,7 @@ describe('Follow-Up Service', () => {
     const updated = await updateFollowUp(fu._id, {
       status: 'completed',
       outcome: 'recovered',
-      completedDate: new Date().toISOString().slice(0, 10),
+      completedDate: todayIsoDate(),
     });
     expect(updated).not.toBeNull();
     expect(updated!.status).toBe('completed');

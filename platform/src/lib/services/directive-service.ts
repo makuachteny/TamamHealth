@@ -11,6 +11,7 @@ import type { DirectiveEntry, DirectiveType } from '../../data/mock';
 import type { PatientDoc } from '../db-types';
 import { getPatientById } from './patient-service';
 import { mutatePatientListField } from './patient-list-field';
+import { todayIsoDate } from '@/lib/date-utils';
 
 /** All directive entries for a patient (active + inactive). */
 export async function getDirectives(patientId: string): Promise<DirectiveEntry[]> {
@@ -40,7 +41,7 @@ export async function addDirective(patientId: string, input: AddDirectiveInput):
     id: uuidv4().slice(0, 8),
     type: input.type,
     description: input.description.trim(),
-    startDate: input.startDate || new Date().toISOString().slice(0, 10),
+    startDate: input.startDate || todayIsoDate(),
     status: 'active',
     recordedBy: input.recordedBy,
     recordedByName: input.recordedByName,

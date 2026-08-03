@@ -11,9 +11,10 @@ import { useState } from 'react';
 import { useApp } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import { ClipboardList, Plus, Check, X, Clock } from '@/components/icons/lucide';
+import { todayIsoDate } from '@/lib/date-utils';
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDate();
 }
 
 const COMMON_SCREENINGS = ['Blood pressure', 'HIV test', 'Cervical cancer (VIA)', 'Diabetes (blood glucose)', 'TB symptom screen', 'Well-child check', 'Nutrition (MUAC)'];

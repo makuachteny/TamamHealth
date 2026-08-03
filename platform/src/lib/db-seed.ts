@@ -49,11 +49,21 @@ const SEED_NOW = Date.now();
 function daysAgo(n: number): string {
   return new Date(SEED_NOW - n * 86400000).toISOString();
 }
+// Date-ONLY fields (appointmentDate etc.) must be in the browser's LOCAL
+// calendar, not UTC: the dashboards compute "today" with local getFullYear/
+// getMonth/getDate (see toIsoDate in EhrMiniCalendar). With UTC dates, anyone
+// west of UTC using the app in the evening got "today's" seeded bookings
+// stamped with tomorrow's date — schedule boards looked empty right after a
+// fresh seed. Timestamps (daysAgo above) stay UTC ISO instants.
+function localIsoDate(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 function dateAgo(n: number): string {
-  return new Date(SEED_NOW - n * 86400000).toISOString().slice(0, 10);
+  return localIsoDate(SEED_NOW - n * 86400000);
 }
 function dateFromNow(n: number): string {
-  return new Date(SEED_NOW + n * 86400000).toISOString().slice(0, 10);
+  return localIsoDate(SEED_NOW + n * 86400000);
 }
 
 const defaultOrganizations: Omit<OrganizationDoc, '_rev'>[] = [

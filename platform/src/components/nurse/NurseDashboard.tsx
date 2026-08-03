@@ -21,6 +21,7 @@ import { EMPTY_WARD_FILTERS, type WardFilterState } from './WardFilters';
 import MarWorkflow from './MarWorkflow';
 import TriageWorkflow from './TriageWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
+import { isoDateOf, todayIsoDate } from '@/lib/date-utils';
 
 type StationTab = 'ward' | 'mar' | 'triage' | 'handoff';
 
@@ -31,8 +32,8 @@ export default function NurseDashboard() {
   const { patients } = usePatients();
   const { triages } = useTriage();
   const { activeAdmissions } = useWards();
-  const today = new Date().toISOString().slice(0, 10);
-  const triageToday = triages.filter(tr => (tr.triagedAt || '').startsWith(today));
+  const today = todayIsoDate();
+  const triageToday = triages.filter(tr => isoDateOf(tr.triagedAt) === today);
   const criticalTriage = triageToday.filter(tr => tr.priority === 'RED').length;
 
   // The Quick Actions cards act as the station switcher — each swaps the inline
@@ -112,7 +113,7 @@ export default function NurseDashboard() {
         statusTone: triage.priority === 'RED' ? 'danger' : triage.priority === 'YELLOW' ? 'warning' : 'ready',
         priority: triage.priority,
         room: triage.assignedRoom,
-        date: (triage.triagedAt || today).slice(0, 10),
+        date: isoDateOf(triage.triagedAt) || today,
         onClick: () => router.push(`/patients/${triage.patientId}`),
         actionLabel: 'Open',
         onAction: () => router.push(`/patients/${triage.patientId}`),
@@ -129,7 +130,7 @@ export default function NurseDashboard() {
         statusTone: admission.severity === 'critical' ? 'danger' : admission.severity === 'severe' ? 'warning' : 'ready',
         priority: admission.severity,
         room: admission.nurseAssignedName,
-        date: (admission.admissionDate || today).slice(0, 10),
+        date: isoDateOf(admission.admissionDate) || today,
         onClick: () => router.push(`/wards/mar/${admission._id}`),
         actionLabel: 'MAR',
         onAction: () => router.push(`/wards/mar/${admission._id}`),
@@ -145,7 +146,7 @@ export default function NurseDashboard() {
       statusTone: patient.assignedDoctor ? 'ready' : 'warning',
       priority: patientAgeLabel(patient),
       room: patient.assignedDoctorName,
-      date: (patient.registeredAt || patient.registrationDate || today).slice(0, 10),
+      date: isoDateOf(patient.registeredAt || patient.registrationDate) || today,
       onClick: () => router.push(`/patients/${patient._id}`),
       actionLabel: 'Open',
       onAction: () => router.push(`/patients/${patient._id}`),
@@ -196,8 +197,8 @@ export default function NurseDashboard() {
           metrics={metrics}
           checklist={checklist}
           calendarEventDates={[
-            ...triageToday.map(triage => (triage.triagedAt || today).slice(0, 10)),
-            ...activeAdmissions.map(admission => (admission.admissionDate || today).slice(0, 10)),
+            ...triageToday.map(triage => isoDateOf(triage.triagedAt) || today),
+            ...activeAdmissions.map(admission => isoDateOf(admission.admissionDate) || today),
           ]}
           metricsTitle="Nursing station"
           checklistTitle="Nursing checklist"

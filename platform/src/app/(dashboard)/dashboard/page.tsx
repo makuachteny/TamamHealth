@@ -35,6 +35,7 @@ import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashb
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import PatientAvatar from '@/components/patients/PatientAvatar';
 import type { AppointmentDoc, PatientDoc } from '@/lib/db-types';
+import { isoDateOf, todayIsoDate } from '@/lib/date-utils';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
 
@@ -285,11 +286,11 @@ export default function DashboardPage() {
   const { triages } = useTriage();
   // Today's triage priority per patient, so the worklist can lead with acuity.
   const triagePriorityByPatient = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
     const map: Record<string, 'RED' | 'YELLOW' | 'GREEN'> = {};
     const rank = { RED: 3, YELLOW: 2, GREEN: 1 } as const;
     for (const tr of triages) {
-      if (!(tr.triagedAt || '').startsWith(today)) continue;
+      if (isoDateOf(tr.triagedAt) !== today) continue;
       const prev = map[tr.patientId];
       if (!prev || rank[tr.priority] > rank[prev]) map[tr.patientId] = tr.priority;
     }

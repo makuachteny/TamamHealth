@@ -23,12 +23,13 @@ import {
   getExpiringUnits,
   getCompatibleGroups,
 } from '@/lib/services/blood-bank-service';
+import { toIsoDate } from '@/lib/date-utils';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
 // Expiry well in the future so "available" fixtures stay non-expired regardless
 // of the wall clock when the suite runs (avoids time-dependent flakiness).
-const FUTURE = new Date(Date.now() + 120 * 86_400_000).toISOString().slice(0, 10);
+const FUTURE = toIsoDate(new Date(Date.now() + 120 * 86_400_000));
 
 type AddUnitInput = Parameters<typeof addUnit>[0];
 function validUnit(overrides: Partial<AddUnitInput> = {}): AddUnitInput {
@@ -227,9 +228,9 @@ describe('Blood Bank Service', () => {
     const nextMonth = new Date();
     nextMonth.setDate(nextMonth.getDate() + 30);
 
-    await addUnit(validUnit({ expiryDate: tomorrow.toISOString().slice(0, 10), unitId: 'U1' }));
-    await addUnit(validUnit({ expiryDate: nextWeek.toISOString().slice(0, 10), unitId: 'U2' }));
-    await addUnit(validUnit({ expiryDate: nextMonth.toISOString().slice(0, 10), unitId: 'U3' }));
+    await addUnit(validUnit({ expiryDate: toIsoDate(tomorrow), unitId: 'U1' }));
+    await addUnit(validUnit({ expiryDate: toIsoDate(nextWeek), unitId: 'U2' }));
+    await addUnit(validUnit({ expiryDate: toIsoDate(nextMonth), unitId: 'U3' }));
 
     const expiring = await getExpiringUnits(7);
     expect(expiring).toHaveLength(2); // tomorrow and next week
@@ -239,9 +240,9 @@ describe('Blood Bank Service', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    await addUnit(validUnit({ expiryDate: tomorrow.toISOString().slice(0, 10), status: 'reserved', unitId: 'U1' }));
+    await addUnit(validUnit({ expiryDate: toIsoDate(tomorrow), status: 'reserved', unitId: 'U1' }));
     await addUnit(validUnit({ expiryDate: '2020-01-01', status: 'available', unitId: 'U2' }));
-    await addUnit(validUnit({ expiryDate: tomorrow.toISOString().slice(0, 10), status: 'available', unitId: 'U3' }));
+    await addUnit(validUnit({ expiryDate: toIsoDate(tomorrow), status: 'available', unitId: 'U3' }));
 
     const expiring = await getExpiringUnits(7);
     expect(expiring).toHaveLength(1);
@@ -285,8 +286,8 @@ describe('Blood Bank Service', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    await addUnit(validUnit({ expiryDate: tomorrow.toISOString().slice(0, 10), facilityId: 'hosp-001', unitId: 'U1' }));
-    await addUnit(validUnit({ expiryDate: tomorrow.toISOString().slice(0, 10), facilityId: 'hosp-002', facilityName: 'Other', unitId: 'U2' }));
+    await addUnit(validUnit({ expiryDate: toIsoDate(tomorrow), facilityId: 'hosp-001', unitId: 'U1' }));
+    await addUnit(validUnit({ expiryDate: toIsoDate(tomorrow), facilityId: 'hosp-002', facilityName: 'Other', unitId: 'U2' }));
 
     const expiring = await getExpiringUnits(7, 'hosp-001');
     expect(expiring).toHaveLength(1);
@@ -313,7 +314,7 @@ describe('Blood Bank Service', () => {
   test('getExpiringUnits filters by facility when facilityId provided (line 213)', async () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 3);
-    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+    const tomorrowStr = toIsoDate(tomorrow);
 
     // Add units to multiple facilities
     await addUnit(validUnit({

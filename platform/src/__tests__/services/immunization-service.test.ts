@@ -24,6 +24,7 @@ import {
   getCoverageByAgeCohort,
 } from '@/lib/services/immunization-service';
 import type { DataScope } from '@/lib/services/data-scope';
+import { todayIsoDate, toIsoDate } from '@/lib/date-utils';
 
 type CreateImmunizationInput = Parameters<typeof createImmunization>[0];
 
@@ -177,8 +178,8 @@ describe('immunization-service', () => {
       vaccine: 'Measles',
       doseNumber: 1,
       status: 'overdue',
-      dateGiven: longOverdue.toISOString().slice(0, 10),
-      nextDueDate: longOverdue.toISOString().slice(0, 10),
+      dateGiven: toIsoDate(longOverdue),
+      nextDueDate: toIsoDate(longOverdue),
       dateOfBirth: '2023-01-01',
     }));
 
@@ -256,8 +257,8 @@ describe('immunization-service', () => {
       patientId: 'critical-child',
       vaccine: 'BCG',
       status: 'overdue',
-      dateGiven: veryPastDate.toISOString().slice(0, 10),
-      nextDueDate: veryPastDate.toISOString().slice(0, 10),
+      dateGiven: toIsoDate(veryPastDate),
+      nextDueDate: toIsoDate(veryPastDate),
       dateOfBirth: '2023-01-01',
     }));
 
@@ -266,8 +267,8 @@ describe('immunization-service', () => {
       patientId: 'high-child',
       vaccine: 'Penta',
       status: 'overdue',
-      dateGiven: moderatePastDate.toISOString().slice(0, 10),
-      nextDueDate: moderatePastDate.toISOString().slice(0, 10),
+      dateGiven: toIsoDate(moderatePastDate),
+      nextDueDate: toIsoDate(moderatePastDate),
       dateOfBirth: '2023-02-01',
     }));
 
@@ -278,8 +279,8 @@ describe('immunization-service', () => {
       patientId: 'medium-child',
       vaccine: 'Measles',
       status: 'overdue',
-      dateGiven: recentDate.toISOString().slice(0, 10),
-      nextDueDate: recentDate.toISOString().slice(0, 10),
+      dateGiven: toIsoDate(recentDate),
+      nextDueDate: toIsoDate(recentDate),
       dateOfBirth: '2023-03-01',
     }));
 
@@ -301,7 +302,7 @@ describe('immunization-service', () => {
       patientId: 'child-<6mo',
       vaccine: 'BCG',
       status: 'completed',
-      dateOfBirth: recentDOB.toISOString().slice(0, 10),
+      dateOfBirth: toIsoDate(recentDOB),
     }));
 
     // Child 6-12 months
@@ -311,7 +312,7 @@ describe('immunization-service', () => {
       patientId: 'child-6-12mo',
       vaccine: 'BCG',
       status: 'completed',
-      dateOfBirth: oldDOB.toISOString().slice(0, 10),
+      dateOfBirth: toIsoDate(oldDOB),
     }));
 
     const rows = await getCoverageByAgeCohort();
@@ -338,7 +339,7 @@ describe('immunization-service', () => {
       patientId: 'child-1-2y',
       vaccine: 'Penta',
       status: 'completed',
-      dateOfBirth: dob1y.toISOString().slice(0, 10),
+      dateOfBirth: toIsoDate(dob1y),
     }));
 
     // Child 2-5 years
@@ -348,7 +349,7 @@ describe('immunization-service', () => {
       patientId: 'child-2-5y',
       vaccine: 'Penta',
       status: 'completed',
-      dateOfBirth: dob2_5y.toISOString().slice(0, 10),
+      dateOfBirth: toIsoDate(dob2_5y),
     }));
 
     // Child 5+ years
@@ -358,7 +359,7 @@ describe('immunization-service', () => {
       patientId: 'child-5y+',
       vaccine: 'Penta',
       status: 'completed',
-      dateOfBirth: dob5y.toISOString().slice(0, 10),
+      dateOfBirth: toIsoDate(dob5y),
     }));
 
     const rows = await getCoverageByAgeCohort();
@@ -419,7 +420,7 @@ describe('immunization-service', () => {
       patientId: 'child-future',
       vaccine: 'OPV',
       status: 'scheduled',
-      nextDueDate: futureDate.toISOString().slice(0, 10),
+      nextDueDate: toIsoDate(futureDate),
       dateGiven: '2026-01-01',
       dateOfBirth: '2025-01-01',
     }));
@@ -489,7 +490,7 @@ describe('immunization-service', () => {
 
   test('getDefaulters with completed records having undefined dateGiven (line 167 coverage)', async () => {
     // Create an overdue record
-    const pastDate = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const pastDate = toIsoDate(new Date(Date.now() - 30 * 86400000));
     await createImmunization(makeImmData({
       patientId: 'child-with-undefined-date',
       vaccine: 'OPV',
@@ -516,7 +517,7 @@ describe('immunization-service', () => {
   });
 
   test('getDefaulters with all completed records having undefined dateGiven', async () => {
-    const pastDate = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const pastDate = toIsoDate(new Date(Date.now() - 30 * 86400000));
     await createImmunization(makeImmData({
       patientId: 'child-009',
       vaccine: 'Penta',
@@ -584,7 +585,7 @@ describe('immunization-service', () => {
   });
 
   test('getDefaultersByBoma groups defaulters correctly', async () => {
-    const pastDate = new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10);
+    const pastDate = toIsoDate(new Date(Date.now() - 15 * 86400000));
     await createImmunization(makeImmData({
       patientId: 'child-001',
       status: 'overdue',
@@ -598,7 +599,7 @@ describe('immunization-service', () => {
   });
 
   test('getDefaulterStats returns statistics', async () => {
-    const pastDate = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const pastDate = toIsoDate(new Date(Date.now() - 30 * 86400000));
     await createImmunization(makeImmData({
       patientId: 'child-001',
       status: 'overdue',
@@ -664,7 +665,7 @@ describe('immunization-service', () => {
 
   // ---- Lines 156-161: Test daysOverdue <= 0 skip condition ----
   test('getDefaulters skips records where daysOverdue is 0 or negative', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
     // Record with today as due date (daysOverdue = 0, should be skipped)
     await createImmunization(makeImmData({
       patientId: 'child-today',
@@ -682,7 +683,7 @@ describe('immunization-service', () => {
 
   // ---- Line 178: Test dueDate fallback to dateGiven when nextDueDate missing ----
   test('getDefaulters uses dateGiven when nextDueDate is missing', async () => {
-    const pastDate = new Date(Date.now() - 40 * 86400000).toISOString().slice(0, 10);
+    const pastDate = toIsoDate(new Date(Date.now() - 40 * 86400000));
     await createImmunization(makeImmData({
       patientId: 'child-no-next-due',
       vaccine: 'Penta',
@@ -724,7 +725,7 @@ describe('immunization-service', () => {
   // ---- Line 256: Test cohort not found condition ----
   test('getCoverageByAgeCohort handles children outside age cohort ranges', async () => {
     // Very old child (would be > 5 years, should fit in 5y+ cohort)
-    const veryOldDOB = new Date('1980-01-01').toISOString().slice(0, 10);
+    const veryOldDOB = '1980-01-01';
     await createImmunization(makeImmData({
       patientId: 'very-old-child',
       vaccine: 'BCG',
@@ -769,7 +770,7 @@ describe('immunization-service', () => {
   test('getDefaulters handles missing dateOfBirth', async () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+    const yesterdayStr = toIsoDate(yesterday);
 
     await createImmunization(makeImmData({
       patientId: 'overdue-no-dob',

@@ -21,6 +21,7 @@ import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
   XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3,
 } from '@/components/icons/lucide';
+import { todayIsoDate } from '@/lib/date-utils';
 
 const VACCINES = ['BCG', 'OPV', 'Penta', 'PCV', 'Rota', 'Measles', 'Yellow Fever', 'Vitamin A'];
 const SITES: Array<'left arm' | 'right arm' | 'left thigh' | 'right thigh' | 'oral'> = ['left arm', 'right arm', 'left thigh', 'right thigh', 'oral'];
@@ -97,7 +98,7 @@ export default function ImmunizationsPage() {
   // Form state
   const [form, setForm] = useState({
     patientId: '', patientName: '', gender: 'Male' as 'Male' | 'Female',
-    dateOfBirth: '', vaccine: 'BCG', doseNumber: 1, dateGiven: new Date().toISOString().slice(0, 10),
+    dateOfBirth: '', vaccine: 'BCG', doseNumber: 1, dateGiven: todayIsoDate(),
     nextDueDate: '', batchNumber: '', site: 'left arm' as typeof SITES[number],
     adverseReaction: false, adverseReactionDetails: '',
   });
@@ -172,7 +173,7 @@ export default function ImmunizationsPage() {
       status: 'completed',
     });
     setShowModal(false);
-    setForm({ patientId: '', patientName: '', gender: 'Male', dateOfBirth: '', vaccine: 'BCG', doseNumber: 1, dateGiven: new Date().toISOString().slice(0, 10), nextDueDate: '', batchNumber: '', site: 'left arm', adverseReaction: false, adverseReactionDetails: '' });
+    setForm({ patientId: '', patientName: '', gender: 'Male', dateOfBirth: '', vaccine: 'BCG', doseNumber: 1, dateGiven: todayIsoDate(), nextDueDate: '', batchNumber: '', site: 'left arm', adverseReaction: false, adverseReactionDetails: '' });
   };
 
   // Persist a correction to a saved dose, then close the edit modal.

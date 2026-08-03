@@ -19,13 +19,14 @@ import {
   getBirthStats,
 } from '@/lib/services/birth-service';
 import { ancDB } from '@/lib/db';
+import { todayIsoDate } from '@/lib/date-utils';
 
 type BirthInput = Parameters<typeof createBirth>[0];
 const makeBirthData = (overrides: Partial<BirthInput> = {}): BirthInput => ({
   childFirstName: 'Akech',
   childSurname: 'Deng',
   childGender: 'Female' as const,
-  dateOfBirth: new Date().toISOString().slice(0, 10), // today for thisMonth/thisYear tests
+  dateOfBirth: todayIsoDate(), // today for thisMonth/thisYear tests
   placeOfBirth: 'Juba Teaching Hospital',
   facilityId: 'hosp-001',
   facilityName: 'Juba Teaching Hospital',
@@ -118,7 +119,7 @@ describe('birth-service', () => {
   });
 
   test('getBirthStats calculates correctly', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
 
     await createBirth(makeBirthData({
       childGender: 'Male',

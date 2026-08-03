@@ -14,6 +14,7 @@ import type { HandoffPatientEntry, ShiftHandoffDoc } from '@/lib/db-types';
 import { ACCENT, useMarEntries, useWardRoster } from './shared';
 import { useHandoffs } from '@/lib/hooks/useHandoffs';
 import ListSearch from './ListSearch';
+import { toIsoDate } from '@/lib/date-utils';
 
 // Per-patient SBAR + tasks captured in the editor (string form for the textarea).
 interface SbarDraft {
@@ -55,7 +56,7 @@ export default function HandoffWorkflow({
   const [search, setSearch] = useState('');
 
   const now = new Date();
-  const todayKey = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  const todayKey = toIsoDate(now); // YYYY-MM-DD
   const shift = deriveShift(now.getHours());
   const todayDate = formatLongDate(now);
   const nowTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });

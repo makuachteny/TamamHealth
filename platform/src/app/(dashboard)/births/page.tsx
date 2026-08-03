@@ -12,6 +12,7 @@ import { FilterMenu } from '@/components/filters';
 import {
   Baby, Plus, X, ChevronDown, ChevronUp,
 } from '@/components/icons/lucide';
+import { todayIsoDate } from '@/lib/date-utils';
 
 export default function BirthsPage() {
   const { births, loading, register } = useBirths();
@@ -29,7 +30,7 @@ export default function BirthsPage() {
   const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
   const [form, setForm] = useState({
     childFirstName: '', childSurname: '', childGender: 'Male' as 'Male' | 'Female',
-    dateOfBirth: new Date().toISOString().slice(0, 10), placeOfBirth: '', facilityId: '', facilityName: '',
+    dateOfBirth: todayIsoDate(), placeOfBirth: '', facilityId: '', facilityName: '',
     motherName: '', motherAge: 0, motherNationality: 'South Sudanese',
     fatherName: '', fatherNationality: 'South Sudanese',
     birthWeight: 3000, birthType: 'single' as 'single' | 'twin' | 'multiple', deliveryType: 'normal' as 'normal' | 'caesarean' | 'assisted',
@@ -56,7 +57,7 @@ export default function BirthsPage() {
       });
       showToast(t('births.registeredSuccess'), 'success');
       setShowForm(false);
-      setForm({ childFirstName: '', childSurname: '', childGender: 'Male', dateOfBirth: new Date().toISOString().slice(0, 10), placeOfBirth: '', facilityId: '', facilityName: '', motherName: '', motherAge: 0, motherNationality: 'South Sudanese', fatherName: '', fatherNationality: 'South Sudanese', birthWeight: 3000, birthType: 'single', deliveryType: 'normal', attendedBy: '', registeredBy: '', state: '', county: '', certificateNumber: '' });
+      setForm({ childFirstName: '', childSurname: '', childGender: 'Male', dateOfBirth: todayIsoDate(), placeOfBirth: '', facilityId: '', facilityName: '', motherName: '', motherAge: 0, motherNationality: 'South Sudanese', fatherName: '', fatherNationality: 'South Sudanese', birthWeight: 3000, birthType: 'single', deliveryType: 'normal', attendedBy: '', registeredBy: '', state: '', county: '', certificateNumber: '' });
     } catch {
       showToast(t('births.registerFailed'), 'error');
     }

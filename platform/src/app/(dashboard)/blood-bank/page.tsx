@@ -11,6 +11,7 @@ import type { BloodBankDoc } from '@/lib/db-types';
 import Badge, { type BadgeTone } from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { formatDate } from '@/lib/format-utils';
+import { todayIsoDate, toIsoDate } from '@/lib/date-utils';
 
 const BLOOD_GROUPS: BloodBankDoc['bloodGroup'][] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -36,7 +37,7 @@ const STATUS_TONE: Record<BloodBankDoc['status'], BadgeTone> = {
   discarded: 'danger',
 };
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => todayIsoDate();
 const daysUntil = (date: string) =>
   Math.ceil((new Date(date).getTime() - new Date(todayStr()).getTime()) / 86400000);
 
@@ -62,7 +63,7 @@ export default function BloodBankPage() {
     component: 'whole_blood' as BloodBankDoc['component'],
     volume: 450,
     collectionDate: todayStr(),
-    expiryDate: new Date(Date.now() + 42 * 86400000).toISOString().slice(0, 10),
+    expiryDate: toIsoDate(new Date(Date.now() + 42 * 86400000)),
     donorName: '',
     notes: '',
   }), [suggestUnitId]);

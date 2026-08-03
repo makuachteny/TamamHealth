@@ -18,6 +18,7 @@ import {
   Thermometer, Pill, FlaskConical, Droplets,
   ShieldCheck, Truck, FileText,
 } from '@/components/icons/lucide';
+import { todayIsoDate } from '@/lib/date-utils';
 
 const ACCENT = '#0891B2';
 
@@ -102,7 +103,7 @@ export default function DataEntryDashboard() {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   const [showForm, setShowForm] = useState(false);
   const [census, setCensus] = useState<CensusData>(() => emptyCensus(today));
   const [savedReports, setSavedReports] = useState<CensusData[]>([]);

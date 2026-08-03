@@ -11,6 +11,7 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Building2, ClipboardCheck, Wifi, Droplets, Users, Activity, TrendingUp, ChevronDown, ChevronUp, Plus, X } from '@/components/icons/lucide';
 import Badge from '@/components/Badge';
+import { todayIsoDate } from '@/lib/date-utils';
 
 /**
  * Default values for the minimal create-assessment form. The full
@@ -20,7 +21,7 @@ import Badge from '@/components/Badge';
  */
 const EMPTY_FORM = {
   facilityId: '',
-  assessmentDate: new Date().toISOString().slice(0, 10),
+  assessmentDate: todayIsoDate(),
   generalEquipmentScore: 70,
   diagnosticCapacityScore: 70,
   essentialMedicinesScore: 70,

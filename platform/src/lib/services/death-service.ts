@@ -8,6 +8,7 @@ import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { findByType } from './db-query';
 import { jubaYearMonth, jubaIsInMonth } from '../time-juba';
+import { todayIsoDate } from '@/lib/date-utils';
 
 export async function getAllDeaths(scope?: DataScope): Promise<DeathRegistrationDoc[]> {
   const db = deathsDB();
@@ -51,7 +52,7 @@ export async function createDeath(data: Omit<DeathRegistrationDoc, '_id' | '_rev
     try {
       await updatePatient(data.patientId, {
         isDeceased: true,
-        deceasedDate: data.dateOfDeath || now.slice(0, 10),
+        deceasedDate: data.dateOfDeath || todayIsoDate(),
         followUpStatus: 'died',
         isActive: false,
       });
