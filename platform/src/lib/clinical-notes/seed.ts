@@ -126,8 +126,16 @@ export async function seedTextShortcutsFor(
       createdAt: ts,
       updatedAt: ts,
     };
-    await db.put(doc);
-    created += 1;
+    try {
+      await db.put(doc);
+      created += 1;
+    } catch (err) {
+      // A 409 means someone else laid this row down between our get() and our
+      // put() — React mounts effects twice in development, so two identical
+      // seed runs race routinely. The row exists either way, which is the whole
+      // point of a deterministic id; anything else is a real failure.
+      if ((err as { status?: number }).status !== 409) throw err;
+    }
   }
   return created;
 }

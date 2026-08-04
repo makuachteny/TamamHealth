@@ -33,10 +33,32 @@ function byUsage(a: TextShortcutDoc, b: TextShortcutDoc): number {
   return (a.name || '').localeCompare(b.name || '');
 }
 
+/**
+ * Rank shortcuts written for this section above the rest, without hiding
+ * anything.
+ *
+ * Section scoping used to filter: a shortcut tagged `plan` simply did not
+ * appear on Subjective. With every starter phrase tagged, opening the picker on
+ * an untagged section showed an empty list, which reads as a broken feature
+ * rather than a filtered one. A phrase is a starting point for prose — useful
+ * in more places than whoever saved it had in mind — so the section decides
+ * order, not visibility.
+ */
+function sectionFirst(sectionId: NoteSectionId | undefined) {
+  return (a: TextShortcutDoc, b: TextShortcutDoc): number => {
+    if (sectionId) {
+      const am = a.sectionId === sectionId ? 0 : 1;
+      const bm = b.sectionId === sectionId ? 0 : 1;
+      if (am !== bm) return am - bm;
+    }
+    return byUsage(a, b);
+  };
+}
+
 export interface ShortcutQuery {
   userId: string;
   orgId?: string;
-  /** Narrow to shortcuts valid for one section (unscoped ones always match). */
+  /** Section being edited. Ranks its shortcuts first; never hides the others. */
   sectionId?: NoteSectionId;
   /** Free-text filter from the picker's search box. */
   search?: string;
@@ -58,7 +80,7 @@ export async function getTextShortcuts(query: ShortcutQuery): Promise<TextShortc
     const mine = s.userId === query.userId;
     const sharedHere = !!s.shared && (!query.orgId || !s.orgId || s.orgId === query.orgId);
     if (!mine && !sharedHere) return false;
-    if (query.sectionId && s.sectionId && s.sectionId !== query.sectionId) return false;
+    // Section no longer excludes — see sectionFirst. It orders instead.
     if (term) {
       const hay = `${s.name} ${s.body}`.toLowerCase();
       if (!hay.includes(term)) return false;
@@ -66,7 +88,7 @@ export async function getTextShortcuts(query: ShortcutQuery): Promise<TextShortc
     return true;
   });
 
-  const sorted = visible.sort(byUsage);
+  const sorted = visible.sort(sectionFirst(query.sectionId));
   return typeof query.limit === 'number' ? sorted.slice(0, query.limit) : sorted;
 }
 

@@ -41,11 +41,16 @@ export default function TextShortcutPicker({
         // opening empty. Seeding is idempotent and never overwrites edits.
         let rows = await getTextShortcuts({ userId, orgId, sectionId });
         if (rows.length === 0 && userId) {
-          const anywhere = await getTextShortcuts({ userId, orgId });
-          if (anywhere.length === 0) {
+          // Lay down the starter set the first time, so the picker teaches what
+          // it is for instead of opening empty. Seeding is a convenience: if it
+          // fails, the clinician still gets a working (empty) picker rather
+          // than an unhandled rejection and a list that never loads.
+          try {
             const { seedTextShortcutsFor } = await import('@/lib/clinical-notes/seed');
             await seedTextShortcutsFor(userId, { orgId });
             rows = await getTextShortcuts({ userId, orgId, sectionId });
+          } catch {
+            /* keep whatever the first query returned */
           }
         }
         if (!cancelled) setAll(rows);
