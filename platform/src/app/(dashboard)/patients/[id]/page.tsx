@@ -10,7 +10,7 @@ import {
   Pill, Activity,
   ShieldAlert, ChevronRight,
   ClipboardList,
-  User as UserIcon, Building2, X, Wallet, Syringe,
+  User as UserIcon, Building2, X, Wallet, Syringe, Stethoscope,
   Heart, Printer, History, Calendar,
   Bandage, Layers, Plus,
 } from '@/components/icons/lucide';
@@ -50,6 +50,7 @@ import PatientSBAR from '@/components/patients/PatientSBAR';
 import DirectiveList from '@/components/patients/DirectiveList';
 import NotesList from '@/components/clinical-notes/NotesList';
 import { useCreateNote } from '@/lib/clinical-notes/useCreateNote';
+import type { ClinicalNoteDoc } from '@/lib/clinical-notes/types';
 import PhoneNotes from '@/components/patients/PhoneNotes';
 import AssessmentsPanel from '@/components/patients/AssessmentsPanel';
 import ScreeningsPanel from '@/components/patients/ScreeningsPanel';
@@ -327,6 +328,21 @@ export default function PatientDetailPage() {
     return () => { cancelled = true; };
   }, [patientIdForNotes]);
 
+  // Clinical notes for this patient. They are the encounter record now that
+  // the consultation wizard is retired, so the chart's Visits timeline needs
+  // them: without this, signing a note left no trace in the patient's history.
+  const [clinicalNotes, setClinicalNotes] = useState<ClinicalNoteDoc[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!patientIdForNotes) { setClinicalNotes([]); return; }
+    import('@/lib/clinical-notes/note-service')
+      .then(m => m.getNotesByPatient(patientIdForNotes))
+      .then(rows => { if (!cancelled) setClinicalNotes(rows); })
+      .catch(() => { /* the timeline simply omits notes */ });
+    return () => { cancelled = true; };
+    // notesRefreshToken re-reads after a note is created, saved or signed.
+  }, [patientIdForNotes, notesRefreshToken]);
+
   // ── "+ Note" → the clinical-notes module, edited in the chart's drawer. ──
   // Reopen today's unsigned draft when one exists (a second click must not
   // fork the record — the same rule useCreateNote applies per appointment),
@@ -568,27 +584,32 @@ export default function PatientDetailPage() {
   // Sections NOT on this rail (care plan, care coordination, notes,
   // demographics) still render if something deep-links to them — the tab model
   // in `allTabs` is unchanged — they are simply not navigation any more.
-  const OMRS_RAIL_DEFS: { id: string; label: string; icon: typeof Heart; clinicalOnly?: boolean }[] = [
-    { id: 'overview', label: 'Patient summary', icon: Heart },
-    { id: 'vitals', label: 'Vitals & Biometrics', icon: Activity },
-    { id: 'prescriptions', label: 'Medications', icon: Pill },
-    { id: 'orders', label: 'Orders', icon: ClipboardList },
-    { id: 'labs', label: 'Results', icon: FlaskConical },
+  // `group` is the heading of the rail card a section sits under: the clinical
+  // record a clinician works through, then the administrative tail that
+  // describes the patient rather than their care.
+  const OMRS_RAIL_DEFS: { id: string; label: string; icon: typeof Heart; group: string; clinicalOnly?: boolean }[] = [
+    { id: 'overview', label: 'Patient summary', icon: Heart, group: 'Clinical' },
+    { id: 'vitals', label: 'Vitals & Biometrics', icon: Activity, group: 'Clinical' },
+    { id: 'prescriptions', label: 'Medications', icon: Pill, group: 'Clinical' },
+    { id: 'orders', label: 'Orders', icon: ClipboardList, group: 'Clinical' },
+    { id: 'labs', label: 'Results', icon: FlaskConical, group: 'Clinical' },
     // The timeline IS the visit history — encounters, with the labs, drugs and
     // referrals that hung off them.
-    { id: 'history', label: 'Visits', icon: History },
-    { id: 'allergies', label: 'Allergies', icon: ShieldAlert },
-    { id: 'problems', label: 'Conditions', icon: AlertTriangle },
-    { id: 'immunizations', label: 'Immunizations', icon: Syringe },
-    { id: 'procedures', label: 'Procedures', icon: Bandage },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'programs', label: 'Programs', icon: Layers },
-    { id: 'appointments', label: 'Appointments', icon: Calendar },
+    { id: 'history', label: 'Visits', icon: History, group: 'Clinical' },
+    // The encounter notes themselves, next to the visits they document.
+    { id: 'notes', label: 'Notes', icon: Stethoscope, group: 'Clinical' },
+    { id: 'allergies', label: 'Allergies', icon: ShieldAlert, group: 'Clinical' },
+    { id: 'problems', label: 'Conditions', icon: AlertTriangle, group: 'Clinical' },
+    { id: 'immunizations', label: 'Immunizations', icon: Syringe, group: 'Clinical' },
+    { id: 'procedures', label: 'Procedures', icon: Bandage, group: 'Clinical' },
+    { id: 'programs', label: 'Programs', icon: Layers, group: 'Clinical' },
+    { id: 'documents', label: 'Documents', icon: FileText, group: 'Record' },
+    { id: 'appointments', label: 'Appointments', icon: Calendar, group: 'Record' },
     // Who the patient is, as registered — contact details, address, next of
     // kin, payor. Sits with the administrative tail rather than the clinical
     // sections above it, and only appears for roles whose `tabs` include it.
-    { id: 'demographics', label: 'Demographics', icon: UserIcon },
-    { id: 'billing', label: 'Billing history', icon: Wallet },
+    { id: 'demographics', label: 'Demographics', icon: UserIcon, group: 'Record' },
+    { id: 'billing', label: 'Billing history', icon: Wallet, group: 'Record' },
   ];
   // Role restrictions still apply: a lab technician's rail is the two sections
   // LAB_TAB_IDS allows, not the full list.
@@ -1350,6 +1371,8 @@ export default function PatientDetailPage() {
               <ConditionsSection
                 patientId={patient._id}
                 patientName={patientFullName(patient)}
+                noKnownProblems={patient.noKnownProblems}
+                reconciledAt={patient.problemReconciledAt}
                 autoOpenAdd={sectionAddRequest === 'problems'}
                 onAutoOpenHandled={() => setSectionAddRequest(null)}
               />
@@ -1384,9 +1407,10 @@ export default function PatientDetailPage() {
                   patientDob={patient.dateOfBirth}
                   currentUser={currentUser}
                   showCreate={canConsult}
-                  // In chart context a note opens beside the chart, not on the
-                  // standalone /notes route.
-                  onOpenNote={id => setChartPanelRequest(`clinical-note:${id}`)}
+                  // Opening a note leaves the chart for /notes/[id]: the note
+                  // is a document to be read and signed in full, and the
+                  // drawer gave it a third of the screen next to the chart it
+                  // was already summarising.
                   refreshToken={notesRefreshToken}
                 />
               </div>
@@ -1443,6 +1467,7 @@ export default function PatientDetailPage() {
           {activeTab === 'history' && patient && (
             <PatientTimeline
               medicalRecords={records}
+              clinicalNotes={clinicalNotes}
               labResults={allLabResults || []}
               prescriptions={allPrescriptions || []}
               immunizations={allImmunizations || []}
@@ -1487,6 +1512,9 @@ export default function PatientDetailPage() {
                 patientId={patient._id}
                 canPrescribe={canPrescribe}
                 onAdd={() => setShowPrescribeModal(true)}
+                noKnownMedications={patient.noKnownMedications}
+                reconciliation={patient.medReconciliation}
+                reconciledAt={patient.medReconciliationAt}
               />
             </div>
           )}

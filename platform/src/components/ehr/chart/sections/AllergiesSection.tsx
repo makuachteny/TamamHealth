@@ -54,7 +54,15 @@ export default function AllergiesSection({ patient, autoOpenAdd, onAutoOpenHandl
   return (
     <>
       <ChartSection title="Allergies" addLabel="Add" onAdd={() => setAdding(true)}>
-        {active.length === 0 ? (
+        {active.length === 0 && patient.noKnownDrugAllergies ? (
+          // An empty list and a recorded "none" are not the same fact. Empty
+          // means nobody has asked; NKDA means someone asked and the answer
+          // was none — and a prescriber deciding on an antibiotic needs to
+          // know which of the two they are looking at.
+          <p className="omrs-attestation">
+            <strong>No known drug allergies.</strong> Recorded at a medication review.
+          </p>
+        ) : active.length === 0 ? (
           <OmrsEmptyState itemLabel="allergies" actionLabel="Record allergies" onAction={() => setAdding(true)} />
         ) : (
           <table className="omrs-table">

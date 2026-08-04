@@ -40,14 +40,46 @@
    the column, which is the shell's full height; the nav inside it is only as
    tall as its list, so painting it there left the tint and the divider
    stopping in mid-air part-way down a long chart. */
+/* White canvas, white cards: the rail is one surface with the chart beside it,
+   and the CLINICAL / RECORD grouping is carried by the card hairlines alone.
+   Those hairlines and the hover tint are the chart's own cool neutrals — the
+   warm greys this rail used to run (#f1efec canvas, #eceae5 borders) were
+   pitched against the tint and read as dirt once it went. */
 .omrs-rail-col {
   /* Wide enough for the longest label — "Appointments & follow-up" — to sit on
      one line; below this it ellipsises and the rail looks broken. */
   flex: 0 0 234px;
   width: 234px;
   align-self: stretch;
-  background: var(--ehr-page-bg, #F8FBFD);
+  background: var(--ehr-panel, #fff);
   border-right: 1px solid var(--ehr-border, #D8E3EC);
+}
+
+.omrs-rail-card {
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 10px;
+  background: var(--ehr-panel, #fff);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.omrs-rail-card:last-child { margin-bottom: 0; }
+
+.omrs-rail-cardhead {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ehr-muted, #597386);
+  border-bottom: 1px solid var(--ehr-border, #D8E3EC);
+}
+
+.omrs-rail-cardbody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px;
 }
 
 /* One flat list — no groups, no collapsed "More sections". With nothing to
@@ -66,8 +98,10 @@
      a stretched flex column makes all of them one width. */
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 10px 8px 22px;
+  gap: 0;
+  /* No top padding: the rail's first card meets the patient header beside it
+     rather than starting fourteen pixels below the line the header starts on. */
+  padding: 0 12px 22px;
 }
 
 /* Rows are the top rail's modules dropdown: inset pills, 6px radius, filling
@@ -95,13 +129,19 @@
 
 /* Hover and selection are one treatment, down to the weight — the dropdown
    makes no distinction between them either. */
-.omrs-rail-item:hover,
+/* Hover is a quiet warm tint and only the CURRENT section is filled — the old
+   rule painted hover the same solid blue as the active row, so dragging the
+   pointer down the rail made every section look selected in turn. */
+/* On the old warm canvas a #f5f3f0 hover was visible; on white it vanished.
+   This is the tint the rest of the app hovers with (`--accent-light`). */
+.omrs-rail-item:hover { background: var(--accent-light, rgba(33, 145, 208, 0.08)); }
 .omrs-rail-item.is-active {
   /* --tb-blue-900 rather than --nav-active-bg, for the reason the dropdown's
      own rule gives: org branding rewrites the latter at runtime, and a light
      org primary renders white-on-white. */
   background: var(--tb-blue-900);
   color: #fff;
+  font-weight: 600;
 }
 
 /* Keep the focus ring inside the row — at the global +2px offset it overlaps
@@ -132,7 +172,7 @@
    icon rules document. The active row is NOT filled, so its glyph takes the
    teal ink; white there would erase it against the rail. */
 .omrs-left-rail .omrs-rail-item:hover svg {
-  color: #fff;
+  color: var(--ehr-muted, #8395A8);
   stroke: currentColor;
 }
 
@@ -1750,3 +1790,19 @@
 /* Columns are sized by colgroup; keep the cells from re-negotiating it. */
 .omrs-table--conditions { table-layout: fixed; }
 .omrs-table--conditions td:first-child { white-space: normal; }
+
+/* An attestation recorded during a note's medication / problem / allergy
+   review: "no known drug allergies", "reconciliation performed". It is not an
+   empty state — it is a positive clinical statement that someone asked and the
+   answer was none, which is exactly what an empty list cannot tell you. */
+.omrs-attestation {
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-left: 3px solid var(--ehr-success-text, #0E7155);
+  border-radius: 6px;
+  background: var(--ehr-panel, #fff);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ehr-text-body, #39536B);
+}

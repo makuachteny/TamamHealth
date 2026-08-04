@@ -4221,6 +4221,7 @@ const nus: TranslationMap = {
   'storyboard.consultedBy': 'kɛ {{name}}',
   'roleGuard.noAccessMessage': 'Lätdu ({{role}}) cɛ luɔk kä page emɔ.',
   'timeline.categoryTriage': 'Tɛk Juɔ̱c',
+  'timeline.categoryNote': 'Note',
   'timeline.categoryConsultation': 'Loop',
   'timeline.categoryLab': 'Lab',
   'timeline.categoryRx': 'Wal',

@@ -31,6 +31,7 @@ import EhrModuleMenu from './EhrModuleMenu';
 import EhrTopActions from './EhrTopActions';
 import QuickActions from '@/components/QuickActions';
 import {
+  activeNavItem,
   getPrimaryShortcutItems,
   groupNavItemsBySection,
   isHrefAllowed,
@@ -152,13 +153,9 @@ export default function EhrTopRail() {
     return item.label;
   };
 
-  const activeModuleItem = useMemo(() => {
-    const isActiveHref = (href?: string) => !!href && (pathname === href || pathname?.startsWith(href + '/'));
-    const matches = navItems
-      .filter(item => isActiveHref(item.href))
-      .sort((a, b) => (b.href?.length || 0) - (a.href?.length || 0));
-    return matches[0] || null;
-  }, [navItems, pathname]);
+  // Resolved once, then handed to the dropdown and the shortcut row, so all
+  // three surfaces name the same module instead of each matching on its own.
+  const activeModuleItem = useMemo(() => activeNavItem(navItems, pathname), [navItems, pathname]);
 
   const ActiveModuleIcon = activeModuleItem?.icon || LayoutDashboard;
 
@@ -238,7 +235,7 @@ export default function EhrTopRail() {
           <EhrModuleMenu
             groups={navGroups}
             roleLabel={roleLabel}
-            pathname={pathname}
+            activeHref={activeModuleItem?.href}
             navLabel={navLabel}
             onOpenModule={openModule}
           />
@@ -247,6 +244,7 @@ export default function EhrTopRail() {
         <EhrTopActions
           items={headerShortcutItems}
           navLabel={navLabel}
+          activeHref={activeModuleItem?.href}
           onOpenModule={openModule}
           badges={moduleBadges}
         />

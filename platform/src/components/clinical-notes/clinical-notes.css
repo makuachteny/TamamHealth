@@ -196,8 +196,10 @@
 /* Design: white cards on a warm gray canvas — each card is a header row over a
    hairline, then its body. Flat: separation comes from the background, not
    shadows. */
+/* No top padding: the rail's first card meets the header band beside it
+   instead of floating fourteen pixels below the line the header starts on. */
 .cn-sidebar {
-  padding: 14px 12px;
+  padding: 0 12px 14px;
   overflow-y: auto;
   background: #f1efec;
 }

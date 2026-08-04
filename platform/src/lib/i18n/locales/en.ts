@@ -5758,6 +5758,7 @@ const en: TranslationMap = {
   'timeline.batchNumber': 'Batch {{batch}}',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'Appointment',
+  'timeline.categoryNote': 'Note',
   'timeline.categoryConsultation': 'Consultation',
   'timeline.categoryLab': 'Lab',
   'timeline.categoryReferral': 'Referral',

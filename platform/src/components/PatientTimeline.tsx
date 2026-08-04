@@ -7,6 +7,8 @@ import type {
   MedicalRecordDoc, LabResultDoc, PrescriptionDoc, ImmunizationDoc,
   ReferralDoc, ANCVisitDoc, AppointmentDoc, TriageDoc,
 } from '@/lib/db-types';
+import type { ClinicalNoteDoc } from '@/lib/clinical-notes/types';
+import { getNoteType } from '@/lib/clinical-notes/note-catalog';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { formatRxSig, humanizeStatus } from '@/lib/format-utils';
 import ChartSection, { OmrsEmptyState } from '@/components/ehr/chart/ChartSection';
@@ -24,6 +26,9 @@ type TFunc = (key: string, vars?: Record<string, string | number>) => string;
  */
 export interface PatientTimelineProps {
   medicalRecords?: MedicalRecordDoc[];
+  /** Clinical notes — the encounter record since the consultation wizard was
+   *  retired, so the history is incomplete without them. */
+  clinicalNotes?: ClinicalNoteDoc[];
   labResults?: LabResultDoc[];
   prescriptions?: PrescriptionDoc[];
   immunizations?: ImmunizationDoc[];
@@ -36,7 +41,7 @@ export interface PatientTimelineProps {
 interface TimelineEvent {
   id: string;
   date: string;            // ISO or YYYY-MM-DD
-  category: 'triage' | 'consultation' | 'lab' | 'prescription' | 'immunization' | 'referral' | 'anc' | 'appointment';
+  category: 'triage' | 'consultation' | 'note' | 'lab' | 'prescription' | 'immunization' | 'referral' | 'anc' | 'appointment';
   title: string;
   subtitle?: string;
   meta?: string;
@@ -49,6 +54,7 @@ interface TimelineEvent {
 const CATEGORY_CONFIG: Record<TimelineEvent['category'], { color: string; labelKey: string }> = {
   triage:        { color: '#FB923C',               labelKey: 'timeline.categoryTriage' },
   consultation:  { color: 'var(--accent-primary)', labelKey: 'timeline.categoryConsultation' },
+  note:          { color: '#7C3AED',               labelKey: 'timeline.categoryNote' },
   lab:           { color: 'var(--accent-primary)', labelKey: 'timeline.categoryLab' },
   prescription:  { color: '#0D9488',               labelKey: 'timeline.categoryRx' },
   immunization:  { color: '#059669',               labelKey: 'timeline.categoryVaccine' },
@@ -56,6 +62,17 @@ const CATEGORY_CONFIG: Record<TimelineEvent['category'], { color: string; labelK
   anc:           { color: '#EC4899',               labelKey: 'timeline.categoryAnc' },
   appointment:   { color: '#6366F1',               labelKey: 'timeline.categoryAppointment' },
 };
+
+/** First line of real text in a note, for the timeline's subtitle. */
+function notePreviewLine(note: ClinicalNoteDoc): string | undefined {
+  for (const section of note.sections) {
+    const body = (section.text || section.snapshot || '')
+      .replace(/<!--\/?template-->/g, '')
+      .trim();
+    if (body) return body.split('\n')[0].slice(0, 90);
+  }
+  return undefined;
+}
 
 function buildEvents(props: PatientTimelineProps, t: TFunc): TimelineEvent[] {
   const events: TimelineEvent[] = [];
@@ -94,6 +111,28 @@ function buildEvents(props: PatientTimelineProps, t: TFunc): TimelineEvent[] {
       subtitle: dx || r.providerName || undefined,
       meta: r.providerName ? `${r.providerName}${r.department ? ` · ${r.department}` : ''}` : r.department,
       badge: r.visitType ? { label: humanizeStatus(r.visitType), bg: 'rgba(59, 130, 246,0.10)', color: 'var(--accent-primary)' } : undefined,
+    });
+  }
+
+  // Clinical notes. Unsigned drafts are shown and labelled as such rather than
+  // hidden: a draft is work in progress on this patient's record, and a
+  // history that silently omits it reads as "nothing happened that day".
+  for (const n of props.clinicalNotes || []) {
+    const diagnoses = n.sections
+      .flatMap(s => s.diagnoses || [])
+      .map(d => `${d.name}${d.icd11Code ? ` (${d.icd11Code})` : ''}`);
+    const signed = n.status === 'signed' || n.status === 'amended';
+    events.push({
+      id: `cn-${n._id}`,
+      date: n.serviceTime ? `${n.serviceDate}T${n.serviceTime}` : n.serviceDate,
+      category: 'note',
+      title: getNoteType(n.noteType).label,
+      subtitle: diagnoses.length ? diagnoses.join(', ') : notePreviewLine(n),
+      meta: [n.signedByName || n.assignedToName || n.authorName, n.hospitalName]
+        .filter(Boolean).join(' · ') || undefined,
+      badge: signed
+        ? { label: n.status === 'amended' ? 'Amended' : 'Signed', bg: 'rgba(31, 157, 111,0.12)', color: 'var(--color-success)' }
+        : { label: n.status === 'awaiting_cosign' ? 'Awaiting co-sign' : 'Unsigned', bg: 'rgba(252,211,77,0.16)', color: 'var(--color-warning)' },
     });
   }
 
