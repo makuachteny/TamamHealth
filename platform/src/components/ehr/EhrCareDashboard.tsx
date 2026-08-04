@@ -2,7 +2,7 @@
 
 import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
@@ -542,15 +542,12 @@ export default function EhrCareDashboard({
                           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); } }}
                         >
                           <div className="ehr-appointment-identity">
-                            {/* The caret is the row's own affordance: details
-                                open underneath, they do not fly in over the
-                                list. Rows that navigate elsewhere (onOpen) get
-                                no caret, because nothing expands. */}
-                            {!row.onOpen && (
-                              <span className="ehr-row-caret" aria-hidden>
-                                <ChevronDown className="w-4 h-4" />
-                              </span>
-                            )}
+                            {/* No caret ahead of the avatar: the doctor
+                                dashboard's rows expand the same way without
+                                one, and every role's worklist should read as
+                                the same control. The row itself is the
+                                affordance — `aria-expanded` still tells
+                                assistive tech what it does. */}
                             <div className="ehr-patient-icon" style={stateTint(avatarAcuity)}>
                               {row.photoUrl
                                 // eslint-disable-next-line @next/next/no-img-element

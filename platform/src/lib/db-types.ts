@@ -846,6 +846,14 @@ export interface MessageDoc extends BaseDoc {
   channel: 'app' | 'sms' | 'both';
   status: 'sent' | 'delivered' | 'failed';
   sentAt: string;
+  /**
+   * Set when the message was sent as patient education (the chart header's
+   * "Patient education" action) — the chart's Documents ▸ Patient education
+   * view lists these as material already delivered to the patient. A flag
+   * rather than a subject match, so the classification survives the sender
+   * editing the subject line.
+   */
+  patientEducation?: boolean;
   orgId?: string;
   /**
    * Internal staff chat: groups a message into a conversation thread.
@@ -1023,12 +1031,19 @@ export interface ConsultationTemplateDoc extends BaseDoc {
   orgId?: string;
 }
 
-/** Category a scanned/uploaded chart document is filed under. */
+/**
+ * Category a scanned/uploaded chart document is filed under.
+ *
+ * Two of these also decide which view of the chart's Documents section a
+ * document lands in: `referral_letter` files it under Referrals and
+ * `patient_education` under Patient education. Everything else is a general
+ * chart document.
+ */
 export type PatientDocumentCategory =
   | 'radiology' | 'lab_report' | 'referral_letter' | 'discharge_summary'
   | 'consent' | 'advance_directive' | 'legal_document' | 'treatment_agreement'
   | 'insurance' | 'id_document' | 'prescription' | 'scanned_record'
-  | 'external_medical_record' | 'other';
+  | 'external_medical_record' | 'patient_education' | 'other';
 
 /**
  * A scanned or uploaded document filed on the patient chart — radiology films,

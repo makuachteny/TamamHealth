@@ -333,7 +333,7 @@ export default function PatientIntakePage() {
               }
             />
 
-            <div className="p-4">
+            <div className="ehr-list-scroll">
               {loading ? (
                 <p className="text-[13px] py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</p>
               ) : filtered.length === 0 ? (

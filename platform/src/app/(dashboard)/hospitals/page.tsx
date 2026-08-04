@@ -358,11 +358,15 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
   }
 
   return (
-    <div style={{ padding: '0 16px', overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+    <div className="ehr-list-scroll">
       <table className="data-table" style={{ minWidth: 940, tableLayout: 'fixed' }}>
+        {/* The Manage <col> only exists when the Manage cells do. It used to be
+            declared unconditionally, so for a user without that permission
+            `table-layout: fixed` reserved 8% for a column with no cells and
+            every row stopped short of the card's right edge. */}
         <colgroup>
           <col style={{ width: '4%' }} />
-          <col style={{ width: '20%' }} />
+          <col style={{ width: canManage ? '20%' : '28%' }} />
           <col style={{ width: '10%' }} />
           <col style={{ width: '14%' }} />
           <col style={{ width: '9%' }} />
@@ -370,7 +374,7 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
           <col style={{ width: '7%' }} />
           <col style={{ width: '10%' }} />
           <col style={{ width: '11%' }} />
-          <col style={{ width: '8%' }} />
+          {canManage && <col style={{ width: '8%' }} />}
         </colgroup>
         <thead>
           <tr>

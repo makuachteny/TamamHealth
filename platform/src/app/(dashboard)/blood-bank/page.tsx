@@ -415,7 +415,7 @@ export default function BloodBankPage() {
               </button>
             }
           />
-          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <div className="ehr-list-scroll">
           {loading ? (
             <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</div>
           ) : units.length === 0 ? (
@@ -476,7 +476,7 @@ export default function BloodBankPage() {
                       <td>
                         <Badge tone={STATUS_TONE[u.status]}>{u.status}</Badge>
                       </td>
-                      <td>
+                      <td className="is-right">
                         <RowActionsMenu actions={rowActions(u)} ariaLabel={`Actions for unit ${u.unitId}`} />
                       </td>
                     </tr>

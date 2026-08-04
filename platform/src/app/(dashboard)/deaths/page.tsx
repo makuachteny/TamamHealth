@@ -209,7 +209,7 @@ export default function DeathsPage() {
               </>
             }
           />
-          <div style={{ padding: '0 16px', overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <div className="ehr-list-scroll">
           <table className="data-table" style={{ minWidth: 1040, tableLayout: 'fixed' }}>
             <colgroup>
               {deathCols.map(c => (

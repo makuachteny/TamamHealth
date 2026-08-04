@@ -162,7 +162,7 @@ function NotificationsPageInner() {
                 <button
                   type="button"
                   onClick={markAllRead}
-                  className="flex items-center gap-1.5 px-3 h-[38px] rounded-full text-[12px] font-semibold flex-shrink-0"
+                  className="flex items-center gap-1.5 px-3 h-[38px] rounded-lg text-[12px] font-semibold flex-shrink-0"
                   style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)' }}
                 >
                   <Check className="w-4 h-4" style={{ stroke: 'currentColor' }} />

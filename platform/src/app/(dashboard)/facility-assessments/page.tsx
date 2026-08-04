@@ -159,22 +159,24 @@ export default function FacilityAssessmentsPage() {
               </button>
             )}
           />
-          <div className="overflow-x-auto" style={{ padding: '0 16px' }}>
-          <table className="data-table" style={{ minWidth: 1120, tableLayout: 'fixed' }}>
+          <div className="ehr-list-scroll">
+          {/* Wider so "2026-01-20" and the state names hold one line — at 6%
+              the date broke across two rows and every row grew unevenly. */}
+          <table className="data-table" style={{ minWidth: 1220, tableLayout: 'fixed' }}>
             <colgroup>
-              <col style={{ width: '16%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} />
+              <col style={{ width: '15%' }} />
+              <col style={{ width: '10%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '6%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
               <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '10%' }} />
             </colgroup>
             <thead>
               <tr>

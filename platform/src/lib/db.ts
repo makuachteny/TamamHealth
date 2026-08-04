@@ -317,7 +317,13 @@ export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 // Bumped to 59: lab seed rows now carry accession numbers, specimen condition,
 // collection/receipt timestamps, and a rejection/recollection example so the
 // LIMS workflow additions are visible in fresh demo data.
-export const SEED_VERSION = 59;
+// Bumped to 60: patient-education messages (msg-edu-1..3) for three patients
+// who also have referrals, so the chart's Documents ▸ Patient education view
+// has delivered material to show in fresh demo data.
+// Bumped to 61: chart documents (pdoc-seed-001..010) — reports, referral
+// letters, education handouts and a consent form, as real one-page PDFs — so
+// all three views of the chart's Documents section open with content.
+export const SEED_VERSION = 61;
 
 export async function isSeeded(): Promise<boolean> {
   try {

@@ -656,7 +656,7 @@ export default function ImmunizationsPage() {
                   )}
                 </div>
               </div>
-              <div className="overflow-x-auto" style={{ padding: '0 16px' }}>
+              <div className="ehr-list-scroll">
                 <table className="data-table" style={{ minWidth: 1080, tableLayout: 'fixed' }}>
                   <colgroup>
                     <col style={{ width: '16%' }} />

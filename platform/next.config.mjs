@@ -91,6 +91,13 @@ const nextConfig = {
               "img-src 'self' data: blob:",
               `connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com${couchdbConnectSrc}${posthogConnectSrc}`,
               "worker-src 'self' blob:",
+              // Chart document previews frame the decoded file as a blob: URL
+              // so Chrome's PDF viewer can render it. Without this, blob frames
+              // fall back to `default-src 'self'` and every PDF preview in the
+              // patient chart shows the viewer's broken-file icon. Same-origin
+              // and blob: only — `object-src 'none'` below still stands, and
+              // this app is never framed itself (`frame-ancestors 'none'`).
+              "frame-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

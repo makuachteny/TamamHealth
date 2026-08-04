@@ -54,7 +54,6 @@ import ScreeningsPanel from '@/components/patients/ScreeningsPanel';
 import RemindersPanel from '@/components/patients/RemindersPanel';
 import TransferHistoryPanel, { TransferBanner } from '@/components/patients/TransferHistoryPanel';
 import DocumentsPanel from '@/components/patients/DocumentsPanel';
-import SuperbillPanel from '@/components/patients/SuperbillPanel';
 import { useProblems } from '@/lib/hooks/useProblems';
 import type {
   AppointmentDoc,
@@ -189,6 +188,11 @@ export default function PatientDetailPage() {
   const [messageSending, setMessageSending] = useState(false);
   const [messageError, setMessageError] = useState('');
   const [messageSent, setMessageSent] = useState(false);
+  // Set when the composer was opened from a "Patient education" action, so the
+  // sent message is flagged as education and lists under Documents ▸ Patient
+  // education. Tracked separately from the subject line, which the sender may
+  // rewrite before sending.
+  const [messageIsEducation, setMessageIsEducation] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPaymentPanel, setShowPaymentPanel] = useState(false);
   const [showPlanWizard, setShowPlanWizard] = useState(false);
@@ -470,6 +474,7 @@ export default function PatientDetailPage() {
         subject: messageSubject.trim() || 'Patient message',
         body,
         channel: messageChannel,
+        patientEducation: messageIsEducation || undefined,
         sentAt: new Date().toISOString(),
         orgId: currentUser.orgId,
       });
@@ -477,6 +482,7 @@ export default function PatientDetailPage() {
       setMessageBody('');
       setMessageSubject('Follow-up from your care team');
       setMessageChannel('app');
+      setMessageIsEducation(false);
     } catch (err) {
       console.error(err);
       setMessageError('Could not send this message. Please try again.');
@@ -505,7 +511,7 @@ export default function PatientDetailPage() {
     { id: 'demographics', label: 'Demographics', icon: UserIcon },
     { id: 'billing', label: 'Billing history', icon: Wallet },
     { id: 'careChecklist', label: 'Care plan', icon: ClipboardList },
-    { id: 'documents', label: 'Attachments', icon: FileText },
+    { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'appointments', label: 'Appointments', icon: Calendar },
     { id: 'referrals', label: 'Care coordination', icon: ArrowRightLeft },
   ];
@@ -543,7 +549,7 @@ export default function PatientDetailPage() {
     { id: 'problems', label: 'Conditions', icon: AlertTriangle },
     { id: 'immunizations', label: 'Immunizations', icon: Syringe },
     { id: 'procedures', label: 'Procedures', icon: Bandage },
-    { id: 'documents', label: 'Attachments', icon: FileText },
+    { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'programs', label: 'Programs', icon: Layers },
     { id: 'appointments', label: 'Appointments', icon: Calendar },
     // Who the patient is, as registered — contact details, address, next of
@@ -1164,12 +1170,14 @@ export default function PatientDetailPage() {
                 pregnancyPill={pregnancyPillNode}
                 patientBalance={patientBalance}
                 onCollectPayment={openPaymentFromHeader}
-                onMessage={() => setShowMessageModal(true)}
+                onMessage={() => { setMessageIsEducation(false); setShowMessageModal(true); }}
                 onPrint={() => { setPrintSignature(currentUser?.name || ''); setPrintSections(new Set(DEFAULT_PRINT_SECTIONS)); setPrintSigned(false); setShowPrintModal(true); }}
                 onPatientEd={() => {
                   // Real patient-education action: a message queued to the
                   // patient (app/SMS), pre-labelled — not just a tab switch.
+                  // The flag files it under Documents ▸ Patient education.
                   setMessageSubject('Patient education');
+                  setMessageIsEducation(true);
                   setShowMessageModal(true);
                 }}
                 onNote={() => (canConsult ? setChartPanelRequest('visit-note') : setActiveTab('notes'))}
@@ -1383,7 +1391,22 @@ export default function PatientDetailPage() {
 
           {activeTab === 'documents' && patient && (
             <div className="space-y-4">
-              <DocumentsPanel patient={patient} />
+              {/* Documents ▸ Referrals ▸ Patient education. Referrals are read
+                  here (the record itself is owned by the referrals module) and
+                  education reuses the header's own send action, so the section
+                  adds no second way to do either. */}
+              <DocumentsPanel
+                patient={patient}
+                referrals={patientReferrals}
+                canViewClinical={canViewClinical}
+                onSendEducation={() => {
+                  setMessageSubject('Patient education');
+                  setMessageIsEducation(true);
+                  setShowMessageModal(true);
+                }}
+                onOpenAllReferrals={() => router.push(`/referrals?patient=${encodeURIComponent(patientFullName(patient))}`)}
+                onNewReferral={canManageReferrals ? () => setShowReferModal(true) : undefined}
+              />
             </div>
           )}
 
@@ -1650,14 +1673,9 @@ export default function PatientDetailPage() {
 
           {activeTab === 'billing' && (
             <div className="space-y-5">
-              {/* Clinician-facing superbill / fee ticket — review + post charges (P2.3). */}
-              <div className="card-elevated p-5">
-                <SuperbillPanel
-                  patient={patient}
-                  encounterId={(records[0] as { encounterId?: string } | undefined)?.encounterId}
-                  hospitalName={hospitals.find(h => h._id === patient.registrationHospital)?.name}
-                />
-              </div>
+              {/* The superbill / fee ticket (P2.3) is no longer its own card —
+                  its service picker rides the Charges toolbar inside BillingTab
+                  and the draft ticket renders above the charges it prices. */}
               <BillingTab
                 patient={patient}
                 patientBalance={patientBalance}
@@ -1666,6 +1684,8 @@ export default function PatientDetailPage() {
                 setShowPaymentPanel={setShowPaymentPanel}
                 setShowPlanWizard={setShowPlanWizard}
                 reloadPayments={reloadPayments}
+                superbillEncounterId={(records[0] as { encounterId?: string } | undefined)?.encounterId}
+                hospitalName={hospitals.find(h => h._id === patient.registrationHospital)?.name}
               />
             </div>
           )}

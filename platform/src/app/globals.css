@@ -5316,7 +5316,8 @@ html:has(.ehr-top-rail) {
   align-items: center;
   gap: 8px;
   min-height: 60px;
-  padding: 6px 12px;
+  /* 16px ends — same inset as the module list tables and the registry rows. */
+  padding: 6px 16px;
   border: 1px solid var(--ehr-border);
   border-radius: 14px;
   background: #fff;
@@ -14308,7 +14309,7 @@ span:has(> svg:only-child) {
   grid-template-columns: minmax(360px, 1.45fr) minmax(120px, 0.48fr) minmax(240px, 0.85fr) minmax(210px, 0.75fr) minmax(150px, 0.52fr);
   gap: 22px;
   min-height: 60px;
-  padding: 8px 18px;
+  padding: 8px 16px;
 }
 
 .ehr-center-panel .ehr-appointment-row:not(.ehr-care-row) .ehr-status-menu {
@@ -16496,8 +16497,11 @@ textarea.ehr-handoff-input {
   padding-inline: 4px;
 }
 
+/* 16px ends across every list surface — the row's rounded border holds the
+   avatar and the status pill a consistent 16px inboard, matching the module
+   tables (`.ehr-list-scroll`) and the appointments board. */
 .ehr-appointment-row:not(.ehr-care-row) {
-  padding-inline: 9px;
+  padding-inline: 16px;
 }
 
 @media (min-width: 640px) {
@@ -16987,7 +16991,8 @@ textarea.ehr-handoff-input {
   gap: 16px;
   align-items: center;
   min-height: 56px;
-  padding: 8px 10px;
+  /* 16px ends — shared row-end inset with every other list card. */
+  padding: 8px 16px;
   border: 1px solid var(--ehr-border);
   border-radius: 10px;
   background: #fff;
@@ -17010,7 +17015,9 @@ textarea.ehr-handoff-input {
   display: grid;
   gap: 16px;
   align-items: center;
-  padding: 0 9px;
+  /* Card side padding (16px) minus the card's 1px border, so the labels sit
+     exactly over the values below them. */
+  padding: 0 15px;
   margin-bottom: -2px;
 }
 
@@ -17304,7 +17311,7 @@ textarea.ehr-handoff-input {
 
 .ehr-care-list .ehr-queue-guide--care {
   grid-template-columns: minmax(260px, 1.7fr) minmax(104px, 0.8fr) minmax(112px, 0.9fr) minmax(104px, 0.8fr) minmax(132px, 1fr) minmax(92px, 0.7fr);
-  padding: 0 9px;
+  padding: 0 15px;
   margin: 0 0 -2px;
 }
 
@@ -17469,7 +17476,7 @@ textarea.ehr-handoff-input {
 
 .ehr-assigned-worklist-list .ehr-queue-card--worklist {
   min-height: 58px;
-  padding: 8px 15px;
+  padding: 8px 16px;
   border: 1px solid var(--ehr-border);
   border-radius: 8px;
   background: #fff;
@@ -18284,7 +18291,7 @@ textarea.ehr-handoff-input {
   align-items: center;
   /* Tracks the row's side padding so the column labels stay over their
      values. */
-  padding: 0 4px 6px;
+  padding: 0 16px 6px;
   background: #fff;
   color: var(--text-muted);
   font-size: 10px;
@@ -18300,14 +18307,14 @@ textarea.ehr-handoff-input {
   padding-right: 6px;
 }
 
-/* 4px side padding, down from 16px: with the list gutter cut to 1px, the
-   row's own inset was what still held the avatar and the status pill off the
-   panel edges. Vertical stays at 9px — only the sides tighten. */
+/* 16px side padding — the canonical row-end inset every module list shares
+   (`.ehr-list-scroll` cells, `.patient-data-cell`): the avatar and the status
+   pill both sit a clear 16px inside the card's rounded border. */
 .appointment-card-row.ehr-appointment-row {
   grid-template-columns: minmax(320px, 1.6fr) repeat(4, minmax(150px, 1fr));
   gap: 24px;
   min-height: 64px;
-  padding: 9px 4px;
+  padding: 9px 16px;
   border-radius: 14px;
   box-shadow: none;
 }
@@ -18898,6 +18905,13 @@ textarea.ehr-handoff-input {
 .listpage-icon-btn:hover {
   background: rgba(33, 145, 208, 0.08);
   border-color: var(--accent-border);
+}
+/* Filters button while filters are applied — same tinted state the icon-select
+   funnel uses, so the two read as one control family. */
+.listpage-icon-btn.is-active {
+  border-color: var(--accent-primary);
+  background: rgba(33, 145, 208, 0.10);
+  color: var(--accent-primary);
 }
 .listpage-icon-btn-primary {
   background: var(--accent-primary);
@@ -22442,6 +22456,9 @@ table.patient-data-table.patient-data-table {
   background: #fff !important;
 }
 
+/* `capitalize`, not `uppercase`: the appointments board and the module
+   worklists both title-case their column labels, and the registry was the one
+   screen still shouting them. */
 .patient-data-head-cell span {
   overflow: hidden;
   color: inherit;
@@ -22449,7 +22466,7 @@ table.patient-data-table.patient-data-table {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
-  text-transform: uppercase;
+  text-transform: capitalize;
   white-space: nowrap;
 }
 
@@ -22470,12 +22487,12 @@ table.patient-data-table.patient-data-table {
 
 .patient-data-row .patient-data-cell:first-child {
   border-left: 1px solid var(--ehr-border);
-  border-radius: 12px 0 0 12px;
+  border-radius: 14px 0 0 14px;
 }
 
 .patient-data-row .patient-data-cell:last-child {
   border-right: 1px solid var(--ehr-border);
-  border-radius: 0 12px 12px 0;
+  border-radius: 0 14px 14px 0;
 }
 
 .patient-data-row:hover .patient-data-cell,
@@ -22591,6 +22608,232 @@ table.patient-data-table.patient-data-table {
 
   .patient-data-head-cell.is-right.has-row-action {
     padding-right: 60px;
+  }
+}
+
+/* ============ Shared module list surface (.ehr-list-scroll) ============
+   One row language for every module worklist — lab, referrals, pharmacy,
+   births, deaths, equipment and the rest — so moving between them does not
+   change the shape of the screen.
+
+   The appointments board is the reference. It escapes the app-wide table
+   theming only because it is a div grid rather than a <table>, which is why
+   every other module read as a different product. This block reproduces its
+   metrics (16px gutters, 8px between rows, 64px rows, 14px radius, hairline
+   border that turns blue on hover) for a plain `.data-table`, so a page opts
+   in by putting `ehr-list-scroll` on its scroll container — no per-cell
+   classes, no markup rewrite.
+
+   `!important` and the `.tamam-ehr-app` prefix are both required: the role
+   theme sets `border-collapse: collapse`, a tinted sentence-case header, and
+   a bottom rule on every cell, all with `!important`. Those are exactly the
+   three things that flatten a card row back into a spreadsheet row. */
+.ehr-list-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 16px;
+  background: #fff;
+}
+
+.tamam-ehr-app .ehr-list-scroll .data-table,
+.ehr-list-scroll .data-table {
+  border-collapse: separate !important;
+  /* The 8px gutter between rows the appointments board has. */
+  border-spacing: 0 8px;
+}
+
+/* ── Column header: quiet sticky band, no tint ── */
+.ehr-list-scroll .data-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+}
+
+.tamam-ehr-app .ehr-list-scroll .data-table thead th,
+.ehr-list-scroll .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 0 16px 6px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.2;
+  text-align: left;
+  text-transform: capitalize !important;
+  white-space: nowrap;
+}
+
+/* Trailing status/action columns hang right where a page asks for it — the
+   header label is nudged in so it sits over the pill's text rather than its
+   border, same as `.appointment-card-head span:last-child`. Opt-in rather
+   than automatic on `:last-child`: plenty of these tables end on a date or a
+   place name, which reads wrong flushed right. */
+/* `!important` because the `.tamam-ehr-app`-prefixed header rule above is one
+   element more specific than any selector that can name a single column. */
+.ehr-list-scroll .data-table th.is-right,
+.ehr-list-scroll .data-table td.is-right,
+.ehr-list-scroll .data-table th.text-right,
+.ehr-list-scroll .data-table td.text-right {
+  text-align: right !important;
+}
+
+.ehr-list-scroll .data-table thead th.is-right,
+.ehr-list-scroll .data-table thead th.text-right {
+  padding-right: 22px !important;
+}
+
+/* ── Rows: bordered cards, not ruled lines ── */
+.tamam-ehr-app .ehr-list-scroll .data-table tbody td,
+.ehr-list-scroll .data-table tbody td {
+  padding: 9px 16px;
+  border-top: 1px solid var(--ehr-border) !important;
+  border-bottom: 1px solid var(--ehr-border) !important;
+  background: var(--bg-card-solid, #fff);
+  color: var(--text-primary);
+  font-size: 13px;
+  vertical-align: middle;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ehr-list-scroll .data-table tbody tr {
+  height: 64px;
+}
+
+.tamam-ehr-app .ehr-list-scroll .data-table tbody td:first-child,
+.ehr-list-scroll .data-table tbody td:first-child {
+  border-left: 1px solid var(--ehr-border) !important;
+  border-radius: 14px 0 0 14px;
+}
+
+.tamam-ehr-app .ehr-list-scroll .data-table tbody td:last-child,
+.ehr-list-scroll .data-table tbody td:last-child {
+  border-right: 1px solid var(--ehr-border) !important;
+  border-radius: 0 14px 14px 0;
+}
+
+/* The whole row lights up, not just the cell under the cursor — the row is
+   the card. `tr:hover` alone cannot paint a border because the border lives
+   on the cells. */
+.tamam-ehr-app .ehr-list-scroll .data-table tbody tr:hover td,
+.ehr-list-scroll .data-table tbody tr:hover td,
+.ehr-list-scroll .data-table tbody tr:focus-visible td {
+  border-color: var(--ehr-blue) !important;
+  background: #fff;
+}
+
+/* `.data-table tbody tr:last-child td { border-bottom: none }` would clip the
+   final card's bottom edge. */
+.ehr-list-scroll .data-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--ehr-border) !important;
+}
+
+/* Flagged rows (an overdue review, an expiring unit). The tint has to sit on
+   the cells: each cell paints its own white card background, so a `background`
+   on the <tr> never shows through. The left rail marks the row at a glance
+   without relying on colour alone carrying the meaning. */
+.ehr-list-scroll .data-table tbody tr.is-danger td,
+.ehr-list-scroll .data-table tbody tr.is-danger:hover td {
+  background: rgba(229, 46, 66, 0.08);
+}
+
+.ehr-list-scroll .data-table tbody tr.is-danger td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-danger);
+}
+
+.ehr-list-scroll .data-table tbody tr.is-warning td,
+.ehr-list-scroll .data-table tbody tr.is-warning:hover td {
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.ehr-list-scroll .data-table tbody tr.is-warning td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-warning);
+}
+
+/* ── Cell typography: the appointments primary/secondary pair ──
+   `<strong>`/`<b>` is the primary line, `<small>`/`<span class="ehr-list-sub">`
+   the caption under it, matching `.appointment-card-provider`. */
+.ehr-list-scroll .ehr-list-main {
+  display: block;
+  min-width: 0;
+}
+
+.ehr-list-scroll .ehr-list-main b,
+.ehr-list-scroll .ehr-list-main strong,
+.ehr-list-scroll .ehr-list-main small,
+.ehr-list-scroll .ehr-list-main span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-list-scroll .ehr-list-main b,
+.ehr-list-scroll .ehr-list-main strong {
+  color: var(--ehr-text, var(--text-primary));
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.ehr-list-scroll .ehr-list-main small,
+.ehr-list-scroll .ehr-list-main span {
+  margin-top: 3px;
+  color: var(--ehr-muted, var(--text-muted));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+/* Status column: pill above, operational cue beneath, both right-aligned —
+   `.appointment-card-status`. */
+.ehr-list-scroll .ehr-list-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ehr-list-scroll .ehr-list-status small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  padding-right: 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .ehr-list-scroll {
+    padding: 8px;
+  }
+
+  .tamam-ehr-app .ehr-list-scroll .data-table thead th,
+  .ehr-list-scroll .data-table thead th,
+  .tamam-ehr-app .ehr-list-scroll .data-table tbody td,
+  .ehr-list-scroll .data-table tbody td {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .ehr-list-scroll .data-table thead th:last-child {
+    padding-right: 18px !important;
   }
 }
 
@@ -23595,26 +23838,12 @@ table.patient-data-table.patient-data-table {
   box-shadow: none !important;
 }
 
-/* Caret sits ahead of the avatar so the identity column keeps its shape and
-   the row grid is untouched. */
-.ehr-row-caret {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  flex: 0 0 18px;
-  margin-right: 2px;
-  color: var(--text-muted);
-  transition: transform 0.15s ease;
-}
-
-.ehr-appointment-group.is-expanded .ehr-row-caret {
-  transform: rotate(180deg);
-  color: var(--accent-primary);
-}
-
+/* Left inset lines the detail up with the row's avatar column, the same place
+   the doctor dashboard's expanded visit starts. It was 44px — sized for the
+   caret that used to sit ahead of the avatar — which left every expanded row
+   indented a caret-width further than the doctor's. */
 .ehr-row-detail {
-  padding: 4px 20px 16px 44px;
+  padding: 4px 20px 16px 24px;
   border-top: 0;
   animation: ehrRowDetailIn 0.16s ease-out;
 }
