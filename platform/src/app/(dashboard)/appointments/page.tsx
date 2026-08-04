@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { formatClockTime } from '@/lib/format-utils';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
+import AppointmentDetailFields, { type AppointmentDetailFieldValues } from '@/components/appointments/AppointmentDetailFields';
 import {
   APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_I18N_KEYS,
   APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_PENDING_STATUSES, priorAppointmentStatus,
@@ -275,6 +276,11 @@ export default function AppointmentsPage() {
   // Where the booking sits on the desk's ladder. A new booking starts at
   // Scheduled; the edit form loads whatever the appointment already is.
   const [formStatus, setFormStatus] = useState<AppointmentStatus>('scheduled');
+  // Mode / location / staff / room / recurrence — the group under the status
+  // dropdown in the edit form. One object so the child patches it in one call.
+  const [formDetail, setFormDetail] = useState<AppointmentDetailFieldValues>({
+    mode: 'in_office', recurrence: '', staffId: '', staffName: '', room: '',
+  });
   const [formDepartment, setFormDepartment] = useState('Outpatient');
   const [formReason, setFormReason] = useState('');
   const [formNotes, setFormNotes] = useState('');
@@ -373,6 +379,15 @@ export default function AppointmentsPage() {
     setFormType(apt.appointmentType); setFormPriority(apt.priority); setFormDepartment(apt.department);
     setFormProvider(apt.providerName); setFormReason(apt.reason); setFormNotes(apt.notes || '');
     setFormStatus(apt.status);
+    setFormDetail({
+      // Legacy rows have no mode; a telehealth *type* is how a remote visit used
+      // to be recorded, so it still reads as telehealth.
+      mode: apt.appointmentMode || (apt.appointmentType === 'telehealth' ? 'telehealth' : 'in_office'),
+      recurrence: apt.isRecurring ? (apt.recurrencePattern || 'weekly') : '',
+      staffId: apt.staffId || '',
+      staffName: apt.staffName || '',
+      room: apt.room || '',
+    });
   };
 
   const handleSubmit = async () => {
@@ -1097,23 +1112,79 @@ export default function AppointmentsPage() {
           if (!apt) return null;
           return (
             <Modal onClose={() => setEditingApt(null)} title={t('appointments.editTitle')} size="lg">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>{t('frontDesk.date')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
-                  <div><label>{t('frontDesk.colTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
-                  <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
+              <div className="appt-edit-grid">
+                {/* Three columns, as the design has them: who and when on the
+                    left, who is on the visit in the middle, what it costs on the
+                    right. Each column is a stack of titled sections. */}
+                <div className="appt-edit-col">
+
                   <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
-                  <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
-                  <div><label>{t('appointments.labelStatus')}</label><AppointmentStatusSelect status={formStatus} layout="bare" onChange={setFormStatus} /></div>
+
+                  <h4 className="appt-edit-section">Appointment mode &amp; location</h4>
+                  <AppointmentDetailFields
+                    section="mode"
+                    patient={patientById.get(apt.patientId)}
+                    appointment={apt}
+                    appointments={appointments}
+                    providerId={apt.providerId}
+                    providerName={formProvider || apt.providerName}
+                    date={formDate}
+                    time={formTime}
+                    duration={formDuration}
+                    values={formDetail}
+                    onChange={patch => setFormDetail(current => ({ ...current, ...patch }))}
+                  />
+
+                  <h4 className="appt-edit-section">Date &amp; time</h4>
+                  <div className="appt-edit-row">
+                    <div><label>{t('frontDesk.date')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
+                    <div><label>{t('frontDesk.colTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
+                    <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
+                  </div>
+                  <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={3} /></div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+
+                <div className="appt-edit-col">
+                  <h4 className="appt-edit-section">Provider &amp; staff</h4>
                   <div><label>{t('appointments.labelProvider')}</label><input value={formProvider} onChange={e => setFormProvider(e.target.value)} placeholder={t('appointments.providerPlaceholder')} /></div>
+                  <AppointmentDetailFields
+                    section="provider"
+                    patient={patientById.get(apt.patientId)}
+                    appointment={apt}
+                    appointments={appointments}
+                    providerId={apt.providerId}
+                    providerName={formProvider || apt.providerName}
+                    date={formDate}
+                    time={formTime}
+                    duration={formDuration}
+                    values={formDetail}
+                    onChange={patch => setFormDetail(current => ({ ...current, ...patch }))}
+                  />
+                  <h4 className="appt-edit-section">Visit detail</h4>
+                  <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                  <div><label>{t('appointments.detailReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} /></div>
                 </div>
-                <div><label>{t('appointments.detailReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} /></div>
-                <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} /></div>
+
+                <div className="appt-edit-col">
+                  <h4 className="appt-edit-section">Status &amp; priority</h4>
+                  <div><label>{t('appointments.labelStatus')}</label><AppointmentStatusSelect status={formStatus} layout="bare" onChange={setFormStatus} /></div>
+                  <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
+                  <AppointmentDetailFields
+                    section="billing"
+                    patient={patientById.get(apt.patientId)}
+                    appointment={apt}
+                    appointments={appointments}
+                    providerId={apt.providerId}
+                    providerName={formProvider || apt.providerName}
+                    date={formDate}
+                    time={formTime}
+                    duration={formDuration}
+                    values={formDetail}
+                    onChange={patch => setFormDetail(current => ({ ...current, ...patch }))}
+                  />
+                </div>
+              </div>
+              <div>
                 <ModalActions
                   onCancel={() => setEditingApt(null)}
                   onConfirm={async () => {
@@ -1122,6 +1193,12 @@ export default function AppointmentsPage() {
                         appointmentDate: formDate, appointmentTime: formTime, duration: formDuration,
                         appointmentType: formType, priority: formPriority, department: formDepartment,
                         providerName: formProvider, reason: formReason, notes: formNotes,
+                        appointmentMode: formDetail.mode,
+                        staffId: formDetail.staffId || undefined,
+                        staffName: formDetail.staffName || undefined,
+                        room: formDetail.room || undefined,
+                        isRecurring: Boolean(formDetail.recurrence),
+                        recurrencePattern: formDetail.recurrence || undefined,
                       });
                       // Status goes through updateStatus, not the field write
                       // above: that path stamps confirmedAt/checkedInAt, appends

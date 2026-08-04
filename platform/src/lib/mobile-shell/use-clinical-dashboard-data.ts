@@ -13,7 +13,7 @@ import { getRoleConfig } from '@/lib/permissions';
 import { isHrefAllowed } from '@/components/ehr/ehr-navigation';
 import type { AppointmentDoc } from '@/lib/db-types';
 import type { MobileDashboardData, MobileLane, MobileOutstandingItem } from './dashboard-strategy';
-import { APPOINTMENT_PENDING_STATUSES } from '@/lib/appointment-status';
+import { appointmentStatusGroup } from '@/lib/appointment-status';
 
 function todayIso(): string {
   // Local calendar date, not UTC — see identical helper + rationale in
@@ -51,10 +51,14 @@ export function useClinicalDashboardData(): MobileDashboardData {
   const hasTelehealth = isHrefAllowed('/telehealth', allowedRoutes);
 
   const lanes = useMemo<MobileLane<AppointmentDoc>[]>(() => {
+    // Same shared grouping the desktop dashboards' lane tabs use, so mobile
+    // and desktop file the same visit into the same lane — including closed
+    // slots (cancelled/no-show/rescheduled), which used to fall out of every
+    // lane here while the desktop board shows them under Finished.
     const todays = appointments.filter((a) => a.appointmentDate === today);
-    const scheduled = todays.filter((a) => a.status === 'requested' || APPOINTMENT_PENDING_STATUSES.includes(a.status));
-    const inOffice = todays.filter((a) => ['checked_in', 'in_progress'].includes(a.status));
-    const finished = todays.filter((a) => a.status === 'completed');
+    const scheduled = todays.filter((a) => appointmentStatusGroup(a.status) === 'scheduled');
+    const inOffice = todays.filter((a) => appointmentStatusGroup(a.status) === 'in_office');
+    const finished = todays.filter((a) => appointmentStatusGroup(a.status) === 'finished');
     return [
       { key: 'scheduled', label: `${scheduled.length} Scheduled`, tone: 'info', items: scheduled },
       { key: 'in_office', label: `${inOffice.length} In Office`, tone: 'warning', items: inOffice },

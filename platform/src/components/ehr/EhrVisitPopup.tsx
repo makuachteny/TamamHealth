@@ -163,9 +163,13 @@ export default function EhrVisitPopup({
           {/* Open chart / Move / Start consultation sit on the tab line: the
               one row that is always visible, however far the visit scrolls. */}
           <div className="ehr-visit-pop-actions">
+            {/* Labelled, not an icon: it sat beside the note button's own
+                document glyph, so two identical-looking icons did different
+                things. The note action keeps the glyph; this one says what it
+                does. */}
             {onOpenChart && (
-              <button type="button" className="ehr-visit-pop-icon" onClick={onOpenChart} aria-label="Open chart" title="Open chart">
-                <FileText className="w-4 h-4" aria-hidden />
+              <button type="button" className="ehr-visit-pop-icon ehr-visit-pop-labelled" onClick={onOpenChart} title="Open chart">
+                <FileText className="w-4 h-4" aria-hidden /> Open chart
               </button>
             )}
             {onMove && entry && (

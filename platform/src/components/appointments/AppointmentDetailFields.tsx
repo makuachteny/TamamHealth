@@ -13,8 +13,7 @@
  * Read-only by design: Billing & Insurance shows what the payer record already
  * says. Cover is edited where policies are managed, not while moving a booking.
  */
-import { useMemo } from 'react';
-import { useHospitals } from '@/lib/hooks/useHospitals';
+import { useMemo, type ReactNode } from 'react';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { usePatientPayments } from '@/lib/hooks/usePayments';
 import { useSettings } from '@/lib/settings/SettingsProvider';
@@ -25,13 +24,15 @@ import { AlertTriangle } from '@/components/icons/lucide';
 
 export interface AppointmentDetailFieldValues {
   mode: 'in_office' | 'telehealth';
-  facilityId: string;
   recurrence: '' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
   staffId: string;
+  staffName: string;
   room: string;
 }
 
 export default function AppointmentDetailFields({
+  section,
+  modeSlot,
   patient,
   appointment,
   appointments,
@@ -55,8 +56,12 @@ export default function AppointmentDetailFields({
   duration: number;
   values: AppointmentDetailFieldValues;
   onChange: (patch: Partial<AppointmentDetailFieldValues>) => void;
+  /** Which of the design's column groups to render. Omit for all of them. */
+  section?: 'mode' | 'provider' | 'billing';
+  /** Rendered directly under the mode radios — the caller owns the field, this
+   *  just decides where in the group it belongs. */
+  modeSlot?: ReactNode;
 }) {
-  const { hospitals } = useHospitals();
   const { users } = useUsers();
   const { rooms } = useSettings();
   const { policies, balance } = usePatientPayments(patient?._id);
@@ -87,8 +92,13 @@ export default function AppointmentDetailFields({
 
   const primaryPolicy = policies.find(p => p.isPrimary) || policies[0];
 
+  const showMode = !section || section === 'mode';
+  const showProvider = !section || section === 'provider';
+  const showBilling = !section || section === 'billing';
+
   return (
     <>
+      {showMode && (<>
       {/* ── How and where ─────────────────────────────────────────────── */}
       <div>
         <label>Appointment mode</label>
@@ -107,15 +117,9 @@ export default function AppointmentDetailFields({
           ))}
         </div>
       </div>
+      {modeSlot}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-        <div>
-          <label>Service location</label>
-          <select value={values.facilityId} onChange={e => onChange({ facilityId: e.target.value })}>
-            <option value="">Unchanged</option>
-            {hospitals.map(hospital => <option key={hospital._id} value={hospital._id}>{hospital.name}</option>)}
-          </select>
-        </div>
+      <>
         <div>
           <label>Room</label>
           <select value={values.room} onChange={e => onChange({ room: e.target.value })}>
@@ -123,30 +127,37 @@ export default function AppointmentDetailFields({
             {rooms.map(room => <option key={room} value={room}>{room}</option>)}
           </select>
         </div>
-      </div>
+      </>
 
+      <div>
+        <label>Recurrence</label>
+        <select value={values.recurrence} onChange={e => onChange({ recurrence: e.target.value as AppointmentDetailFieldValues['recurrence'] })}>
+          <option value="">Does not repeat</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Every 2 weeks</option>
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+        </select>
+      </div>
+      </>)}
+
+      {showProvider && (<>
       {/* ── Who else is on it ─────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
         <div>
           <label>Staff</label>
-          <select value={values.staffId} onChange={e => onChange({ staffId: e.target.value })}>
+          <select
+            value={values.staffId}
+            onChange={e => {
+              const person = staffOptions.find(candidate => candidate._id === e.target.value);
+              onChange({ staffId: e.target.value, staffName: person?.name || person?.username || '' });
+            }}
+          >
             <option value="">None</option>
             {staffOptions.map(person => (
               <option key={person._id} value={person._id}>{person.name || person.username}{person.role ? ` · ${person.role.replace(/_/g, ' ')}` : ''}</option>
             ))}
           </select>
         </div>
-        <div>
-          <label>Recurrence</label>
-          <select value={values.recurrence} onChange={e => onChange({ recurrence: e.target.value as AppointmentDetailFieldValues['recurrence'] })}>
-            <option value="">Does not repeat</option>
-            <option value="weekly">Weekly</option>
-            <option value="biweekly">Every 2 weeks</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-          </select>
-        </div>
-      </div>
 
       {/* The provider clash, stated where the time is being chosen. */}
       {conflict && (
@@ -159,23 +170,23 @@ export default function AppointmentDetailFields({
         </p>
       )}
 
-      {/* ── Billing & insurance, as recorded ──────────────────────────── */}
-      <div>
-        <label>Billing &amp; insurance</label>
-        <div className="appointment-billing-panel">
+      </>)}
+
+      {showBilling && (
+      <div className="appointment-billing-panel">
           <div><dt>Balance</dt><dd>{balance ? `SSP ${balance.toLocaleString()}` : 'Nothing due'}</dd></div>
           {primaryPolicy ? (
             <>
-              <div><dt>Payer</dt><dd>{primaryPolicy.payerName}</dd></div>
-              <div><dt>Effective</dt><dd>{primaryPolicy.effectiveDate ? formatDate(primaryPolicy.effectiveDate) : 'Not specified'}</dd></div>
-              <div><dt>Copay</dt><dd>{typeof primaryPolicy.copayAmount === 'number' ? `SSP ${primaryPolicy.copayAmount.toLocaleString()}` : '—'}</dd></div>
-              <div><dt>Eligibility</dt><dd>{primaryPolicy.isActive ? 'Active' : 'Inactive — patient pays'}</dd></div>
+              <div><dt>Insurer</dt><dd>{primaryPolicy.payerName}</dd></div>
+              <div><dt>Cover from</dt><dd>{primaryPolicy.effectiveDate ? formatDate(primaryPolicy.effectiveDate) : 'Not specified'}</dd></div>
+              <div><dt>Co-pay</dt><dd>{typeof primaryPolicy.copayAmount === 'number' ? `SSP ${primaryPolicy.copayAmount.toLocaleString()}` : '—'}</dd></div>
+              <div><dt>Cover status</dt><dd>{primaryPolicy.isActive ? 'Active' : 'Lapsed — patient pays'}</dd></div>
             </>
           ) : (
-            <div><dt>Cover</dt><dd>Self-paying — no policy on file</dd></div>
+            <div><dt>Insurer</dt><dd>None — patient pays</dd></div>
           )}
-        </div>
       </div>
+      )}
     </>
   );
 }

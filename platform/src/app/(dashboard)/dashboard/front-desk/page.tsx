@@ -11,7 +11,7 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, AppointmentStatus, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
 import {
-  APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
+  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
   APPOINTMENT_PENDING_STATUSES, appointmentStatusLabel,
   APPOINTMENT_STATUS_GROUP_LABELS, type AppointmentStatusGroup,
 } from '@/lib/appointment-status';
@@ -23,7 +23,7 @@ import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
 import PatientCheckInForm from '@/components/check-in/PatientCheckInForm';
-import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
+import AppointmentEditModal from '@/components/appointments/AppointmentEditModal';
 import { PatientRegistrationForm } from '@/app/(dashboard)/patients/new/page';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -34,7 +34,7 @@ import {
   Calendar, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList,
   MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
-  Send, Stethoscope, FileText, Ban, RotateCcw, type LucideIcon,
+  Send, Stethoscope, FileText, RotateCcw, type LucideIcon,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
@@ -155,6 +155,8 @@ export default function FrontDeskDashboardPage() {
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
+  // The appointment open in the shared edit form, if any.
+  const [editAppointment, setEditAppointment] = useState<AppointmentDoc | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
   const [checkInTarget, setCheckInTarget] = useState<AppointmentDoc | null>(null);
   // Reception can move an appointment to a new slot or mark it a no-show from
@@ -805,6 +807,15 @@ export default function FrontDeskDashboardPage() {
         // desk's own work from it.
         status: appointment.status,
         statusLabel: appointmentStatusLabel(appointment.status),
+        // The pill itself is the picker for appointment-backed rows: reception
+        // moves a booking along the ladder from the list, no expanding needed.
+        statusValue: appointment.status,
+        statusOptions: canSetAppointmentStatus
+          ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))
+          : undefined,
+        onStatusChange: canSetAppointmentStatus
+          ? value => handleAppointmentStatusChange(appointment, value as AppointmentStatus)
+          : undefined,
         statusSecondary: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
         statusTone: APPOINTMENT_STATUS_TONES[appointment.status],
         // Only a real acuity gets the RED/YELLOW pill — routine appointments
@@ -812,31 +823,17 @@ export default function FrontDeskDashboardPage() {
         priority: appointment.priority === 'emergency' ? 'RED' : appointment.priority === 'urgent' ? 'YELLOW' : undefined,
         date: isoDateKey(appointment.appointmentDate),
         patientId: appointment.patientId,
+        // The row drops down into the appointment itself, the way the doctor
+        // dashboard's rows drop down into a visit — no pop-up over the list, and
+        // nothing restating what the row already shows.
         popupDetail: (
-          <>
-            {/* Open chart and No show are gone from this strip: the row's patient
-                name already opens the chart, and no-show is a rung on the status
-                dropdown below (which still routes through its confirm step). */}
-            <FrontDeskDetailActions actions={[
-              { icon: LogIn, label: 'Check in', onClick: () => setCheckInTarget(appointment), primary: true },
-              { icon: Calendar, label: 'Reschedule', onClick: () => openReschedule(appointment) },
-            ]} />
-            {/* The whole ladder in one control. The buttons above stay: they are
-                the two moves the desk makes constantly and each does more than
-                set a status (check-in opens a visit, no-show asks for a note).
-                This is for every other rung — reminded, confirmed, arrived,
-                roomed, checked out, rescheduled. */}
-            <AppointmentStatusSelect
-              status={appointment.status}
-              disabled={!canSetAppointmentStatus}
-              onChange={status => handleAppointmentStatusChange(appointment, status)}
-            />
-            <FrontDeskDetailFacts facts={[
-              { label: 'Reason', value: appointment.reason || 'Scheduled visit' },
-              { label: t('patient.phone'), value: patient?.phone ? formatPhoneDisplay(patient.phone) : undefined },
-              { label: 'Hospital number', value: patient?.hospitalNumber },
-            ]} />
-          </>
+          <AppointmentEditModal
+            inline
+            appointment={appointment}
+            appointments={appointments}
+            patient={patient}
+            onClose={() => undefined}
+          />
         ),
       };
     });
@@ -946,6 +943,12 @@ export default function FrontDeskDashboardPage() {
         statusLabel,
         statusSecondary: statusContext,
         statusTone,
+        // No status picker on these rows. The ladder is set on the Scheduled
+        // tab, where a booking is still being managed; once a patient is in the
+        // building their row's pill reports the queue's own stage (Waiting, In
+        // consult, Done), which is derived from triage and the encounter — a
+        // ladder picker here would have offered ten options that disagreed with
+        // the word next to them.
         priority: acuity,
         room: entry.assignedRoom,
         careTeam: entry.assignedDoctorName || 'Doctor unassigned',
@@ -966,6 +969,9 @@ export default function FrontDeskDashboardPage() {
             {hasAllergies && (
               <p className="ehr-care-alert">{t('frontDesk.allergiesLabel', { list: (patient?.allergies ?? []).join(', ') })}</p>
             )}
+            {/* Room, doctor and nurse share one line — three stacked blocks ate
+                more of the row panel than the fields they contain. */}
+            <div className="ehr-care-assign-grid">
             {entry.id.startsWith('triage-') && (
               <RoomAssignmentControl
                 triageId={entry.sourceId}
@@ -999,6 +1005,7 @@ export default function FrontDeskDashboardPage() {
                 />
               </>
             )}
+            </div>
           </>
         ),
       };
@@ -1086,36 +1093,24 @@ export default function FrontDeskDashboardPage() {
     visiblePendingAppointments,
   ]);
 
-  const metrics = useMemo<EhrCareDashboardMetric[]>(() => ([
-    {
-      label: "Today's appointments",
-      value: todaysAppointments.length,
-      active: panelView === 'appointments',
-      onClick: () => {
-        setQueueFilter('scheduled');
-        setPanelView('appointments');
-      },
+  /**
+   * The rail's tiles count the same three lanes the tab strip counts, and
+   * clicking one selects that lane in the list. They used to count raw
+   * documents — every appointment today, every triage row — while the tabs
+   * counted deduped rows, so the rail said 34/2/29 where the list said 2/28/1;
+   * and each tile set its own `panelView`, which made them feel like separate
+   * pages. Deriving both from `tabs` means they cannot disagree.
+   */
+  const metrics = useMemo<EhrCareDashboardMetric[]>(() => tabs.map(lane => ({
+    label: lane.label,
+    value: lane.count ?? 0,
+    tone: lane.key === 'scheduled' && (lane.count ?? 0) > 0 ? 'warning' : 'neutral',
+    active: queueFilter === lane.key && panelView === 'all',
+    onClick: () => {
+      setQueueFilter(lane.key as AppointmentStatusGroup);
+      setPanelView('all');
     },
-    {
-      label: 'Pending arrivals',
-      value: pendingAppointments.length,
-      tone: pendingAppointments.length > 0 ? 'warning' : 'neutral',
-      active: panelView === 'pending',
-      onClick: () => {
-        setQueueFilter('scheduled');
-        setPanelView('pending');
-      },
-    },
-    {
-      label: 'Live queue',
-      value: queue.length,
-      active: panelView === 'queue',
-      onClick: () => {
-        setQueueFilter('in_office');
-        setPanelView('queue');
-      },
-    },
-  ]), [panelView, pendingAppointments.length, queue.length, todaysAppointments.length]);
+  })), [tabs, queueFilter, panelView]);
 
   const centerCopy = useMemo(() => {
     if (panelView === 'appointments') {
@@ -1209,6 +1204,15 @@ export default function FrontDeskDashboardPage() {
             setRegisterOpen(true);
           }}
         />
+
+        {editAppointment && (
+          <AppointmentEditModal
+            appointment={editAppointment}
+            appointments={appointments}
+            patient={patients.find(p => p._id === editAppointment.patientId)}
+            onClose={() => setEditAppointment(null)}
+          />
+        )}
 
         {assignTarget && (
           <AssignDoctorModal
@@ -1456,7 +1460,7 @@ function StaffAssignmentControl({
         disabled={saving || draft === (currentId || '')}
         onClick={async () => { setSaving(true); try { await onSave(draft); } finally { setSaving(false); } }}
       >
-        {saving ? 'Saving...' : currentId ? `Update ${label.toLowerCase()}` : `Assign ${label.toLowerCase()}`}
+        {saving ? 'Saving...' : currentId ? 'Update' : 'Assign'}
       </button>
     </div>
   );
@@ -1485,6 +1489,12 @@ function RoomAssignmentControl({
     <div className="ehr-care-rooming">
       <MapPin className="w-4 h-4" />
       <span>Exam room</span>
+      {/* The acuity belongs on the header line, not on a third line below the
+          button — that extra line was what knocked this control out of
+          alignment with the doctor and nurse pickers beside it. */}
+      <span style={{ color: priorityColor(priority) }}>
+        {priority === 'RED' ? t('appointments.priorityEmergency') : priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
+      </span>
       <select value={draft} onChange={(event) => setDraft(event.target.value)}>
         <option value="">Unassigned</option>
         {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
@@ -1494,11 +1504,8 @@ function RoomAssignmentControl({
         disabled={saving}
         onClick={async () => { setSaving(true); try { await onSave(triageId, draft); } finally { setSaving(false); } }}
       >
-        {saving ? 'Saving...' : currentRoom ? 'Update room' : 'Assign room'}
+        {saving ? 'Saving...' : currentRoom ? 'Update' : 'Assign'}
       </button>
-      <span style={{ color: priorityColor(priority) }}>
-        {priority === 'RED' ? t('appointments.priorityEmergency') : priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
-      </span>
     </div>
   );
 }

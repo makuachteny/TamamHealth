@@ -76,6 +76,15 @@ export type EhrCareDashboardRow = {
   statusSecondary?: string;
   statusLabel?: string;
   statusTone?: 'scheduled' | 'ready' | 'active' | 'done' | 'warning' | 'danger';
+  /**
+   * Set these two together and the status pill becomes a picker: the row's own
+   * state can be changed from the list without expanding it. Left unset, the
+   * pill stays a read-only chip — which is right for rows whose state is
+   * derived (a walk-in's "Waiting" comes from triage, not a settable ladder).
+   */
+  statusValue?: string;
+  statusOptions?: { value: string; label: string }[];
+  onStatusChange?: (value: string) => void | Promise<void>;
   priority?: string;
   room?: string;
   // No row-level `onClick`: the shell owns what a row click does (expand, or
@@ -525,6 +534,10 @@ export default function EhrCareDashboard({
                       : row.statusTone === 'ready' ? 'status-confirmed'
                       : row.statusTone === 'danger' ? 'status-no-show'
                       : row.statusTone === 'warning' ? 'status-attention'
+                      // 'scheduled' used to fall through to no class, so a booked
+                      // row was the one pill in the list with no tint — the
+                      // Scheduled tab's picker looked unlike every other tab's.
+                      : row.statusTone === 'scheduled' ? 'status-scheduled'
                       : '';
                     // Under-pill cue: acuity when known, else the countdown.
                     const cue = priorityCode
@@ -589,7 +602,31 @@ export default function EhrCareDashboard({
                           </div>
 
                           <div className="appointment-card-status">
-                            <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText || '—'}</span>
+                            {/* The pill is the control when the row offers
+                                somewhere to move to — same picker-on-a-pill as
+                                the appointments table. Rows whose state is
+                                derived rather than set (a walk-in's Waiting comes
+                                from triage, not the appointment ladder) keep a
+                                plain pill. */}
+                            {row.statusOptions?.length && row.onStatusChange ? (
+                              <span
+                                className={`appointment-status-pill appointment-status-pill--select ${statusPillClass}`.trim()}
+                                onClick={event => event.stopPropagation()}
+                              >
+                                {statusText || '—'}
+                                <select
+                                  value={row.statusValue ?? ''}
+                                  aria-label="Appointment status"
+                                  onChange={event => row.onStatusChange?.(event.target.value)}
+                                >
+                                  {row.statusOptions.map(option => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
+                              </span>
+                            ) : (
+                              <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText || '—'}</span>
+                            )}
                             <small>{row.statusSecondary || cue}</small>
                           </div>
                         </div>
