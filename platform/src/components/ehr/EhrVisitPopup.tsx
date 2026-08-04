@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, ArrowRightLeft, Clock, FileText, Stethoscope, X } from '@/components/icons/lucide';
+import { ArrowRight, ArrowRightLeft, Clock, FileText, X } from '@/components/icons/lucide';
 import CreateNoteButton, { defaultNoteTypeFor } from '@/components/clinical-notes/CreateNoteButton';
 import Modal from '@/components/Modal';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
@@ -182,14 +182,15 @@ export default function EhrVisitPopup({
                 between a glyph and a label that described a different action —
                 the words said "create note" while pressing them started a
                 consultation. Each control says one thing and does it. */}
+            {/* Labelled, not a stethoscope disc: the action names itself, and
+                the label already changes to Resume or Join with the state. */}
             <button
               type="button"
-              className="ehr-visit-pop-icon is-primary"
+              className="ehr-visit-pop-icon is-primary ehr-visit-pop-labelled"
               onClick={onCall}
-              aria-label={callLabel}
               title={callLabel}
             >
-              <Stethoscope className="w-4 h-4" aria-hidden />
+              {callLabel}
             </button>
             {/* A plain split button now: the label creates the note the visit
                 most likely needs, the caret past the divider picks a different

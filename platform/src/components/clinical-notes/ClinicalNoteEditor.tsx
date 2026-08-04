@@ -423,9 +423,6 @@ export default function ClinicalNoteEditor({
   if (loading) return <div className="cn-empty">Loading note…</div>;
   if (!note || !typeDef) return <div className="cn-empty">This note could not be found.</div>;
 
-  const statusClass = note.status === 'signed' || note.status === 'amended'
-    ? 'is-signed'
-    : note.status === 'awaiting_cosign' ? 'is-cosign' : '';
 
   return (
     <div className="cn-editor">
@@ -746,7 +743,6 @@ export default function ClinicalNoteEditor({
 
       {/* Footer */}
       <div className="cn-footer">
-        <span className={`cn-status-dot ${statusClass}`} aria-hidden />
         <button
           type="button"
           className="cn-btn cn-btn-primary"
