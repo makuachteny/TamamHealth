@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, ArrowRightLeft, Clock, FileText, Stethoscope, X } from '@/components/icons/lucide';
+import { ArrowRight, ArrowRightLeft, ClipboardPen, Clock, FileText, Stethoscope, X } from '@/components/icons/lucide';
 import Modal from '@/components/Modal';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { STAGE_LABELS, type QueueEntry, type QueueStage } from '@/lib/services/patient-queue-service';
@@ -72,6 +72,8 @@ export default function EhrVisitPopup({
   onCall,
   onMove,
   onOpenChart,
+  onCreateNote,
+  creatingNote = false,
   inline = false,
 }: {
   patientId?: string;
@@ -89,6 +91,14 @@ export default function EhrVisitPopup({
   /** Opens the Move dialog (only offered while a queue entry exists). */
   onMove?: () => void;
   onOpenChart?: () => void;
+  /**
+   * Start a clinical note for this visit. Offered here because the appointment
+   * card already carries the patient, provider, date and telehealth mode the
+   * note header needs — creating from the chart makes the clinician re-select
+   * all of it.
+   */
+  onCreateNote?: () => void;
+  creatingNote?: boolean;
   /** Render the panel in the flow of the list, under the row it belongs to,
    *  rather than as an overlay. The content is identical — only the frame
    *  differs — so a queue keeps its context while one visit is read. */
@@ -160,6 +170,21 @@ export default function EhrVisitPopup({
             {onMove && entry && (
               <button type="button" className="ehr-visit-pop-icon" onClick={onMove} aria-label="Move to another queue" title="Move…">
                 <ArrowRightLeft className="w-4 h-4" aria-hidden />
+              </button>
+            )}
+            {onCreateNote && patientId && (
+              <button
+                type="button"
+                className="ehr-visit-pop-icon"
+                // The panel renders inside a clickable queue row, so without
+                // stopping propagation the row's own handler runs too and its
+                // re-render cancels the navigation this click started.
+                onClick={(e) => { e.stopPropagation(); onCreateNote(); }}
+                disabled={creatingNote}
+                aria-label="Create clinical note"
+                title="Create clinical note"
+              >
+                <ClipboardPen className="w-4 h-4" aria-hidden />
               </button>
             )}
             <button

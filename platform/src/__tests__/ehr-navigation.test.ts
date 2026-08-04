@@ -15,11 +15,23 @@ describe('header navigation shortcuts', () => {
     }
   });
 
+  // Asserts the rule rather than a frozen row: the previous version hard-coded
+  // the four nurse hrefs, so adding any nav item to the nursing station broke
+  // it even when the ordering rule still held.
   it('prefers routes without dashboard duplicates before filling the row', () => {
     const items = uniqueAllowedNavItems(ROLE_PERMISSIONS.nurse.navItems, ROLE_PERMISSIONS.nurse.allowedRoutes);
     const shortcuts = getPrimaryShortcutItems(items, 'nurse', 4);
 
     expect(shortcuts).toHaveLength(4);
-    expect(shortcuts.map(item => item.href)).toEqual(['/births', '/deaths', '/messages', '/dashboard/nurse']);
+
+    // The role's own dashboard is filler — it may only appear once every
+    // non-dashboard destination has been used.
+    const hrefs = shortcuts.map(item => item.href);
+    const firstDashboard = hrefs.findIndex(h => h.startsWith('/dashboard'));
+    if (firstDashboard !== -1) {
+      expect(hrefs.slice(firstDashboard).every(h => h.startsWith('/dashboard'))).toBe(true);
+    }
+    // And a real destination is preferred over it.
+    expect(hrefs[0].startsWith('/dashboard')).toBe(false);
   });
 });

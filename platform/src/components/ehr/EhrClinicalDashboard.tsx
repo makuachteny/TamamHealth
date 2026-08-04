@@ -43,6 +43,7 @@ import {
 } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import EhrVisitPopup, { EhrQueueMoveDialog, PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
+import { useCreateNote } from '@/lib/clinical-notes/useCreateNote';
 import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useAuth } from '@/lib/context';
@@ -529,6 +530,9 @@ export default function EhrClinicalDashboard({
   // deduped to the newest record per patient.
   const { currentUser } = useAuth();
   const { triages, update: updateTriageDoc } = useTriage();
+  // "Create clinical note" on a visit card — the appointment already carries
+  // the patient, provider, date and telehealth mode the note header needs.
+  const { createNote, creating: creatingNote } = useCreateNote(currentUser);
 
   // ── Clinical activity charts (consultations trend + lab-review aging) ──
   // Neither `getAllEncounters` nor `getOverdueUnreviewedResults` has a
@@ -1471,6 +1475,17 @@ export default function EhrClinicalDashboard({
                             onCall={() => { setVisitRow(null); void callPatient(row); }}
                             onMove={columns.entry ? () => { setVisitRow(null); setMoveEntry(columns.entry); } : undefined}
                             onOpenChart={row.patientId ? () => router.push(`/patients/${row.patientId}`) : undefined}
+                            creatingNote={creatingNote}
+                            onCreateNote={row.patientId ? () => {
+                              void createNote({
+                                patientId: row.patientId!,
+                                patientName: row.name,
+                                mrn: row.patient?.id,
+                                appointmentId: row.appointment?._id,
+                                telehealth: row.appointment?.appointmentType === 'telehealth',
+                                serviceTime: row.appointment?.appointmentTime,
+                              });
+                            } : undefined}
                           />
                         </div>
                       )}
