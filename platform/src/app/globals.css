@@ -14308,7 +14308,7 @@ span:has(> svg:only-child) {
   grid-template-columns: minmax(360px, 1.45fr) minmax(120px, 0.48fr) minmax(240px, 0.85fr) minmax(210px, 0.75fr) minmax(150px, 0.52fr);
   gap: 22px;
   min-height: 60px;
-  padding: 8px 16px;
+  padding: 8px 18px;
 }
 
 .ehr-center-panel .ehr-appointment-row:not(.ehr-care-row) .ehr-status-menu {
@@ -17304,7 +17304,7 @@ textarea.ehr-handoff-input {
 
 .ehr-care-list .ehr-queue-guide--care {
   grid-template-columns: minmax(260px, 1.7fr) minmax(104px, 0.8fr) minmax(112px, 0.9fr) minmax(104px, 0.8fr) minmax(132px, 1fr) minmax(92px, 0.7fr);
-  padding: 0 15px;
+  padding: 0 9px;
   margin: 0 0 -2px;
 }
 
@@ -17469,7 +17469,7 @@ textarea.ehr-handoff-input {
 
 .ehr-assigned-worklist-list .ehr-queue-card--worklist {
   min-height: 58px;
-  padding: 8px 16px;
+  padding: 8px 15px;
   border: 1px solid var(--ehr-border);
   border-radius: 8px;
   background: #fff;
@@ -18284,7 +18284,7 @@ textarea.ehr-handoff-input {
   align-items: center;
   /* Tracks the row's side padding so the column labels stay over their
      values. */
-  padding: 0 16px 6px;
+  padding: 0 4px 6px;
   background: #fff;
   color: var(--text-muted);
   font-size: 10px;
@@ -22625,7 +22625,9 @@ table.patient-data-table.patient-data-table {
   flex: 1 1 0%;
   min-height: 0;
   overflow: auto;
-  padding: 10px 16px;
+  /* The inline padding every page's scroll container carried before this class
+     replaced them — sides only, no vertical inset. */
+  padding: 0 16px;
   background: #fff;
 }
 
@@ -23836,7 +23838,7 @@ table.patient-data-table.patient-data-table {
    caret that used to sit ahead of the avatar — which left every expanded row
    indented a caret-width further than the doctor's. */
 .ehr-row-detail {
-  padding: 4px 20px 16px 24px;
+  padding: 4px 20px 16px 44px;
   border-top: 0;
   animation: ehrRowDetailIn 0.16s ease-out;
 }

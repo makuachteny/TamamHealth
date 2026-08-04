@@ -4,6 +4,7 @@ import {
   isNoteTypeId, isNoteSectionId, getSectionLabel,
   type NoteTypeId,
 } from '@/lib/clinical-notes/note-catalog';
+import { noteTypeMenuOrder } from '@/components/clinical-notes/CreateNoteButton';
 
 const ALL_TYPES = Object.keys(NOTE_TYPES) as NoteTypeId[];
 
@@ -219,5 +220,29 @@ describe('availableOptionalSections', () => {
 
   test('amendment offers nothing optional — it is a fixed two-part form', () => {
     expect(availableOptionalSections('amendment')).toEqual([]);
+  });
+});
+
+/**
+ * Menu ordering for the type dropdown. Extracted from the component so the
+ * rule is testable without mounting React.
+ */
+describe('note type menu order', () => {
+  test('puts the type in play first so the menu opens on what is selected', () => {
+    expect(noteTypeMenuOrder('procedure')[0]).toBe('procedure');
+    expect(noteTypeMenuOrder('soap')[0]).toBe('soap');
+  });
+
+  test('sorts the rest alphabetically by label — the only predictable order', () => {
+    const rest = noteTypeMenuOrder('soap').slice(1).map(id => NOTE_TYPES[id].label);
+    expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b)));
+  });
+
+  test('offers every type exactly once, whatever is selected', () => {
+    for (const selected of ALL_TYPES) {
+      const order = noteTypeMenuOrder(selected);
+      expect(order).toHaveLength(ALL_TYPES.length);
+      expect(new Set(order).size).toBe(ALL_TYPES.length);
+    }
   });
 });

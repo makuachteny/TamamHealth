@@ -335,6 +335,17 @@
   min-width: 0;
 }
 .bl-search input::placeholder { color: var(--ehr-muted, #8395A8); }
+/* Inside the patient chart, `.ehr-chart-page input` repaints every field with
+   its own white box (and globals.css adds a blue focus ring), so the input drew
+   a second border inside this one — one search box looking like two. `.bl-root`
+   + `!important` is what it takes to outrank those rules; the frame and the
+   teal focus state belong to `.bl-search` alone. */
+.bl-root .bl-search input {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
 
 /* ── Tables ──────────────────────────────────────────────────────── */
 
@@ -617,6 +628,9 @@
   gap: 0;
 }
 .bl-pay-main { padding: 16px 18px 18px; min-width: 0; }
+/* Same padding without the grid — the chart's billing tab lists payments full
+   width, its account totals already living in the summary strip above. */
+.bl-pay-single { padding: 16px 18px 18px; min-width: 0; }
 .bl-pay-aside {
   border-left: 1px solid var(--ehr-border, #D8E3EC);
   padding: 18px 20px;

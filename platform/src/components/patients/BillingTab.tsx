@@ -685,52 +685,40 @@ export default function BillingTab({
         )}
       </div>
 
-      {/* ─── Payments + totals ───
-          Same two-column layout as the bill detail page: the payments list
-          on the left, a running totals column on the right. */}
+      {/* ─── Payments ───
+          Full width: the running totals column the bill detail page carries
+          alongside this list is dropped here, since the summary strip above
+          already states billed/paid/outstanding for the whole account. */}
       <div className="bl-card">
-        <div className="bl-pay-layout">
-          <div className="bl-pay-main">
-            <h2 className="bl-card-title">Payments</h2>
-            <span className="bl-underline" />
+        <div className="bl-pay-single">
+          <h2 className="bl-card-title">Payments</h2>
+          <span className="bl-underline" />
 
-            {d.payments.length === 0 ? (
-              <div className="bl-empty">
-                <h3>{t('billing.noPaymentsRecorded')}</h3>
-                <p>Payments recorded for this patient will appear here.</p>
-              </div>
-            ) : (
-              <div className="bl-table-wrap">
-                <table className="bl-table">
-                  <thead>
-                    <tr><th>Date</th><th>Method</th><th>Reference</th><th>Received by</th><th className="bl-right">Amount</th></tr>
-                  </thead>
-                  <tbody>
-                    {d.payments.map(pmt => (
-                      <tr key={pmt._id}>
-                        <td style={{ whiteSpace: 'nowrap' }}>{new Date(pmt.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                        <td>{getMethodConfig(pmt.method).label}</td>
-                        <td className="bl-muted">{pmt.reference || '—'}</td>
-                        <td>{pmt.processedByName}</td>
-                        <td className="bl-num bl-right">{formatMoney(pmt.amount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <aside className="bl-pay-aside">
-            <dl className="bl-totals">
-              <div className="bl-totals-row"><dt>Total charged:</dt><dd>{formatMoney(d.totalCharged)}</dd></div>
-              <div className="bl-totals-row"><dt>Total paid:</dt><dd>{formatMoney(d.totalPaid)}</dd></div>
-              <div className="bl-totals-row"><dt>Discount:</dt><dd>- {formatMoney(d.totalDiscount)}</dd></div>
-              <div className="bl-totals-row"><dt>Refunds:</dt><dd>- {formatMoney(d.totalRefunds)}</dd></div>
-              <hr className="bl-totals-rule" />
-              <div className="bl-totals-row bl-totals-row--due"><dt>Balance due:</dt><dd>{formatMoney(patientBalance)}</dd></div>
-            </dl>
-          </aside>
+          {d.payments.length === 0 ? (
+            <div className="bl-empty">
+              <h3>{t('billing.noPaymentsRecorded')}</h3>
+              <p>Payments recorded for this patient will appear here.</p>
+            </div>
+          ) : (
+            <div className="bl-table-wrap">
+              <table className="bl-table">
+                <thead>
+                  <tr><th>Date</th><th>Method</th><th>Reference</th><th>Received by</th><th className="bl-right">Amount</th></tr>
+                </thead>
+                <tbody>
+                  {d.payments.map(pmt => (
+                    <tr key={pmt._id}>
+                      <td style={{ whiteSpace: 'nowrap' }}>{new Date(pmt.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                      <td>{getMethodConfig(pmt.method).label}</td>
+                      <td className="bl-muted">{pmt.reference || '—'}</td>
+                      <td>{pmt.processedByName}</td>
+                      <td className="bl-num bl-right">{formatMoney(pmt.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
