@@ -72,12 +72,32 @@ const updatePrescription = jest.fn(
 jest.mock('@/lib/services/prescription-service', () => ({
   updatePrescription: (...args: unknown[]) =>
     (updatePrescription as unknown as (...a: unknown[]) => unknown)(...args),
+  // Mirrors the real helper: a legacy doc with no `orderStatus` falls back to
+  // the coarse status and defaults to "in the queue" — i.e. not yet cleared.
+  effectivePrescriptionStatus: (doc: { orderStatus?: string; status?: string }) => {
+    if (doc.orderStatus) return doc.orderStatus;
+    if (doc.status === 'dispensed') return 'dispensed';
+    if (doc.status === 'discontinued') return 'held_awaiting_clarification';
+    return 'received_in_pharmacy_queue';
+  },
 }));
 
 const recordMovement = jest.fn(async () => ({ _id: 'cslog-1' }));
 jest.mock('@/lib/services/controlled-substance-service', () => ({
   recordMovement: (...args: unknown[]) =>
     (recordMovement as unknown as (...a: unknown[]) => unknown)(...args),
+}));
+
+/**
+ * Staff directory backing the witness check. A controlled dispense now
+ * verifies the witness is a real, active user at the dispensing facility, so
+ * these tests need a directory to verify against.
+ */
+let userStore: Record<string, { _id: string; name: string; isActive: boolean; hospitalId?: string; orgId?: string }> = {};
+const getUserById = jest.fn(async (id: string) => userStore[id] || null);
+jest.mock('@/lib/services/user-service', () => ({
+  getUserById: (...args: unknown[]) =>
+    (getUserById as unknown as (...a: unknown[]) => unknown)(...args),
 }));
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
@@ -117,6 +137,11 @@ beforeEach(() => {
     async (id: string, patch: Partial<PrescriptionDoc>) => ({ _id: id, ...patch } as PrescriptionDoc),
   );
   recordMovement.mockImplementation(async () => ({ _id: 'cslog-1' }));
+  userStore = {
+    'u-pharm': { _id: 'u-pharm', name: 'Rose Pharmacist', isActive: true, hospitalId: 'hosp-001' },
+    'u-2': { _id: 'u-2', name: 'Witness Nurse', isActive: true, hospitalId: 'hosp-001' },
+  };
+  getUserById.mockImplementation(async (id: string) => userStore[id] || null);
 });
 
 // ── FEFO ordering ────────────────────────────────────────────────────────
@@ -200,7 +225,13 @@ describe('controlled substances', () => {
     _id: 'inv-cs', medicationName: 'Morphine', batchNumber: 'CS-1',
     controlledSchedule: 'II', requiresWitness: true, stockLevel: 100,
   });
-  const csInput = { ...input, prescription: { ...rx, medication: 'Morphine' }, quantity: 10 };
+  // quantityToDispense matches the quantity so these stay full fills — they
+  // exercise the witness and register paths, not partial-fill confirmation.
+  const csInput = {
+    ...input,
+    prescription: { ...rx, medication: 'Morphine', quantityToDispense: 10 },
+    quantity: 10,
+  };
 
   it('refuses without a witness and leaves stock untouched', async () => {
     store['inv-cs'] = controlled();
@@ -293,7 +324,7 @@ describe('outcomes', () => {
   it('keeps a partial fill active as stockout_partial_referred', async () => {
     store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
 
-    const result = await dispenseMedication({ ...input, quantity: 10 });
+    const result = await dispenseMedication({ ...input, quantity: 10, allowPartial: true });
 
     expect(result.outcome).toBe('partial');
     expect(updatePrescription).toHaveBeenCalledWith('rx-1', expect.objectContaining({
@@ -342,6 +373,216 @@ describe('medication name matching', () => {
     expect(medicationMatches('Amoxicillin', 'Metformin 500mg')).toBe(false);
     expect(medicationMatches('Paracetamol', 'Morphine 10mg/mL injection')).toBe(false);
     expect(medicationMatches('', 'Amoxicillin 500mg')).toBe(false);
+  });
+
+  // Regression: matching used to be `a.includes(b) || b.includes(a)`, so any
+  // shared prefix matched. A prescription for "Insulin" matched glargine,
+  // aspart and isophane alike and FEFO picked whichever expired first — a
+  // route to handing over the wrong drug.
+  it('does not match a bare family name to a specific product', () => {
+    expect(medicationMatches('Insulin', 'Insulin glargine 100IU/mL')).toBe(false);
+    expect(medicationMatches('Insulin', 'Insulin aspart 100IU/mL')).toBe(false);
+  });
+
+  it('does not match a single agent to a combination containing it', () => {
+    expect(medicationMatches('Amoxicillin', 'Amoxicillin-Clavulanate 625mg')).toBe(false);
+  });
+
+  it('does not match across a release modifier', () => {
+    expect(medicationMatches('Metformin', 'Metformin XR 1000mg')).toBe(false);
+  });
+
+  it('still matches a salt, hydrate or grade qualifier', () => {
+    expect(medicationMatches('Amoxicillin', 'Amoxicillin trihydrate 500mg')).toBe(true);
+    expect(medicationMatches('Morphine', 'Morphine sulfate 10mg/mL injection')).toBe(true);
+    expect(medicationMatches('Adrenaline', 'Adrenaline acetate')).toBe(true);
+  });
+});
+
+// ── Regressions from the post-merge audit ────────────────────────────────
+describe('ambiguous medication', () => {
+  it('refuses rather than letting expiry decide which product is dispensed', async () => {
+    store['inv-a'] = batch({ _id: 'inv-a', medicationName: 'Insulin glargine', stockLevel: 50, expiryDate: '2026-09-01' });
+    store['inv-b'] = batch({ _id: 'inv-b', medicationName: 'Insulin aspart', stockLevel: 50, expiryDate: '2026-10-01' });
+
+    await expect(dispenseMedication({
+      ...input,
+      prescription: { ...rx, medication: 'Insulin', quantityToDispense: 10 },
+      quantity: 10,
+    })).rejects.toMatchObject({ code: 'STOCK_OUT' });
+
+    // Neither lot moved.
+    expect(store['inv-a'].stockLevel).toBe(50);
+    expect(store['inv-b'].stockLevel).toBe(50);
+  });
+
+  it('refuses when two catalogued spellings of one order both match', async () => {
+    store['inv-a'] = batch({ _id: 'inv-a', medicationName: 'Amoxicillin', stockLevel: 40, expiryDate: '2026-09-01' });
+    store['inv-b'] = batch({ _id: 'inv-b', medicationName: 'Amoxicillin trihydrate', stockLevel: 40, expiryDate: '2026-10-01' });
+
+    await expect(dispenseMedication({ ...input, quantity: 21 }))
+      .rejects.toMatchObject({ code: 'AMBIGUOUS_MEDICATION' });
+
+    expect(store['inv-a'].stockLevel).toBe(40);
+    expect(store['inv-b'].stockLevel).toBe(40);
+  });
+});
+
+describe('witness verification', () => {
+  const controlled = () => batch({
+    _id: 'inv-cs', medicationName: 'Morphine', batchNumber: 'CS-1',
+    controlledSchedule: 'II', requiresWitness: true, stockLevel: 100,
+  });
+  const csInput = {
+    ...input,
+    prescription: { ...rx, medication: 'Morphine', quantityToDispense: 10 },
+    quantity: 10,
+  };
+
+  // Regression: witnessId/witnessName were free-form strings no layer checked,
+  // so one pharmacist could satisfy the two-signature control alone.
+  it('refuses a witness who is not in the staff directory', async () => {
+    store['inv-cs'] = controlled();
+    await expect(dispenseMedication({
+      ...csInput, witnessId: 'not-a-real-person', witnessName: 'Imaginary Colleague',
+    })).rejects.toMatchObject({ code: 'WITNESS_INVALID' });
+
+    expect(store['inv-cs'].stockLevel).toBe(100);
+    expect(recordMovement).not.toHaveBeenCalled();
+  });
+
+  it('refuses a deactivated witness', async () => {
+    store['inv-cs'] = controlled();
+    userStore['u-2'].isActive = false;
+    await expect(dispenseMedication({
+      ...csInput, witnessId: 'u-2', witnessName: 'Witness Nurse',
+    })).rejects.toMatchObject({ code: 'WITNESS_INVALID' });
+    expect(store['inv-cs'].stockLevel).toBe(100);
+  });
+
+  it('refuses a witness from another facility', async () => {
+    store['inv-cs'] = controlled();
+    userStore['u-2'].hospitalId = 'hosp-999';
+    await expect(dispenseMedication({
+      ...csInput, witnessId: 'u-2', witnessName: 'Witness Nurse',
+    })).rejects.toMatchObject({ code: 'WITNESS_INVALID' });
+    expect(store['inv-cs'].stockLevel).toBe(100);
+  });
+
+  it('registers the directory name, not the caller-supplied one', async () => {
+    store['inv-cs'] = controlled();
+    await dispenseMedication({
+      ...csInput, witnessId: 'u-2', witnessName: 'Spoofed Name',
+    });
+    expect(recordMovement).toHaveBeenCalledWith(expect.objectContaining({
+      witnessId: 'u-2', witnessName: 'Witness Nurse',
+    }));
+  });
+});
+
+describe('controlled register across batches', () => {
+  const csRx = { ...rx, medication: 'Morphine', quantityToDispense: 30 };
+
+  // Regression: only the first controlled batch was registered, and it carried
+  // the whole dispense quantity — so the second lot's stock left the shelf with
+  // no register movement, and neither lot could be reconciled.
+  it('writes one entry per controlled lot with that lot’s own quantity', async () => {
+    store['cs-1'] = batch({
+      _id: 'cs-1', medicationName: 'Morphine', batchNumber: 'CS-1',
+      controlledSchedule: 'II', requiresWitness: true,
+      stockLevel: 20, expiryDate: '2026-09-01',
+    });
+    store['cs-2'] = batch({
+      _id: 'cs-2', medicationName: 'Morphine', batchNumber: 'CS-2',
+      controlledSchedule: 'II', requiresWitness: true,
+      stockLevel: 20, expiryDate: '2026-12-01',
+    });
+    recordMovement
+      .mockImplementationOnce(async () => ({ _id: 'cslog-1' }))
+      .mockImplementationOnce(async () => ({ _id: 'cslog-2' }));
+
+    const result = await dispenseMedication({
+      ...input, prescription: csRx, quantity: 30,
+      witnessId: 'u-2', witnessName: 'Witness Nurse',
+    });
+
+    expect(recordMovement).toHaveBeenCalledTimes(2);
+    // FEFO takes all 20 from the earlier-expiring lot, then 10 from the next.
+    expect(recordMovement).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      inventoryId: 'cs-1', quantity: 20, beforeBalance: 20,
+    }));
+    expect(recordMovement).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      inventoryId: 'cs-2', quantity: 10, beforeBalance: 20,
+    }));
+    expect(result.controlledLogIds).toEqual(['cslog-1', 'cslog-2']);
+    expect(store['cs-1'].stockLevel).toBe(0);
+    expect(store['cs-2'].stockLevel).toBe(10);
+  });
+
+  it('counter-entries the entries that landed when a later one fails', async () => {
+    store['cs-1'] = batch({
+      _id: 'cs-1', medicationName: 'Morphine', batchNumber: 'CS-1',
+      controlledSchedule: 'II', requiresWitness: true,
+      stockLevel: 20, expiryDate: '2026-09-01',
+    });
+    store['cs-2'] = batch({
+      _id: 'cs-2', medicationName: 'Morphine', batchNumber: 'CS-2',
+      controlledSchedule: 'II', requiresWitness: true,
+      stockLevel: 20, expiryDate: '2026-12-01',
+    });
+    recordMovement
+      .mockImplementationOnce(async () => ({ _id: 'cslog-1' }))
+      .mockImplementationOnce(async () => { throw new Error('register down'); })
+      .mockImplementation(async () => ({ _id: 'cslog-rev' }));
+
+    await expect(dispenseMedication({
+      ...input, prescription: csRx, quantity: 30,
+      witnessId: 'u-2', witnessName: 'Witness Nurse',
+    })).rejects.toMatchObject({ code: 'REGISTER_FAILED' });
+
+    // The landed entry is reversed, never deleted…
+    expect(recordMovement).toHaveBeenCalledWith(expect.objectContaining({
+      movement: 'reconciliation', inventoryId: 'cs-1', quantity: 20,
+    }));
+    // …and all stock is back.
+    expect(store['cs-1'].stockLevel).toBe(20);
+    expect(store['cs-2'].stockLevel).toBe(20);
+    expect(updatePrescription).not.toHaveBeenCalled();
+  });
+});
+
+describe('partial fill confirmation', () => {
+  it('refuses an unconfirmed short fill and moves no stock', async () => {
+    store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
+
+    await expect(dispenseMedication({ ...input, quantity: 10 }))
+      .rejects.toMatchObject({ code: 'PARTIAL_NOT_ALLOWED' });
+
+    expect(store['inv-1'].stockLevel).toBe(100);
+    expect(updatePrescription).not.toHaveBeenCalled();
+  });
+
+  it('reports a genuine blocker ahead of the partial-fill prompt', async () => {
+    // Nothing in stock: the pharmacist should hear "out of stock", not
+    // "confirm a partial fill".
+    await expect(dispenseMedication({ ...input, quantity: 10 }))
+      .rejects.toMatchObject({ code: 'STOCK_OUT' });
+  });
+});
+
+describe('clearance gate', () => {
+  // Regression: the gate read `rx.orderStatus` directly and skipped entirely
+  // when the field was absent, so a legacy order could be dispensed straight
+  // out of the queue without ever being cleared.
+  it('refuses a legacy prescription that carries no orderStatus', async () => {
+    store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
+    const legacy = { ...rx, quantityToDispense: 21 } as PrescriptionDoc;
+    delete (legacy as { orderStatus?: unknown }).orderStatus;
+
+    await expect(dispenseMedication({ ...input, prescription: legacy, quantity: 21 }))
+      .rejects.toMatchObject({ code: 'NOT_CLEARED' });
+
+    expect(store['inv-1'].stockLevel).toBe(100);
   });
 
   it('finds stock for a prescription whose name omits the strength', async () => {

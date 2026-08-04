@@ -126,12 +126,39 @@ export function scrubMeta(input: unknown): Record<string, unknown> | undefined {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-/** Build a compact element descriptor; prefer data-track. */
+/**
+ * Characters an element descriptor may contain. Anything outside this set is
+ * rejected wholesale rather than escaped — a descriptor is machine-generated
+ * from a fixed vocabulary, so unexpected characters mean the value did not come
+ * from `describeElement` and must not be trusted.
+ */
+const ELEMENT_SAFE_RE = /^[a-z0-9._|=/\-]+$/i;
+
+/** Reduce a developer-authored `data-track` id to the safe charset. */
+function sanitizeTrackId(raw: string): string {
+  const cleaned = raw.trim().toLowerCase().replace(/[^a-z0-9._|=/-]+/g, '-').replace(/-{2,}/g, '-');
+  return cleaned.slice(0, ELEMENT_MAX).replace(/^-|-$/g, '') || 'unknown';
+}
+
+/**
+ * Build a compact element descriptor.
+ *
+ * Structural attributes only — never `textContent` and never `aria-label`.
+ * Both routinely carry patient identifiers in this app: a patient row renders
+ * the patient's name as the link text, and action buttons are labelled
+ * "Open chart for <name>". Capturing either put PHI into `usage_events` and,
+ * with PostHog enabled, shipped it to a third-party processor.
+ *
+ * The consequence is that untagged clicks are low-signal (`a|role=button`).
+ * That is deliberate: a `data-track` attribute is how a click earns a readable
+ * name, which keeps naming a reviewed decision rather than a scrape of
+ * whatever text happened to be on screen.
+ */
 export function describeElement(el: Element | null): string {
   if (!el || typeof (el as Element).closest !== 'function') return 'unknown';
   const tracked = el.closest('[data-track]');
   const track = tracked?.getAttribute('data-track');
-  if (track) return truncateLabel(track, ELEMENT_MAX);
+  if (track) return sanitizeTrackId(track);
 
   const target =
     el.closest(
@@ -142,21 +169,19 @@ export function describeElement(el: Element | null): string {
   const role = target.getAttribute?.('role') || '';
   const typeAttr = target.getAttribute?.('type') || '';
   const nameAttr = target.getAttribute?.('name') || '';
-  const aria = target.getAttribute?.('aria-label') || '';
-  const text = truncateLabel(target.textContent || '');
 
   // Never include name attributes that look like PHI fields
-  const safeName = nameAttr && !isPHIKey(nameAttr) ? nameAttr : '';
+  const safeName = nameAttr && !isPHIKey(nameAttr) ? sanitizeTrackId(nameAttr) : '';
 
   const parts = [
     tag,
     role ? `role=${role}` : '',
     typeAttr ? `type=${typeAttr}` : '',
-    safeName ? `name=${truncateLabel(safeName, 24)}` : '',
-    aria ? truncateLabel(aria) : text || '',
+    safeName ? `name=${safeName.slice(0, 24)}` : '',
   ].filter(Boolean);
 
-  return truncateLabel(parts.join('|'), ELEMENT_MAX);
+  const descriptor = parts.join('|').slice(0, ELEMENT_MAX);
+  return ELEMENT_SAFE_RE.test(descriptor) ? descriptor : 'unknown';
 }
 
 /** Client/server shared shape before persistence. */
@@ -185,8 +210,14 @@ export function sanitizeUsageEvent(raw: unknown): SanitizedUsageEventInput | nul
   }
 
   const path = templatePath(typeof r.path === 'string' ? r.path : '/');
-  const element =
-    typeof r.element === 'string' ? truncateLabel(r.element, ELEMENT_MAX) : undefined;
+  // The ingest API runs this on client-supplied JSON, so the descriptor is
+  // re-validated here rather than trusted. A value that did not come from
+  // describeElement (free text, a patient name, a stale client still sending
+  // textContent) fails the charset check and is dropped — the event is still
+  // recorded, just without an element.
+  const rawElement =
+    typeof r.element === 'string' ? r.element.trim().slice(0, ELEMENT_MAX) : '';
+  const element = rawElement && ELEMENT_SAFE_RE.test(rawElement) ? rawElement : undefined;
   const meta = scrubMeta(r.meta);
 
   return {
