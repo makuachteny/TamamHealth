@@ -5316,8 +5316,7 @@ html:has(.ehr-top-rail) {
   align-items: center;
   gap: 8px;
   min-height: 60px;
-  /* 16px ends — same inset as the module list tables and the registry rows. */
-  padding: 6px 16px;
+  padding: 6px 12px;
   border: 1px solid var(--ehr-border);
   border-radius: 14px;
   background: #fff;
@@ -16497,11 +16496,8 @@ textarea.ehr-handoff-input {
   padding-inline: 4px;
 }
 
-/* 16px ends across every list surface — the row's rounded border holds the
-   avatar and the status pill a consistent 16px inboard, matching the module
-   tables (`.ehr-list-scroll`) and the appointments board. */
 .ehr-appointment-row:not(.ehr-care-row) {
-  padding-inline: 16px;
+  padding-inline: 9px;
 }
 
 @media (min-width: 640px) {
@@ -16991,8 +16987,7 @@ textarea.ehr-handoff-input {
   gap: 16px;
   align-items: center;
   min-height: 56px;
-  /* 16px ends — shared row-end inset with every other list card. */
-  padding: 8px 16px;
+  padding: 8px 10px;
   border: 1px solid var(--ehr-border);
   border-radius: 10px;
   background: #fff;
@@ -17015,9 +17010,7 @@ textarea.ehr-handoff-input {
   display: grid;
   gap: 16px;
   align-items: center;
-  /* Card side padding (16px) minus the card's 1px border, so the labels sit
-     exactly over the values below them. */
-  padding: 0 15px;
+  padding: 0 9px;
   margin-bottom: -2px;
 }
 
@@ -18307,14 +18300,14 @@ textarea.ehr-handoff-input {
   padding-right: 6px;
 }
 
-/* 16px side padding — the canonical row-end inset every module list shares
-   (`.ehr-list-scroll` cells, `.patient-data-cell`): the avatar and the status
-   pill both sit a clear 16px inside the card's rounded border. */
+/* 4px side padding, down from 16px: with the list gutter cut to 1px, the
+   row's own inset was what still held the avatar and the status pill off the
+   panel edges. Vertical stays at 9px — only the sides tighten. */
 .appointment-card-row.ehr-appointment-row {
   grid-template-columns: minmax(320px, 1.6fr) repeat(4, minmax(150px, 1fr));
   gap: 24px;
   min-height: 64px;
-  padding: 9px 16px;
+  padding: 9px 4px;
   border-radius: 14px;
   box-shadow: none;
 }

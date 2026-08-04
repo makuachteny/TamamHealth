@@ -11,6 +11,7 @@ import type { TriageDoc, TriagePriority, EncounterDoc } from '../db-types';
 import { createTriage } from './triage-service';
 import { getAppointmentsByPatient, updateAppointmentStatus } from './appointment-service';
 import { jubaDate } from '../time-juba';
+import { APPOINTMENT_PENDING_STATUSES } from '../appointment-status';
 import { createArrivalEncounter, findOpenEncounterForPatient, hasClosedEncounterForPatient, PRE_CLINICIAN_STATUSES } from './encounter-service';
 import { getRecordsByPatient } from './medical-record-service';
 
@@ -110,8 +111,10 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
   try {
     const today = jubaDate();
     const appts = await getAppointmentsByPatient(input.patientId);
+    // Any rung that still expects the patient: booked, reminded, confirmed, or
+    // marked arrived but not yet checked in at the desk.
     const match = appts.find(
-      (a) => a.appointmentDate === today && (a.status === 'scheduled' || a.status === 'confirmed'),
+      (a) => a.appointmentDate === today && APPOINTMENT_PENDING_STATUSES.includes(a.status),
     );
     if (match) appointmentId = match._id;
   } catch {

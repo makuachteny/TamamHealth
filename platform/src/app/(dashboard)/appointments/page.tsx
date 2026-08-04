@@ -2,6 +2,10 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { formatClockTime } from '@/lib/format-utils';
+import {
+  APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_I18N_KEYS,
+  APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_PENDING_STATUSES, priorAppointmentStatus,
+} from '@/lib/appointment-status';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AvailabilityModal from '@/components/AvailabilityModal';
@@ -60,16 +64,15 @@ const FALLBACK_DEPARTMENTS = [
   'Dermatology', 'ENT', 'Outpatient', 'Dental', 'Mental Health', 'Maternity',
 ];
 
-const statusConfig: Record<AppointmentStatus, { color: string; bg: string; label: string }> = {
-  requested:   { color: '#7C3AED', bg: 'rgba(124,58,237,0.10)', label: 'Requested' },
-  scheduled:   { color: '#2191D0', bg: 'rgba(33,145,208,0.10)',  label: 'Scheduled' },
-  confirmed:   { color: '#015697', bg: 'rgba(1,86,151,0.10)',    label: 'Confirmed' },
-  checked_in:  { color: '#D97706', bg: 'rgba(217,119,6,0.10)',   label: 'Checked In' },
-  in_progress: { color: '#059669', bg: 'rgba(5,150,105,0.10)',   label: 'In Progress' },
-  completed:   { color: '#047857', bg: 'rgba(4,120,87,0.10)',    label: 'Completed' },
-  cancelled:   { color: '#DC2626', bg: 'rgba(220,38,38,0.10)',   label: 'Cancelled' },
-  no_show:     { color: '#64748B', bg: 'rgba(100,116,139,0.10)', label: 'No Show' },
-};
+// Colours and labels both come from the shared vocabulary, so this list and
+// the chart's status dropdown can no longer disagree about what a status is
+// called (it used to say "In Progress" where the chart said "Roomed").
+const statusConfig = Object.fromEntries(
+  (Object.keys(APPOINTMENT_STATUS_LABELS) as AppointmentStatus[]).map(status => [
+    status,
+    { ...APPOINTMENT_STATUS_COLORS[status], label: APPOINTMENT_STATUS_LABELS[status] },
+  ]),
+) as Record<AppointmentStatus, { color: string; bg: string; label: string }>;
 
 const priorityConfig: Record<AppointmentPriority, { color: string; label: string }> = {
   routine: { color: 'var(--color-success)', label: 'Routine' },
@@ -149,13 +152,7 @@ export default function AppointmentsPage() {
     dental: 'appointments.typeDental', mental_health: 'appointments.typeMentalHealth',
     walk_in: 'appointments.typeWalkIn',
   };
-  const statusLabelKey: Record<AppointmentStatus, string> = {
-    requested: 'appointments.statusRequested',
-    scheduled: 'appointments.statusScheduled', confirmed: 'appointments.statusConfirmed',
-    checked_in: 'appointments.statusCheckedIn', in_progress: 'appointments.statusInProgress',
-    completed: 'appointments.statusCompleted', cancelled: 'appointments.statusCancelled',
-    no_show: 'appointments.statusNoShow',
-  };
+  const statusLabelKey = APPOINTMENT_STATUS_I18N_KEYS;
   const priorityLabelKey: Record<AppointmentPriority, string> = {
     routine: 'appointments.priorityRoutine', urgent: 'appointments.priorityUrgent',
     emergency: 'appointments.priorityEmergency',
@@ -422,15 +419,10 @@ export default function AppointmentsPage() {
     catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
   }, [updateStatus, showToast, t, statusLabelKey]);
 
-  // Map a status to the step it can be reversed back to. Reversing reuses the
-  // same updateAppointmentStatus path (which accepts any target status), so an
-  // accidental confirm / check-in / start can be undone, and a cancelled,
-  // completed, or no-show appointment can be reopened to 'scheduled'.
-  const PRIOR_STATUS: Partial<Record<AppointmentStatus, AppointmentStatus>> = {
-    confirmed: 'scheduled',
-    checked_in: 'confirmed',
-    in_progress: 'checked_in',
-  };
+  // Reversing a step reuses the same updateAppointmentStatus path (which
+  // accepts any target status), so an accidental remind / confirm / check-in
+  // can be undone. `priorAppointmentStatus` reads the rung off the shared
+  // ladder, so a new status joins the undo path without a second map here.
 
   const handleReschedule = async () => {
     if (!rescheduleId || !rescheduleDate || !rescheduleTime) return;
@@ -459,7 +451,9 @@ export default function AppointmentsPage() {
 
   const dayStats = useMemo(() => {
     const checkedIn = dayList.filter(a => a.status === 'checked_in' || a.status === 'in_progress' || a.status === 'completed').length;
-    const notArrived = dayList.filter(a => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'requested').length;
+    // Reminded and arrived-but-not-checked-in count as not yet arrived at the
+    // desk, so the stat keeps meaning "still to walk up to the window".
+    const notArrived = dayList.filter(a => a.status === 'requested' || APPOINTMENT_PENDING_STATUSES.includes(a.status)).length;
     const svcCounts = new Map<AppointmentType, number>();
     for (const a of dayList) svcCounts.set(a.appointmentType, (svcCounts.get(a.appointmentType) || 0) + 1);
     let topService: { type: AppointmentType; count: number } | null = null;
@@ -570,10 +564,13 @@ export default function AppointmentsPage() {
         {canManageAppointmentSchedule && (
           <button onClick={() => { setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); onDone(); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
         )}
-        {(canManageAppointmentSchedule || canCheckInAppointments || canAdvanceAppointments) && PRIOR_STATUS[apt.status] && (
-          <button onClick={() => { onDone(); handleStatusChange(apt._id, PRIOR_STATUS[apt.status]!); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
+        {(canManageAppointmentSchedule || canCheckInAppointments || canAdvanceAppointments)
+          && !APPOINTMENT_CLOSED_STATUSES.includes(apt.status) && priorAppointmentStatus(apt.status) && (
+          <button onClick={() => { onDone(); handleStatusChange(apt._id, priorAppointmentStatus(apt.status)!); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
         )}
-        {canManageAppointmentSchedule && (apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'no_show') && (
+        {/* Reopen covers every closed status — completed, cancelled, no-show,
+            and now rescheduled — none of which has a rung to step back to. */}
+        {canManageAppointmentSchedule && APPOINTMENT_CLOSED_STATUSES.includes(apt.status) && (
           <button onClick={() => { onDone(); handleStatusChange(apt._id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
         )}
         {canManageAppointmentSchedule && apt.status !== 'cancelled' && apt.status !== 'completed' && (

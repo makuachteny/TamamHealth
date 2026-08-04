@@ -1916,7 +1916,19 @@ export interface BloodBankDoc extends BaseDoc {
 }
 
 // ===== Appointment Booking (Payam Level & Above) =====
-export type AppointmentStatus = 'requested' | 'scheduled' | 'confirmed' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
+/**
+ * Where a booking sits on the front desk's ladder. `src/lib/appointment-status.ts`
+ * owns the order, labels and groupings — including that `in_progress` is shown
+ * as "Roomed" and `completed` as "Checked Out" (the stored names predate that
+ * vocabulary and are load-bearing in the analytics pipeline).
+ *
+ * `requested` comes from the patient portal, not the desk: a patient asking for
+ * a slot they have not been given yet.
+ */
+export type AppointmentStatus =
+  | 'requested' | 'scheduled' | 'reminder_sent' | 'confirmed' | 'arrived'
+  | 'checked_in' | 'in_progress' | 'completed'
+  | 'cancelled' | 'no_show' | 'rescheduled';
 export type AppointmentType = 'general' | 'follow_up' | 'specialist' | 'anc' | 'immunization' | 'lab' | 'telehealth' | 'surgical' | 'dental' | 'mental_health' | 'walk_in';
 export type AppointmentPriority = 'routine' | 'urgent' | 'emergency';
 

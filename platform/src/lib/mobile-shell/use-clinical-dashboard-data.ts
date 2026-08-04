@@ -13,6 +13,7 @@ import { getRoleConfig } from '@/lib/permissions';
 import { isHrefAllowed } from '@/components/ehr/ehr-navigation';
 import type { AppointmentDoc } from '@/lib/db-types';
 import type { MobileDashboardData, MobileLane, MobileOutstandingItem } from './dashboard-strategy';
+import { APPOINTMENT_PENDING_STATUSES } from '@/lib/appointment-status';
 
 function todayIso(): string {
   // Local calendar date, not UTC — see identical helper + rationale in
@@ -51,7 +52,7 @@ export function useClinicalDashboardData(): MobileDashboardData {
 
   const lanes = useMemo<MobileLane<AppointmentDoc>[]>(() => {
     const todays = appointments.filter((a) => a.appointmentDate === today);
-    const scheduled = todays.filter((a) => ['requested', 'scheduled', 'confirmed'].includes(a.status));
+    const scheduled = todays.filter((a) => a.status === 'requested' || APPOINTMENT_PENDING_STATUSES.includes(a.status));
     const inOffice = todays.filter((a) => ['checked_in', 'in_progress'].includes(a.status));
     const finished = todays.filter((a) => a.status === 'completed');
     return [

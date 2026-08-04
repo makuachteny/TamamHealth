@@ -8,7 +8,11 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
-import type { AppointmentDoc, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
+import type { AppointmentDoc, AppointmentStatus, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
+import {
+  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
+  APPOINTMENT_PENDING_STATUSES, appointmentStatusLabel,
+} from '@/lib/appointment-status';
 import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
 import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
@@ -24,7 +28,7 @@ import { useSettings } from '@/lib/settings/SettingsProvider';
 import { getRoleConfig } from '@/lib/permissions';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMetric, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
-  Calendar, ClipboardCheck, ArrowRightLeft,
+  Calendar, CalendarClock, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList,
   MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
   Send, Stethoscope, FileText, Ban, RotateCcw, type LucideIcon,
@@ -122,7 +126,10 @@ function patientFacilityName(patient: PatientDoc | undefined, fallback = 'Facili
 export default function FrontDeskDashboardPage() {
   const router = useRouter();
   const { currentUser } = useAuth();
-  const { canConsult } = usePermissions();
+  const { canConsult, canManageAppointmentSchedule, canCheckInAppointments } = usePermissions();
+  // Reception schedules and checks in; a role that can do neither may look at
+  // the ladder but not move a booking along it.
+  const canSetAppointmentStatus = canManageAppointmentSchedule || canCheckInAppointments;
   const { patients } = usePatients();
   const { appointments, updateStatus: updateAppointmentStatus, reschedule: rescheduleAppointment } = useAppointments();
   const { triages, update: updateTriage } = useTriage();
@@ -331,10 +338,12 @@ export default function FrontDeskDashboardPage() {
       });
     }
 
-    // Appointments only join the queue once the patient has CHECKED IN (arrived).
-    // Scheduled/confirmed appointments stay in the Today's Appointments card until
-    // the receptionist checks them in via the check-in popup.
-    const ARRIVED = new Set<AppointmentDoc['status']>(['checked_in', 'in_progress', 'completed']);
+    // Appointments only join the queue once the desk has CHECKED THEM IN.
+    // Scheduled/reminded/confirmed appointments — and ones merely marked
+    // `arrived`, where the patient is in the waiting room but the desk has not
+    // opened the visit — stay in the Today's Appointments card until the
+    // receptionist checks them in via the check-in popup.
+    const ARRIVED = new Set<AppointmentDoc['status']>(APPOINTMENT_CHECKED_IN_STATUSES);
     const triagedPatientIds = new Set(activeTriageByPatient.keys());
     const APPT_SCORE: Record<string, number> = { emergency: 3, urgent: 2 };
     for (const a of todaysAppointments) {
@@ -559,6 +568,29 @@ export default function FrontDeskDashboardPage() {
     }
   }, [updateAppointmentStatus, showToast]);
 
+  // ── Set any rung on the ladder straight from the row's status dropdown.
+  //    Checking in and no-show keep their own buttons: those two do more than
+  //    move a status (open the visit thread; confirm before hiding the patient
+  //    from arrivals), so the dropdown routes to them rather than writing the
+  //    status behind their backs. ──
+  const handleAppointmentStatusChange = useCallback(async (appt: AppointmentDoc, status: AppointmentStatus) => {
+    if (status === 'checked_in') { setCheckInTarget(appt); return; }
+    if (status === 'no_show') { setNoShowTarget(appt); return; }
+    // 'rescheduled' is set directly, and means "not happening at this time, to
+    // be rebooked" — the Reschedule action beside it moves a booking to a known
+    // new slot in place, which leaves it scheduled, not rescheduled.
+    try {
+      await updateAppointmentStatus(appt._id, status, {
+        actorId: currentUser?._id,
+        actorName: currentUser?.name || currentUser?.username,
+        actorRole: currentUser?.role,
+      });
+      showToast(`${appt.patientName} — ${appointmentStatusLabel(status).toLowerCase()}`, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not update the appointment status', 'error');
+    }
+  }, [updateAppointmentStatus, showToast, currentUser]);
+
   // ── Move an appointment to a new date/time without leaving the desk. ──
   const openReschedule = useCallback((appt: AppointmentDoc) => {
     setRescheduleDate(isoDateKey(appt.appointmentDate));
@@ -614,7 +646,11 @@ export default function FrontDeskDashboardPage() {
   }, [roleConfig]);
 
   const pendingAppointments = useMemo(() => {
-    const pendingStatuses = new Set<AppointmentDoc['status']>(['requested', 'scheduled', 'confirmed']);
+    // Every rung that still expects the patient — including the two the desk
+    // itself sets, Reminder Sent and Arrived. Hardcoding the old three meant
+    // reminding or marking someone arrived dropped their row off this list.
+    // `requested` joins them: a portal ask is reception's to answer.
+    const pendingStatuses = new Set<AppointmentDoc['status']>(['requested', ...APPOINTMENT_PENDING_STATUSES]);
     const triagedPatientIds = new Set(todaysTriages.map(item => item.patientId));
     return todaysAppointments.filter(appointment => pendingStatuses.has(appointment.status) && !triagedPatientIds.has(appointment.patientId));
   }, [todaysAppointments, todaysTriages]);
@@ -693,10 +729,13 @@ export default function FrontDeskDashboardPage() {
         location: appointment.department || appointment.facilityName || patientFacilityName(patient, currentUser?.hospitalName || 'Facility'),
         locationSecondary: appointment.department ? patientFacilityName(patient, currentUser?.hospitalName || 'Facility') : 'Location',
         locationLabel: appointment.department ? 'Department' : 'Location',
-        status: appointment.status === 'requested' ? 'requested' : 'scheduled',
-        statusLabel: appointment.status === 'confirmed' ? 'Confirmed' : appointment.status === 'requested' ? 'Requested' : 'Scheduled',
+        // The pill states the rung the booking is actually on — Reminder Sent
+        // and Arrived used to collapse into a flat "Scheduled", which hid the
+        // desk's own work from it.
+        status: appointment.status,
+        statusLabel: appointmentStatusLabel(appointment.status),
         statusSecondary: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
-        statusTone: 'scheduled',
+        statusTone: APPOINTMENT_STATUS_TONES[appointment.status],
         // Only a real acuity gets the RED/YELLOW pill — routine appointments
         // show no priority pill rather than a free-text 'Appointment' label.
         priority: appointment.priority === 'emergency' ? 'RED' : appointment.priority === 'urgent' ? 'YELLOW' : undefined,
@@ -710,6 +749,16 @@ export default function FrontDeskDashboardPage() {
               { icon: Calendar, label: 'Reschedule', onClick: () => openReschedule(appointment) },
               { icon: Ban, label: 'No show', onClick: () => setNoShowTarget(appointment) },
             ]} />
+            {/* The whole ladder in one control. The buttons above stay: they are
+                the two moves the desk makes constantly and each does more than
+                set a status (check-in opens a visit, no-show asks for a note).
+                This is for every other rung — reminded, confirmed, arrived,
+                roomed, checked out, rescheduled. */}
+            <AppointmentStatusPicker
+              appointment={appointment}
+              disabled={!canSetAppointmentStatus}
+              onChange={handleAppointmentStatusChange}
+            />
             <FrontDeskDetailFacts facts={[
               { label: 'Reason', value: appointment.reason || 'Scheduled visit' },
               { label: t('patient.phone'), value: patient?.phone ? formatPhoneDisplay(patient.phone) : undefined },
@@ -1235,6 +1284,50 @@ function FrontDeskDetailActions({ actions }: {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The appointment's rung on the desk's ladder, as one dropdown: Scheduled,
+ * Reminder Sent, Confirmed, Arrived, Checked In, Roomed, Checked Out, then the
+ * three exits (No Show, Rescheduled, Cancelled). Options and order come from
+ * the shared vocabulary, so this control and the clinician's chart offer the
+ * same list.
+ *
+ * A `requested` booking (patient-portal ask) keeps its own option while it is
+ * the current value — reception answers it by picking a real rung — but
+ * `requested` is never offered as a destination.
+ */
+function AppointmentStatusPicker({ appointment, disabled, onChange }: {
+  appointment: AppointmentDoc;
+  disabled?: boolean;
+  onChange: (appointment: AppointmentDoc, status: AppointmentStatus) => Promise<void> | void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const options = APPOINTMENT_STATUS_OPTIONS.includes(appointment.status)
+    ? APPOINTMENT_STATUS_OPTIONS
+    : [appointment.status, ...APPOINTMENT_STATUS_OPTIONS];
+  return (
+    <div className="ehr-care-rooming">
+      <CalendarClock className="w-4 h-4" />
+      <span>Appointment status</span>
+      <select
+        value={appointment.status}
+        disabled={disabled || saving}
+        aria-label="Appointment status"
+        onChange={async (event) => {
+          const next = event.target.value as AppointmentStatus;
+          if (next === appointment.status) return;
+          setSaving(true);
+          try { await onChange(appointment, next); } finally { setSaving(false); }
+        }}
+      >
+        {options.map(status => (
+          <option key={status} value={status}>{appointmentStatusLabel(status)}</option>
+        ))}
+      </select>
+      {saving && <span>Saving…</span>}
     </div>
   );
 }

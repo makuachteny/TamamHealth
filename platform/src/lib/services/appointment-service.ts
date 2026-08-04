@@ -8,6 +8,7 @@ import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
 import { withPendingOfflineSync } from '../sync/offline-metadata';
+import { APPOINTMENT_PENDING_STATUSES } from '../appointment-status';
 
 export type AppointmentStatusUpdateExtra = {
   cancelledReason?: string;
@@ -314,7 +315,9 @@ export async function getAppointmentStats(scope?: DataScope) {
     total: all.length,
     todayTotal: todayAppts.length,
     todayCompleted: todayAppts.filter(a => a.status === 'completed').length,
-    todayPending: todayAppts.filter(a => a.status === 'scheduled' || a.status === 'confirmed').length,
+    // Pending = the patient is still expected: booked, reminded, confirmed, or
+    // arrived but not yet checked in.
+    todayPending: todayAppts.filter(a => APPOINTMENT_PENDING_STATUSES.includes(a.status)).length,
     todayInProgress: todayAppts.filter(a => a.status === 'in_progress' || a.status === 'checked_in').length,
     upcoming: upcoming.length,
     completedTotal: completed.length,

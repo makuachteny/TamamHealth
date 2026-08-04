@@ -28,6 +28,7 @@ import { initials, stateTint, AVATAR_TINT_NEUTRAL } from '@/lib/patient-utils';
 import { NOTIFICATION_META, SEVERITY_META } from '@/lib/notification-meta';
 import type { NotificationSeverity, NotificationType } from '@/lib/hooks/useNotifications';
 import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
+import { APPOINTMENT_STATUS_OPTIONS, appointmentStatusLabel } from '@/lib/appointment-status';
 import { useToast } from '@/components/Toast';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -136,14 +137,12 @@ type OutstandingItem = {
   entries?: OutstandingEntry[];
 };
 
-const statusOptions: AppointmentStatus[] = ['requested', 'scheduled', 'confirmed', 'checked_in', 'in_progress', 'completed', 'cancelled', 'no_show'];
+/* The desk's ladder plus `requested`, which only the patient portal writes but
+   a clinician may still be looking at. Order and labels come from the shared
+   vocabulary so this dropdown and the front desk's offer the same thing. */
+const statusOptions: AppointmentStatus[] = ['requested', ...APPOINTMENT_STATUS_OPTIONS];
 
-function statusLabel(status: AppointmentStatus) {
-  if (status === 'checked_in') return 'Checked in';
-  if (status === 'in_progress') return 'Roomed';
-  if (status === 'completed') return 'Checked out';
-  return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
+const statusLabel = appointmentStatusLabel;
 
 function typeLabel(value: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -1476,8 +1475,9 @@ export default function EhrClinicalDashboard({
                             onMove={columns.entry ? () => { setVisitRow(null); setMoveEntry(columns.entry); } : undefined}
                             onOpenChart={row.patientId ? () => router.push(`/patients/${row.patientId}`) : undefined}
                             creatingNote={creatingNote}
-                            onCreateNote={row.patientId ? () => {
+                            onCreateNote={row.patientId ? (noteType) => {
                               void createNote({
+                                noteType,
                                 patientId: row.patientId!,
                                 patientName: row.name,
                                 mrn: row.patient?.id,
