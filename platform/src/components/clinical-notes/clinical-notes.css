@@ -1286,3 +1286,88 @@
   margin-top: 8px;
 }
 .cn-inc-details .cn-input { min-width: 220px; }
+
+/* ── Prescribe Medications popup ────────────────────────────────────────── */
+.cn-rx-sectionhead {
+  margin: 14px 0 10px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.cn-rx-sectionhead:first-child { margin-top: 0; }
+
+.cn-rx-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.cn-rx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  text-transform: none;
+  position: relative;
+  min-width: 90px;
+}
+.cn-rx-field > span {
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+.cn-rx-field--wide { flex: 1 1 300px; }
+.cn-rx-field input[type='number'] { max-width: 110px; }
+
+.cn-rx-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  z-index: 30;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+}
+
+.cn-rx-reason {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+.cn-rx-reason-chip {
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--color-primary-soft, #ccfbf1);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.cn-rx-instructions { min-height: 64px; }
+
+.cn-rx-sigs {
+  list-style: none;
+  margin: 6px 0 4px;
+  padding: 0;
+}
+.cn-rx-sigs button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 3px 0;
+  color: var(--color-text, #0f172a);
+}
+.cn-rx-sigs button:hover { color: var(--color-primary, #0f766e); text-decoration: underline; }
+
+.cn-rx-drugname { margin: 0 0 12px; font-size: 15px; font-weight: 800; letter-spacing: 0.02em; }
+.cn-rx-panelhead { margin: 14px 0 6px; font-size: 13px; font-weight: 700; }
+.cn-rx-warnings {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.cn-rx-warnings li { margin-bottom: 6px; }
+.cn-rx-currentmeds { color: var(--color-text-muted, #64748b); }

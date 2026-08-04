@@ -17,8 +17,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Info, Plus, X } from '@/components/icons/lucide';
+import PrescribeModal from './PrescribeModal';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
@@ -66,8 +66,8 @@ interface MedicationsModalProps {
 export default function MedicationsModal({
   patientId, patientName, currentUser, onClose,
 }: MedicationsModalProps) {
-  const router = useRouter();
   const { showToast } = useToast();
+  const [showPrescribe, setShowPrescribe] = useState(false);
   const userName = currentUser?.name || currentUser?.username || 'Unknown user';
 
   const [prescriptions, setPrescriptions] = useState<PrescriptionDoc[]>([]);
@@ -256,11 +256,7 @@ export default function MedicationsModal({
                 ))}
               </div>
               <div className="cn-meds-adders">
-                <button
-                  type="button"
-                  className="cn-btn"
-                  onClick={() => router.push(`/patients/${patientId}?tab=prescriptions`)}
-                >
+                <button type="button" className="cn-btn" onClick={() => setShowPrescribe(true)}>
                   <Plus size={13} /> Prescription
                 </button>
                 <button type="button" className="cn-btn" onClick={() => setShowAddMed(v => !v)} aria-expanded={showAddMed}>
@@ -445,6 +441,16 @@ export default function MedicationsModal({
           </div>
         </div>
       </div>
+
+      {showPrescribe && (
+        <PrescribeModal
+          patientId={patientId}
+          patientName={patientName}
+          currentUser={currentUser}
+          onClose={() => setShowPrescribe(false)}
+          onPrescribed={() => void load()}
+        />
+      )}
     </Modal>
   );
 }
