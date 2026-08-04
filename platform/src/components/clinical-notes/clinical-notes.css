@@ -1,0 +1,601 @@
+/*
+ * Clinical notes module styling.
+ *
+ * Everything is namespaced `cn-`. globals.css force-uppercases every bare
+ * <label>, does not style datetime-local inputs, and overrides icon colour and
+ * background inside form rows — so the note editor keeps its own scope rather
+ * than inheriting a cascade written for the older forms.
+ *
+ * Colours come from the app's existing custom properties so the module tracks
+ * the platform theme instead of hard-coding a second palette.
+ */
+
+.cn-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #0f172a);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.cn-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #fff);
+}
+
+.cn-header-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.cn-header-meta {
+  font-weight: 400;
+  color: var(--color-text-muted, #64748b);
+}
+
+.cn-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Toolbar (type, date, assignment) ───────────────────────────────────── */
+.cn-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.cn-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Scoped so globals.css does not uppercase these — they are sentence-case
+   field names, not the shouty section headers that rule was written for. */
+.cn-field > .cn-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+
+.cn-select,
+.cn-input {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+  background: var(--color-surface, #fff);
+  color: inherit;
+  min-height: 34px;
+}
+
+/* globals.css never styles datetime-local / date / time; do it here so the
+   date and time of service match every other control in the toolbar. */
+.cn-input[type='date'],
+.cn-input[type='time'],
+.cn-input[type='datetime-local'] {
+  min-width: 132px;
+  appearance: none;
+}
+
+.cn-select:focus-visible,
+.cn-input:focus-visible,
+.cn-textarea:focus-visible {
+  outline: 2px solid var(--color-primary, #0f766e);
+  outline-offset: 1px;
+}
+
+/* ── Body layout ────────────────────────────────────────────────────────── */
+.cn-body {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .cn-body { grid-template-columns: minmax(0, 1fr); }
+  .cn-sidebar { display: none; }
+}
+
+.cn-sidebar {
+  border-right: 1px solid var(--color-border, #e2e8f0);
+  padding: 12px;
+  overflow-y: auto;
+  background: var(--color-surface-muted, #f8fafc);
+}
+
+.cn-sidebar-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.cn-sidebar-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cn-patient-name { font-size: 14px; font-weight: 700; margin: 0 0 4px; }
+.cn-patient-line { font-size: 12px; color: var(--color-text-muted, #64748b); margin: 0; }
+
+.cn-sidebar-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--color-primary, #0f766e);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cn-sidebar-link:hover { text-decoration: underline; }
+
+.cn-section-nav { display: flex; flex-direction: column; gap: 2px; }
+
+.cn-section-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cn-section-nav-item:hover { background: var(--color-surface-muted, #f1f5f9); }
+.cn-section-nav-item[aria-current='true'] {
+  background: var(--color-primary-soft, #ccfbf1);
+  font-weight: 600;
+}
+
+.cn-section-nav-badge {
+  font-size: 11px;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+/* ── Note canvas ────────────────────────────────────────────────────────── */
+.cn-canvas {
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+  min-height: 0;
+}
+
+.cn-note-heading {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 4px 0 16px;
+}
+
+.cn-note-patient {
+  text-align: right;
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.cn-section {
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+}
+
+.cn-section:hover,
+.cn-section.is-active {
+  border-color: var(--color-border, #e2e8f0);
+  background: var(--color-surface-muted, #f8fafc);
+}
+
+.cn-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.cn-section-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary, #0f766e);
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.cn-section-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Section tool buttons keep their own icon colour — globals.css otherwise
+   repaints icons inside form rows. */
+.cn-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #0f172a);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cn-tool:hover:not(:disabled) { background: var(--color-surface-muted, #f1f5f9); }
+.cn-tool:disabled { opacity: 0.5; cursor: not-allowed; }
+.cn-tool svg { color: currentColor; background: none; }
+
+.cn-textarea {
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-surface, #fff);
+  color: inherit;
+}
+
+.cn-textarea[readonly] {
+  background: var(--color-surface-muted, #f8fafc);
+  color: var(--color-text-muted, #475569);
+}
+
+.cn-derived {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  color: var(--color-text, #334155);
+}
+
+.cn-derived-empty { color: var(--color-text-muted, #94a3b8); font-style: italic; }
+
+/* ── Popovers (shortcut + template pickers) ─────────────────────────────── */
+.cn-popover {
+  position: absolute;
+  z-index: 40;
+  min-width: 260px;
+  max-width: 380px;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+  padding: 8px;
+}
+
+.cn-popover-search {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.cn-popover-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cn-popover-item:hover,
+.cn-popover-item:focus-visible { background: var(--color-surface-muted, #f1f5f9); }
+
+.cn-popover-item-body {
+  display: block;
+  font-size: 11.5px;
+  color: var(--color-text-muted, #94a3b8);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cn-popover-empty {
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+/* ── Template tree ──────────────────────────────────────────────────────── */
+.cn-tree-group { border-bottom: 1px solid var(--color-border, #f1f5f9); padding: 4px 0; }
+.cn-tree-group:last-child { border-bottom: none; }
+
+.cn-tree-group-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted, #64748b);
+  padding: 4px 6px;
+  margin: 0;
+}
+
+.cn-tree-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cn-tree-option:hover { background: var(--color-surface-muted, #f1f5f9); }
+.cn-tree-option input[type='checkbox'],
+.cn-tree-option input[type='radio'] { margin-top: 2px; flex: 0 0 auto; }
+
+.cn-tree-freetext {
+  margin: 4px 0 6px 26px;
+  width: calc(100% - 34px);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+}
+
+.cn-tree-preview {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-surface-muted, #f8fafc);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-text, #334155);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.cn-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #fff);
+}
+
+.cn-footer-spacer { flex: 1 1 auto; }
+
+.cn-saved {
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+
+.cn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: var(--color-surface, #fff);
+  color: inherit;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.cn-btn:hover:not(:disabled) { background: var(--color-surface-muted, #f1f5f9); }
+.cn-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.cn-btn-primary {
+  background: var(--color-primary, #0f766e);
+  border-color: var(--color-primary, #0f766e);
+  color: #fff;
+}
+
+.cn-btn-primary:hover:not(:disabled) { filter: brightness(1.06); background: var(--color-primary, #0f766e); }
+
+.cn-status-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #dc2626; flex: 0 0 auto;
+}
+.cn-status-dot.is-signed { background: #16a34a; }
+.cn-status-dot.is-cosign { background: #d97706; }
+
+/* ── Signed banner + addenda ────────────────────────────────────────────── */
+.cn-locked-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 13px;
+}
+
+.cn-addendum {
+  border-left: 3px solid var(--color-primary, #0f766e);
+  padding: 8px 12px;
+  margin: 10px 0;
+  background: var(--color-surface-muted, #f8fafc);
+  border-radius: 0 6px 6px 0;
+}
+
+.cn-addendum-meta {
+  font-size: 11.5px;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 3px;
+}
+
+/* ── Notes list ─────────────────────────────────────────────────────────── */
+.cn-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.cn-note-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: var(--color-surface, #fff);
+}
+
+.cn-note-card-main { flex: 1 1 320px; min-width: 0; }
+
+.cn-note-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.cn-note-card-type { font-size: 14px; font-weight: 700; }
+
+.cn-note-card-preview {
+  font-size: 13px;
+  color: var(--color-text-muted, #64748b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cn-note-card-meta {
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+  margin-top: 4px;
+}
+
+.cn-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--color-surface-muted, #f1f5f9);
+  color: var(--color-text-muted, #475569);
+}
+
+.cn-badge.is-signed { background: #dcfce7; color: #166534; }
+.cn-badge.is-draft { background: #fef3c7; color: #92400e; }
+.cn-badge.is-amended { background: #e0e7ff; color: #3730a3; }
+.cn-badge.is-cosign { background: #ffedd5; color: #9a3412; }
+
+/* ── Care coordination ──────────────────────────────────────────────────── */
+.cn-coord-section { margin-bottom: 16px; }
+
+.cn-coord-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cn-coord-table th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted, #64748b);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+.cn-coord-table td { padding: 7px 8px; border-bottom: 1px solid var(--color-border, #f1f5f9); }
+
+.cn-segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cn-segmented button {
+  padding: 6px 16px;
+  font: inherit;
+  font-size: 13px;
+  border: none;
+  background: var(--color-surface, #fff);
+  cursor: pointer;
+  color: inherit;
+}
+
+.cn-segmented button[aria-pressed='true'] {
+  background: var(--color-primary, #0f766e);
+  color: #fff;
+  font-weight: 600;
+}
+
+.cn-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 13.5px;
+}
