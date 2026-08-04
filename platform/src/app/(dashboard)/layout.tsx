@@ -10,8 +10,6 @@ import PreferenceEffects from '@/components/PreferenceEffects';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import LockScreen from '@/components/LockScreen';
 import ConnectivityNotice from '@/components/ConnectivityNotice';
-import MessagingDock from '@/components/MessagingDock';
-import { MessagingDockProvider } from '@/lib/messaging-dock-context';
 import { TourProvider } from '@/lib/tour/tour-context';
 import GetStartedCard from '@/components/onboarding/GetStartedCard';
 import ForcePasswordChange from '@/components/ForcePasswordChange';
@@ -60,7 +58,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SettingsProvider>
-    <MessagingDockProvider>
     <TourProvider>
     <div className="flex h-screen overflow-hidden tamam-solid-bg tamam-ehr-app">
       {isLocked && currentUser && (
@@ -96,15 +93,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <PreferenceEffects />
       <KeyboardShortcuts />
       <ConnectivityNotice />
-      {/* MessagingDock's floating bottom-right launcher collides with the
-          mobile shell's tab bar, and staff-to-staff chat has no equivalent
-          slot in the mockup — the shell's Inbox tab is the mobile messaging
-          entry point instead. */}
-      {!useShell && <MessagingDock />}
       <UsageTracker />
     </div>
     </TourProvider>
-    </MessagingDockProvider>
     </SettingsProvider>
   );
 }

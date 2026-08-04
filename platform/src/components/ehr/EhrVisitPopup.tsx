@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, ArrowRightLeft, Clock, FileText, Stethoscope, X } from '@/components/icons/lucide';
+import { ArrowRight, ArrowRightLeft, Clock, FileText, X } from '@/components/icons/lucide';
+import CreateNoteButton, { defaultNoteTypeFor } from '@/components/clinical-notes/CreateNoteButton';
 import Modal from '@/components/Modal';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { STAGE_LABELS, type QueueEntry, type QueueStage } from '@/lib/services/patient-queue-service';
@@ -72,6 +73,8 @@ export default function EhrVisitPopup({
   onCall,
   onMove,
   onOpenChart,
+  onCreateNote,
+  creatingNote = false,
   inline = false,
 }: {
   patientId?: string;
@@ -89,6 +92,14 @@ export default function EhrVisitPopup({
   /** Opens the Move dialog (only offered while a queue entry exists). */
   onMove?: () => void;
   onOpenChart?: () => void;
+  /**
+   * Start a clinical note for this visit. Offered here because the appointment
+   * card already carries the patient, provider, date and telehealth mode the
+   * note header needs — creating from the chart makes the clinician re-select
+   * all of it.
+   */
+  onCreateNote?: (noteType: import('@/lib/clinical-notes/note-catalog').NoteTypeId) => void;
+  creatingNote?: boolean;
   /** Render the panel in the flow of the list, under the row it belongs to,
    *  rather than as an overlay. The content is identical — only the frame
    *  differs — so a queue keeps its context while one visit is read. */
@@ -152,9 +163,13 @@ export default function EhrVisitPopup({
           {/* Open chart / Move / Start consultation sit on the tab line: the
               one row that is always visible, however far the visit scrolls. */}
           <div className="ehr-visit-pop-actions">
+            {/* Labelled, not an icon: it sat beside the note button's own
+                document glyph, so two identical-looking icons did different
+                things. The note action keeps the glyph; this one says what it
+                does. */}
             {onOpenChart && (
-              <button type="button" className="ehr-visit-pop-icon" onClick={onOpenChart} aria-label="Open chart" title="Open chart">
-                <FileText className="w-4 h-4" aria-hidden />
+              <button type="button" className="ehr-visit-pop-icon ehr-visit-pop-labelled" onClick={onOpenChart} title="Open chart">
+                <FileText className="w-4 h-4" aria-hidden /> Open chart
               </button>
             )}
             {onMove && entry && (
@@ -162,15 +177,35 @@ export default function EhrVisitPopup({
                 <ArrowRightLeft className="w-4 h-4" aria-hidden />
               </button>
             )}
+            {/* The consultation keeps the stethoscope on its own button. It was
+                folded into the note button's main half, which put the divider
+                between a glyph and a label that described a different action —
+                the words said "create note" while pressing them started a
+                consultation. Each control says one thing and does it. */}
+            {/* Labelled, not a stethoscope disc: the action names itself, and
+                the label already changes to Resume or Join with the state. */}
             <button
               type="button"
-              className="ehr-visit-pop-icon is-primary"
+              className="ehr-visit-pop-icon is-primary ehr-visit-pop-labelled"
               onClick={onCall}
-              aria-label={callLabel}
               title={callLabel}
             >
-              <Stethoscope className="w-4 h-4" aria-hidden />
+              {callLabel}
             </button>
+            {/* A plain split button now: the label creates the note the visit
+                most likely needs, the caret past the divider picks a different
+                type. */}
+            {onCreateNote && patientId && (
+              <CreateNoteButton
+                tone="primary"
+                defaultType={defaultNoteTypeFor({
+                  telehealth: appointment?.appointmentType === 'telehealth',
+                  reason: appointment?.reason || triage?.chiefComplaint,
+                })}
+                disabled={creatingNote}
+                onCreate={onCreateNote}
+              />
+            )}
           </div>
         </div>
 

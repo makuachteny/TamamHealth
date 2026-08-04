@@ -86,6 +86,23 @@ export interface OnboardingState {
 export interface PatientDoc extends BaseDoc, Omit<Patient, 'id'> {
   type: 'patient';
   orgId?: string;
+  /** Medications review: clinician attested the patient takes no medications. */
+  noKnownMedications?: boolean;
+  /** Problems review: clinician attested the patient has no known problems. */
+  noKnownProblems?: boolean;
+  /** "Problem reconciliation performed" attestation (Include Problems popup). */
+  problemReconciledAt?: string;
+  /** Allergies review: clinician attested no known drug allergies (NKDA). */
+  noKnownDrugAllergies?: boolean;
+  /** Medication reconciliation status recorded in the Medications popup. */
+  medReconciliation?: string;
+  medReconciliationAt?: string;
+  /**
+   * Consent gate for viewing the patient's network medication history (their
+   * prescriptions across facilities). PHI: viewing is recorded, not assumed —
+   * the record keeps who obtained the answer and when, whichever way it went.
+   */
+  medHistoryConsent?: { granted: boolean; byId?: string; byName?: string; at: string };
 }
 
 /**
@@ -421,6 +438,16 @@ export interface PrescriptionDoc extends BaseDoc {
   stoppedByName?: string;
   /** Source of the stop: 'clinician' | 'patient_reported' */
   stoppedSource?: 'clinician' | 'patient_reported';
+  /** Clinical indication (Reason for Rx), e.g. "1A40 · Malaria". */
+  indication?: string;
+  /** Prescriber allowed generic substitution at the pharmacy. */
+  allowSubstitution?: boolean;
+  /** Number of refills authorised (0 = none). */
+  refills?: number;
+  /** Date the prescription becomes effective (YYYY-MM-DD). */
+  effectiveOn?: string;
+  /** Free-text note to the dispensing pharmacy. */
+  pharmacyInstructions?: string;
   /** Granular pharmacy dispensing lifecycle (Stage 8): prescribed →
    *  received_in_pharmacy_queue → under_review → cleared_for_dispensing →
    *  dispensed → counseled → complete, plus stockout/held/recalled branches.
@@ -846,6 +873,14 @@ export interface MessageDoc extends BaseDoc {
   channel: 'app' | 'sms' | 'both';
   status: 'sent' | 'delivered' | 'failed';
   sentAt: string;
+  /**
+   * Set when the message was sent as patient education (the chart header's
+   * "Patient education" action) — the chart's Documents ▸ Patient education
+   * view lists these as material already delivered to the patient. A flag
+   * rather than a subject match, so the classification survives the sender
+   * editing the subject line.
+   */
+  patientEducation?: boolean;
   orgId?: string;
   /**
    * Internal staff chat: groups a message into a conversation thread.
@@ -1023,12 +1058,19 @@ export interface ConsultationTemplateDoc extends BaseDoc {
   orgId?: string;
 }
 
-/** Category a scanned/uploaded chart document is filed under. */
+/**
+ * Category a scanned/uploaded chart document is filed under.
+ *
+ * Two of these also decide which view of the chart's Documents section a
+ * document lands in: `referral_letter` files it under Referrals and
+ * `patient_education` under Patient education. Everything else is a general
+ * chart document.
+ */
 export type PatientDocumentCategory =
   | 'radiology' | 'lab_report' | 'referral_letter' | 'discharge_summary'
   | 'consent' | 'advance_directive' | 'legal_document' | 'treatment_agreement'
   | 'insurance' | 'id_document' | 'prescription' | 'scanned_record'
-  | 'external_medical_record' | 'other';
+  | 'external_medical_record' | 'patient_education' | 'other';
 
 /**
  * A scanned or uploaded document filed on the patient chart — radiology films,
@@ -1901,7 +1943,19 @@ export interface BloodBankDoc extends BaseDoc {
 }
 
 // ===== Appointment Booking (Payam Level & Above) =====
-export type AppointmentStatus = 'requested' | 'scheduled' | 'confirmed' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
+/**
+ * Where a booking sits on the front desk's ladder. `src/lib/appointment-status.ts`
+ * owns the order, labels and groupings — including that `in_progress` is shown
+ * as "Roomed" and `completed` as "Checked Out" (the stored names predate that
+ * vocabulary and are load-bearing in the analytics pipeline).
+ *
+ * `requested` comes from the patient portal, not the desk: a patient asking for
+ * a slot they have not been given yet.
+ */
+export type AppointmentStatus =
+  | 'requested' | 'scheduled' | 'reminder_sent' | 'confirmed' | 'arrived'
+  | 'checked_in' | 'in_progress' | 'completed'
+  | 'cancelled' | 'no_show' | 'rescheduled';
 export type AppointmentType = 'general' | 'follow_up' | 'specialist' | 'anc' | 'immunization' | 'lab' | 'telehealth' | 'surgical' | 'dental' | 'mental_health' | 'walk_in';
 export type AppointmentPriority = 'routine' | 'urgent' | 'emergency';
 
@@ -1921,7 +1975,18 @@ export interface AppointmentDoc extends BaseDoc {
   endTime?: string;           // HH:MM estimated end
   duration: number;           // minutes
   appointmentType: AppointmentType;
+  /**
+   * How the visit happens, independent of what kind of visit it is. Legacy rows
+   * carry no mode and are read as in-office unless `appointmentType` is
+   * 'telehealth', which is how a remote visit used to be recorded.
+   */
+  appointmentMode?: 'in_office' | 'telehealth';
   priority: AppointmentPriority;
+  /** Second staff member on the visit (rooming nurse, interpreter, scribe). */
+  staffId?: string;
+  staffName?: string;
+  /** Exam room or bay this visit is booked into. */
+  room?: string;
   department: string;
   // Clinical context
   reason: string;             // Chief complaint or reason for visit

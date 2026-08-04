@@ -149,7 +149,7 @@ export default function AssetsPage() {
         )}
 
         {/* Asset table */}
-        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+        <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <EhrListHeader
             title={t('equipment.topBarTitle')}
             search={{ value: globalSearch, onChange: setGlobalSearch, placeholder: 'Search assets…' }}
@@ -159,7 +159,7 @@ export default function AssetsPage() {
               </button>
             }
           />
-          <div style={{ padding: '0 16px', overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <div className="ehr-list-scroll">
           <table className="data-table" style={{ minWidth: 820, tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: '26%' }} />
@@ -211,8 +211,8 @@ export default function AssetsPage() {
                         </span>
                       ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                     </td>
-                    <td>
-                      <div className="flex">
+                    <td className="is-right">
+                      <div className="flex justify-end">
                         <RowActionsMenu
                           actions={[
                             { key: 'service', label: t('equipment.logServiceTitle'), icon: <Wrench className="w-4 h-4" />, onClick: () => setServiceFor(a) },

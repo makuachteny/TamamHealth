@@ -115,6 +115,197 @@
   margin-bottom: 12px;
 }
 
+/* ── Table toolbar ───────────────────────────────────────────────── */
+
+/* Search box + the card's actions on one line, the appointments list header's
+   shape: a flexible search field with 38px `listpage-icon-btn` squares to its
+   right. The buttons keep their own margin-free row so they stay aligned with
+   the search box when the card narrows and they wrap. */
+.bl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 18px;
+}
+.bl-toolbar .bl-search {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+  height: 38px;
+}
+.bl-toolbar .bl-search input { padding: 0; }
+
+/* Superbill service picker — a text select on the toolbar line, sized to the
+   appointments toolbar's date input so select, search and icon buttons share
+   one 38px rhythm. Notes on fighting the globals.css `select` rule:
+   `width` beats its `width: 100%`; `background-color` (not the `background`
+   shorthand) keeps its chevron background-image; the right padding leaves room
+   for that chevron. Focus keeps the platform's blue ring — the same one the
+   appointments toolbar's date input gets. */
+.bl-toolbar-select {
+  flex: 0 0 auto;
+  width: 210px;
+  max-width: 100%;
+  height: 38px;
+  margin: 0;
+  padding: 0 34px 0 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ehr-text, #102634);
+  appearance: none;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  cursor: pointer;
+}
+/* The chart cascade (`.ehr-chart-page select`, `.ehr-chart-content select`)
+   forces `background: #fff !important`, which wipes any chevron the select
+   inherits from globals.css — so this carries its own, and `.bl-root` +
+   `!important` is what it takes to outrank those rules. */
+.bl-root .bl-toolbar-select {
+  background-color: var(--ehr-panel, #fff) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238395A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+}
+.bl-toolbar-select:hover:not(:disabled):not(:focus) { border-color: var(--bl-teal); }
+.bl-toolbar-select:disabled {
+  color: var(--ehr-muted, #8395A8);
+  background-color: var(--ehr-page-bg, #F8FBFD);
+  cursor: not-allowed;
+}
+
+/* ── Superbill draft ticket ──────────────────────────────────────── */
+
+/* The unposted fee ticket, between the toolbar and the charges it will post
+   into. Teal-tinted so it reads as pending work rather than a second table. */
+.bl-draft {
+  margin: 12px 18px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--bl-teal);
+  border-radius: 8px;
+  background: var(--bl-teal-soft);
+}
+.bl-draft-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.bl-draft-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bl-teal-dark);
+}
+.bl-draft-note {
+  font-size: 11.5px;
+  color: var(--ehr-muted, #8395A8);
+}
+/* The ticket is already a tinted panel — the shared table's grey head and
+   hover tint would read as a second table inside it. The `.bl-draft` ancestor
+   is load-bearing: it outranks `.bl-root .bl-table thead th`, which carries the
+   same `!important` and is declared later in this file. */
+.bl-root .bl-draft .bl-draft-table thead th {
+  background: transparent !important;
+  padding: 0 10px 6px;
+  color: var(--ehr-muted, #8395A8);
+  font-weight: 600;
+}
+.bl-root .bl-draft .bl-draft-table tbody td {
+  padding: 7px 10px;
+  border-bottom-color: rgba(0, 125, 121, 0.16);
+}
+.bl-root .bl-draft .bl-draft-table tbody tr:hover td { background: transparent; }
+.bl-draft-table .bl-center { text-align: center; }
+/* Narrow columns so the service description takes the width, not the qty box. */
+.bl-draft-table th:nth-child(2), .bl-draft-table td:nth-child(2) { width: 70px; }
+.bl-draft-table th:nth-child(3), .bl-draft-table td:nth-child(3) { width: 120px; }
+.bl-draft-table th:nth-child(4), .bl-draft-table td:nth-child(4) { width: 50px; }
+.bl-draft-table th:nth-child(5), .bl-draft-table td:nth-child(5) { width: 34px; }
+/* `.bl-draft-table` prefix beats globals.css `input[type="number"] { width: 100% }`. */
+.bl-draft-table .bl-draft-qty {
+  width: 52px;
+  height: 28px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--ehr-text, #102634);
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 4px;
+}
+.bl-draft-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--ehr-muted, #8395A8);
+  cursor: pointer;
+}
+.bl-draft-remove:hover { color: var(--color-danger, #DA1E28); }
+.bl-draft-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ehr-border, #D8E3EC);
+}
+.bl-draft-totals {
+  margin: 0;
+  min-width: 200px;
+  font-size: 12.5px;
+}
+.bl-draft-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  color: var(--ehr-text-body, #39536B);
+}
+.bl-draft-totals dt, .bl-draft-totals dd { margin: 0; }
+.bl-draft-totals dd { font-variant-numeric: tabular-nums; }
+.bl-draft-abn { color: #B45309; }
+.bl-draft-total {
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+}
+.bl-draft-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--ehr-muted, #8395A8);
+}
+.bl-draft-posted {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--bl-teal-dark);
+}
+.bl-draft-error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-danger, #DA1E28);
+}
+
+/* Write-off / adjustment stays the destructive action once it's icon-only.
+   The <Icon> shim paints a `color` attribute on the SVG, so the glyph rule
+   has to be explicit — same escape hatch `.listpage-icon-btn-primary` uses. */
+.bl-icon-btn--danger { color: var(--color-danger, #DA1E28); }
+.bl-icon-btn--danger svg,
+.bl-icon-btn--danger svg.lucide {
+  color: var(--color-danger, #DA1E28);
+  stroke: currentColor;
+}
+.bl-icon-btn--danger:hover {
+  background: rgba(218, 30, 40, 0.08);
+  border-color: var(--color-danger, #DA1E28);
+}
+
 /* ── Search ──────────────────────────────────────────────────────── */
 
 .bl-search {
@@ -144,6 +335,17 @@
   min-width: 0;
 }
 .bl-search input::placeholder { color: var(--ehr-muted, #8395A8); }
+/* Inside the patient chart, `.ehr-chart-page input` repaints every field with
+   its own white box (and globals.css adds a blue focus ring), so the input drew
+   a second border inside this one — one search box looking like two. `.bl-root`
+   + `!important` is what it takes to outrank those rules; the frame and the
+   teal focus state belong to `.bl-search` alone. */
+.bl-root .bl-search input {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
 
 /* ── Tables ──────────────────────────────────────────────────────── */
 
@@ -426,6 +628,9 @@
   gap: 0;
 }
 .bl-pay-main { padding: 16px 18px 18px; min-width: 0; }
+/* Same padding without the grid — the chart's billing tab lists payments full
+   width, its account totals already living in the summary strip above. */
+.bl-pay-single { padding: 16px 18px 18px; min-width: 0; }
 .bl-pay-aside {
   border-left: 1px solid var(--ehr-border, #D8E3EC);
   padding: 18px 20px;

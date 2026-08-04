@@ -138,21 +138,24 @@ export default function BirthsPage() {
               )
             }
           />
-          <div style={{ overflow: 'auto', flex: 1, minHeight: 0, padding: '0 16px' }}>
+          <div className="ehr-list-scroll">
           {loading ? (
             <div className="p-8 text-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p></div>
           ) : (
             <table className="data-table" style={{ minWidth: 1080, tableLayout: 'fixed' }}>
+              {/* State needs room for "Western Bahr el Ghazal", not the 6% it
+                  had — at that width every row wrapped to two or three lines
+                  and the list lost its even rhythm. */}
               <colgroup>
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '17%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '12%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '16%' }} />
                 <col style={{ width: '8%' }} />
                 <col style={{ width: '11%' }} />
-                <col style={{ width: '14%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '13%' }} />
                 <col style={{ width: '12%' }} />
-                <col style={{ width: '6%' }} />
+                <col style={{ width: '12%' }} />
               </colgroup>
               <thead>
                 <tr>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { formatCompactDateTime } from '@/lib/format-utils';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
@@ -258,9 +259,10 @@ export default function LabPage() {
     { key: 'test', label: t('lab.testName'), width: 19 },
     { key: 'specimen', label: t('lab.specimen'), width: 10 },
     { key: 'status', label: t('lab.status'), width: 11 },
-    { key: 'result', label: t('lab.result'), width: 17 },
+    { key: 'result', label: t('lab.result'), width: 14 },
     { key: 'orderedBy', label: t('lab.orderedByLabel'), width: 13 },
-    { key: 'time', label: t('lab.time'), width: 11 },
+    // Wide enough for "Aug 27 · 03:42 PM" plus the "Done:" line beneath it.
+    { key: 'time', label: t('lab.time'), width: 14 },
     ...(canEnterLabResults ? [{ key: 'action', label: t('lab.action'), width: 14 }] : []),
   ];
   const labColTotal = labCols.reduce((sum, c) => sum + c.width, 0);
@@ -278,7 +280,7 @@ export default function LabPage() {
           )}
 
           {/* Lab Orders Table */}
-          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
             <EhrListHeader
               title={t('lab.laboratory')}
               stats={[
@@ -379,9 +381,10 @@ export default function LabPage() {
                 </>
               }
             />
-            {/* 16px gutter matches the card's title/search inset, so the first
-              column starts under the search box rather than 15px left of it. */}
-          <div style={{ overflow: 'auto', flex: 1, minHeight: 0, padding: '0 16px' }}>
+            {/* `ehr-list-scroll` carries the shared worklist row language (the
+                appointments board's card rows, 16px gutter, sticky quiet
+                header) so this queue looks the same as every other module. */}
+          <div className="ehr-list-scroll">
             {/* `table-layout: fixed` is what makes the colgroup binding: without
                 it the browser re-sizes from content and Result swallows the row. */}
             <table className="data-table" style={{ minWidth: 1040, tableLayout: 'fixed' }}>
@@ -390,10 +393,10 @@ export default function LabPage() {
                   <col key={c.key} style={{ width: `${(c.width / labColTotal * 100).toFixed(2)}%` }} />
                 ))}
               </colgroup>
-              <thead className="appointment-table-head">
+              <thead>
                 <tr>
                   {labCols.map(c => (
-                    <th key={c.key}>
+                    <th key={c.key} className={c.key === 'action' ? 'is-right' : undefined}>
                       <span className="whitespace-nowrap">{c.label}</span>
                     </th>
                   ))}
@@ -405,11 +408,10 @@ export default function LabPage() {
                   return (
                   <tr
                     key={order._id}
-                    className="cursor-pointer hover:bg-white/[0.03]"
-                    style={overdue ? { background: 'rgba(229,46,66,0.08)' } : undefined}
+                    className={`cursor-pointer${overdue ? ' is-danger' : ''}`}
                     onClick={() => { if (order.patientId) router.push(`/patients/${order.patientId}?tab=labs&focus=${order._id}`); }}
                   >
-                    <td style={overdue ? { boxShadow: 'inset 3px 0 0 var(--color-danger)' } : undefined}>
+                    <td>
                       <PatientName
                         patient={patientById.get(order.patientId)}
                         patientId={order.patientId}
@@ -457,14 +459,20 @@ export default function LabPage() {
                       )}
                     </td>
                     <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{order.orderedBy}</td>
+                    {/* Compact "Aug 27 · 19:42", not the raw ISO stamp: the
+                        stamp wrapped onto three lines and made every resulted
+                        row twice the height of an ordered one, which is the
+                        ragged rhythm the appointments board doesn't have. */}
                     <td>
-                      <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{order.orderedAt}</p>
-                      {order.completedAt && (
-                        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('lab.donePrefix', { time: order.completedAt })}</p>
-                      )}
+                      <div className="ehr-list-main">
+                        <strong>{formatCompactDateTime(order.orderedAt)}</strong>
+                        {order.completedAt && (
+                          <small>{t('lab.donePrefix', { time: formatCompactDateTime(order.completedAt) })}</small>
+                        )}
+                      </div>
                     </td>
                     {canEnterLabResults && (
-                      <td onClick={(e) => e.stopPropagation()}>
+                      <td className="is-right" onClick={(e) => e.stopPropagation()}>
                         {(() => {
                           // Lab work happens in the chart, not in a popup: the
                           // technician needs the patient around the result

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
+import PatientName from '@/components/PatientName';
 import EmptyState from '@/components/EmptyState';
 import Badge, { toneForStatus } from '@/components/Badge';
 import {
@@ -155,6 +155,11 @@ export default function ReferralsPage() {
   // (e.g. JTH-00012) rather than the internal record id.
   const hospitalNoByPatient = new Map(patients.map(p => [p._id, p.hospitalNumber]));
   const hospitalNoFor = (pid: string) => hospitalNoByPatient.get(pid) || pid;
+  // Backs the avatar + name identity cell (photo, gender tint) shared with the
+  // lab queue and the patient registry.
+  const patientById = new Map(patients.map(p => [p._id, p]));
+  // Seeded demo referrals point at patients with no chart to open.
+  const isRealPatient = (pid: string) => !!pid && !pid.startsWith('demo-') && !pid.includes('_demo');
 
   // Urgency / status option lists shared by the filter popover.
   const urgencyOptions = [
@@ -563,7 +568,9 @@ export default function ReferralsPage() {
                   value={activeTab}
                   onChange={e => setActiveTab(e.target.value as 'incoming' | 'outgoing')}
                   aria-label="Filter referrals by direction"
-                  style={{ width: 'auto', height: 38, padding: '0 14px', borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, flexShrink: 0 }}
+                  /* 8px radius, not a 999px pill — matches the square icon
+                     buttons beside it and the appointments toolbar. */
+                  style={{ width: 'auto', height: 38, padding: '0 14px', borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, flexShrink: 0 }}
                 >
                   <option value="incoming">{`Incoming referrals${newIncomingCount > 0 ? ` (${newIncomingCount} new)` : ''}`}</option>
                   <option value="outgoing">Outgoing referrals</option>
@@ -593,9 +600,10 @@ export default function ReferralsPage() {
             }
           />
 
-          {/* 16px gutter matches the card's title/search inset, so the first
-              column starts under the search box rather than 15px left of it. */}
-          <div style={{ overflow: 'auto', flex: 1, minHeight: 0, padding: '0 16px' }}>
+          {/* `ehr-list-scroll` carries the shared worklist row language (the
+              appointments board's card rows, 16px gutter, sticky quiet header)
+              so this list looks the same as every other module. */}
+          <div className="ehr-list-scroll">
             {filteredReferrals.length === 0 ? (
               <div className="p-8">
                 <EmptyState
@@ -609,26 +617,26 @@ export default function ReferralsPage() {
               </div>
             ) : (
             <table className="data-table referral-table" style={{ minWidth: 1040 }}>
+              {/* Patient absorbs the old Hospital ID column (the ID now sits
+                  under the name), so it takes that width back. */}
               <colgroup>
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '10%' }} />
+                <col style={{ width: '24%' }} />
                 <col style={{ width: '22%' }} />
                 <col style={{ width: '14%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '12%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '13%' }} />
                 <col style={{ width: '9%' }} />
                 <col style={{ width: '7%' }} />
               </colgroup>
               <thead>
                 <tr>
                   <th>Patient</th>
-                  <th>Hospital ID</th>
                   <th>Route</th>
                   <th>Context</th>
                   <th>Urgency</th>
                   <th>Status</th>
                   <th>Date</th>
-                  <th className="ref-actions-col">Actions</th>
+                  <th className="ref-actions-col is-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -660,27 +668,29 @@ export default function ReferralsPage() {
                       className="cursor-pointer hover:bg-[var(--table-row-hover)]"
                       onClick={() => setExpandedReferral(ref._id)}
                     >
+                      {/* Same identity cell the lab queue and the registry use:
+                          avatar, name, facility ID beneath — which is what the
+                          separate "Hospital ID" column used to carry. */}
                       <td>
-                        {ref.patientId && !ref.patientId.startsWith('demo-') && !ref.patientId.includes('_demo') ? (
-                          <Link
-                            href={`/patients/${ref.patientId}`}
-                            onClick={e => e.stopPropagation()}
-                            className="font-normal text-[13px] truncate block hover:underline"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            {ref.patientName}
-                          </Link>
-                        ) : (
-                          <span
-                            className="font-normal text-[13px] truncate block"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            {ref.patientName}
-                          </span>
-                        )}
+                        <PatientName
+                          patient={patientById.get(ref.patientId)}
+                          patientId={isRealPatient(ref.patientId) ? ref.patientId : undefined}
+                          name={ref.patientName}
+                          showAvatar
+                          size={40}
+                          secondaryText={hospitalNoFor(ref.patientId)}
+                          nameClassName="font-medium text-sm"
+                        />
                       </td>
-                      <td className="font-mono text-[11px]" style={{ color: 'var(--text-secondary)' }}>{hospitalNoFor(ref.patientId)}</td>
-                      <td className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{ref.fromHospital} → {ref.toHospital}</td>
+                      {/* Destination on top, origin beneath — the same
+                          primary/secondary stack the rest of the row uses. As
+                          one "A → B" line it wrapped and left the rows ragged. */}
+                      <td>
+                        <div className="ehr-list-main" title={`${ref.fromHospital} → ${ref.toHospital}`}>
+                          <strong>{ref.toHospital}</strong>
+                          <span>{t('frontDesk.from')} {ref.fromHospital}</span>
+                        </div>
+                      </td>
                       <td>
                         <div className="appointment-card-provider">
                           <strong>{ref.department || 'Department unassigned'}</strong>

@@ -16,12 +16,14 @@
  * patient/current-user/permission/router context they need down to them.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import {
   ShoppingCart, Stethoscope, ClipboardCheck, FileText, Users, X, Maximize2,
 } from '@/components/icons/lucide';
 import type { PatientDoc } from '@/lib/db-types';
+import ClinicalNoteEditor from '@/components/clinical-notes/ClinicalNoteEditor';
+import { useUsers } from '@/lib/hooks/useUsers';
 import OrderBasketPanel from './panels/OrderBasketPanel';
 import VisitNotePanel from './panels/VisitNotePanel';
 import TaskListPanel from './panels/TaskListPanel';
@@ -53,6 +55,14 @@ const DRAWER_PANELS: DrawerPanelDef[] = [
   { id: 'clinical-forms', title: 'Clinical forms', icon: FileText },
   { id: 'patient-lists', title: 'Patient lists', icon: Users },
 ];
+
+/**
+ * The clinical-note editor panel is deliberately NOT on the right icon rail:
+ * it always edits a specific note, so it only opens via an id-carrying panel
+ * request (`clinical-note:<noteId>`) — the header's "+ Note", a Notes-tab row.
+ * A bare rail button would have no note to open.
+ */
+const CLINICAL_NOTE_PANEL: DrawerPanelDef = { id: 'clinical-note', title: 'Clinical note', icon: FileText };
 
 interface OpenmrsChartShellProps {
   activeTab: string;
@@ -91,17 +101,35 @@ export default function OpenmrsChartShell({
   panelRequest, onPanelRequestHandled,
 }: OpenmrsChartShellProps) {
   const [openPanel, setOpenPanel] = useState<string | null>(null);
+  // Note being edited by the clinical-note panel, set by an id-carrying request.
+  const [drawerNoteId, setDrawerNoteId] = useState<string | null>(null);
+  // Providers the note editor's "Assigned to" picker offers. Scoped by
+  // useUsers, so a clinician can only hand a note to their own facility.
+  const { users } = useUsers();
+  const assignableUsers = useMemo(
+    () => (users || []).map(u => ({ _id: u._id, name: u.name || u.username })),
+    [users],
+  );
   // Drawer expand toggle — widens the workspace drawer to near-full-width.
   const [drawerMaximized, setDrawerMaximized] = useState(false);
 
   useEffect(() => {
     if (panelRequest) {
-      setOpenPanel(panelRequest);
-      setDrawerMaximized(false);
+      if (panelRequest.startsWith('clinical-note:')) {
+        setDrawerNoteId(panelRequest.slice('clinical-note:'.length));
+        setOpenPanel('clinical-note');
+        // The editor is a full documentation workspace with its own section
+        // canvas — it opens wide by default rather than in the 420px drawer.
+        setDrawerMaximized(true);
+      } else {
+        setOpenPanel(panelRequest);
+        setDrawerMaximized(false);
+      }
       onPanelRequestHandled?.();
     }
   }, [panelRequest, onPanelRequestHandled]);
-  const activePanel = DRAWER_PANELS.find(p => p.id === openPanel) || null;
+  const activePanel = DRAWER_PANELS.find(p => p.id === openPanel)
+    || (openPanel === CLINICAL_NOTE_PANEL.id ? CLINICAL_NOTE_PANEL : null);
 
   // One list, not two. `moreItems` used to hide behind a collapsed "More
   // sections" toggle, which meant half the chart's sections were one click away
@@ -110,11 +138,19 @@ export default function OpenmrsChartShell({
   // ordering still puts the mapped sections first.
   const allRailItems = [...railItems, ...moreItems];
 
+  // The editor autosaves as it goes, so "the note drawer went away" is the
+  // moment the Notes tab under it may be stale — reuse onNoteSaved as that
+  // refresh signal however the drawer closes (X, backdrop, or a rail switch).
+  const notifyIfNoteClosing = (next: string | null) => {
+    if (openPanel === CLINICAL_NOTE_PANEL.id && next !== CLINICAL_NOTE_PANEL.id) onNoteSaved?.();
+  };
+
   const togglePanel = (id: string) => {
+    notifyIfNoteClosing(openPanel === id ? null : id);
     setOpenPanel(prev => (prev === id ? null : id));
     setDrawerMaximized(false);
   };
-  const closeDrawer = () => { setOpenPanel(null); setDrawerMaximized(false); };
+  const closeDrawer = () => { notifyIfNoteClosing(null); setOpenPanel(null); setDrawerMaximized(false); };
 
   const goToRecallTab = () => {
     // Recall is consolidated into the patient's appointments/follow-up view.
@@ -146,6 +182,27 @@ export default function OpenmrsChartShell({
             onSaved={onNoteSaved}
           />
         );
+      case 'clinical-note':
+        return drawerNoteId ? (
+          <div className="omrs-drawer-note-body">
+            <ClinicalNoteEditor
+              noteId={drawerNoteId}
+              // Without this the drawer's "Assigned to" picker has nobody to
+              // offer — the standalone /notes route passes the same list.
+              assignableUsers={assignableUsers}
+              // ChartPanelUser allows a missing _id; the editor does not — an
+              // id-less session gets the editor's own signed-out handling.
+              currentUser={currentUser?._id ? {
+                _id: currentUser._id,
+                name: currentUser.name,
+                username: currentUser.username,
+                role: currentUser.role,
+                orgId: currentUser.orgId,
+              } : null}
+              onClose={closeDrawer}
+            />
+          </div>
+        ) : null;
       case 'task-list':
         return (
           <TaskListPanel

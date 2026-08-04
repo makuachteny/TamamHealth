@@ -799,7 +799,7 @@ export default function PharmacyPage() {
       <PageInstructionCard />
 
       {/* ═══ Table card ═══ */}
-      <div className="dash-card overflow-hidden">
+      <div className="card-elevated overflow-hidden">
         <EhrListHeader
           title={sectionTitles[activeTab]}
           stats={[
@@ -827,7 +827,8 @@ export default function PharmacyPage() {
                   width: 'auto',
                   maxWidth: 320,
                   flexShrink: 0,
-                  borderRadius: 999,
+                  // 8px, matching the square icon buttons beside it.
+                  borderRadius: 8,
                   padding: '0 14px',
                   fontSize: 13,
                   fontWeight: 600,
@@ -925,7 +926,7 @@ export default function PharmacyPage() {
             // with the search box above it, and given explicit column shares —
             // on auto layout Dosage grew to nearly a third of the row while
             // Time was squeezed onto two lines.
-            <div className="overflow-x-auto" style={{ padding: '0 16px' }}>
+            <div className="ehr-list-scroll">
               <table className="data-table" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                 <colgroup>
                   <col style={{ width: '18%' }} />
@@ -1031,7 +1032,7 @@ export default function PharmacyPage() {
         )}
 
         {activeTab === 'inventory' && (
-          <div className="overflow-x-auto">
+          <div className="ehr-list-scroll">
             <table className="data-table" style={{ minWidth: 1080 }}>
               <thead>
                 <tr>
@@ -1101,7 +1102,7 @@ export default function PharmacyPage() {
         )}
 
         {activeTab === 'reorder' && (
-          <div className="overflow-x-auto">
+          <div className="ehr-list-scroll">
             <table className="data-table" style={{ minWidth: 720 }}>
               <thead>
                 <tr>
@@ -1145,7 +1146,7 @@ export default function PharmacyPage() {
         )}
 
         {activeTab === 'expiry' && (
-          <div className="overflow-x-auto">
+          <div className="ehr-list-scroll">
             <table className="data-table" style={{ minWidth: 600 }}>
               <thead>
                 <tr>

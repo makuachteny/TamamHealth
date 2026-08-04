@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Wallet, CalendarClock,
   Receipt, Printer, Search,
-  Plus, RotateCcw, RefreshCw,
+  ShieldCheck, RotateCcw, RefreshCw,
   Send, Copy, Check, ExternalLink,
 } from '@/components/icons/lucide';
 import { PaymentPanel, PaymentPlanWizard } from '@/components/payments';
+import { useSuperbill, SuperbillPicker, SuperbillDraft } from '@/components/patients/SuperbillPanel';
 import '@/components/billing/billing.css';
 import InsurancePolicyModal from '@/components/payments/InsurancePolicyModal';
 import Modal from '@/components/Modal';
@@ -47,6 +48,10 @@ interface BillingTabProps {
   setShowPaymentPanel: (v: boolean) => void;
   setShowPlanWizard: (v: boolean) => void;
   reloadPayments: () => void;
+  /** Encounter the superbill's charges post against, when the chart has one. */
+  superbillEncounterId?: string;
+  /** Registration facility's display name, for the posted superbill. */
+  hospitalName?: string;
 }
 
 interface FinancialOverview {
@@ -202,6 +207,7 @@ function buildStatementHTML(opts: {
 export default function BillingTab({
   patient, patientBalance, showPaymentPanel, showPlanWizard,
   setShowPaymentPanel, setShowPlanWizard, reloadPayments,
+  superbillEncounterId, hospitalName,
 }: BillingTabProps) {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
@@ -462,6 +468,24 @@ export default function BillingTab({
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // Superbill state lives here so its picker can sit on the Charges toolbar
+  // while the draft ticket renders directly above the charges it prices.
+  // Posting creates a bill, which billing-service mirrors into the ledger — so
+  // reload the tab's ledger-derived figures and the header balance, which the
+  // standalone panel left stale until the chart was reopened. (The Charges
+  // table itself lists ChargeDocs; a posted superbill lands as a bill, and
+  // shows up under Billing rather than as rows here.)
+  const superbill = useSuperbill({
+    patient,
+    encounterId: superbillEncounterId,
+    hospitalName,
+    onPosted: (message) => {
+      showToast(message, 'success');
+      loadAll();
+      reloadPayments();
+    },
+  });
+
   if (loading) {
     return (
       <div className="bl-root">
@@ -485,41 +509,10 @@ export default function BillingTab({
   const visibleCharges = d.charges.filter(c => !chargeQuery
     || c.description.toLowerCase().includes(chargeQuery)
     || c.category.toLowerCase().includes(chargeQuery));
+  const addInsuranceLabel = t('insuranceSnapshot.addInsurance') || 'Add insurance';
 
   return (
     <div className="bl-root">
-      {/* ─── Action bar ───
-          Right-aligned, same bl-btn variants and ordering convention as the
-          bill detail page's action row: one filled primary, outlined actions
-          next, link-styled and danger-link actions last. */}
-      <div className="bl-actions-row">
-        <button type="button" className="bl-btn bl-btn--outline" onClick={() => setInsuranceModalOpen(true)}>
-          <Plus size={15} /> {t('insuranceSnapshot.addInsurance') || 'Add insurance'}
-        </button>
-        <button type="button" className="bl-btn bl-btn--outline" onClick={() => setShowPlanWizard(true)}>
-          <CalendarClock size={15} /> {t('billing.createPaymentPlan')}
-        </button>
-        <button type="button" className="bl-btn bl-btn--outline" onClick={handlePrintStatement}>
-          <Printer size={15} /> {t('billing.printStatement')}
-        </button>
-        <button type="button" className="bl-btn bl-btn--link" onClick={openPaymentLink}>
-          <Send size={15} /> {t('billing.sendPaymentLink')}
-        </button>
-        {canManageBilling && (
-          <>
-            <button type="button" className="bl-btn bl-btn--link" onClick={openRefund}>
-              <RotateCcw size={15} /> {t('billing.issueRefund')}
-            </button>
-            <button type="button" className="bl-btn bl-btn--danger-link" onClick={() => setShowAdjustment(true)}>
-              <RefreshCw size={15} /> {t('billing.adjustmentWriteOff')}
-            </button>
-          </>
-        )}
-        <button type="button" className="bl-btn bl-btn--primary" onClick={() => setShowPaymentPanel(true)}>
-          <Wallet size={15} /> {t('billing.collectPayment')}
-        </button>
-      </div>
-
       {/* ─── Money summary ───
           The chart header (visible on every tab) already carries the
           patient's live balance as a clickable chip, so this strip doesn't
@@ -573,16 +566,93 @@ export default function BillingTab({
           <p className="bl-card-sub">Items billed to this patient across all encounters</p>
           <span className="bl-underline" />
         </div>
-        <div className="bl-search">
-          <Search size={16} />
-          <input
-            type="text"
-            value={chargeSearch}
-            onChange={e => setChargeSearch(e.target.value)}
-            placeholder="Search this table"
-            aria-label="Search charges"
-          />
+        {/* ─── Toolbar ───
+            Same shape as the appointments list header: the table's search box
+            takes the row, then the superbill service picker (the one control
+            that writes new rows into this table), then the account actions as
+            38px square `listpage-icon-btn`s (label lives in title/aria-label)
+            with the one filled primary last. */}
+        <div className="bl-toolbar">
+          <div className="bl-search">
+            <Search size={16} />
+            <input
+              type="text"
+              value={chargeSearch}
+              onChange={e => setChargeSearch(e.target.value)}
+              placeholder="Search this table"
+              aria-label="Search charges"
+            />
+          </div>
+          <SuperbillPicker sb={superbill} />
+          <button
+            type="button"
+            className="listpage-icon-btn"
+            onClick={() => setInsuranceModalOpen(true)}
+            title={addInsuranceLabel}
+            aria-label={addInsuranceLabel}
+          >
+            <ShieldCheck size={16} />
+          </button>
+          <button
+            type="button"
+            className="listpage-icon-btn"
+            onClick={() => setShowPlanWizard(true)}
+            title={t('billing.createPaymentPlan')}
+            aria-label={t('billing.createPaymentPlan')}
+          >
+            <CalendarClock size={16} />
+          </button>
+          <button
+            type="button"
+            className="listpage-icon-btn"
+            onClick={handlePrintStatement}
+            title={t('billing.printStatement')}
+            aria-label={t('billing.printStatement')}
+          >
+            <Printer size={16} />
+          </button>
+          <button
+            type="button"
+            className="listpage-icon-btn"
+            onClick={openPaymentLink}
+            title={t('billing.sendPaymentLink')}
+            aria-label={t('billing.sendPaymentLink')}
+          >
+            <Send size={16} />
+          </button>
+          {canManageBilling && (
+            <>
+              <button
+                type="button"
+                className="listpage-icon-btn"
+                onClick={openRefund}
+                title={t('billing.issueRefund')}
+                aria-label={t('billing.issueRefund')}
+              >
+                <RotateCcw size={16} />
+              </button>
+              <button
+                type="button"
+                className="listpage-icon-btn bl-icon-btn--danger"
+                onClick={() => setShowAdjustment(true)}
+                title={t('billing.adjustmentWriteOff')}
+                aria-label={t('billing.adjustmentWriteOff')}
+              >
+                <RefreshCw size={16} />
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className="listpage-icon-btn listpage-icon-btn-primary"
+            onClick={() => setShowPaymentPanel(true)}
+            title={t('billing.collectPayment')}
+            aria-label={t('billing.collectPayment')}
+          >
+            <Wallet size={16} />
+          </button>
         </div>
+        <SuperbillDraft sb={superbill} />
         {d.charges.length === 0 ? (
           <div className="bl-empty">
             <Receipt size={28} />
@@ -615,52 +685,40 @@ export default function BillingTab({
         )}
       </div>
 
-      {/* ─── Payments + totals ───
-          Same two-column layout as the bill detail page: the payments list
-          on the left, a running totals column on the right. */}
+      {/* ─── Payments ───
+          Full width: the running totals column the bill detail page carries
+          alongside this list is dropped here, since the summary strip above
+          already states billed/paid/outstanding for the whole account. */}
       <div className="bl-card">
-        <div className="bl-pay-layout">
-          <div className="bl-pay-main">
-            <h2 className="bl-card-title">Payments</h2>
-            <span className="bl-underline" />
+        <div className="bl-pay-single">
+          <h2 className="bl-card-title">Payments</h2>
+          <span className="bl-underline" />
 
-            {d.payments.length === 0 ? (
-              <div className="bl-empty">
-                <h3>{t('billing.noPaymentsRecorded')}</h3>
-                <p>Payments recorded for this patient will appear here.</p>
-              </div>
-            ) : (
-              <div className="bl-table-wrap">
-                <table className="bl-table">
-                  <thead>
-                    <tr><th>Date</th><th>Method</th><th>Reference</th><th>Received by</th><th className="bl-right">Amount</th></tr>
-                  </thead>
-                  <tbody>
-                    {d.payments.map(pmt => (
-                      <tr key={pmt._id}>
-                        <td style={{ whiteSpace: 'nowrap' }}>{new Date(pmt.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                        <td>{getMethodConfig(pmt.method).label}</td>
-                        <td className="bl-muted">{pmt.reference || '—'}</td>
-                        <td>{pmt.processedByName}</td>
-                        <td className="bl-num bl-right">{formatMoney(pmt.amount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <aside className="bl-pay-aside">
-            <dl className="bl-totals">
-              <div className="bl-totals-row"><dt>Total charged:</dt><dd>{formatMoney(d.totalCharged)}</dd></div>
-              <div className="bl-totals-row"><dt>Total paid:</dt><dd>{formatMoney(d.totalPaid)}</dd></div>
-              <div className="bl-totals-row"><dt>Discount:</dt><dd>- {formatMoney(d.totalDiscount)}</dd></div>
-              <div className="bl-totals-row"><dt>Refunds:</dt><dd>- {formatMoney(d.totalRefunds)}</dd></div>
-              <hr className="bl-totals-rule" />
-              <div className="bl-totals-row bl-totals-row--due"><dt>Balance due:</dt><dd>{formatMoney(patientBalance)}</dd></div>
-            </dl>
-          </aside>
+          {d.payments.length === 0 ? (
+            <div className="bl-empty">
+              <h3>{t('billing.noPaymentsRecorded')}</h3>
+              <p>Payments recorded for this patient will appear here.</p>
+            </div>
+          ) : (
+            <div className="bl-table-wrap">
+              <table className="bl-table">
+                <thead>
+                  <tr><th>Date</th><th>Method</th><th>Reference</th><th>Received by</th><th className="bl-right">Amount</th></tr>
+                </thead>
+                <tbody>
+                  {d.payments.map(pmt => (
+                    <tr key={pmt._id}>
+                      <td style={{ whiteSpace: 'nowrap' }}>{new Date(pmt.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                      <td>{getMethodConfig(pmt.method).label}</td>
+                      <td className="bl-muted">{pmt.reference || '—'}</td>
+                      <td>{pmt.processedByName}</td>
+                      <td className="bl-num bl-right">{formatMoney(pmt.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 

@@ -154,7 +154,7 @@ export default function WardsPage() {
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageInstructionCard />
-        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+        <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <EhrListHeader
             title={t('ward.currentAdmissions')}
             stats={[

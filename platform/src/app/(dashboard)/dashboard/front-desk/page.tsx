@@ -1,14 +1,20 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { useUsers } from '@/lib/hooks/useUsers';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
-import type { AppointmentDoc, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
+import type { AppointmentDoc, AppointmentStatus, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
+import {
+  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
+  APPOINTMENT_PENDING_STATUSES, appointmentStatusLabel,
+  APPOINTMENT_STATUS_GROUP_LABELS, type AppointmentStatusGroup,
+} from '@/lib/appointment-status';
 import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
 import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
@@ -17,6 +23,7 @@ import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
 import PatientCheckInForm from '@/components/check-in/PatientCheckInForm';
+import AppointmentEditModal from '@/components/appointments/AppointmentEditModal';
 import { PatientRegistrationForm } from '@/app/(dashboard)/patients/new/page';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -27,7 +34,7 @@ import {
   Calendar, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList,
   MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
-  Send, Stethoscope, FileText, Ban, RotateCcw, type LucideIcon,
+  Send, Stethoscope, FileText, RotateCcw, type LucideIcon,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
@@ -122,8 +129,15 @@ function patientFacilityName(patient: PatientDoc | undefined, fallback = 'Facili
 export default function FrontDeskDashboardPage() {
   const router = useRouter();
   const { currentUser } = useAuth();
-  const { canConsult } = usePermissions();
+  const { canConsult, canManageAppointmentSchedule, canCheckInAppointments } = usePermissions();
+  // Reception schedules and checks in; a role that can do neither may look at
+  // the ladder but not move a booking along it.
+  const canSetAppointmentStatus = canManageAppointmentSchedule || canCheckInAppointments;
+  // Same roles the chart's Assign-provider action uses, so routing a patient
+  // means the same thing wherever it is done from.
+  const canAssignCareTeam = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
   const { patients } = usePatients();
+  const { users } = useUsers();
   const { appointments, updateStatus: updateAppointmentStatus, reschedule: rescheduleAppointment } = useAppointments();
   const { triages, update: updateTriage } = useTriage();
   const { showToast } = useToast();
@@ -132,11 +146,31 @@ export default function FrontDeskDashboardPage() {
   // Reactive room list from facility settings; fall back to the static list.
   const roomOptions = rooms.length ? rooms : ROOM_OPTIONS;
 
-  const [queueFilter, setQueueFilter] = useState<'all' | 'walk-in' | 'appointment'>('all');
+  // Which of the three shared lanes the tabs show: Scheduled = today's
+  // bookings still expecting the patient, In Office = the live in-building
+  // queue, Finished = visits at/after checkout. Same lanes as every other
+  // role dashboard and the mobile shell.
+  const [queueFilter, setQueueFilter] = useState<AppointmentStatusGroup>('scheduled');
   const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered'>('all');
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
+
+  // Deep link: ?lane= lands on a specific lane tab and ?q= prefills the queue
+  // search — how "merge intake → land on the patient's Scheduled row" works
+  // from /patient-intake (and any other surface that wants to point here).
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const lane = searchParams?.get('lane');
+    if (lane === 'scheduled' || lane === 'in_office' || lane === 'finished') {
+      setQueueFilter(lane);
+      setPanelView('all');
+    }
+    const q = searchParams?.get('q');
+    if (q) setQueueSearch(q);
+  }, [searchParams]);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
+  // The appointment open in the shared edit form, if any.
+  const [editAppointment, setEditAppointment] = useState<AppointmentDoc | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
   const [checkInTarget, setCheckInTarget] = useState<AppointmentDoc | null>(null);
   // Reception can move an appointment to a new slot or mark it a no-show from
@@ -254,7 +288,9 @@ export default function FrontDeskDashboardPage() {
     const genderOf = (pid: string) => patientById.get(pid)?.gender || '—';
     const ageOf = (pid: string) => { const p = patientById.get(pid); return p ? patientAgeLabel(p) : '—'; };
     const doctorOf = (pid: string) => patientById.get(pid)?.assignedDoctorName || '';
-    const nurseOf = (pid: string) => patientById.get(pid)?.assignedByName || '';
+    // The patient's covering nurse. This used to read `assignedByName`, which is
+    // whoever last assigned a doctor — not a nurse at all.
+    const nurseOf = (pid: string) => patientById.get(pid)?.assignedNurseName || '';
     const locationOf = (pid: string, fallback?: string) => {
       const p = patientById.get(pid);
       return fallback || patientFacilityName(p, currentUser?.hospitalName || 'Facility');
@@ -331,10 +367,12 @@ export default function FrontDeskDashboardPage() {
       });
     }
 
-    // Appointments only join the queue once the patient has CHECKED IN (arrived).
-    // Scheduled/confirmed appointments stay in the Today's Appointments card until
-    // the receptionist checks them in via the check-in popup.
-    const ARRIVED = new Set<AppointmentDoc['status']>(['checked_in', 'in_progress', 'completed']);
+    // Appointments only join the queue once the desk has CHECKED THEM IN.
+    // Scheduled/reminded/confirmed appointments — and ones merely marked
+    // `arrived`, where the patient is in the waiting room but the desk has not
+    // opened the visit — stay in the Today's Appointments card until the
+    // receptionist checks them in via the check-in popup.
+    const ARRIVED = new Set<AppointmentDoc['status']>(APPOINTMENT_CHECKED_IN_STATUSES);
     const triagedPatientIds = new Set(activeTriageByPatient.keys());
     const APPT_SCORE: Record<string, number> = { emergency: 3, urgent: 2 };
     for (const a of todaysAppointments) {
@@ -405,7 +443,12 @@ export default function FrontDeskDashboardPage() {
   }, [currentUser?.hospitalName, encounters, patients, queueNowMs, today, todaysAppointments, triages]);
 
   const filteredQueue = useMemo(() => {
-    let items = queueFilter === 'all' ? queue : queue.filter(q => q.type === queueFilter);
+    // The Live queue tile shows the whole in-building queue regardless of the
+    // active lane tab; the tabs themselves split it DONE vs not-DONE (Finished
+    // vs In Office). Scheduled is served by pendingAppointments, not this list.
+    let items = panelView === 'queue' ? queue :
+      queueFilter === 'scheduled' ? [] :
+      queue.filter(q => (q.status === 'DONE') === (queueFilter === 'finished'));
 
     const q = queueSearch.trim().toLowerCase();
     if (q) {
@@ -426,7 +469,7 @@ export default function FrontDeskDashboardPage() {
     }
 
     return items;
-  }, [queue, queueFilter, queueSearch, queueSort]);
+  }, [panelView, queue, queueFilter, queueSearch, queueSort]);
 
   const filteredRegisteredPatients = useMemo(() => {
     const sorted = [...patients].sort((a, b) =>
@@ -445,6 +488,56 @@ export default function FrontDeskDashboardPage() {
   // ── Room assignment (OPD rooming) for triage-sourced queue entries ──
   // The saving flag now lives on RoomAssignmentControl itself (one control
   // mounts per expanded row), so this just does the write + toast.
+  // Facility staff the desk can route to. Doctors and clinical officers carry
+  // visits; nurses cover patients. Filtered to this facility so a clerk never
+  // assigns someone at another hospital.
+  const assignableDoctors = useMemo(() => users
+    .filter(u => (u.role === 'doctor' || u.role === 'clinical_officer')
+      && (!currentUser?.hospitalId || u.hospitalId === currentUser.hospitalId))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '')), [users, currentUser?.hospitalId]);
+
+  const assignableNurses = useMemo(() => users
+    .filter(u => (u.role === 'nurse' || u.role === 'midwife')
+      && (!currentUser?.hospitalId || u.hospitalId === currentUser.hospitalId))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '')), [users, currentUser?.hospitalId]);
+
+  const handleAssignDoctor = useCallback(async (patient: PatientDoc, doctorId: string, triageId?: string) => {
+    const doctor = assignableDoctors.find(d => d._id === doctorId);
+    if (!doctor) { showToast('Select a doctor to assign', 'error'); return; }
+    try {
+      const { assignProviderToPatient } = await import('@/lib/services/patient-assignment-service');
+      await assignProviderToPatient({
+        patientId: patient._id,
+        patientName: `${patient.firstName} ${patient.surname}`.trim(),
+        provider: { id: doctor._id, name: doctor.name || doctor.username || 'Provider', role: doctor.role },
+        actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
+        hospitalId: currentUser?.hospitalId,
+        hospitalName: currentUser?.hospitalName,
+        orgId: currentUser?.orgId,
+        triageId,
+      });
+      showToast(`Assigned to ${doctor.name || doctor.username}`, 'success');
+    } catch {
+      showToast('Failed to assign the doctor', 'error');
+    }
+  }, [assignableDoctors, currentUser, showToast]);
+
+  const handleAssignNurse = useCallback(async (patient: PatientDoc, nurseId: string) => {
+    const nurse = nurseId ? assignableNurses.find(n => n._id === nurseId) : null;
+    if (nurseId && !nurse) { showToast('Select a nurse to assign', 'error'); return; }
+    try {
+      const { assignNurseToPatient } = await import('@/lib/services/patient-assignment-service');
+      await assignNurseToPatient({
+        patientId: patient._id,
+        nurse: nurse ? { id: nurse._id, name: nurse.name || nurse.username || 'Nurse' } : null,
+        actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
+      });
+      showToast(nurse ? `Nurse set to ${nurse.name || nurse.username}` : 'Nurse cleared', 'success');
+    } catch {
+      showToast('Failed to assign the nurse', 'error');
+    }
+  }, [assignableNurses, currentUser, showToast]);
+
   const handleSaveRoom = useCallback(async (triageId: string, room: string) => {
     try {
       await updateTriage(triageId, { assignedRoom: room || undefined });
@@ -559,6 +652,29 @@ export default function FrontDeskDashboardPage() {
     }
   }, [updateAppointmentStatus, showToast]);
 
+  // ── Set any rung on the ladder straight from the row's status dropdown.
+  //    Checking in and no-show keep their own buttons: those two do more than
+  //    move a status (open the visit thread; confirm before hiding the patient
+  //    from arrivals), so the dropdown routes to them rather than writing the
+  //    status behind their backs. ──
+  const handleAppointmentStatusChange = useCallback(async (appt: AppointmentDoc, status: AppointmentStatus) => {
+    if (status === 'checked_in') { setCheckInTarget(appt); return; }
+    if (status === 'no_show') { setNoShowTarget(appt); return; }
+    // 'rescheduled' is set directly, and means "not happening at this time, to
+    // be rebooked" — the Reschedule action beside it moves a booking to a known
+    // new slot in place, which leaves it scheduled, not rescheduled.
+    try {
+      await updateAppointmentStatus(appt._id, status, {
+        actorId: currentUser?._id,
+        actorName: currentUser?.name || currentUser?.username,
+        actorRole: currentUser?.role,
+      });
+      showToast(`${appt.patientName} — ${appointmentStatusLabel(status).toLowerCase()}`, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not update the appointment status', 'error');
+    }
+  }, [updateAppointmentStatus, showToast, currentUser]);
+
   // ── Move an appointment to a new date/time without leaving the desk. ──
   const openReschedule = useCallback((appt: AppointmentDoc) => {
     setRescheduleDate(isoDateKey(appt.appointmentDate));
@@ -614,7 +730,11 @@ export default function FrontDeskDashboardPage() {
   }, [roleConfig]);
 
   const pendingAppointments = useMemo(() => {
-    const pendingStatuses = new Set<AppointmentDoc['status']>(['requested', 'scheduled', 'confirmed']);
+    // Every rung that still expects the patient — including the two the desk
+    // itself sets, Reminder Sent and Arrived. Hardcoding the old three meant
+    // reminding or marking someone arrived dropped their row off this list.
+    // `requested` joins them: a portal ask is reception's to answer.
+    const pendingStatuses = new Set<AppointmentDoc['status']>(['requested', ...APPOINTMENT_PENDING_STATUSES]);
     const triagedPatientIds = new Set(todaysTriages.map(item => item.patientId));
     return todaysAppointments.filter(appointment => pendingStatuses.has(appointment.status) && !triagedPatientIds.has(appointment.patientId));
   }, [todaysAppointments, todaysTriages]);
@@ -624,15 +744,15 @@ export default function FrontDeskDashboardPage() {
   ), []);
 
   const tabs = useMemo(() => ([
-    { key: 'all', label: 'All', count: queue.length + pendingAppointments.length },
-    { key: 'walk-in', label: 'Walk-ins', count: queue.filter(q => q.type === 'walk-in').length },
-    { key: 'appointment', label: 'Appointments', count: queue.filter(q => q.type === 'appointment').length + pendingAppointments.length },
+    { key: 'scheduled', label: APPOINTMENT_STATUS_GROUP_LABELS.scheduled, count: pendingAppointments.length },
+    { key: 'in_office', label: APPOINTMENT_STATUS_GROUP_LABELS.in_office, count: queue.filter(q => q.status !== 'DONE').length },
+    { key: 'finished', label: APPOINTMENT_STATUS_GROUP_LABELS.finished, count: queue.filter(q => q.status === 'DONE').length },
   ]), [queue, pendingAppointments.length]);
 
   const handleTabChange = useCallback((tab: string) => {
-    const next = tab as typeof queueFilter;
-    setQueueFilter(next);
-    setPanelView(next === 'appointment' ? 'appointments' : next === 'all' ? 'all' : 'queue');
+    setQueueFilter(tab as AppointmentStatusGroup);
+    // Leave any tile-opened special view: the lane tabs drive the main list.
+    setPanelView('all');
   }, []);
 
   const openFullRegistration = useCallback(() => {
@@ -641,7 +761,10 @@ export default function FrontDeskDashboardPage() {
   }, [router]);
 
   const visiblePendingAppointments = useMemo(() => {
-    if (queueFilter !== 'all' && queueFilter !== 'appointment') return [];
+    // Pending bookings are the Scheduled lane; the tile views that list
+    // appointments ('appointments'/'pending') read this list directly, so it
+    // must stay populated for them regardless of the active lane tab.
+    if (queueFilter !== 'scheduled' && panelView !== 'appointments' && panelView !== 'pending') return [];
     const q = queueSearch.trim().toLowerCase();
     const items = q
       ? pendingAppointments.filter(appointment =>
@@ -651,7 +774,7 @@ export default function FrontDeskDashboardPage() {
         )
       : pendingAppointments;
     return items.sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
-  }, [pendingAppointments, queueFilter, queueSearch]);
+  }, [panelView, pendingAppointments, queueFilter, queueSearch]);
 
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
     ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: LogIn, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
@@ -693,29 +816,39 @@ export default function FrontDeskDashboardPage() {
         location: appointment.department || appointment.facilityName || patientFacilityName(patient, currentUser?.hospitalName || 'Facility'),
         locationSecondary: appointment.department ? patientFacilityName(patient, currentUser?.hospitalName || 'Facility') : 'Location',
         locationLabel: appointment.department ? 'Department' : 'Location',
-        status: appointment.status === 'requested' ? 'requested' : 'scheduled',
-        statusLabel: appointment.status === 'confirmed' ? 'Confirmed' : appointment.status === 'requested' ? 'Requested' : 'Scheduled',
+        // The pill states the rung the booking is actually on — Reminder Sent
+        // and Arrived used to collapse into a flat "Scheduled", which hid the
+        // desk's own work from it.
+        status: appointment.status,
+        statusLabel: appointmentStatusLabel(appointment.status),
+        // The pill itself is the picker for appointment-backed rows: reception
+        // moves a booking along the ladder from the list, no expanding needed.
+        telehealth: appointment.appointmentMode === 'telehealth' || appointment.appointmentType === 'telehealth',
+        statusValue: appointment.status,
+        statusOptions: canSetAppointmentStatus
+          ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))
+          : undefined,
+        onStatusChange: canSetAppointmentStatus
+          ? value => handleAppointmentStatusChange(appointment, value as AppointmentStatus)
+          : undefined,
         statusSecondary: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
-        statusTone: 'scheduled',
+        statusTone: APPOINTMENT_STATUS_TONES[appointment.status],
         // Only a real acuity gets the RED/YELLOW pill — routine appointments
         // show no priority pill rather than a free-text 'Appointment' label.
         priority: appointment.priority === 'emergency' ? 'RED' : appointment.priority === 'urgent' ? 'YELLOW' : undefined,
         date: isoDateKey(appointment.appointmentDate),
         patientId: appointment.patientId,
+        // The row drops down into the appointment itself, the way the doctor
+        // dashboard's rows drop down into a visit — no pop-up over the list, and
+        // nothing restating what the row already shows.
         popupDetail: (
-          <>
-            <FrontDeskDetailActions actions={[
-              { icon: LogIn, label: 'Check in', onClick: () => setCheckInTarget(appointment), primary: true },
-              { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${appointment.patientId}`) },
-              { icon: Calendar, label: 'Reschedule', onClick: () => openReschedule(appointment) },
-              { icon: Ban, label: 'No show', onClick: () => setNoShowTarget(appointment) },
-            ]} />
-            <FrontDeskDetailFacts facts={[
-              { label: 'Reason', value: appointment.reason || 'Scheduled visit' },
-              { label: t('patient.phone'), value: patient?.phone ? formatPhoneDisplay(patient.phone) : undefined },
-              { label: 'Hospital number', value: patient?.hospitalNumber },
-            ]} />
-          </>
+          <AppointmentEditModal
+            inline
+            appointment={appointment}
+            appointments={appointments}
+            patient={patient}
+            onClose={() => undefined}
+          />
         ),
       };
     });
@@ -825,6 +958,12 @@ export default function FrontDeskDashboardPage() {
         statusLabel,
         statusSecondary: statusContext,
         statusTone,
+        // No status picker on these rows. The ladder is set on the Scheduled
+        // tab, where a booking is still being managed; once a patient is in the
+        // building their row's pill reports the queue's own stage (Waiting, In
+        // consult, Done), which is derived from triage and the encounter — a
+        // ladder picker here would have offered ten options that disagreed with
+        // the word next to them.
         priority: acuity,
         room: entry.assignedRoom,
         careTeam: entry.assignedDoctorName || 'Doctor unassigned',
@@ -845,6 +984,9 @@ export default function FrontDeskDashboardPage() {
             {hasAllergies && (
               <p className="ehr-care-alert">{t('frontDesk.allergiesLabel', { list: (patient?.allergies ?? []).join(', ') })}</p>
             )}
+            {/* Room, doctor and nurse share one line — three stacked blocks ate
+                more of the row panel than the fields they contain. */}
+            <div className="ehr-care-assign-grid">
             {entry.id.startsWith('triage-') && (
               <RoomAssignmentControl
                 triageId={entry.sourceId}
@@ -854,6 +996,31 @@ export default function FrontDeskDashboardPage() {
                 onSave={handleSaveRoom}
               />
             )}
+            {/* Room, doctor, nurse — the three things reception routes, all in
+                the row, all the same control. */}
+            {canAssignCareTeam && patient && (
+              <>
+                <StaffAssignmentControl
+                  icon={Stethoscope}
+                  label="Doctor"
+                  staff={assignableDoctors}
+                  currentId={patient.assignedDoctor}
+                  currentName={patient.assignedDoctorName}
+                  emptyLabel="Unassigned"
+                  onSave={doctorId => handleAssignDoctor(patient, doctorId, entry.id.startsWith('triage-') ? entry.sourceId : undefined)}
+                />
+                <StaffAssignmentControl
+                  icon={ClipboardCheck}
+                  label="Nurse"
+                  staff={assignableNurses}
+                  currentId={patient.assignedNurse}
+                  currentName={patient.assignedNurseName}
+                  emptyLabel="Unassigned"
+                  onSave={nurseId => handleAssignNurse(patient, nurseId)}
+                />
+              </>
+            )}
+            </div>
           </>
         ),
       };
@@ -925,9 +1092,11 @@ export default function FrontDeskDashboardPage() {
     return [...appointmentRows, ...queueRows];
   }, [
     canConsult,
+    canSetAppointmentStatus,
     currentUser?.hospitalName,
     filteredQueue,
     filteredRegisteredPatients,
+    handleAppointmentStatusChange,
     handleSaveRoom,
     handleUndoCheckout,
     patients,
@@ -939,36 +1108,24 @@ export default function FrontDeskDashboardPage() {
     visiblePendingAppointments,
   ]);
 
-  const metrics = useMemo<EhrCareDashboardMetric[]>(() => ([
-    {
-      label: "Today's appointments",
-      value: todaysAppointments.length,
-      active: panelView === 'appointments',
-      onClick: () => {
-        setQueueFilter('appointment');
-        setPanelView('appointments');
-      },
+  /**
+   * The rail's tiles count the same three lanes the tab strip counts, and
+   * clicking one selects that lane in the list. They used to count raw
+   * documents — every appointment today, every triage row — while the tabs
+   * counted deduped rows, so the rail said 34/2/29 where the list said 2/28/1;
+   * and each tile set its own `panelView`, which made them feel like separate
+   * pages. Deriving both from `tabs` means they cannot disagree.
+   */
+  const metrics = useMemo<EhrCareDashboardMetric[]>(() => tabs.map(lane => ({
+    label: lane.label,
+    value: lane.count ?? 0,
+    tone: lane.key === 'scheduled' && (lane.count ?? 0) > 0 ? 'warning' : 'neutral',
+    active: queueFilter === lane.key && panelView === 'all',
+    onClick: () => {
+      setQueueFilter(lane.key as AppointmentStatusGroup);
+      setPanelView('all');
     },
-    {
-      label: 'Pending arrivals',
-      value: pendingAppointments.length,
-      tone: pendingAppointments.length > 0 ? 'warning' : 'neutral',
-      active: panelView === 'pending',
-      onClick: () => {
-        setQueueFilter('appointment');
-        setPanelView('pending');
-      },
-    },
-    {
-      label: 'Live queue',
-      value: queue.length,
-      active: panelView === 'queue',
-      onClick: () => {
-        setQueueFilter('all');
-        setPanelView('queue');
-      },
-    },
-  ]), [panelView, pendingAppointments.length, queue.length, todaysAppointments.length]);
+  })), [tabs, queueFilter, panelView]);
 
   const centerCopy = useMemo(() => {
     if (panelView === 'appointments') {
@@ -1003,13 +1160,16 @@ export default function FrontDeskDashboardPage() {
         emptyActionLabel: 'Register patient',
       };
     }
+    const laneNoun = queueFilter === 'scheduled' ? 'scheduled' : queueFilter === 'in_office' ? 'in office' : 'finished';
     return {
       title: dateLabel,
-      subtitle: `${frontDeskRows.length} active item${frontDeskRows.length === 1 ? '' : 's'}`,
-      emptyTitle: t('frontDesk.noPatientsInQueue'),
+      subtitle: `${frontDeskRows.length} patient${frontDeskRows.length === 1 ? '' : 's'} ${laneNoun}`,
+      emptyTitle: queueFilter === 'scheduled' ? 'No appointments still expected'
+        : queueFilter === 'in_office' ? t('frontDesk.noPatientsInQueue')
+        : 'No finished visits yet',
       emptyActionLabel: 'Register patient',
     };
-  }, [dateLabel, frontDeskRows.length, panelView, t]);
+  }, [dateLabel, frontDeskRows.length, panelView, queueFilter, t]);
 
   if (!currentUser) return null;
 
@@ -1059,6 +1219,15 @@ export default function FrontDeskDashboardPage() {
             setRegisterOpen(true);
           }}
         />
+
+        {editAppointment && (
+          <AppointmentEditModal
+            appointment={editAppointment}
+            appointments={appointments}
+            patient={patients.find(p => p._id === editAppointment.patientId)}
+            onClose={() => setEditAppointment(null)}
+          />
+        )}
 
         {assignTarget && (
           <AssignDoctorModal
@@ -1129,7 +1298,8 @@ export default function FrontDeskDashboardPage() {
                   onCancel={() => setCheckInOpen(false)}
                   onComplete={() => {
                     setCheckInOpen(false);
-                    setQueueFilter('all');
+                    // The patient just joined the live queue — land on their lane.
+                    setQueueFilter('in_office');
                     setPanelView('queue');
                   }}
                   onRegisterPatient={() => {
@@ -1256,6 +1426,61 @@ function FrontDeskDetailFacts({ facts }: { facts: { label: string; value?: strin
   );
 }
 
+/**
+ * Care-team assignment for a row — the doctor carrying the visit and the nurse
+ * covering the patient, each the same shape as the exam-room control beside
+ * them: pick from the facility's staff, press the button, done in the row.
+ *
+ * The doctor path runs the shared provider assignment (patient fields, the
+ * consultation tracker the provider's board reads, and the triage handoff
+ * stamp), which is the same path the Assign-provider modal uses. The nurse path
+ * only records who is covering, which is all nursing cover means here.
+ */
+function StaffAssignmentControl({
+  icon: Icon,
+  label,
+  staff,
+  currentId,
+  currentName,
+  emptyLabel,
+  onSave,
+}: {
+  icon: LucideIcon;
+  label: string;
+  staff: { _id: string; name?: string; username?: string }[];
+  currentId?: string;
+  currentName?: string;
+  emptyLabel: string;
+  onSave: (staffId: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(currentId || '');
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="ehr-care-rooming">
+      <Icon className="w-4 h-4" />
+      <span>{label}</span>
+      <select value={draft} onChange={event => setDraft(event.target.value)}>
+        <option value="">{emptyLabel}</option>
+        {/* A provider assigned from elsewhere may not be in this facility's
+            staff list; keep them selectable so the control never misreports. */}
+        {currentId && !staff.some(person => person._id === currentId) && (
+          <option value={currentId}>{currentName || 'Currently assigned'}</option>
+        )}
+        {staff.map(person => (
+          <option key={person._id} value={person._id}>{person.name || person.username}</option>
+        ))}
+      </select>
+      <button
+        type="button"
+        disabled={saving || draft === (currentId || '')}
+        onClick={async () => { setSaving(true); try { await onSave(draft); } finally { setSaving(false); } }}
+      >
+        {saving ? 'Saving...' : currentId ? 'Update' : 'Assign'}
+      </button>
+    </div>
+  );
+}
+
 // Exam-room assignment for a triage-sourced queue row. Saving state is local
 // to this component (not page-level) because it now mounts fresh each time
 // its row expands, rather than being the single target of a page-level modal.
@@ -1279,6 +1504,12 @@ function RoomAssignmentControl({
     <div className="ehr-care-rooming">
       <MapPin className="w-4 h-4" />
       <span>Exam room</span>
+      {/* The acuity belongs on the header line, not on a third line below the
+          button — that extra line was what knocked this control out of
+          alignment with the doctor and nurse pickers beside it. */}
+      <span style={{ color: priorityColor(priority) }}>
+        {priority === 'RED' ? t('appointments.priorityEmergency') : priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
+      </span>
       <select value={draft} onChange={(event) => setDraft(event.target.value)}>
         <option value="">Unassigned</option>
         {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
@@ -1288,11 +1519,8 @@ function RoomAssignmentControl({
         disabled={saving}
         onClick={async () => { setSaving(true); try { await onSave(triageId, draft); } finally { setSaving(false); } }}
       >
-        {saving ? 'Saving...' : currentRoom ? 'Update room' : 'Assign room'}
+        {saving ? 'Saving...' : currentRoom ? 'Update' : 'Assign'}
       </button>
-      <span style={{ color: priorityColor(priority) }}>
-        {priority === 'RED' ? t('appointments.priorityEmergency') : priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
-      </span>
     </div>
   );
 }

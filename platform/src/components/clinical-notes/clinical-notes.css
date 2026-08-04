@@ -1,0 +1,1562 @@
+/*
+ * Clinical notes module styling.
+ *
+ * Everything is namespaced `cn-`. globals.css force-uppercases every bare
+ * <label>, does not style datetime-local inputs, and overrides icon colour and
+ * background inside form rows — so the note editor keeps its own scope rather
+ * than inheriting a cascade written for the older forms.
+ *
+ * Colours come from the app's existing custom properties so the module tracks
+ * the platform theme instead of hard-coding a second palette.
+ */
+
+.cn-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #0f172a);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.cn-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #fff);
+}
+
+.cn-header-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.cn-header-meta {
+  font-weight: 400;
+  color: var(--color-text-muted, #64748b);
+}
+
+/* Holds the note's identity fields (type, date/time, assignee) beside the
+   title. There is no second toolbar strip under the header any more, so this
+   row carries them: it wraps under the title when the editor is narrow — in
+   the chart drawer, for instance — rather than squeezing the controls. */
+.cn-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cn-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Scoped so globals.css does not uppercase these — they are sentence-case
+   field names, not the shouty section headers that rule was written for. */
+.cn-field > .cn-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+
+.cn-select,
+.cn-input {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  background: var(--color-surface, #fff);
+  color: inherit;
+  min-height: 34px;
+}
+
+/* globals.css never styles datetime-local / date / time; do it here so the
+   date and time of service match every other control in the toolbar. */
+.cn-input[type='date'],
+.cn-input[type='time'],
+.cn-input[type='datetime-local'] {
+  min-width: 132px;
+  appearance: none;
+}
+
+.cn-select:focus-visible,
+.cn-input:focus-visible,
+.cn-textarea:focus-visible {
+  outline: 2px solid var(--color-primary, var(--accent-primary));
+  outline-offset: 1px;
+}
+
+/* ── Body layout ────────────────────────────────────────────────────────── */
+/* The rail spans the full viewport height; the header and toolbar live inside
+   the note column (.cn-main), so nothing of the note chrome stretches over
+   the rail. */
+.cn-body {
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  gap: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.cn-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .cn-body { grid-template-columns: minmax(0, 1fr); }
+  .cn-sidebar { display: none; }
+}
+
+/* Design: white cards on a warm gray canvas — each card is a header row over a
+   hairline, then its body. Flat: separation comes from the background, not
+   shadows. */
+.cn-sidebar {
+  padding: 14px 12px;
+  overflow-y: auto;
+  background: #f1efec;
+}
+
+.cn-sidebar-card {
+  border: 1px solid #eceae5;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.cn-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 14px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #3d4a52;
+  border-bottom: 1px solid #eceae5;
+}
+
+.cn-card-head-action {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary, var(--accent-primary));
+}
+.cn-card-head-action:hover { text-decoration: underline; }
+
+.cn-card-body { padding: 10px 14px 12px; }
+/* Notes/labs cards keep the reference's airy height even when short. */
+.cn-card-body-roomy { min-height: 132px; }
+
+.cn-card-empty {
+  margin: 0;
+  padding: 34px 10px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #98a09b;
+}
+
+.cn-patient-id {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 2px 0 6px;
+}
+
+.cn-patient-photo {
+  width: 54px;
+  height: 54px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  background: #edecea;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #a2aaa5;
+}
+
+.cn-patient-line {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #55605c;
+  margin: 0;
+}
+
+.cn-sidebar-links { margin-top: 2px; }
+
+.cn-sidebar-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-primary, var(--accent-primary));
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.cn-sidebar-link:hover { text-decoration: underline; }
+.cn-sidebar-link svg { color: #adb4af; flex: 0 0 auto; }
+
+/* Date/lab rows in the Patient Notes and Labs/Studies cards. */
+.cn-rail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-primary, var(--accent-primary));
+  text-align: left;
+}
+.cn-rail-row:hover { text-decoration: underline; }
+.cn-rail-row-main {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cn-rail-row-meta {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: #98a09b;
+}
+
+.cn-section-nav { display: flex; flex-direction: column; gap: 2px; }
+
+.cn-section-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cn-section-nav-row .cn-section-nav-item { flex: 1 1 auto; min-width: 0; }
+
+.cn-section-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 6px;
+  border: none;
+  border-radius: var(--radius-control, 6px);
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  color: #3d4a52;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cn-section-nav-item:hover { background: #f5f3f0; }
+.cn-section-nav-item[aria-current='true'] {
+  background: var(--color-primary-soft, var(--accent-light));
+  font-weight: 600;
+}
+
+.cn-section-nav-badge {
+  font-size: 11px;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+/* The ⊟ remove control on rows the clinician added. */
+.cn-section-nav-remove {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e0ddd7;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  color: #a2aaa5;
+  padding: 0;
+}
+.cn-section-nav-remove:hover {
+  color: var(--color-danger, #dc2626);
+  border-color: var(--color-danger, #dc2626);
+}
+
+/* ── Note canvas ────────────────────────────────────────────────────────── */
+.cn-canvas {
+  /* Flex-fills .cn-main so the canvas scrolls inside whatever hosts the
+     editor (the /notes page or the chart drawer) instead of growing past it. */
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+  min-height: 0;
+}
+
+.cn-note-heading {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 4px 0 16px;
+}
+
+.cn-note-patient {
+  text-align: right;
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.cn-section {
+  border-radius: var(--radius-card, 8px);
+  padding: 10px 12px 12px;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+}
+
+/* Only the section being worked in is tinted. There is deliberately no hover
+   state: a note is a wall of sections the pointer crosses on its way to the
+   one being written, and lighting each one up on the way is movement that
+   means nothing. */
+.cn-section.is-active {
+  border-color: var(--color-border, #e2e8f0);
+  background: var(--color-surface-muted, #f8fafc);
+}
+
+.cn-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.cn-section-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary, var(--accent-primary));
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.cn-section-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Section tool buttons keep their own icon colour — globals.css otherwise
+   repaints icons inside form rows. */
+.cn-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #0f172a);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cn-tool:hover:not(:disabled) { background: var(--color-surface-muted, #f1f5f9); }
+.cn-tool:disabled { opacity: 0.5; cursor: not-allowed; }
+.cn-tool svg { color: currentColor; background: none; }
+
+.cn-textarea {
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-control, 6px);
+  background: var(--color-surface, #fff);
+  color: inherit;
+}
+
+.cn-textarea[readonly] {
+  background: var(--color-surface-muted, #f8fafc);
+  color: var(--color-text-muted, #475569);
+}
+
+.cn-derived {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  color: var(--color-text, #334155);
+}
+
+.cn-derived-empty { color: var(--color-text-muted, #94a3b8); font-style: italic; }
+
+/* ── Popovers (shortcut + template pickers) ─────────────────────────────── */
+/* The search box is one of the section's tools, sized like the buttons beside
+   it — same padding, border and radius as .cn-tool, so the row reads as one
+   set of controls rather than a form field wedged among buttons. */
+.cn-shortcut-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 112px;
+}
+.cn-shortcut-field svg {
+  position: absolute;
+  left: 8px;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Scoped through .cn-section-tools on purpose. globals.css styles bare inputs
+   (`input:not([type])`, `input[type="text"]` …) with `padding: 10px 16px` and
+   `width: 100%`, and those selectors outrank a lone class — unscoped, this box
+   rendered 168×42 and wrapped onto its own line instead of sitting in the tool
+   row. The descendant selector wins the specificity, and the height is pinned
+   to .cn-tool's so the box lines up with the buttons beside it. */
+.cn-section-tools .cn-shortcut-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 29px;
+  min-height: 0;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 9px 4px 24px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  background: var(--color-surface, #fff);
+  color: inherit;
+}
+.cn-section-tools .cn-shortcut-input:focus-visible {
+  outline: 2px solid var(--color-primary, var(--accent-primary));
+  outline-offset: 1px;
+}
+
+/* The list drops under the heading in normal flow: it pushes the note down
+   while it is open and gives the space straight back when it closes, so the
+   document is never hidden behind it. */
+.cn-shortcut-results {
+  margin: 0 0 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-card, 8px);
+  background: var(--color-surface, #fff);
+  padding: 6px;
+}
+
+.cn-popover-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border: none;
+  border-radius: var(--radius-control, 6px);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cn-popover-item:hover,
+.cn-popover-item:focus-visible { background: var(--color-surface-muted, #f1f5f9); }
+
+.cn-popover-item-body {
+  display: block;
+  font-size: 11.5px;
+  color: var(--color-text-muted, #94a3b8);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cn-popover-empty {
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+/* ── Template tree ──────────────────────────────────────────────────────── */
+.cn-tree-group { border-bottom: 1px solid var(--color-border, #f1f5f9); padding: 4px 0; }
+.cn-tree-group:last-child { border-bottom: none; }
+
+.cn-tree-group-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted, #64748b);
+  padding: 4px 6px;
+  margin: 0;
+}
+
+.cn-tree-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius-control, 6px);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cn-tree-option:hover { background: var(--color-surface-muted, #f1f5f9); }
+.cn-tree-option input[type='checkbox'],
+.cn-tree-option input[type='radio'] { margin-top: 2px; flex: 0 0 auto; }
+
+.cn-tree-freetext {
+  margin: 4px 0 6px 26px;
+  width: calc(100% - 34px);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+}
+
+.cn-tree-preview {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-control, 6px);
+  background: var(--color-surface-muted, #f8fafc);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-text, #334155);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.cn-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #fff);
+}
+
+.cn-footer-spacer { flex: 1 1 auto; }
+
+.cn-saved {
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+
+.cn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-control, 6px);
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: var(--color-surface, #fff);
+  color: inherit;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.cn-btn:hover:not(:disabled) { background: var(--color-surface-muted, #f1f5f9); }
+.cn-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.cn-btn-primary {
+  background: var(--color-primary, var(--accent-primary));
+  border-color: var(--color-primary, var(--accent-primary));
+  color: #fff;
+}
+
+.cn-btn-primary:hover:not(:disabled) { filter: brightness(1.06); background: var(--color-primary, var(--accent-primary)); }
+
+/* Sits in a row of outlined icon buttons (open chart, move, start consult), so
+   it matches them rather than dropping a saturated block into the middle. */
+.cn-btn-neutral {
+  background: var(--color-surface, #fff);
+  border-color: var(--color-border, #cbd5e1);
+  color: var(--color-text, #0f172a);
+}
+.cn-btn-neutral:hover:not(:disabled) { background: var(--color-surface-muted, #f1f5f9); }
+.cn-split-main.cn-btn-neutral { border-right-color: var(--color-border, #cbd5e1); }
+
+
+/* ── Signed banner + addenda ────────────────────────────────────────────── */
+.cn-locked-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-card, 8px);
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 13px;
+}
+
+.cn-addendum {
+  border-left: 3px solid var(--color-primary, var(--accent-primary));
+  padding: 8px 12px;
+  margin: 10px 0;
+  background: var(--color-surface-muted, #f8fafc);
+  border-radius: 0 var(--radius-control, 6px) var(--radius-control, 6px) 0;
+}
+
+.cn-addendum-meta {
+  font-size: 11.5px;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 3px;
+}
+
+/* ── Notes list ─────────────────────────────────────────────────────────── */
+.cn-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.cn-note-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-card, 8px);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: var(--color-surface, #fff);
+}
+
+.cn-note-card-main { flex: 1 1 320px; min-width: 0; }
+
+.cn-note-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.cn-note-card-type { font-size: 14px; font-weight: 700; }
+
+.cn-note-card-preview {
+  font-size: 13px;
+  color: var(--color-text-muted, #64748b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cn-note-card-meta {
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+  margin-top: 4px;
+}
+
+.cn-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--color-surface-muted, #f1f5f9);
+  color: var(--color-text-muted, #475569);
+}
+
+.cn-badge.is-signed { background: #dcfce7; color: #166534; }
+.cn-badge.is-draft { background: #fef3c7; color: #92400e; }
+.cn-badge.is-amended { background: #e0e7ff; color: #3730a3; }
+.cn-badge.is-cosign { background: #ffedd5; color: #9a3412; }
+
+/* ── Care coordination ──────────────────────────────────────────────────── */
+.cn-coord-section { margin-bottom: 16px; }
+
+.cn-coord-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cn-coord-table th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted, #64748b);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+.cn-coord-table td { padding: 7px 8px; border-bottom: 1px solid var(--color-border, #f1f5f9); }
+
+.cn-segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-pill, 999px);
+  overflow: hidden;
+}
+
+.cn-segmented button {
+  padding: 6px 16px;
+  font: inherit;
+  font-size: 13px;
+  border: none;
+  background: var(--color-surface, #fff);
+  cursor: pointer;
+  color: inherit;
+}
+
+.cn-segmented button[aria-pressed='true'] {
+  background: var(--color-primary, var(--accent-primary));
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── Split "Create Clinical Note" button ────────────────────────────────── */
+.cn-split { position: relative; display: inline-flex; }
+
+.cn-split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right-color: rgba(255, 255, 255, 0.35);
+}
+
+.cn-split-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* The primary split reads as one salmon capsule: flat rose fill, dark ink
+   label, fully rounded ends, hairline ink divider ahead of the caret. Scoped
+   under .cn-split so the note editor's Sign/Save .cn-btn-primary keeps the
+   standard action color; the neutral (toolbar) tone keeps its square look. */
+.cn-split .cn-btn-primary {
+  --cn-split-fill: #e8937e;
+  --cn-split-fill-hover: #e28169;
+  --cn-split-ink: #33424b;
+  background: var(--cn-split-fill);
+  border-color: var(--cn-split-fill);
+  color: var(--cn-split-ink);
+}
+.cn-split .cn-btn-primary:hover:not(:disabled) {
+  background: var(--cn-split-fill-hover);
+  border-color: var(--cn-split-fill-hover);
+  filter: none;
+}
+.cn-split .cn-btn-primary.cn-split-main {
+  border-radius: 999px 0 0 999px;
+  padding-left: 16px;
+  border-right-color: rgba(51, 66, 75, 0.28);
+}
+.cn-split .cn-btn-primary.cn-split-caret {
+  border-radius: 0 999px 999px 0;
+  padding-right: 12px;
+}
+
+/* The icon set writes its colour out as a literal `stroke` attribute, so the
+   note glyph and the caret arrived brand-blue on the salmon fill — legible only
+   because the fill is light. Repaint both to the capsule's own ink. */
+.cn-split .cn-btn svg.lucide,
+.cn-split .cn-btn svg.lucide * {
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}
+
+/*
+ * The type list is deliberately narrow — one label per row, no descriptions.
+ * A wide menu with subtitles reads as a settings screen; this is a pick-one
+ * list a clinician scans in a second, so width tracks the longest label rather
+ * than the longest sentence. Descriptions move to the row's title tooltip.
+ */
+.cn-type-menu {
+  /* Fixed + portalled to body: every ancestor between the trigger and the app
+     shell sets overflow:hidden, which clipped five of the thirteen types out
+     of reach. Coordinates are computed from the trigger's rect. */
+  position: fixed;
+  z-index: 1200;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-card, 8px);
+  background: var(--color-surface, #fff);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.cn-type-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-control, 6px);
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.25;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cn-type-item:hover,
+.cn-type-item:focus-visible { background: var(--color-surface-muted, #f1f5f9); }
+
+/* The type already in play is marked, so the menu opens on what is selected
+   rather than making the clinician remember what they picked. */
+.cn-type-item.is-selected {
+  background: var(--color-primary-soft, #e6f4f1);
+  font-weight: 600;
+}
+
+.cn-type-tick {
+  width: 12px;
+  flex: 0 0 12px;
+  font-size: 11px;
+  color: var(--color-primary, var(--accent-primary));
+}
+
+/* ── Assign picker (reuses the portalled menu above) ─────────────────────── */
+.cn-assign { display: inline-flex; }
+
+/* Matches .cn-select so the assignee reads as one more field in the header
+   row, not a button that happens to sit beside them. */
+.cn-assign-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 168px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.cn-assign-trigger:disabled { cursor: default; opacity: 0.6; }
+.cn-assign-trigger:focus-visible {
+  outline: 2px solid var(--color-primary, var(--accent-primary));
+  outline-offset: 1px;
+}
+.cn-assign-trigger svg { flex: 0 0 auto; color: var(--color-text-muted, #64748b); }
+
+.cn-assign-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cn-assign-empty {
+  margin: 0;
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--color-text-muted, #64748b);
+}
+
+.cn-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 13.5px;
+}
+
+/* ── Medications popup ──────────────────────────────────────────────────── */
+.cn-meds { display: flex; flex-direction: column; max-height: 84vh; }
+
+.cn-meds-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 10px;
+}
+.cn-meds-title { margin: 0; font-size: 17px; font-weight: 700; }
+.cn-meds-close {
+  border: none; background: none; cursor: pointer; padding: 4px;
+  color: var(--color-text-muted, #64748b);
+}
+
+.cn-meds-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  min-height: 0;
+  overflow: hidden;
+}
+@media (max-width: 1000px) {
+  .cn-meds-body { grid-template-columns: minmax(0, 1fr); }
+  .cn-meds-right { border-top: 1px solid var(--color-border, #e2e8f0); }
+}
+
+.cn-meds-left {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 18px 16px;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border, #e2e8f0);
+}
+.cn-meds-right { padding: 14px 18px 16px; overflow-y: auto; }
+
+.cn-meds-controlrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cn-meds-adders { display: flex; gap: 8px; }
+
+.cn-meds-nkm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.cn-meds-reconcile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 13px;
+  text-transform: none;
+}
+.cn-meds-reconcile > span:first-child { color: var(--color-text-muted, #64748b); }
+.cn-meds-reconcile-at { font-size: 12px; color: var(--color-text-muted, #94a3b8); }
+
+.cn-meds-add {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px dashed var(--color-border, #cbd5e1);
+  border-radius: 8px;
+}
+
+.cn-meds-listhead { margin: 16px 0 8px; font-size: 14px; font-weight: 700; }
+
+.cn-meds-list {
+  flex: 1 1 auto;
+  min-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.cn-meds-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  cursor: pointer;
+}
+.cn-meds-row:last-child { border-bottom: none; }
+.cn-meds-row:hover { background: var(--color-surface-muted, #f8fafc); }
+.cn-meds-row.is-selected { background: var(--color-primary-soft, var(--accent-light)); }
+
+.cn-meds-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+.cn-meds-row-meta { font-size: 12px; color: var(--color-text-muted, #64748b); }
+.cn-meds-row-stage {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+}
+
+.cn-meds-footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+}
+
+.cn-meds-histhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 12px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.cn-meds-histhead svg { color: var(--color-text-muted, #94a3b8); }
+
+.cn-consent-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+}
+.cn-consent-card h4 { margin: 0 0 10px; font-size: 14.5px; font-weight: 600; }
+.cn-consent-card p { margin: 0 0 10px; font-size: 12.5px; line-height: 1.6; }
+.cn-consent-question { font-size: 13px !important; font-weight: 600; margin-top: 14px !important; }
+.cn-consent-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+  text-transform: none;
+  cursor: pointer;
+}
+.cn-consent-card .cn-btn { margin-top: 10px; }
+.cn-consent-note { font-size: 12px; color: var(--color-text-muted, #64748b); margin: 8px 0; }
+
+.cn-meds-history { display: flex; flex-direction: column; }
+.cn-meds-histrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  font-size: 13px;
+}
+.cn-meds-histrow:last-child { border-bottom: none; }
+.cn-meds-histdate { flex: 0 0 78px; color: var(--color-text-muted, #64748b); font-size: 12px; }
+.cn-meds-histmed { flex: 1 1 auto; min-width: 0; }
+
+/* The medications snapshot doubles as the button into the popup. */
+.cn-derived-clickable { cursor: pointer; }
+.cn-derived-clickable:hover {
+  background: var(--color-surface-muted, #f8fafc);
+  border-radius: var(--radius-control, 6px);
+}
+
+/* ── Assessment diagnosis cards ─────────────────────────────────────────── */
+.cn-dx { margin-bottom: 10px; }
+
+.cn-dx-search { max-width: 440px; margin-bottom: 10px; }
+
+.cn-dx-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+
+.cn-dx-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  padding: 10px 12px;
+}
+
+.cn-dx-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cn-dx-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cn-dx-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted, #64748b);
+  background: var(--color-surface-muted, #f1f5f9);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.cn-dx-remove {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--color-text-muted, #94a3b8);
+}
+.cn-dx-remove:hover { color: var(--color-danger, #dc2626); }
+
+.cn-dx-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.cn-dx-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  text-transform: none;
+}
+.cn-dx-field > span {
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+.cn-dx-date { min-height: 30px; padding: 3px 8px; font-size: 12.5px; }
+
+/* Mini acute/chronic segmented toggle. */
+.cn-dx-acuity {
+  display: inline-flex;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  overflow: hidden;
+}
+.cn-dx-acuity button {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--color-text-muted, #64748b);
+}
+.cn-dx-acuity button + button { border-left: 1px solid var(--color-border, #cbd5e1); }
+.cn-dx-acuity button[aria-pressed='true'] {
+  background: var(--color-primary, var(--accent-primary));
+  color: #fff;
+  font-weight: 600;
+}
+.cn-dx-acuity button:disabled { cursor: default; }
+
+.cn-dx-spacer { flex: 1 1 auto; }
+
+.cn-dx-problem {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary, var(--accent-primary));
+}
+.cn-dx-problem:hover { text-decoration: underline; }
+
+.cn-dx-on-list {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-success, #16a34a);
+  white-space: nowrap;
+}
+
+/* ── Documents rail card ────────────────────────────────────────────────── */
+.cn-card-head-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+.cn-card-head-filter select {
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  background: none;
+  color: var(--color-primary, var(--accent-primary));
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  max-width: 110px;
+}
+
+.cn-rail-row-stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.cn-rail-row-sub {
+  font-size: 12px;
+  color: #55605c;
+}
+
+/* ── Problems / Allergies popups (share the Medications chrome) ─────────── */
+.cn-meds-body--single { grid-template-columns: minmax(0, 1fr); }
+.cn-meds-body--single .cn-meds-left { border-right: none; }
+
+.cn-meds-dxsearch { margin-top: 12px; max-width: 440px; }
+
+.cn-allergy-add {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px dashed var(--color-border, #cbd5e1);
+  border-radius: 8px;
+}
+.cn-allergy-add-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ── Include Problems popup ─────────────────────────────────────────────── */
+.cn-dx-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  font-size: 13px;
+}
+.cn-dx-line:last-child { border-bottom: none; margin-bottom: 6px; }
+.cn-dx-line-meta { color: var(--color-text-muted, #94a3b8); font-size: 12px; }
+
+.cn-inc-tablewrap {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  overflow-x: auto;
+  min-height: 180px;
+}
+.cn-inc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.cn-inc-table th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-muted, #64748b);
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  white-space: nowrap;
+}
+.cn-inc-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  vertical-align: top;
+}
+.cn-inc-table tbody tr { cursor: pointer; }
+.cn-inc-table tbody tr:hover { background: var(--color-surface-muted, #f8fafc); }
+.cn-inc-table tbody tr.is-checked { background: var(--color-primary-soft, var(--accent-light)); }
+.cn-inc-name { font-weight: 600; }
+.cn-inc-code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11.5px; }
+.cn-inc-comments { max-width: 160px; }
+.cn-inc-empty {
+  text-align: center;
+  color: var(--color-text-muted, #94a3b8);
+  padding: 42px 10px !important;
+}
+
+.cn-inc-add {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-surface-muted, #f8fafc);
+}
+.cn-inc-add h4 { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+.cn-inc-add-status { display: flex; gap: 16px; margin-bottom: 10px; }
+.cn-inc-add-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-transform: none;
+  font-size: 12.5px;
+}
+.cn-inc-add-search > span { font-weight: 600; white-space: nowrap; }
+.cn-inc-add-search .cn-input { flex: 1 1 auto; max-width: 460px; }
+.cn-inc-results {
+  margin: 6px 0 0 74px;
+  max-width: 460px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-surface, #fff);
+  overflow: hidden;
+}
+.cn-inc-results button {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.cn-inc-results button:last-child { border-bottom: none; }
+.cn-inc-results button:hover { background: var(--color-surface-muted, #f8fafc); }
+
+.cn-inc-details-toggle { display: inline-block; margin-top: 10px; }
+.cn-inc-details {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.cn-inc-details .cn-input { min-width: 220px; }
+
+/* ── Prescribe Medications popup ────────────────────────────────────────── */
+.cn-rx-sectionhead {
+  margin: 14px 0 10px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.cn-rx-sectionhead:first-child { margin-top: 0; }
+
+.cn-rx-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.cn-rx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  text-transform: none;
+  position: relative;
+  min-width: 90px;
+}
+.cn-rx-field > span {
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+.cn-rx-field--wide { flex: 1 1 300px; }
+.cn-rx-field input[type='number'] { max-width: 110px; }
+
+.cn-rx-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  z-index: 30;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+}
+
+.cn-rx-reason {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+.cn-rx-reason-chip {
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--color-primary-soft, var(--accent-light));
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.cn-rx-instructions { min-height: 64px; }
+
+.cn-rx-sigs {
+  list-style: none;
+  margin: 6px 0 4px;
+  padding: 0;
+}
+.cn-rx-sigs button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 3px 0;
+  color: var(--color-text, #0f172a);
+}
+.cn-rx-sigs button:hover { color: var(--color-primary, var(--accent-primary)); text-decoration: underline; }
+
+.cn-rx-drugname { margin: 0 0 12px; font-size: 15px; font-weight: 800; letter-spacing: 0.02em; }
+.cn-rx-panelhead { margin: 14px 0 6px; font-size: 13px; font-weight: 700; }
+.cn-rx-warnings {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.cn-rx-warnings li { margin-bottom: 6px; }
+.cn-rx-currentmeds { color: var(--color-text-muted, #64748b); }
+
+/* ── Prescribe: collapsible blocks + monograph rail ─────────────────────── */
+.cn-rx-block { border-bottom: 1px solid var(--color-border-light, #f1f5f9); }
+.cn-rx-block:last-of-type { border-bottom: none; }
+
+.cn-rx-blockhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cn-rx-blocktoggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  gap: 8px;
+  padding: 12px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  text-align: left;
+}
+.cn-rx-blocktoggle svg { transition: transform 0.15s ease; }
+.cn-rx-blocktoggle svg.is-open { transform: rotate(180deg); }
+
+.cn-rx-blockbody { padding: 0 0 14px; }
+
+.cn-rx-inlinerow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 2px 0 10px;
+}
+.cn-rx-inlinerow .cn-meds-nkm { margin-top: 0; }
+
+.cn-rx-qtynote {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.cn-rx-favorite {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary, var(--accent-primary));
+}
+.cn-rx-favorite:disabled { opacity: 0.5; cursor: not-allowed; }
+.cn-rx-favorite[aria-pressed='true'] { color: var(--color-warning, #d97706); }
+
+.cn-rx-cost {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+/* Monograph rail */
+.cn-rx-drugform {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+}
+.cn-rx-panelbody {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-text, #0f172a);
+}
+
+.cn-rx-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 14px 0 10px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+.cn-rx-tabs button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 8px;
+  color: var(--color-text-muted, #64748b);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.cn-rx-tabs button[aria-selected='true'] {
+  color: var(--color-primary, var(--accent-primary));
+  border-bottom-color: var(--color-primary, var(--accent-primary));
+}
+
+.cn-rx-warnings li[data-severity='contraindicated'],
+.cn-rx-warnings li[data-severity='allergy'] {
+  color: var(--color-danger, #dc2626);
+  font-weight: 600;
+}
+.cn-rx-warnings li[data-severity='serious'] { color: var(--color-danger, #dc2626); }
+.cn-rx-warnings li[data-severity='moderate'] { color: var(--color-warning, #b45309); }
+.cn-rx-note { color: var(--color-text-muted, #94a3b8); font-style: italic; }

@@ -1,12 +1,18 @@
 'use client';
 
 /**
- * Visit note workspace panel — OpenMRS-style: primary/secondary diagnosis
- * search + a free-text note. Diagnosis search reuses the same
+ * Visit note workspace panel — OpenMRS-style quick capture: primary/secondary
+ * diagnosis search + a free-text note. Diagnosis search reuses the same
  * CodedSearchField + COMMON_ICD11_CODES pairing as ProblemList's "Add
- * problem" flow. Persists via the existing patient-note-service
- * (createPatientNote / getNotesByPatient — the same pattern page.tsx already
- * uses for `patientNotes`) rather than standing up a new data layer.
+ * problem" flow.
+ *
+ * Persists as a clinical-notes-module draft (`ClinicalNoteDoc`), not the old
+ * `PatientNoteDoc`: the diagnoses land structured on the SOAP Assessment
+ * section and the paragraph becomes its narrative, so a note captured here
+ * shows up in the chart's Notes tab, can be opened in the full editor, and
+ * goes through the same sign/addendum lifecycle as every other note. The old
+ * data layer made this panel's output invisible to the Notes list — a note
+ * the author could not find again.
  *
  * The primary action starts a full consultation for this patient: this panel
  * captures a diagnosis and a paragraph, while the encounter itself (vitals,
@@ -18,6 +24,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Image as ImageIcon, Stethoscope, X } from '@/components/icons/lucide';
 import CodedSearchField from '@/components/CodedSearchField';
 import { useToast } from '@/components/Toast';
+import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
 import type { PatientDoc } from '@/lib/db-types';
 import type { ChartPanelRouter, ChartPanelUser } from './types';
@@ -87,20 +94,39 @@ export default function VisitNotePanel({ patient, currentUser, router, canConsul
    *  to attach; throws if the note itself could not be saved. */
   const persistNote = async (): Promise<number> => {
     {
+      const now = new Date();
+      // Structured, not prose: the dx cards land on the Assessment section the
+      // same way the full editor writes them, so reopening this note there
+      // shows editable diagnosis cards rather than a paragraph to re-type.
+      const diagnoses = [primaryDx, secondaryDx]
+        .filter((dx): dx is PickedDx => !!dx)
+        .map((dx, i) => ({
+          id: `dx-${now.getTime()}-${i}`,
+          name: dx.title,
+          icd11Code: dx.code,
+          addedAt: now.toISOString(),
+        }));
       const lines: string[] = [];
-      if (primaryDx) lines.push(`Primary diagnosis: ${primaryDx.title} (ICD-11 ${primaryDx.code})`);
-      if (secondaryDx) lines.push(`Secondary diagnosis: ${secondaryDx.title} (ICD-11 ${secondaryDx.code})`);
       if (note.trim()) lines.push(note.trim());
       if (images.length > 0) lines.push(`Attached images: ${images.map(f => f.name).join(', ')}`);
-      const { createPatientNote } = await import('@/lib/services/patient-note-service');
-      await createPatientNote({
+      const { createClinicalNote } = await import('@/lib/clinical-notes/note-service');
+      const { patientFullName } = await import('@/lib/patient-utils');
+      await createClinicalNote({
         patientId: patient._id,
-        body: lines.join('\n\n'),
-        authorId: currentUser?._id || currentUser?.username || 'unknown',
+        patientName: patientFullName(patient),
+        mrn: patient.hospitalNumber,
+        patientDob: patient.dateOfBirth,
+        noteType: 'soap',
+        serviceDate: toIsoDate(now),
+        serviceTime: now.toTimeString().slice(0, 5),
+        sections: [{ sectionId: 'assessment', text: lines.join('\n\n'), diagnoses }],
+        assignedToId: currentUser?._id,
+        assignedToName: currentUser?.name,
+        authorId: currentUser?._id || currentUser?.username,
         authorName: currentUser?.name || 'Care team',
-        authorRole: currentUser?.role,
-        orgId: currentUser?.orgId,
         hospitalId: currentUser?.hospitalId,
+        hospitalName: currentUser?.hospitalName,
+        orgId: currentUser?.orgId,
       });
       // Persist picked images to the synced patient_documents store (the same
       // place radiology films land) so they outlive this session.

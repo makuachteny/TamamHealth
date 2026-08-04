@@ -10,7 +10,7 @@ import {
   appointmentsDB, wardDB, pharmacyInventoryDB, triageDB, availabilityDB,
   assetsDB, leaveRequestsDB, payrollEntriesDB,
   problemsDB, telehealthDB, patientNotesDB, orderSetsDB,
-  phoneNotesDB, assessmentsDB, intakeFormsDB, bloodBankDB,
+  phoneNotesDB, assessmentsDB, intakeFormsDB, bloodBankDB, patientDocumentsDB,
   isSeeded, markSeeded, resetAllDatabases, getDB,
   isSeedInProgress, markSeedStarted
 } from './db';
@@ -300,6 +300,34 @@ export const seedMessages: Omit<MessageDoc, '_rev' | 'createdBy'>[] = [
     fromDoctorId: 'user-dr.achol', fromDoctorName: 'Dr. Achol Mayen Deng', fromHospitalName: 'Juba Teaching Hospital',
     subject: 'Medicine Ready', body: 'Your medicine is ready at the pharmacy. Please collect it today before 5 PM.',
     channel: 'both', status: 'sent', sentAt: '2026-02-09T09:00:00Z', createdAt: '2026-02-09T09:00:00Z', updatedAt: '2026-02-09T09:00:00Z',
+  },
+  // Patient education already delivered — `patientEducation: true` files these
+  // under the chart's Documents ▸ Patient education view, alongside any
+  // handouts uploaded there. Attached to patients who also have referrals, so
+  // one chart demonstrates both views of the section.
+  {
+    _id: 'msg-edu-1', type: 'message', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678',
+    fromDoctorId: 'user-dr.wani', fromDoctorName: 'Dr. James Wani Igga', fromHospitalName: 'Juba Teaching Hospital',
+    subject: 'Patient education — Malaria prevention',
+    body: 'Sleep under your treated mosquito net every night, including during the dry season. Clear standing water around the compound. Come back the same day if fever returns with vomiting or confusion.',
+    channel: 'both', status: 'delivered', patientEducation: true,
+    sentAt: '2026-02-10T08:15:00Z', createdAt: '2026-02-10T08:15:00Z', updatedAt: '2026-02-10T08:15:00Z',
+  },
+  {
+    _id: 'msg-edu-2', type: 'message', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005',
+    fromDoctorId: 'user-dr.achol', fromDoctorName: 'Dr. Achol Mayen Deng', fromHospitalName: 'Juba Teaching Hospital',
+    subject: 'Patient education — Danger signs in pregnancy',
+    body: 'Come to the hospital straight away for any bleeding, severe headache, blurred vision, swelling of the face or hands, fever, or reduced movement of the baby. Keep taking the iron and folate tablets daily.',
+    channel: 'app', status: 'delivered', patientEducation: true,
+    sentAt: '2026-02-07T09:40:00Z', createdAt: '2026-02-07T09:40:00Z', updatedAt: '2026-02-07T09:40:00Z',
+  },
+  {
+    _id: 'msg-edu-3', type: 'message', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012',
+    fromDoctorId: 'user-dr.wani', fromDoctorName: 'Dr. James Wani Igga', fromHospitalName: 'Juba Teaching Hospital',
+    subject: 'Patient education — Taking your TB treatment',
+    body: 'Take every dose, at the same time each day, for the full six months — stopping early lets the illness come back and become harder to treat. Bring your treatment card to each visit.',
+    channel: 'sms', status: 'sent', patientEducation: true,
+    sentAt: '2026-02-05T15:20:00Z', createdAt: '2026-02-05T15:20:00Z', updatedAt: '2026-02-05T15:20:00Z',
   },
   // Inbound patient enquiries (patient → staff) — power the facility dashboard
   // "Enquiries" panel. fromDoctorId='patient' + direction mark them inbound.
@@ -2744,6 +2772,21 @@ async function seedDatabaseExclusive(): Promise<void> {
       updatedAt: sent,
       orgId: PUBLIC_ORG_ID,
     } as unknown as Record<string, unknown>);
+  }
+
+  // Chart documents (all public org) — the files behind the patient chart's
+  // Documents ▸ Referrals ▸ Patient education views. Payloads are real
+  // one-page PDFs generated from their text, so the chart's preview opens
+  // something readable instead of a placeholder.
+  // Demo document text, loaded here rather than statically imported so the
+  // production bundle never carries it (same reason as `@/data/mock`).
+  const { seedPatientDocumentDefs, buildSeedPatientDocument } = await import('./seed-patient-documents');
+  const pdocDB = patientDocumentsDB();
+  for (const def of seedPatientDocumentDefs) {
+    await safePut(
+      pdocDB,
+      buildSeedPatientDocument(def, daysAgo(def.daysAgo), PUBLIC_ORG_ID) as unknown as Record<string, unknown>,
+    );
   }
 
   // ── Internal clinical staff chat: demo conversations among Juba Teaching

@@ -57,6 +57,26 @@ export function pharmacyStageTone(stage: PrescriptionStatus): 'scheduled' | 'rea
   }
 }
 
+/**
+ * The dashboard's three-lane grouping (same lanes as the mobile shell):
+ * Scheduled = ordered but not yet picked up by the pharmacy workflow,
+ * In Office = actively being worked (review, clarification, cleared, held,
+ * stockout, recall), Finished = the medication actually left the pharmacy.
+ */
+export function pharmacyStageGroup(stage: PrescriptionStatus): 'scheduled' | 'in_office' | 'finished' {
+  switch (stage) {
+    case 'prescribed':
+    case 'received_in_pharmacy_queue':
+      return 'scheduled';
+    case 'dispensed':
+    case 'counseled':
+    case 'complete':
+      return 'finished';
+    default:
+      return 'in_office';
+  }
+}
+
 export function isFinanciallyCleared(balance?: number): boolean {
   return (balance ?? 0) <= 0;
 }

@@ -93,10 +93,14 @@ export default function EhrListHeader({
 }
 
 /**
- * EhrListHeaderButton — icon-only round toolbar button matching the patients
- * header's Filters / Download controls (38px circle, icon only — the meaning
- * carries via `ariaLabel`, which also becomes the hover tooltip). `active`
- * renders the blue-tinted state used when filters are applied.
+ * EhrListHeaderButton — icon-only toolbar button (38px, icon only — the
+ * meaning carries via `ariaLabel`, which also becomes the hover tooltip).
+ * `active` renders the blue-tinted state used when filters are applied.
+ *
+ * Shape and colour come from `.listpage-icon-btn`, the appointments toolbar's
+ * button: an 8px-radius square with a blue glyph. It used to be a 999px pill
+ * with a grey glyph, which meant the same Download control changed shape
+ * between Appointments and Lab.
  */
 export function EhrListHeaderButton({
   onClick,
@@ -119,15 +123,8 @@ export function EhrListHeaderButton({
       aria-expanded={ariaExpanded}
       aria-label={ariaLabel}
       title={ariaLabel}
-      style={{
-        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 38, height: 38, padding: 0, flexShrink: 0,
-        borderRadius: 999,
-        border: `1px solid ${active ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-        background: active ? 'rgba(33,145,208,0.08)' : 'var(--bg-card-solid)',
-        color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
-        cursor: 'pointer', whiteSpace: 'nowrap',
-      }}
+      className={`listpage-icon-btn ${active ? 'is-active' : ''}`}
+      style={{ position: 'relative' }}
     >
       {children}
     </button>

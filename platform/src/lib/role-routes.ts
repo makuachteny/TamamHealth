@@ -22,6 +22,9 @@ const NURSE_MODULE_ROUTES = [
   '/dashboard/nurse', '/patients', '/messages',
   '/lab', '/immunizations', '/anc', '/births', '/deaths',
   '/settings', '/appointments', '/patient-intake',
+  // Nurses document their own encounters (the Nurse Visit note type), so the
+  // notes module is part of the nursing station, not a clinician-only surface.
+  '/notes',
   '/wards',
 ] as const;
 
@@ -37,7 +40,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/it', '/system-admin',
       '/admin/billing', '/admin/analytics',
       '/org-admin', '/org-admin/analytics',
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/hospitals', '/settings',
       '/epidemic-intelligence', '/mch-analytics', '/government',
@@ -78,7 +81,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   doctor: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/settings',
       '/appointments', '/telehealth', '/patient-intake',
@@ -92,7 +95,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // visits. Clinical scope only — payment processing belongs to
     // cashier/biller, not clinicians.
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/settings',
       '/appointments', '/telehealth', '/patient-intake',
@@ -118,7 +121,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard/nurse', '/patients', '/messages',
       '/anc', '/births', '/deaths', '/immunizations',
       '/wards', '/referrals', '/appointments', '/patient-intake',
-      '/settings',
+      '/notes', '/settings',
     ],
     defaultDashboard: '/dashboard/nurse',
   },
@@ -210,7 +213,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   medical_superintendent: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/hospitals', '/settings',
       '/facility-settings',
@@ -324,7 +327,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   clinician: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/appointments', '/telehealth', '/wards', '/alerts', '/settings',
       '/blood-bank', '/patient-intake',

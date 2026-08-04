@@ -123,11 +123,18 @@ export default function DashboardPage() {
   // Total documents awaiting the clinician's signature.
   const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length;
 
-  // Upcoming appointments for this clinician (drives the schedule board).
+  // All of this clinician's appointments, closed ones included, for the
+  // schedule board — its Finished lane is fed by completed/cancelled/no-show
+  // rows, so dropping them here would pin that lane at zero and make a visit
+  // vanish from the board the moment it is checked out.
   const apptKey = (a: { appointmentDate: string; appointmentTime?: string }) => `${a.appointmentDate}T${a.appointmentTime || '00:00'}`;
-  const myUpcomingAppts = (appointments || [])
-    .filter(a => a.providerId === currentUser._id && a.status !== 'cancelled' && a.status !== 'completed' && a.status !== 'no_show')
+  const myAppts = (appointments || [])
+    .filter(a => a.providerId === currentUser._id)
     .sort((x, y) => apptKey(x).localeCompare(apptKey(y)));
+  // Still-live bookings only — feeds the telehealth tile, where a completed or
+  // cancelled visit is no longer something to join.
+  const myUpcomingAppts = myAppts
+    .filter(a => a.status !== 'cancelled' && a.status !== 'completed' && a.status !== 'no_show');
 
   // Per-item worklists behind the outstanding counts.
   const shortDate = (iso?: string) =>
@@ -241,7 +248,7 @@ export default function DashboardPage() {
         clinicianName={currentUser.name || 'clinician'}
         facilityName={currentUser.hospitalName}
         patients={assignedRows}
-        appointments={myUpcomingAppts}
+        appointments={myAppts}
         outstanding={outstandingItems}
         onUpdateAppointmentStatus={updateApptStatus}
       />

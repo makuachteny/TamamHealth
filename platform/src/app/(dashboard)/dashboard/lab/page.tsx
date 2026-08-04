@@ -151,8 +151,11 @@ export default function LabDashboardPage() {
   // keep the lab bench focused on specimen-based investigations.
   const results = useMemo(() => allResults.filter(r => !isImagingStudy(r)), [allResults]);
   const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
-  // Work-queue status filter (shell tabs) + inline search bound to the shell's left rail.
-  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  // Work-queue status filter (shell tabs) + inline search bound to the shell's
+  // left rail. The tabs use the shared three-lane vocabulary every role
+  // dashboard shows: Scheduled = ordered/pending, In Office = on the bench
+  // (in progress), Finished = resulted.
+  const [queueFilter, setQueueFilter] = useState<'scheduled' | 'in_office' | 'finished'>('scheduled');
   const [queueSearch, setQueueSearch] = useState('');
 
   // Feature 1: Result Entry Modal
@@ -187,7 +190,7 @@ export default function LabDashboardPage() {
   // so the most actionable work is at the top of the list.
   const visibleQueue = useMemo(() => {
     const query = queueSearch.trim().toLowerCase();
-    if (queueFilter === 'completed') {
+    if (queueFilter === 'finished') {
       return results.filter(r => r.status === 'completed' && (
         !query ||
         (r.patientName || '').toLowerCase().includes(query) ||
@@ -197,7 +200,7 @@ export default function LabDashboardPage() {
       )).slice(0, 40);
     }
     return results.filter(r => {
-      const statusOk = queueFilter === 'all' ? true : r.status === queueFilter;
+      const statusOk = r.status === (queueFilter === 'in_office' ? 'in_progress' : 'pending');
       if (!statusOk) return false;
       if (!query) return true;
       return (
@@ -320,10 +323,9 @@ export default function LabDashboardPage() {
           greetingName={currentUser?.name}
           dateLabel={dateLabel}
           tabs={[
-            { key: 'all', label: t('lab.viewAll'), count: results.length },
-            { key: 'pending', label: 'Pending', count: kpis.pending },
-            { key: 'in_progress', label: 'Processing', count: kpis.inProgress },
-            { key: 'completed', label: 'Complete', count: completedDiseaseRows.length },
+            { key: 'scheduled', label: 'Scheduled', count: kpis.pending },
+            { key: 'in_office', label: 'In Office', count: kpis.inProgress },
+            { key: 'finished', label: 'Finished', count: completedDiseaseRows.length },
           ]}
           activeTab={queueFilter}
           onTabChange={(k) => setQueueFilter(k as typeof queueFilter)}
@@ -342,7 +344,7 @@ export default function LabDashboardPage() {
           // explicitly from order.status rather than relying on the done→series1
           // default (which would otherwise misfile a flagged result as "awaiting").
           chartSeriesNames={['Awaiting', 'Resulted']}
-          rows={queueFilter === 'completed' ? visibleCompletedDiseaseRows.map((row): EhrCareDashboardRow => {
+          rows={queueFilter === 'finished' ? visibleCompletedDiseaseRows.map((row): EhrCareDashboardRow => {
             const lab = row.lab;
             const time = lab.completedAt ? new Date(lab.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined;
             return {

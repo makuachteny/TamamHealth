@@ -48,13 +48,14 @@ import { usePatientPayments } from '@/lib/hooks/usePayments';
 import BillingTab from '@/components/patients/BillingTab';
 import PatientSBAR from '@/components/patients/PatientSBAR';
 import DirectiveList from '@/components/patients/DirectiveList';
+import NotesList from '@/components/clinical-notes/NotesList';
+import { useCreateNote } from '@/lib/clinical-notes/useCreateNote';
 import PhoneNotes from '@/components/patients/PhoneNotes';
 import AssessmentsPanel from '@/components/patients/AssessmentsPanel';
 import ScreeningsPanel from '@/components/patients/ScreeningsPanel';
 import RemindersPanel from '@/components/patients/RemindersPanel';
 import TransferHistoryPanel, { TransferBanner } from '@/components/patients/TransferHistoryPanel';
 import DocumentsPanel from '@/components/patients/DocumentsPanel';
-import SuperbillPanel from '@/components/patients/SuperbillPanel';
 import { useProblems } from '@/lib/hooks/useProblems';
 import type {
   AppointmentDoc,
@@ -189,6 +190,11 @@ export default function PatientDetailPage() {
   const [messageSending, setMessageSending] = useState(false);
   const [messageError, setMessageError] = useState('');
   const [messageSent, setMessageSent] = useState(false);
+  // Set when the composer was opened from a "Patient education" action, so the
+  // sent message is flagged as education and lists under Documents ▸ Patient
+  // education. Tracked separately from the subject line, which the sender may
+  // rewrite before sending.
+  const [messageIsEducation, setMessageIsEducation] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPaymentPanel, setShowPaymentPanel] = useState(false);
   const [showPlanWizard, setShowPlanWizard] = useState(false);
@@ -199,8 +205,11 @@ export default function PatientDetailPage() {
   const [showNurseVitals, setShowNurseVitals] = useState(false);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   // One-shot request for the chart shell to open a workspace drawer panel
-  // (e.g. header "+ Note" → the persisting visit-note panel).
+  // (e.g. header "+ Note" → `clinical-note:<id>`, the note editor drawer).
   const [chartPanelRequest, setChartPanelRequest] = useState<string | null>(null);
+  // Bumped when the note drawer closes so the Notes tab under it reloads —
+  // the editor autosaves, so whatever was typed is already on disk by then.
+  const [notesRefreshToken, setNotesRefreshToken] = useState(0);
   // One-shot request for a tab's ChartSection to pop its own "Add" form open
   // (e.g. the Facesheet Problems card's "Add" → Conditions tab + add modal).
   const [sectionAddRequest, setSectionAddRequest] = useState<'problems' | 'allergies' | null>(null);
@@ -317,6 +326,33 @@ export default function PatientDetailPage() {
       .catch(() => { /* best-effort */ });
     return () => { cancelled = true; };
   }, [patientIdForNotes]);
+
+  // ── "+ Note" → the clinical-notes module, edited in the chart's drawer. ──
+  // Reopen today's unsigned draft when one exists (a second click must not
+  // fork the record — the same rule useCreateNote applies per appointment),
+  // otherwise start a SOAP draft. Documentation happens beside the chart; the
+  // /notes/[id] route stays for the cross-patient queue.
+  const { createNote: createClinicalNoteDraft } = useCreateNote(currentUser ?? null);
+  const openClinicalNoteDrawer = useCallback(async () => {
+    if (!patient) return;
+    try {
+      const { listClinicalNotes } = await import('@/lib/clinical-notes/note-service');
+      const today = toIsoDate(new Date());
+      const drafts = await listClinicalNotes({ patientId: patient._id, display: 'unsigned' });
+      const note = drafts.find(n => n.serviceDate === today)
+        ?? await createClinicalNoteDraft({
+          patientId: patient._id,
+          patientName: patientFullName(patient),
+          mrn: patient.hospitalNumber,
+          patientDob: patient.dateOfBirth,
+        }, { navigate: false });
+      if (note) setChartPanelRequest(`clinical-note:${note._id}`);
+    } catch {
+      // The drawer could not be readied — land on the Notes tab so the click
+      // still goes somewhere useful.
+      setActiveTab('notes');
+    }
+  }, [patient, createClinicalNoteDraft]);
 
   // Outstanding balance for the most recent encounter — surfaced as a chip on
   // the "Most Recent Record" hero so clinicians see if the visit is settled.
@@ -470,6 +506,7 @@ export default function PatientDetailPage() {
         subject: messageSubject.trim() || 'Patient message',
         body,
         channel: messageChannel,
+        patientEducation: messageIsEducation || undefined,
         sentAt: new Date().toISOString(),
         orgId: currentUser.orgId,
       });
@@ -477,6 +514,7 @@ export default function PatientDetailPage() {
       setMessageBody('');
       setMessageSubject('Follow-up from your care team');
       setMessageChannel('app');
+      setMessageIsEducation(false);
     } catch (err) {
       console.error(err);
       setMessageError('Could not send this message. Please try again.');
@@ -505,7 +543,7 @@ export default function PatientDetailPage() {
     { id: 'demographics', label: 'Demographics', icon: UserIcon },
     { id: 'billing', label: 'Billing history', icon: Wallet },
     { id: 'careChecklist', label: 'Care plan', icon: ClipboardList },
-    { id: 'documents', label: 'Attachments', icon: FileText },
+    { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'appointments', label: 'Appointments', icon: Calendar },
     { id: 'referrals', label: 'Care coordination', icon: ArrowRightLeft },
   ];
@@ -543,7 +581,7 @@ export default function PatientDetailPage() {
     { id: 'problems', label: 'Conditions', icon: AlertTriangle },
     { id: 'immunizations', label: 'Immunizations', icon: Syringe },
     { id: 'procedures', label: 'Procedures', icon: Bandage },
-    { id: 'documents', label: 'Attachments', icon: FileText },
+    { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'programs', label: 'Programs', icon: Layers },
     { id: 'appointments', label: 'Appointments', icon: Calendar },
     // Who the patient is, as registered — contact details, address, next of
@@ -1155,7 +1193,7 @@ export default function PatientDetailPage() {
             router={router}
             onOpenPrescribeModal={() => setShowPrescribeModal(true)}
             onOpenOrderLabModal={() => setShowOrderLabModal(true)}
-            onNoteSaved={reloadPatientNotes}
+            onNoteSaved={() => { reloadPatientNotes(); setNotesRefreshToken(t => t + 1); }}
             panelRequest={chartPanelRequest}
             onPanelRequestHandled={() => setChartPanelRequest(null)}
             header={
@@ -1164,15 +1202,17 @@ export default function PatientDetailPage() {
                 pregnancyPill={pregnancyPillNode}
                 patientBalance={patientBalance}
                 onCollectPayment={openPaymentFromHeader}
-                onMessage={() => setShowMessageModal(true)}
+                onMessage={() => { setMessageIsEducation(false); setShowMessageModal(true); }}
                 onPrint={() => { setPrintSignature(currentUser?.name || ''); setPrintSections(new Set(DEFAULT_PRINT_SECTIONS)); setPrintSigned(false); setShowPrintModal(true); }}
                 onPatientEd={() => {
                   // Real patient-education action: a message queued to the
                   // patient (app/SMS), pre-labelled — not just a tab switch.
+                  // The flag files it under Documents ▸ Patient education.
                   setMessageSubject('Patient education');
+                  setMessageIsEducation(true);
                   setShowMessageModal(true);
                 }}
-                onNote={() => (canConsult ? setChartPanelRequest('visit-note') : setActiveTab('notes'))}
+                onNote={() => (canConsult ? void openClinicalNoteDrawer() : setActiveTab('notes'))}
                 onScripts={() => (canPrescribe ? setShowPrescribeModal(true) : setActiveTab('prescriptions'))}
                 onOrders={() => (canOrderLabs ? setShowOrderLabModal(true) : setActiveTab('labs'))}
                 onExchange={() => (canManageReferrals ? setShowReferModal(true) : setActiveTab('appointments'))}
@@ -1333,29 +1373,27 @@ export default function PatientDetailPage() {
 
           {activeTab === 'notes' && patient && (
             <div className="space-y-4">
+              {/* Clinical notes are the encounter record now that the
+                  consultation wizard is retired, so they lead this tab rather
+                  than being signposted off to the Activity feed. */}
+              <div className="card-elevated p-5">
+                <NotesList
+                  patientId={patient._id}
+                  patientName={patientFullName(patient)}
+                  mrn={patient.hospitalNumber}
+                  patientDob={patient.dateOfBirth}
+                  currentUser={currentUser}
+                  showCreate={canConsult}
+                  // In chart context a note opens beside the chart, not on the
+                  // standalone /notes route.
+                  onOpenNote={id => setChartPanelRequest(`clinical-note:${id}`)}
+                  refreshToken={notesRefreshToken}
+                />
+              </div>
+              {/* Telephone contacts stay separate: they are care-team messages
+                  about a patient, not documentation of an encounter. */}
               <div className="card-elevated p-5">
                 <PhoneNotes patient={patient} />
-              </div>
-              {/* Encounter documentation lives on the Activity feed — this tab
-                  is for persistent care-team notes only, so the same encounters
-                  are not listed twice under two names. */}
-              <div className="card-elevated p-5 flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-sm">Looking for encounter notes?</h3>
-                  <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    Consultations and their documentation are on the Activity feed.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {canConsult && (
-                    <button className="btn btn-secondary text-[12px]" onClick={() => router.push(`/consultation?patientId=${patient._id}`)}>
-                      Start consultation
-                    </button>
-                  )}
-                  <button className="btn btn-primary text-[12px]" onClick={() => setActiveTab('history')}>
-                    Open Activity
-                  </button>
-                </div>
               </div>
             </div>
           )}
@@ -1383,7 +1421,22 @@ export default function PatientDetailPage() {
 
           {activeTab === 'documents' && patient && (
             <div className="space-y-4">
-              <DocumentsPanel patient={patient} />
+              {/* Documents ▸ Referrals ▸ Patient education. Referrals are read
+                  here (the record itself is owned by the referrals module) and
+                  education reuses the header's own send action, so the section
+                  adds no second way to do either. */}
+              <DocumentsPanel
+                patient={patient}
+                referrals={patientReferrals}
+                canViewClinical={canViewClinical}
+                onSendEducation={() => {
+                  setMessageSubject('Patient education');
+                  setMessageIsEducation(true);
+                  setShowMessageModal(true);
+                }}
+                onOpenAllReferrals={() => router.push(`/referrals?patient=${encodeURIComponent(patientFullName(patient))}`)}
+                onNewReferral={canManageReferrals ? () => setShowReferModal(true) : undefined}
+              />
             </div>
           )}
 
@@ -1650,14 +1703,9 @@ export default function PatientDetailPage() {
 
           {activeTab === 'billing' && (
             <div className="space-y-5">
-              {/* Clinician-facing superbill / fee ticket — review + post charges (P2.3). */}
-              <div className="card-elevated p-5">
-                <SuperbillPanel
-                  patient={patient}
-                  encounterId={(records[0] as { encounterId?: string } | undefined)?.encounterId}
-                  hospitalName={hospitals.find(h => h._id === patient.registrationHospital)?.name}
-                />
-              </div>
+              {/* The superbill / fee ticket (P2.3) is no longer its own card —
+                  its service picker rides the Charges toolbar inside BillingTab
+                  and the draft ticket renders above the charges it prices. */}
               <BillingTab
                 patient={patient}
                 patientBalance={patientBalance}
@@ -1666,6 +1714,8 @@ export default function PatientDetailPage() {
                 setShowPaymentPanel={setShowPaymentPanel}
                 setShowPlanWizard={setShowPlanWizard}
                 reloadPayments={reloadPayments}
+                superbillEncounterId={(records[0] as { encounterId?: string } | undefined)?.encounterId}
+                hospitalName={hospitals.find(h => h._id === patient.registrationHospital)?.name}
               />
             </div>
           )}

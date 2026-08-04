@@ -31,13 +31,13 @@ const searchStep = (route: string): TourStep => ({
 const messagingStep = (route: string): TourStep => ({
   id: 'messaging',
   route,
-  // The launcher, not the dock's own tabs: the tour cannot open the dock, and a
-  // target that only exists while it is open would silently fall back to a
-  // centred card. The launcher is rendered on every screen for every role.
-  target: '[data-tour="messaging-dock"]',
-  title: 'Message your team, hand over a patient',
-  body: 'Direct messages, plus Teams for a whole ward or department in one thread. The Transfers tab is where a handover of care lands for you to accept or decline — urgency is colour-coded down the left edge.',
-  placement: 'left',
+  // The sidebar entry, which every role that can message has. This used to
+  // point at the floating dock launcher; the dock has been removed, so the
+  // nav link is the messaging entry point on every screen.
+  target: 'a.nav-item[href="/messages"]',
+  title: 'Message your team',
+  body: 'Direct messages, plus group threads for a whole ward or department. A handover of care waiting on you appears on your dashboard under “Transfers to accept”.',
+  placement: 'right',
 });
 
 const finishStep = (route: string): TourStep => ({

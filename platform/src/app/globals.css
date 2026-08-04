@@ -1009,6 +1009,16 @@
 /* ============ LIGHT THEME — Blue & White Palette ============ */
 :root {
   /* ── App canvas ── */
+  /* ── Corner radius scale ────────────────────────────────────────────────
+     One scale for the whole app. The chart grew three different treatments
+     independently — 3px on the vitals sub-tabs, 4px-top on the demographics
+     tabs, 6/8px in the notes module — so navigation that sits inches apart
+     did not look related. Controls take --radius-control, surfaces that hold
+     them take --radius-card. */
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-pill: 999px;
+
   --bg-app:        var(--tb-blue-50);
   --bg-primary:    var(--tb-blue-50);
   --bg-secondary:  rgba(33, 145, 208, 0.08);
@@ -5820,14 +5830,13 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   list-style: none;
 }
 
-/* Five rows, then scroll (measured: 54.7px row + 4px gap → 5 rows = 290px).
-   Keeps the card a fixed size no matter how deep the backlog is, so the cards
-   below stay reachable in the rail; a sixth row peeks under the fifth as the
-   scroll cue. Raised from four at the user's direction: the "view all" footer
-   sat close enough to the header that the card read as mostly empty chrome,
-   so the list now carries one more row of real work before it. */
+/* Three rows, then scroll (measured: 54.7px row + 4px gap → 3 rows = 172px,
+   plus 8px so the top of the fourth row peeks in as the scroll cue). Keeps the
+   card a fixed size no matter how deep the backlog is, so the cards below stay
+   reachable in the rail. Cut from five at the user's direction: three rows is
+   the glance, the scroll and the "view all" footer carry the depth. */
 .ehr-action-feed.is-scrollable {
-  max-height: 290px;
+  max-height: 180px;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Overlay scrollbar: with the rows now edge-to-edge there is no gutter to
@@ -5842,6 +5851,17 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   border-radius: 999px;
 }
 .ehr-action-feed.is-scrollable::-webkit-scrollbar-track { background: transparent; }
+
+/* Empty state: the card stays mounted when there is nothing to act on, so the
+   rail keeps its shape and the quiet is stated, not inferred from a missing
+   card. Muted ink — "all caught up" is the one row that should not compete. */
+.ehr-action-empty {
+  margin: 0;
+  padding: 14px 2px 8px;
+  color: var(--ehr-text-muted, var(--text-secondary));
+  font-size: 13px;
+  font-weight: 500;
+}
 
 .ehr-action-row {
   width: 100%;
@@ -6798,6 +6818,67 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   border-color: var(--ehr-blue);
   background: var(--ehr-blue);
   color: #fff;
+}
+
+/* ── Room / doctor / nurse, side by side ─────────────────────────────────────
+   Each control on its own full-width line cost three stacked blocks of vertical
+   space in a row panel that has little to spare. As a grid they sit in one line
+   on a normal panel and fall back to two, then one, as the panel narrows. */
+.ehr-care-assign-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 14px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ehr-border);
+}
+
+/* Each control is two lines inside its column: the icon and its name on the
+   first, then the picker with its button beside it. Two lines instead of four,
+   and the button no longer repeats the name above it. */
+.ehr-care-assign-grid .ehr-care-rooming {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ehr-care-assign-grid .ehr-care-rooming > svg {
+  grid-row: 1;
+  grid-column: 1;
+  flex-shrink: 0;
+}
+
+.ehr-care-assign-grid .ehr-care-rooming > span:first-of-type {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+/* Picker and button share the second line. */
+.ehr-care-assign-grid .ehr-care-rooming > select {
+  grid-row: 2;
+  grid-column: 1 / 3;
+  min-width: 0;
+}
+
+.ehr-care-assign-grid .ehr-care-rooming > button {
+  grid-row: 2;
+  grid-column: 3;
+  white-space: nowrap;
+}
+
+/* The acuity word rides the header line at the end, so every control in the row
+   is exactly two lines tall and their pickers line up. */
+.ehr-care-assign-grid .ehr-care-rooming > span:last-of-type:not(:first-of-type) {
+  grid-row: 1;
+  grid-column: 3;
+  justify-self: end;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .ehr-care-workflow {
@@ -8982,7 +9063,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   padding: 0 16px;
   border: 1px solid #D7DEDD;
   border-bottom: 0;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
   background: #fff;
   color: #69807E;
   font-size: 13px;
@@ -10513,7 +10594,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   min-width: 92px;
   height: 30px;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--ehr-muted);
   font-size: var(--type-size-caption);
@@ -18545,10 +18626,85 @@ textarea.ehr-handoff-input {
   color: var(--semantic-danger);
 }
 
-.appointment-status-pill.status-requested {
+/* Scheduled and Reminder Sent had no colour rule, so they alone rendered as the
+   plain white base pill while every other status showed tinted — the Scheduled
+   tab's picker looked like a different control from the In Office one. Both are
+   "booked, waiting on the patient", so they share one calm blue. */
+.appointment-status-pill.status-scheduled,
+.appointment-status-pill.status-reminder-sent {
+  border-color: var(--ehr-blue);
+  background: var(--ehr-blue-light);
+  color: var(--ehr-blue-strong, var(--ehr-blue));
+}
+
+.appointment-status-pill.status-requested,
+/* Rescheduled reads as "someone moved this", the same kind of pending-action
+   signal a portal request is, so it borrows that tone rather than inventing one. */
+.appointment-status-pill.status-rescheduled {
   border-color: var(--semantic-request-border);
   background: var(--semantic-request-bg);
   color: var(--semantic-request);
+}
+
+/* Reminder sent is still just "booked, waiting on the patient" — the neutral
+   base pill, no tint. Arrived is the first rung where the patient is actually
+   in the building, so it takes the attention tone the desk scans for. */
+.appointment-status-pill.status-arrived {
+  border-color: var(--semantic-warning-border);
+  background: var(--semantic-warning-bg);
+  color: var(--semantic-warning);
+}
+
+/* ── The status pill IS the control ──────────────────────────────────────────
+   A native <select> sized over the pill: the row keeps the chip everyone reads
+   at a glance, and changing where a booking sits is one click on the thing that
+   states it — no expanding the row first. Same idea as the chart's condition
+   status picker; kept as a real form control so keyboard and screen readers
+   work for free. */
+.appointment-status-pill--select {
+  position: relative;
+  padding-right: 24px;
+  cursor: pointer;
+}
+
+.appointment-status-pill--select > select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  /* Transparent, not hidden: the select stays the hit target and keeps its
+     native dropdown, while the pill underneath paints the look. */
+  opacity: 0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.appointment-status-pill--select > select:disabled {
+  cursor: default;
+}
+
+/* The caret that says "this can change". */
+.appointment-status-pill--select::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  width: 0;
+  height: 0;
+  margin-top: -1px;
+  border-top: 4px solid currentColor;
+  border-right: 3.5px solid transparent;
+  border-left: 3.5px solid transparent;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.appointment-status-pill--select:focus-within {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
 }
 
 .checkin-patient-summary {
@@ -18898,6 +19054,13 @@ textarea.ehr-handoff-input {
 .listpage-icon-btn:hover {
   background: rgba(33, 145, 208, 0.08);
   border-color: var(--accent-border);
+}
+/* Filters button while filters are applied — same tinted state the icon-select
+   funnel uses, so the two read as one control family. */
+.listpage-icon-btn.is-active {
+  border-color: var(--accent-primary);
+  background: rgba(33, 145, 208, 0.10);
+  color: var(--accent-primary);
 }
 .listpage-icon-btn-primary {
   background: var(--accent-primary);
@@ -22442,6 +22605,9 @@ table.patient-data-table.patient-data-table {
   background: #fff !important;
 }
 
+/* `capitalize`, not `uppercase`: the appointments board and the module
+   worklists both title-case their column labels, and the registry was the one
+   screen still shouting them. */
 .patient-data-head-cell span {
   overflow: hidden;
   color: inherit;
@@ -22449,7 +22615,7 @@ table.patient-data-table.patient-data-table {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
-  text-transform: uppercase;
+  text-transform: capitalize;
   white-space: nowrap;
 }
 
@@ -22470,12 +22636,12 @@ table.patient-data-table.patient-data-table {
 
 .patient-data-row .patient-data-cell:first-child {
   border-left: 1px solid var(--ehr-border);
-  border-radius: 12px 0 0 12px;
+  border-radius: 14px 0 0 14px;
 }
 
 .patient-data-row .patient-data-cell:last-child {
   border-right: 1px solid var(--ehr-border);
-  border-radius: 0 12px 12px 0;
+  border-radius: 0 14px 14px 0;
 }
 
 .patient-data-row:hover .patient-data-cell,
@@ -22591,6 +22757,234 @@ table.patient-data-table.patient-data-table {
 
   .patient-data-head-cell.is-right.has-row-action {
     padding-right: 60px;
+  }
+}
+
+/* ============ Shared module list surface (.ehr-list-scroll) ============
+   One row language for every module worklist — lab, referrals, pharmacy,
+   births, deaths, equipment and the rest — so moving between them does not
+   change the shape of the screen.
+
+   The appointments board is the reference. It escapes the app-wide table
+   theming only because it is a div grid rather than a <table>, which is why
+   every other module read as a different product. This block reproduces its
+   metrics (16px gutters, 8px between rows, 64px rows, 14px radius, hairline
+   border that turns blue on hover) for a plain `.data-table`, so a page opts
+   in by putting `ehr-list-scroll` on its scroll container — no per-cell
+   classes, no markup rewrite.
+
+   `!important` and the `.tamam-ehr-app` prefix are both required: the role
+   theme sets `border-collapse: collapse`, a tinted sentence-case header, and
+   a bottom rule on every cell, all with `!important`. Those are exactly the
+   three things that flatten a card row back into a spreadsheet row. */
+.ehr-list-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  /* The inline padding every page's scroll container carried before this class
+     replaced them — sides only, no vertical inset. */
+  padding: 0 16px;
+  background: #fff;
+}
+
+.tamam-ehr-app .ehr-list-scroll .data-table,
+.ehr-list-scroll .data-table {
+  border-collapse: separate !important;
+  /* The 8px gutter between rows the appointments board has. */
+  border-spacing: 0 8px;
+}
+
+/* ── Column header: quiet sticky band, no tint ── */
+.ehr-list-scroll .data-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+}
+
+.tamam-ehr-app .ehr-list-scroll .data-table thead th,
+.ehr-list-scroll .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 0 16px 6px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.2;
+  text-align: left;
+  text-transform: capitalize !important;
+  white-space: nowrap;
+}
+
+/* Trailing status/action columns hang right where a page asks for it — the
+   header label is nudged in so it sits over the pill's text rather than its
+   border, same as `.appointment-card-head span:last-child`. Opt-in rather
+   than automatic on `:last-child`: plenty of these tables end on a date or a
+   place name, which reads wrong flushed right. */
+/* `!important` because the `.tamam-ehr-app`-prefixed header rule above is one
+   element more specific than any selector that can name a single column. */
+.ehr-list-scroll .data-table th.is-right,
+.ehr-list-scroll .data-table td.is-right,
+.ehr-list-scroll .data-table th.text-right,
+.ehr-list-scroll .data-table td.text-right {
+  text-align: right !important;
+}
+
+.ehr-list-scroll .data-table thead th.is-right,
+.ehr-list-scroll .data-table thead th.text-right {
+  padding-right: 22px !important;
+}
+
+/* ── Rows: bordered cards, not ruled lines ── */
+.tamam-ehr-app .ehr-list-scroll .data-table tbody td,
+.ehr-list-scroll .data-table tbody td {
+  padding: 9px 16px;
+  border-top: 1px solid var(--ehr-border) !important;
+  border-bottom: 1px solid var(--ehr-border) !important;
+  background: var(--bg-card-solid, #fff);
+  color: var(--text-primary);
+  font-size: 13px;
+  vertical-align: middle;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ehr-list-scroll .data-table tbody tr {
+  height: 64px;
+}
+
+.tamam-ehr-app .ehr-list-scroll .data-table tbody td:first-child,
+.ehr-list-scroll .data-table tbody td:first-child {
+  border-left: 1px solid var(--ehr-border) !important;
+  border-radius: 14px 0 0 14px;
+}
+
+.tamam-ehr-app .ehr-list-scroll .data-table tbody td:last-child,
+.ehr-list-scroll .data-table tbody td:last-child {
+  border-right: 1px solid var(--ehr-border) !important;
+  border-radius: 0 14px 14px 0;
+}
+
+/* The whole row lights up, not just the cell under the cursor — the row is
+   the card. `tr:hover` alone cannot paint a border because the border lives
+   on the cells. */
+.tamam-ehr-app .ehr-list-scroll .data-table tbody tr:hover td,
+.ehr-list-scroll .data-table tbody tr:hover td,
+.ehr-list-scroll .data-table tbody tr:focus-visible td {
+  border-color: var(--ehr-blue) !important;
+  background: #fff;
+}
+
+/* `.data-table tbody tr:last-child td { border-bottom: none }` would clip the
+   final card's bottom edge. */
+.ehr-list-scroll .data-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--ehr-border) !important;
+}
+
+/* Flagged rows (an overdue review, an expiring unit). The tint has to sit on
+   the cells: each cell paints its own white card background, so a `background`
+   on the <tr> never shows through. The left rail marks the row at a glance
+   without relying on colour alone carrying the meaning. */
+.ehr-list-scroll .data-table tbody tr.is-danger td,
+.ehr-list-scroll .data-table tbody tr.is-danger:hover td {
+  background: rgba(229, 46, 66, 0.08);
+}
+
+.ehr-list-scroll .data-table tbody tr.is-danger td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-danger);
+}
+
+.ehr-list-scroll .data-table tbody tr.is-warning td,
+.ehr-list-scroll .data-table tbody tr.is-warning:hover td {
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.ehr-list-scroll .data-table tbody tr.is-warning td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-warning);
+}
+
+/* ── Cell typography: the appointments primary/secondary pair ──
+   `<strong>`/`<b>` is the primary line, `<small>`/`<span class="ehr-list-sub">`
+   the caption under it, matching `.appointment-card-provider`. */
+.ehr-list-scroll .ehr-list-main {
+  display: block;
+  min-width: 0;
+}
+
+.ehr-list-scroll .ehr-list-main b,
+.ehr-list-scroll .ehr-list-main strong,
+.ehr-list-scroll .ehr-list-main small,
+.ehr-list-scroll .ehr-list-main span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-list-scroll .ehr-list-main b,
+.ehr-list-scroll .ehr-list-main strong {
+  color: var(--ehr-text, var(--text-primary));
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.ehr-list-scroll .ehr-list-main small,
+.ehr-list-scroll .ehr-list-main span {
+  margin-top: 3px;
+  color: var(--ehr-muted, var(--text-muted));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+/* Status column: pill above, operational cue beneath, both right-aligned —
+   `.appointment-card-status`. */
+.ehr-list-scroll .ehr-list-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ehr-list-scroll .ehr-list-status small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  padding-right: 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .ehr-list-scroll {
+    padding: 8px;
+  }
+
+  .tamam-ehr-app .ehr-list-scroll .data-table thead th,
+  .ehr-list-scroll .data-table thead th,
+  .tamam-ehr-app .ehr-list-scroll .data-table tbody td,
+  .ehr-list-scroll .data-table tbody td {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .ehr-list-scroll .data-table thead th:last-child {
+    padding-right: 18px !important;
   }
 }
 
@@ -23595,24 +23989,10 @@ table.patient-data-table.patient-data-table {
   box-shadow: none !important;
 }
 
-/* Caret sits ahead of the avatar so the identity column keeps its shape and
-   the row grid is untouched. */
-.ehr-row-caret {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  flex: 0 0 18px;
-  margin-right: 2px;
-  color: var(--text-muted);
-  transition: transform 0.15s ease;
-}
-
-.ehr-appointment-group.is-expanded .ehr-row-caret {
-  transform: rotate(180deg);
-  color: var(--accent-primary);
-}
-
+/* Left inset lines the detail up with the row's avatar column, the same place
+   the doctor dashboard's expanded visit starts. It was 44px — sized for the
+   caret that used to sit ahead of the avatar — which left every expanded row
+   indented a caret-width further than the doctor's. */
 .ehr-row-detail {
   padding: 4px 20px 16px 44px;
   border-top: 0;
@@ -23780,3 +24160,866 @@ table.patient-data-table.patient-data-table {
 
 /* A dashboard-supplied panel lays itself out; the shell only gives it room. */
 .ehr-row-detail__custom { display: block; }
+
+/* Billing & insurance readout in the appointment edit form — label/value pairs
+   in the same two-column ledger shape as the appointment detail rows, so the
+   panel reads as part of the form rather than a nested card. */
+.appointment-billing-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 4px 18px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--overlay-subtle);
+}
+
+.appointment-billing-panel > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 22px;
+}
+
+.appointment-billing-panel dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.appointment-billing-panel dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ── Row detail: the icon actions ride the phone/hospital-number line ────────
+   The icons used to own a full-width strip above the facts, which cost a line
+   of panel height for four buttons. Laying the detail out as one flex row puts
+   them at the end of the facts line instead; everything below (status picker,
+   assignment grid, allergy note) still takes its own full-width line. */
+.ehr-row-detail__custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 16px;
+}
+
+.ehr-row-detail__custom > .ehr-row-detail__body {
+  order: 1;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.ehr-row-detail__custom > .ehr-visit-pop-tabs {
+  order: 2;
+  width: auto;
+  margin-left: auto;
+  padding: 0;
+  border-bottom: 0;
+}
+
+/* Everything else keeps its own line, below that first one. */
+.ehr-row-detail__custom > .ehr-care-rooming,
+.ehr-row-detail__custom > .ehr-care-assign-grid,
+.ehr-row-detail__custom > .ehr-care-alert,
+.ehr-row-detail__custom > p {
+  order: 3;
+  flex: 1 1 100%;
+}
+
+/* The assignment grid's divider is the line under the facts row now. */
+.ehr-row-detail__custom > .ehr-care-assign-grid {
+  margin-top: 2px;
+}
+
+/* The fact rows in a queue-row panel drop their underline and their padding:
+   three short label/value pairs sitting in their own columns need no rule
+   beneath each one, and the line plus its padding cost more vertical space in
+   the panel than the values themselves. The rule stays everywhere else
+   `.appointment-detail-row` is used (the appointment modals), where facts are
+   stacked in a single column and the separators do the reading work. */
+.ehr-row-detail__custom .appointment-detail-row {
+  padding: 0;
+  border-bottom: 0;
+}
+
+/* With the underline gone, the facts line needs no gap below it either. */
+.ehr-row-detail__custom > .ehr-row-detail__body {
+  row-gap: 6px;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* ── Edit appointment: three columns ────────────────────────────────────────
+   Who and when on the left, who is on the visit in the middle, what it costs on
+   the right — the reference layout. One column on a narrow screen, since a
+   three-across form is unusable below tablet width. */
+.appt-edit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: 18px 26px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .appt-edit-grid { grid-template-columns: 1fr; }
+}
+
+.appt-edit-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Section titles: the design's bold group headings, with a hairline under the
+   first line of the group rather than a heavy divider. */
+.appt-edit-section {
+  margin: 6px 0 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.appt-edit-col > .appt-edit-section:first-child {
+  margin-top: 0;
+}
+
+/* Date / time / duration side by side, as the design has them. */
+.appt-edit-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+
+/* The shared edit-appointment dialog: header, three-column body, footer. */
+.appt-edit-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px 20px;
+  background: var(--bg-card-solid, var(--bg-card));
+  border-radius: 14px;
+}
+
+.appt-edit-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.appt-edit-head h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.appt-edit-head span {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.appt-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light);
+}
+
+/* ══════════ Edit appointment: the reference dialog's finish ══════════
+ * Closes the gap to the design: a tinted header band, sentence-case field
+ * labels (globals force-uppercases every `<label>`, which is why they read as
+ * VISIT REASON here), section headings without a rule under them, plain
+ * billing rows instead of a filled panel, and a footer band.
+ */
+.appt-edit-shell {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Header band, full width of the dialog. */
+.appt-edit-shell .appt-edit-head {
+  align-items: baseline;
+  margin: 0;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--overlay-subtle);
+}
+
+.appt-edit-shell .appt-edit-head h2 {
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.appt-edit-shell .appt-edit-grid {
+  padding: 20px 22px 22px;
+  gap: 20px 30px;
+}
+
+/* Field labels: sentence case, quiet, close to their control. */
+.appt-edit-shell label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* One control shape everywhere in the dialog. */
+.appt-edit-shell select,
+.appt-edit-shell input:not([type='radio']),
+.appt-edit-shell textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-medium, var(--border-light));
+  border-radius: 8px;
+  background: var(--bg-card-solid, #fff);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.appt-edit-shell textarea {
+  min-height: 74px;
+  font-weight: 500;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.appt-edit-shell select:focus,
+.appt-edit-shell input:focus,
+.appt-edit-shell textarea:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+}
+
+/* Section headings carry their weight without a rule beneath them. */
+.appt-edit-shell .appt-edit-section {
+  margin: 10px 0 2px;
+  padding: 0;
+  border-bottom: 0;
+  font-size: 15.5px;
+  font-weight: 800;
+}
+
+.appt-edit-shell .appt-edit-col > .appt-edit-section:first-child {
+  margin-top: 0;
+}
+
+
+
+/* Billing reads as a statement of fact: label left, value right, no plate. */
+.appt-edit-shell .appointment-billing-panel {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.appt-edit-shell .appointment-billing-panel dt {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.appt-edit-shell .appointment-billing-panel dd {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+/* Mode radios sit on one line with room to breathe. */
+.appt-edit-shell input[type='radio'] {
+  accent-color: var(--accent-primary);
+}
+
+/* Footer band mirrors the header. */
+.appt-edit-shell .appt-edit-actions {
+  margin: 0;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-light);
+  background: var(--overlay-subtle);
+}
+
+.appt-edit-shell .appt-edit-actions .btn {
+  min-width: 104px;
+  min-height: 38px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+/* The edit form as a row dropdown: no dialog chrome, no header/footer bands —
+   it sits in the row's own panel the way the doctor dashboard's visit detail
+   does, and the row's caret/click is what opens and closes it. */
+.appt-edit-shell.is-inline {
+  border-radius: 0;
+  background: transparent;
+}
+
+.appt-edit-shell.is-inline .appt-edit-grid {
+  padding: 4px 0 8px;
+  gap: 16px 28px;
+}
+
+.appt-edit-shell.is-inline .appt-edit-actions {
+  padding: 12px 0 2px;
+  border-top: 1px solid var(--border-light);
+  background: transparent;
+}
+
+/* ── The row dropdown, tightened ─────────────────────────────────────────────
+ * The row above already names the patient, so the identity plate is dropped
+ * here (it stays in the dialog, which has no row to read it from). Fields pair
+ * two per line inside each column; only headings, the date row, textareas and
+ * the billing readout take a full line. */
+/* Two columns, not three: a row panel is ~800px wide, and three columns left
+   every field about 250px — labels truncated and the billing pairs collided.
+   Fields keep one per line inside a column; only date/time/duration pair up. */
+.appt-edit-shell.is-inline .appt-edit-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.appt-edit-shell.is-inline .appt-edit-col {
+  gap: 10px;
+}
+
+/* Date, time and duration stay three across on their own line. */
+.appt-edit-shell.is-inline .appt-edit-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+/* A panel inside a list row is denser than a dialog: shorter controls, quieter
+   labels, headings that separate without shouting. */
+.appt-edit-shell.is-inline select,
+.appt-edit-shell.is-inline input:not([type='radio']),
+.appt-edit-shell.is-inline textarea {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.appt-edit-shell.is-inline textarea {
+  min-height: 56px;
+}
+
+.appt-edit-shell.is-inline label {
+  margin-bottom: 3px;
+  font-size: 11.5px;
+}
+
+.appt-edit-shell.is-inline .appt-edit-section {
+  margin: 6px 0 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13.5px;
+}
+
+/* The conflict line is a sentence, not a column — let it run the full width. */
+.appt-edit-shell.is-inline .appt-edit-col > p {
+  margin: 2px 0 0;
+  line-height: 1.4;
+}
+
+.appt-edit-shell.is-inline .appointment-billing-panel {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+/* Actions pin to the bottom of the panel so Save is reachable without hunting
+   for it below the fold. */
+.appt-edit-shell.is-inline .appt-edit-actions {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 0;
+  background: var(--bg-card-solid, #fff);
+}
+
+/* ── Row dropdown: cards, accent headings, tinted callouts ───────────────────
+ * The panel was a flat field of inputs on the row's own white. Each column
+ * becomes a bordered card, headings take the accent colour with a rule under
+ * them, and the two callouts that carry meaning — the provider clash and the
+ * billing readout — get tinted plates so they read before the fields do. */
+.appt-edit-shell.is-inline .appt-edit-grid {
+  padding: 10px 0 4px;
+  gap: 12px;
+}
+
+.appt-edit-shell.is-inline .appt-edit-col {
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background: var(--bg-card-solid, #fff);
+}
+
+.appt-edit-shell.is-inline .appt-edit-section {
+  margin: 12px 0 2px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--accent-primary);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.appt-edit-shell.is-inline .appt-edit-col > .appt-edit-section:first-child {
+  margin-top: 0;
+}
+
+/* Controls: quiet fill, so a filled field reads as data and an empty one as a
+   gap, without every box shouting with a hard border. */
+.appt-edit-shell.is-inline select,
+.appt-edit-shell.is-inline input:not([type='radio']),
+.appt-edit-shell.is-inline textarea {
+  border-color: var(--border-light);
+  background: var(--overlay-subtle);
+}
+
+.appt-edit-shell.is-inline select:hover,
+.appt-edit-shell.is-inline input:not([type='radio']):hover {
+  border-color: var(--border-medium, var(--border-light));
+  background: var(--bg-card-solid, #fff);
+}
+
+.appt-edit-shell.is-inline select:focus,
+.appt-edit-shell.is-inline input:focus,
+.appt-edit-shell.is-inline textarea:focus {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-solid, #fff);
+  box-shadow: 0 0 0 3px rgba(33, 145, 208, 0.14);
+}
+
+/* The clash is the one thing in here that stops a receptionist — plate it. */
+.appt-edit-shell.is-inline .appt-edit-col > p {
+  align-items: flex-start;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+/* Billing reads as a small statement card, not loose text. */
+.appt-edit-shell.is-inline .appointment-billing-panel {
+  padding: 10px 12px;
+  border: 1px solid var(--accent-border, rgba(33, 145, 208, 0.22));
+  border-radius: 10px;
+  background: var(--accent-light, rgba(33, 145, 208, 0.06));
+}
+
+.appt-edit-shell.is-inline .appointment-billing-panel dt {
+  color: var(--text-secondary);
+}
+
+.appt-edit-shell.is-inline .appointment-billing-panel dd {
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+/* Mode radios sit in their own inset so the pair reads as one choice. */
+.appt-edit-shell.is-inline .appt-edit-col > div:first-of-type > div[style*="flex"] {
+  gap: 16px;
+}
+
+/* Action bar: a tinted foot to the panel, buttons right. */
+.appt-edit-shell.is-inline .appt-edit-actions {
+  margin-top: 2px;
+  padding: 10px 2px 2px;
+  border-top: 1px solid var(--border-light);
+  background: transparent;
+}
+
+/* Tabbed row dropdown: one group of fields at a time, so the panel is the same
+   height whichever tab is open — the doctor dashboard's visit panel behaviour,
+   using its own tab strip so the two read as one control. */
+.appt-edit-shell.is-inline .ehr-visit-pop-tabs {
+  margin-bottom: 10px;
+}
+
+.appt-edit-shell.is-inline .appt-edit-grid {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+
+/* With one group visible the card can breathe into two field columns. */
+.appt-edit-shell.is-inline .appt-edit-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  align-content: start;
+}
+
+.appt-edit-shell.is-inline .appt-edit-col > .appt-edit-section,
+.appt-edit-shell.is-inline .appt-edit-col > .appt-edit-row,
+.appt-edit-shell.is-inline .appt-edit-col > .appointment-billing-panel,
+.appt-edit-shell.is-inline .appt-edit-col > p,
+.appt-edit-shell.is-inline .appt-edit-col > div:has(textarea) {
+  grid-column: 1 / -1;
+}
+
+/* ══════════ Row dropdown, matched to the doctor's visit panel ══════════
+ * That panel is flat: no cards, no tinted fields, no coloured headings — a left
+ * label column against its value, hairline rules between rows, and the tab strip
+ * carrying the only accent. This makes the appointment dropdown read the same,
+ * overriding the card treatment above. */
+.appt-edit-shell.is-inline .appt-edit-col {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Label left, control right, rule under each row — the doctor panel's rhythm. */
+.appt-edit-shell.is-inline .appt-edit-col > div {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: center;
+  gap: 0 18px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--ehr-border-soft, #E5EDF5);
+}
+
+.appt-edit-shell.is-inline .appt-edit-col > div:last-child {
+  border-bottom: 0;
+}
+
+.appt-edit-shell.is-inline .appt-edit-col > div > label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Section names sit in the label column's own line, quiet and dark — the panel
+   groups by rhythm, not by colour. */
+.appt-edit-shell.is-inline .appt-edit-section {
+  margin: 14px 0 0;
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--ehr-border-soft, #E5EDF5);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Controls read as values, not as boxes: no fill, edge only where it is needed
+   to show the field is editable. */
+.appt-edit-shell.is-inline select,
+.appt-edit-shell.is-inline input:not([type='radio']),
+.appt-edit-shell.is-inline textarea {
+  min-height: 32px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.appt-edit-shell.is-inline select:hover,
+.appt-edit-shell.is-inline input:not([type='radio']):hover,
+.appt-edit-shell.is-inline textarea:hover {
+  border-color: var(--border-light);
+  background: var(--overlay-subtle);
+}
+
+.appt-edit-shell.is-inline select:focus,
+.appt-edit-shell.is-inline input:focus,
+.appt-edit-shell.is-inline textarea:focus {
+  border-color: var(--accent-primary);
+  background: #fff;
+}
+
+/* Date / time / duration keep their own line, still label-left. */
+.appt-edit-shell.is-inline .appt-edit-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--ehr-border-soft, #E5EDF5);
+}
+
+.appt-edit-shell.is-inline .appt-edit-row > div {
+  display: block;
+  padding: 0;
+  border: 0;
+}
+
+.appt-edit-shell.is-inline .appt-edit-row label {
+  display: block;
+  margin-bottom: 3px;
+}
+
+/* Billing keeps the doctor panel's flat pairs — no plate, no border. */
+.appt-edit-shell.is-inline .appointment-billing-panel {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.appt-edit-shell.is-inline .appointment-billing-panel > div {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 0 18px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--ehr-border-soft, #E5EDF5);
+}
+
+.appt-edit-shell.is-inline .appointment-billing-panel dd {
+  text-align: left;
+}
+
+/* The clash stays a sentence in the flow, red ink, no plate. */
+.appt-edit-shell.is-inline .appt-edit-col > p {
+  display: flex;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--ehr-border-soft, #E5EDF5);
+  border-radius: 0;
+  background: transparent;
+}
+
+.appt-edit-shell.is-inline .appt-edit-actions {
+  padding: 12px 0 2px;
+}
+
+/* One control size across the dropdown. Fields were as wide as whatever row
+   they sat in — full width in a label-left row, half in the location/room pair,
+   smaller again on the tab line — so no two boxes matched. They all take the
+   same height and the same capped width now, whatever row they are in. */
+.appt-edit-shell.is-inline select,
+.appt-edit-shell.is-inline input:not([type='radio']),
+.appt-edit-shell.is-inline textarea {
+  width: 100%;
+  max-width: 248px;
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* The notes box keeps a visible edge — flat styling had left it as an unmarked
+   gap under its label — and two rows so it is the same width as its siblings. */
+.appt-edit-shell.is-inline textarea {
+  min-height: 62px;
+  border-color: var(--border-light);
+  background: var(--overlay-subtle);
+  font-weight: 600;
+}
+
+/* The row detail is a flex row (icons ride the facts line), so the form was a
+   flex item at its default `flex: 0 1 auto` — shrink-to-fit, which is why it
+   sat in a ~660px column while the row ran the full width. */
+.ehr-row-detail__custom > .appt-edit-shell {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+/* Date, time and duration three-across. The generic label-left rule above
+   (`.appt-edit-col > div`) also matches this row and outranks a plain class, so
+   it was handing it a 132px label column plus one field column — two cells, and
+   duration wrapped to a second line. Matching on the element too takes it back. */
+.appt-edit-shell.is-inline .appt-edit-col > div.appt-edit-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 14px;
+  align-items: end;
+}
+
+/* Pull the panel's contents left and close up the spacing: the 132px label
+   column plus an 18px gutter pushed every value a third of the way across the
+   row, leaving a wide empty channel down the middle. Labels take only the width
+   they need, values sit right beside them, and the date trio bunches left
+   instead of spreading across three equal columns. */
+.appt-edit-shell.is-inline .appt-edit-col > div,
+.appt-edit-shell.is-inline .appointment-billing-panel > div {
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 0 10px;
+  padding: 8px 0;
+}
+
+.appt-edit-shell.is-inline .appt-edit-col > div.appt-edit-row {
+  grid-template-columns: repeat(3, max-content);
+  gap: 0 18px;
+  padding: 8px 0;
+}
+
+.appt-edit-shell.is-inline select,
+.appt-edit-shell.is-inline input:not([type='radio']),
+.appt-edit-shell.is-inline textarea {
+  max-width: 208px;
+}
+
+/* Date and duration only need their own width. */
+.appt-edit-shell.is-inline .appt-edit-row select,
+.appt-edit-shell.is-inline .appt-edit-row input {
+  width: auto;
+  max-width: none;
+  min-width: 96px;
+}
+
+/* The appointment form starts where the patient's avatar starts. The row panel
+   carries a 44px left inset — sized for the facts grid it used to hold — which
+   left the form indented 34px past the avatar above it. Scoped with :has() so
+   every other row panel keeps its own inset. */
+.ehr-row-detail:has(.appt-edit-shell) {
+  padding-left: 10px;
+}
+
+/* Billing rows stack, one pair per line. An earlier block in this file makes the
+   panel a two-column grid; with each row itself a label/value grid, two rows
+   landed side by side in cells too narrow for them and the text overlapped.
+   Matching the column and the element outranks that rule. */
+.appt-edit-shell.is-inline .appt-edit-col > div.appointment-billing-panel {
+  display: block;
+}
+
+/* "Open chart" and "Create clinical note" are peers on this line, so they are
+   one shape in two fills: same height, same pill ends, same label type, glyph
+   then words. Only the fill ranks them — outlined for the chart, salmon for the
+   note action. They came from different stylesheets and looked it: a 30px
+   square-cornered button beside a 36px capsule. */
+.ehr-visit-pop-actions .ehr-visit-pop-labelled,
+.ehr-visit-pop-actions .cn-split .cn-btn {
+  height: 32px;
+  min-height: 32px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ehr-visit-pop-actions .ehr-visit-pop-labelled {
+  width: auto;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+}
+
+/* The unlabelled actions (move, start consultation) are the same height and the
+   same rounding, sized to their glyph. `:not()` keeps this off the labelled
+   button, which shares the class and must stay as wide as its words. */
+.ehr-visit-pop-actions .ehr-visit-pop-icon:not(.ehr-visit-pop-labelled) {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+}
+
+/* Telehealth marker beside a patient's name in a worklist row, and the "Get
+   started" button the edit form shows once a visit is set to telehealth. */
+.ehr-row-telehealth {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  color: var(--ehr-blue, var(--accent-primary));
+  vertical-align: middle;
+}
+
+/* Icon only, and sized to itself — as a text button it inherited the panel's
+   full-width control rule and ran the whole row. */
+.appt-telehealth-join {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--ehr-blue, var(--accent-primary));
+  color: #fff;
+  cursor: pointer;
+}
+
+/* The icon set hardcodes a `stroke` attribute, so on a blue fill the glyph was
+   blue-on-blue and invisible — the colour has to be forced on the property. */
+.appt-telehealth-join svg,
+.appt-telehealth-join svg * {
+  stroke: #fff;
+  color: #fff;
+  fill: none;
+}
+
+.appt-telehealth-join:hover {
+  filter: brightness(1.06);
+}
+
+/* Label side matches "Open chart" inset for inset; the caret is a glyph's worth
+   of room past the divider. Both carry `.cn-btn` in the selector to outrank the
+   capsule's own padding in clinical-notes.css, whichever sheet loads last. */
+.ehr-visit-pop-actions .cn-split .cn-btn.cn-split-main {
+  padding: 0 12px 0 14px;
+}
+
+.ehr-visit-pop-actions .cn-split .cn-btn.cn-split-caret {
+  width: auto;
+  padding: 0 10px;
+}
+
+/* A picker with its own Assign button, sharing one row's value column. */
+.appt-assign-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.appt-assign-btn {
+  flex-shrink: 0;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ehr-blue, var(--accent-primary));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.appt-assign-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Labelled main half of the visit panel's split button: it grows to fit its
+   words rather than staying a square icon target. */
+.cn-split-main-label {
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.ehr-visit-pop-actions .cn-split-main {
+  width: auto;
+  padding: 0 12px;
+}

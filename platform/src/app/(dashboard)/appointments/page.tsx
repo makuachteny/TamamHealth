@@ -2,6 +2,12 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { formatClockTime } from '@/lib/format-utils';
+import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
+import AppointmentDetailFields, { type AppointmentDetailFieldValues } from '@/components/appointments/AppointmentDetailFields';
+import {
+  APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_I18N_KEYS,
+  APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_PENDING_STATUSES, priorAppointmentStatus,
+} from '@/lib/appointment-status';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AvailabilityModal from '@/components/AvailabilityModal';
@@ -60,16 +66,15 @@ const FALLBACK_DEPARTMENTS = [
   'Dermatology', 'ENT', 'Outpatient', 'Dental', 'Mental Health', 'Maternity',
 ];
 
-const statusConfig: Record<AppointmentStatus, { color: string; bg: string; label: string }> = {
-  requested:   { color: '#7C3AED', bg: 'rgba(124,58,237,0.10)', label: 'Requested' },
-  scheduled:   { color: '#2191D0', bg: 'rgba(33,145,208,0.10)',  label: 'Scheduled' },
-  confirmed:   { color: '#015697', bg: 'rgba(1,86,151,0.10)',    label: 'Confirmed' },
-  checked_in:  { color: '#D97706', bg: 'rgba(217,119,6,0.10)',   label: 'Checked In' },
-  in_progress: { color: '#059669', bg: 'rgba(5,150,105,0.10)',   label: 'In Progress' },
-  completed:   { color: '#047857', bg: 'rgba(4,120,87,0.10)',    label: 'Completed' },
-  cancelled:   { color: '#DC2626', bg: 'rgba(220,38,38,0.10)',   label: 'Cancelled' },
-  no_show:     { color: '#64748B', bg: 'rgba(100,116,139,0.10)', label: 'No Show' },
-};
+// Colours and labels both come from the shared vocabulary, so this list and
+// the chart's status dropdown can no longer disagree about what a status is
+// called (it used to say "In Progress" where the chart said "Roomed").
+const statusConfig = Object.fromEntries(
+  (Object.keys(APPOINTMENT_STATUS_LABELS) as AppointmentStatus[]).map(status => [
+    status,
+    { ...APPOINTMENT_STATUS_COLORS[status], label: APPOINTMENT_STATUS_LABELS[status] },
+  ]),
+) as Record<AppointmentStatus, { color: string; bg: string; label: string }>;
 
 const priorityConfig: Record<AppointmentPriority, { color: string; label: string }> = {
   routine: { color: 'var(--color-success)', label: 'Routine' },
@@ -135,6 +140,9 @@ export default function AppointmentsPage() {
     canAdvanceAppointments,
     canExportAppointments,
   } = usePermissions();
+  // Anyone who can move a booking along the ladder gets the pill-as-picker;
+  // read-only roles keep a plain pill.
+  const canChangeAppointmentStatus = canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments;
   const { showToast } = useToast();
   const { t } = useTranslation();
   const { departments: facilityDepartments } = useSettings();
@@ -149,13 +157,7 @@ export default function AppointmentsPage() {
     dental: 'appointments.typeDental', mental_health: 'appointments.typeMentalHealth',
     walk_in: 'appointments.typeWalkIn',
   };
-  const statusLabelKey: Record<AppointmentStatus, string> = {
-    requested: 'appointments.statusRequested',
-    scheduled: 'appointments.statusScheduled', confirmed: 'appointments.statusConfirmed',
-    checked_in: 'appointments.statusCheckedIn', in_progress: 'appointments.statusInProgress',
-    completed: 'appointments.statusCompleted', cancelled: 'appointments.statusCancelled',
-    no_show: 'appointments.statusNoShow',
-  };
+  const statusLabelKey = APPOINTMENT_STATUS_I18N_KEYS;
   const priorityLabelKey: Record<AppointmentPriority, string> = {
     routine: 'appointments.priorityRoutine', urgent: 'appointments.priorityUrgent',
     emergency: 'appointments.priorityEmergency',
@@ -271,6 +273,14 @@ export default function AppointmentsPage() {
   const [formDuration, setFormDuration] = useState(30);
   const [formType, setFormType] = useState<AppointmentType>('general');
   const [formPriority, setFormPriority] = useState<AppointmentPriority>('routine');
+  // Where the booking sits on the desk's ladder. A new booking starts at
+  // Scheduled; the edit form loads whatever the appointment already is.
+  const [formStatus, setFormStatus] = useState<AppointmentStatus>('scheduled');
+  // Mode / location / staff / room / recurrence — the group under the status
+  // dropdown in the edit form. One object so the child patches it in one call.
+  const [formDetail, setFormDetail] = useState<AppointmentDetailFieldValues>({
+    mode: 'in_office', recurrence: '', staffId: '', staffName: '', room: '',
+  });
   const [formDepartment, setFormDepartment] = useState('Outpatient');
   const [formReason, setFormReason] = useState('');
   const [formNotes, setFormNotes] = useState('');
@@ -361,12 +371,23 @@ export default function AppointmentsPage() {
     setFormPatient(''); setFormDate(jubaDate()); setFormTime('09:00');
     setFormDuration(30); setFormType('general'); setFormPriority('routine');
     setFormDepartment('Outpatient'); setFormReason(''); setFormNotes(''); setFormRecurring(false);
+    setFormStatus('scheduled');
   };
 
   const loadEditForm = (apt: typeof appointments[0]) => {
     setFormDate(apt.appointmentDate); setFormTime(apt.appointmentTime); setFormDuration(apt.duration);
     setFormType(apt.appointmentType); setFormPriority(apt.priority); setFormDepartment(apt.department);
     setFormProvider(apt.providerName); setFormReason(apt.reason); setFormNotes(apt.notes || '');
+    setFormStatus(apt.status);
+    setFormDetail({
+      // Legacy rows have no mode; a telehealth *type* is how a remote visit used
+      // to be recorded, so it still reads as telehealth.
+      mode: apt.appointmentMode || (apt.appointmentType === 'telehealth' ? 'telehealth' : 'in_office'),
+      recurrence: apt.isRecurring ? (apt.recurrencePattern || 'weekly') : '',
+      staffId: apt.staffId || '',
+      staffName: apt.staffName || '',
+      room: apt.room || '',
+    });
   };
 
   const handleSubmit = async () => {
@@ -384,7 +405,7 @@ export default function AppointmentsPage() {
         facilityName: currentUser?.hospitalName || '', facilityLevel: 'payam' as FacilityLevel,
         appointmentDate: formDate, appointmentTime: formTime, duration: formDuration,
         appointmentType: formType, priority: formPriority, department: formDepartment,
-        reason: formReason, notes: formNotes || undefined, status: 'scheduled',
+        reason: formReason, notes: formNotes || undefined, status: formStatus,
         reminderSent: false, isRecurring: formRecurring,
         recurrencePattern: formRecurring ? formRecurrencePattern : undefined,
         bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
@@ -422,15 +443,10 @@ export default function AppointmentsPage() {
     catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
   }, [updateStatus, showToast, t, statusLabelKey]);
 
-  // Map a status to the step it can be reversed back to. Reversing reuses the
-  // same updateAppointmentStatus path (which accepts any target status), so an
-  // accidental confirm / check-in / start can be undone, and a cancelled,
-  // completed, or no-show appointment can be reopened to 'scheduled'.
-  const PRIOR_STATUS: Partial<Record<AppointmentStatus, AppointmentStatus>> = {
-    confirmed: 'scheduled',
-    checked_in: 'confirmed',
-    in_progress: 'checked_in',
-  };
+  // Reversing a step reuses the same updateAppointmentStatus path (which
+  // accepts any target status), so an accidental remind / confirm / check-in
+  // can be undone. `priorAppointmentStatus` reads the rung off the shared
+  // ladder, so a new status joins the undo path without a second map here.
 
   const handleReschedule = async () => {
     if (!rescheduleId || !rescheduleDate || !rescheduleTime) return;
@@ -459,7 +475,9 @@ export default function AppointmentsPage() {
 
   const dayStats = useMemo(() => {
     const checkedIn = dayList.filter(a => a.status === 'checked_in' || a.status === 'in_progress' || a.status === 'completed').length;
-    const notArrived = dayList.filter(a => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'requested').length;
+    // Reminded and arrived-but-not-checked-in count as not yet arrived at the
+    // desk, so the stat keeps meaning "still to walk up to the window".
+    const notArrived = dayList.filter(a => a.status === 'requested' || APPOINTMENT_PENDING_STATUSES.includes(a.status)).length;
     const svcCounts = new Map<AppointmentType, number>();
     for (const a of dayList) svcCounts.set(a.appointmentType, (svcCounts.get(a.appointmentType) || 0) + 1);
     let topService: { type: AppointmentType; count: number } | null = null;
@@ -544,6 +562,16 @@ export default function AppointmentsPage() {
       </div>
 
       <div className="ehr-row-detail__actions">
+        {/* The whole ladder, same control the front desk uses. The buttons
+            beside it are shortcuts for the steps taken constantly; this is how
+            any other rung — reminded, arrived, rescheduled — gets set. */}
+        {(canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments) && (
+          <AppointmentStatusSelect
+            status={apt.status}
+            layout="bare"
+            onChange={status => { onDone(); handleStatusChange(apt._id, status); }}
+          />
+        )}
         {canDoTelehealth && apt.appointmentType === 'telehealth' && apt.status !== 'cancelled' && apt.status !== 'completed' && (
           <button onClick={() => { onDone(); router.push(`/telehealth/visit/${encodeURIComponent(apt._id)}`); }} className="btn btn-primary btn-sm" style={{ gap: 6, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
             <Video size={14} /> Join session
@@ -552,10 +580,10 @@ export default function AppointmentsPage() {
         <button onClick={() => { onDone(); router.push(`/patients/${apt.patientId}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
           <User size={14} /> Open patient record
         </button>
-        {canConfirmAppointments && (apt.status === 'requested' || apt.status === 'scheduled') && (
+        {canConfirmAppointments && (apt.status === 'requested' || apt.status === 'scheduled' || apt.status === 'reminder_sent') && (
           <button onClick={() => { onDone(); handleStatusChange(apt._id, 'confirmed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionApprove')}</button>
         )}
-        {canCheckInAppointments && (apt.status === 'requested' || apt.status === 'scheduled' || apt.status === 'confirmed') && (
+        {canCheckInAppointments && (apt.status === 'requested' || APPOINTMENT_PENDING_STATUSES.includes(apt.status)) && (
           <button onClick={() => { onDone(); handleStatusChange(apt._id, 'checked_in'); }} className="btn btn-secondary btn-sm">{t('appointments.actionCheckIn')}</button>
         )}
         {canAdvanceAppointments && apt.status === 'checked_in' && (
@@ -570,10 +598,13 @@ export default function AppointmentsPage() {
         {canManageAppointmentSchedule && (
           <button onClick={() => { setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); onDone(); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
         )}
-        {(canManageAppointmentSchedule || canCheckInAppointments || canAdvanceAppointments) && PRIOR_STATUS[apt.status] && (
-          <button onClick={() => { onDone(); handleStatusChange(apt._id, PRIOR_STATUS[apt.status]!); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
+        {(canManageAppointmentSchedule || canCheckInAppointments || canAdvanceAppointments)
+          && !APPOINTMENT_CLOSED_STATUSES.includes(apt.status) && priorAppointmentStatus(apt.status) && (
+          <button onClick={() => { onDone(); handleStatusChange(apt._id, priorAppointmentStatus(apt.status)!); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
         )}
-        {canManageAppointmentSchedule && (apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'no_show') && (
+        {/* Reopen covers every closed status — completed, cancelled, no-show,
+            and now rescheduled — none of which has a rung to step back to. */}
+        {canManageAppointmentSchedule && APPOINTMENT_CLOSED_STATUSES.includes(apt.status) && (
           <button onClick={() => { onDone(); handleStatusChange(apt._id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
         )}
         {canManageAppointmentSchedule && apt.status !== 'cancelled' && apt.status !== 'completed' && (
@@ -718,9 +749,27 @@ export default function AppointmentsPage() {
                       </div>
 
                       <div className="appointment-card-status">
-                        <span className={`appointment-status-pill status-${statusSlug(apt.status)}`}>
-                          {t(statusLabelKey[apt.status])}
-                        </span>
+                        {/* The pill is the picker: reception moves a booking
+                            along the ladder from the row it is reading, rather
+                            than expanding it first. Roles without any
+                            appointment-workflow permission get the plain pill. */}
+                        {canChangeAppointmentStatus ? (
+                          <span
+                            className={`appointment-status-pill appointment-status-pill--select status-${statusSlug(apt.status)}`}
+                            onClick={event => event.stopPropagation()}
+                          >
+                            {t(statusLabelKey[apt.status])}
+                            <AppointmentStatusSelect
+                              status={apt.status}
+                              layout="bare"
+                              onChange={status => handleStatusChange(apt._id, status)}
+                            />
+                          </span>
+                        ) : (
+                          <span className={`appointment-status-pill status-${statusSlug(apt.status)}`}>
+                            {t(statusLabelKey[apt.status])}
+                          </span>
+                        )}
                         <small>{appointmentOperationalCue(apt)}</small>
                       </div>
                     </div>
@@ -823,6 +872,10 @@ export default function AppointmentsPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
                 <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
                 <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
+                {/* Usually left at Scheduled, but the desk books patients already
+                    standing at the window, and data entry back-fills visits that
+                    have happened — both need to start on a different rung. */}
+                <div><label>{t('appointments.labelStatus')}</label><AppointmentStatusSelect status={formStatus} layout="bare" onChange={setFormStatus} /></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
                 <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
@@ -1023,7 +1076,7 @@ export default function AppointmentsPage() {
                               <CheckCircle2 size={12} />
                             </button>
                           )}
-                          {canCheckInAppointments && (apt.status === 'requested' || apt.status === 'scheduled' || apt.status === 'confirmed') && (
+                          {canCheckInAppointments && (apt.status === 'requested' || APPOINTMENT_PENDING_STATUSES.includes(apt.status)) && (
                             <button onClick={() => { handleStatusChange(apt._id, 'checked_in'); }} title={t('appointments.actionCheckIn')} style={miniBtn('var(--accent-primary)')}>
                               <UserPlus size={12} />
                             </button>
@@ -1059,22 +1112,79 @@ export default function AppointmentsPage() {
           if (!apt) return null;
           return (
             <Modal onClose={() => setEditingApt(null)} title={t('appointments.editTitle')} size="lg">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>{t('frontDesk.date')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
-                  <div><label>{t('frontDesk.colTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
-                  <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
+              <div className="appt-edit-grid">
+                {/* Three columns, as the design has them: who and when on the
+                    left, who is on the visit in the middle, what it costs on the
+                    right. Each column is a stack of titled sections. */}
+                <div className="appt-edit-col">
+
                   <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
-                  <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
+
+                  <h4 className="appt-edit-section">Appointment mode &amp; location</h4>
+                  <AppointmentDetailFields
+                    section="mode"
+                    patient={patientById.get(apt.patientId)}
+                    appointment={apt}
+                    appointments={appointments}
+                    providerId={apt.providerId}
+                    providerName={formProvider || apt.providerName}
+                    date={formDate}
+                    time={formTime}
+                    duration={formDuration}
+                    values={formDetail}
+                    onChange={patch => setFormDetail(current => ({ ...current, ...patch }))}
+                  />
+
+                  <h4 className="appt-edit-section">Date &amp; time</h4>
+                  <div className="appt-edit-row">
+                    <div><label>{t('frontDesk.date')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
+                    <div><label>{t('frontDesk.colTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
+                    <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
+                  </div>
+                  <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={3} /></div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+
+                <div className="appt-edit-col">
+                  <h4 className="appt-edit-section">Provider &amp; staff</h4>
                   <div><label>{t('appointments.labelProvider')}</label><input value={formProvider} onChange={e => setFormProvider(e.target.value)} placeholder={t('appointments.providerPlaceholder')} /></div>
+                  <AppointmentDetailFields
+                    section="provider"
+                    patient={patientById.get(apt.patientId)}
+                    appointment={apt}
+                    appointments={appointments}
+                    providerId={apt.providerId}
+                    providerName={formProvider || apt.providerName}
+                    date={formDate}
+                    time={formTime}
+                    duration={formDuration}
+                    values={formDetail}
+                    onChange={patch => setFormDetail(current => ({ ...current, ...patch }))}
+                  />
+                  <h4 className="appt-edit-section">Visit detail</h4>
+                  <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                  <div><label>{t('appointments.detailReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} /></div>
                 </div>
-                <div><label>{t('appointments.detailReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} /></div>
-                <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} /></div>
+
+                <div className="appt-edit-col">
+                  <h4 className="appt-edit-section">Status &amp; priority</h4>
+                  <div><label>{t('appointments.labelStatus')}</label><AppointmentStatusSelect status={formStatus} layout="bare" onChange={setFormStatus} /></div>
+                  <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
+                  <AppointmentDetailFields
+                    section="billing"
+                    patient={patientById.get(apt.patientId)}
+                    appointment={apt}
+                    appointments={appointments}
+                    providerId={apt.providerId}
+                    providerName={formProvider || apt.providerName}
+                    date={formDate}
+                    time={formTime}
+                    duration={formDuration}
+                    values={formDetail}
+                    onChange={patch => setFormDetail(current => ({ ...current, ...patch }))}
+                  />
+                </div>
+              </div>
+              <div>
                 <ModalActions
                   onCancel={() => setEditingApt(null)}
                   onConfirm={async () => {
@@ -1083,7 +1193,18 @@ export default function AppointmentsPage() {
                         appointmentDate: formDate, appointmentTime: formTime, duration: formDuration,
                         appointmentType: formType, priority: formPriority, department: formDepartment,
                         providerName: formProvider, reason: formReason, notes: formNotes,
+                        appointmentMode: formDetail.mode,
+                        staffId: formDetail.staffId || undefined,
+                        staffName: formDetail.staffName || undefined,
+                        room: formDetail.room || undefined,
+                        isRecurring: Boolean(formDetail.recurrence),
+                        recurrencePattern: formDetail.recurrence || undefined,
                       });
+                      // Status goes through updateStatus, not the field write
+                      // above: that path stamps confirmedAt/checkedInAt, appends
+                      // the status history, and enforces who may confirm. A raw
+                      // field write would skip all three.
+                      if (formStatus !== apt.status) await handleStatusChange(apt._id, formStatus);
                       showToast(t('appointments.toastUpdated'), 'success'); setEditingApt(null);
                     } catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
                   }}
