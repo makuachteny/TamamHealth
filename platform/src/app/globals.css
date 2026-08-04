@@ -1009,6 +1009,16 @@
 /* ============ LIGHT THEME — Blue & White Palette ============ */
 :root {
   /* ── App canvas ── */
+  /* ── Corner radius scale ────────────────────────────────────────────────
+     One scale for the whole app. The chart grew three different treatments
+     independently — 3px on the vitals sub-tabs, 4px-top on the demographics
+     tabs, 6/8px in the notes module — so navigation that sits inches apart
+     did not look related. Controls take --radius-control, surfaces that hold
+     them take --radius-card. */
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-pill: 999px;
+
   --bg-app:        var(--tb-blue-50);
   --bg-primary:    var(--tb-blue-50);
   --bg-secondary:  rgba(33, 145, 208, 0.08);
@@ -8982,7 +8992,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   padding: 0 16px;
   border: 1px solid #D7DEDD;
   border-bottom: 0;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
   background: #fff;
   color: #69807E;
   font-size: 13px;
@@ -10513,7 +10523,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   min-width: 92px;
   height: 30px;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--ehr-muted);
   font-size: var(--type-size-caption);
@@ -18545,10 +18555,74 @@ textarea.ehr-handoff-input {
   color: var(--semantic-danger);
 }
 
-.appointment-status-pill.status-requested {
+.appointment-status-pill.status-requested,
+/* Rescheduled reads as "someone moved this", the same kind of pending-action
+   signal a portal request is, so it borrows that tone rather than inventing one. */
+.appointment-status-pill.status-rescheduled {
   border-color: var(--semantic-request-border);
   background: var(--semantic-request-bg);
   color: var(--semantic-request);
+}
+
+/* Reminder sent is still just "booked, waiting on the patient" — the neutral
+   base pill, no tint. Arrived is the first rung where the patient is actually
+   in the building, so it takes the attention tone the desk scans for. */
+.appointment-status-pill.status-arrived {
+  border-color: var(--semantic-warning-border);
+  background: var(--semantic-warning-bg);
+  color: var(--semantic-warning);
+}
+
+/* ── The status pill IS the control ──────────────────────────────────────────
+   A native <select> sized over the pill: the row keeps the chip everyone reads
+   at a glance, and changing where a booking sits is one click on the thing that
+   states it — no expanding the row first. Same idea as the chart's condition
+   status picker; kept as a real form control so keyboard and screen readers
+   work for free. */
+.appointment-status-pill--select {
+  position: relative;
+  padding-right: 24px;
+  cursor: pointer;
+}
+
+.appointment-status-pill--select > select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  /* Transparent, not hidden: the select stays the hit target and keeps its
+     native dropdown, while the pill underneath paints the look. */
+  opacity: 0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.appointment-status-pill--select > select:disabled {
+  cursor: default;
+}
+
+/* The caret that says "this can change". */
+.appointment-status-pill--select::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  width: 0;
+  height: 0;
+  margin-top: -1px;
+  border-top: 4px solid currentColor;
+  border-right: 3.5px solid transparent;
+  border-left: 3.5px solid transparent;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.appointment-status-pill--select:focus-within {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
 }
 
 .checkin-patient-summary {

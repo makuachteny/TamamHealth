@@ -48,6 +48,7 @@ import { usePatientPayments } from '@/lib/hooks/usePayments';
 import BillingTab from '@/components/patients/BillingTab';
 import PatientSBAR from '@/components/patients/PatientSBAR';
 import DirectiveList from '@/components/patients/DirectiveList';
+import NotesList from '@/components/clinical-notes/NotesList';
 import PhoneNotes from '@/components/patients/PhoneNotes';
 import AssessmentsPanel from '@/components/patients/AssessmentsPanel';
 import ScreeningsPanel from '@/components/patients/ScreeningsPanel';
@@ -1341,29 +1342,23 @@ export default function PatientDetailPage() {
 
           {activeTab === 'notes' && patient && (
             <div className="space-y-4">
+              {/* Clinical notes are the encounter record now that the
+                  consultation wizard is retired, so they lead this tab rather
+                  than being signposted off to the Activity feed. */}
+              <div className="card-elevated p-5">
+                <NotesList
+                  patientId={patient._id}
+                  patientName={patientFullName(patient)}
+                  mrn={patient.hospitalNumber}
+                  patientDob={patient.dateOfBirth}
+                  currentUser={currentUser}
+                  showCreate={canConsult}
+                />
+              </div>
+              {/* Telephone contacts stay separate: they are care-team messages
+                  about a patient, not documentation of an encounter. */}
               <div className="card-elevated p-5">
                 <PhoneNotes patient={patient} />
-              </div>
-              {/* Encounter documentation lives on the Activity feed — this tab
-                  is for persistent care-team notes only, so the same encounters
-                  are not listed twice under two names. */}
-              <div className="card-elevated p-5 flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-sm">Looking for encounter notes?</h3>
-                  <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    Consultations and their documentation are on the Activity feed.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {canConsult && (
-                    <button className="btn btn-secondary text-[12px]" onClick={() => router.push(`/consultation?patientId=${patient._id}`)}>
-                      Start consultation
-                    </button>
-                  )}
-                  <button className="btn btn-primary text-[12px]" onClick={() => setActiveTab('history')}>
-                    Open Activity
-                  </button>
-                </div>
               </div>
             </div>
           )}

@@ -11,7 +11,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Plus, Trash2 } from '@/components/icons/lucide';
+import { FileText, Trash2 } from '@/components/icons/lucide';
+import CreateNoteButton from './CreateNoteButton';
 import { useToast } from '@/components/Toast';
 import {
   listClinicalNotes, notePreview, deleteClinicalNote, createClinicalNote,
@@ -76,7 +77,7 @@ export default function NotesList({
 
   useEffect(() => { void load(); }, [load]);
 
-  const handleCreate = async () => {
+  const handleCreate = async (noteType: NoteTypeId = newType) => {
     if (!patientId || !patientName) return;
     setCreating(true);
     try {
@@ -85,7 +86,7 @@ export default function NotesList({
         patientName,
         mrn,
         patientDob,
-        noteType: newType,
+        noteType,
         serviceDate: new Date().toISOString().slice(0, 10),
         serviceTime: new Date().toTimeString().slice(0, 5),
         assignedToId: currentUser?._id,
@@ -168,26 +169,13 @@ export default function NotesList({
         <div className="cn-footer-spacer" />
 
         {showCreate && patientId && (
-          <>
-            <select
-              className="cn-select"
-              value={newType}
-              onChange={e => setNewType(e.target.value as NoteTypeId)}
-              aria-label="New note type"
-            >
-              {NOTE_TYPE_ORDER.map(id => (
-                <option key={id} value={id}>{NOTE_TYPES[id].label}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="cn-btn cn-btn-primary"
-              onClick={handleCreate}
-              disabled={creating}
-            >
-              <Plus size={14} /> Create Note
-            </button>
-          </>
+          // The same split control the visit card uses, so starting a note
+          // looks and behaves identically wherever a clinician reaches for it.
+          <CreateNoteButton
+            defaultType={newType}
+            disabled={creating}
+            onCreate={(type) => { setNewType(type); void handleCreate(type); }}
+          />
         )}
       </div>
 
