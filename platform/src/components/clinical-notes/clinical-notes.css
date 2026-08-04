@@ -50,9 +50,76 @@
 .cn-header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+/* ── One size for every control in the header ────────────────────────────
+   These were four different heights (34, 36, 36 and a 44px date box) and two
+   radii. globals.css styles bare `input[type="date"]`, `input[type="text"]` …
+   with `padding: 10px 16px` and a 3px radius; those selectors tie or beat a
+   lone class and win on source order, so the module's own sizing lost. Going
+   through .cn-header raises specificity above them, and every control is then
+   pinned to the same box so the row reads as one strip of chrome. */
+.cn-header .cn-select,
+.cn-header .cn-input,
+.cn-header .cn-btn,
+.cn-header .cn-assign-trigger {
+  box-sizing: border-box;
+  height: 32px;
+  min-height: 32px;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: 12.5px;
+  line-height: 1;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #0f172a);
+}
+
+/* The platform squares off inputs app-wide (`.tamam-ehr-app input … {
+   border-radius: … !important }`) but leaves buttons rounded, so a select and
+   the button beside it disagreed. Rather than fight an !important rule, the
+   button and the assign trigger take the same corner the inputs are given —
+   the row matches the rest of the app instead of only matching itself. */
+.cn-header .cn-btn,
+.cn-header .cn-assign-trigger {
+  border-radius: 3px;
+}
+
+/* Widths sized to their longest real value — "Telehealth SOAP", a date, a
+   time, a provider's full name — so nothing truncates and the row keeps a
+   steady rhythm instead of five arbitrary lengths.
+
+   The per-type rules repeat `min-width: 0` because the module's own
+   `.cn-input[type='date'], .cn-input[type='time'] { min-width: 132px }` ties
+   these two-class selectors and wins on source order — without it the time
+   box stayed 132px wide however narrow it was asked to be. */
+.cn-header .cn-select { width: 164px; padding-right: 24px; }
+.cn-header .cn-input[type='date'] { width: 142px; min-width: 0; }
+.cn-header .cn-input[type='time'] { width: 112px; min-width: 0; }
+.cn-header .cn-assign-trigger { width: 186px; }
+.cn-header .cn-btn { padding: 0 12px; }
+
+/* Field wrappers match their control's height so a labelled field and a bare
+   button sit on the same line. The margin reset matters: these wrappers are
+   <label> elements and globals.css gives every label a 6px bottom margin, so
+   their margin box was 38px tall — centred in the row that lifted each
+   labelled field three pixels above the buttons next to it. */
+.cn-header .cn-field {
+  height: 32px;
+  align-items: center;
+  margin: 0;
+}
+
+.cn-header .cn-select:disabled,
+.cn-header .cn-input:disabled,
+.cn-header .cn-btn:disabled,
+.cn-header .cn-assign-trigger:disabled {
+  background: var(--color-surface-muted, #f8fafc);
+  color: var(--color-text-muted, #94a3b8);
+  cursor: not-allowed;
 }
 
 .cn-field {
@@ -62,13 +129,15 @@
 }
 
 /* Scoped so globals.css does not uppercase these — they are sentence-case
-   field names, not the shouty section headers that rule was written for. */
+   field names, not the shouty section headers that rule was written for.
+   Quieter than the value they label: the clinician reads "Telehealth SOAP",
+   not the word "Note type", so the label sits back. */
 .cn-field > .cn-label {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted, #94a3b8);
   white-space: nowrap;
 }
 

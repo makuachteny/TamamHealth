@@ -120,9 +120,6 @@ export default function EhrVisitPopup({
   const previousNote = consultations.find(record => !(record.consultedAt || record.visitDate).startsWith(todayIso));
 
   const vitals = triage ? triageVitals(triage) : [];
-  const callLabel = entry && !entry.assignedToId
-    ? 'Call patient'
-    : todaysNote ? 'Resume consultation' : 'Start consultation';
 
   const body = (
       <div className={inline ? 'ehr-visit-pop ehr-visit-pop--inline' : 'modal-content card-elevated ehr-visit-pop'}>
@@ -177,21 +174,6 @@ export default function EhrVisitPopup({
                 <ArrowRightLeft className="w-4 h-4" aria-hidden />
               </button>
             )}
-            {/* The consultation keeps the stethoscope on its own button. It was
-                folded into the note button's main half, which put the divider
-                between a glyph and a label that described a different action —
-                the words said "create note" while pressing them started a
-                consultation. Each control says one thing and does it. */}
-            {/* Labelled, not a stethoscope disc: the action names itself, and
-                the label already changes to Resume or Join with the state. */}
-            <button
-              type="button"
-              className="ehr-visit-pop-icon is-primary ehr-visit-pop-labelled"
-              onClick={onCall}
-              title={callLabel}
-            >
-              {callLabel}
-            </button>
             {/* A plain split button now: the label creates the note the visit
                 most likely needs, the caret past the divider picks a different
                 type. */}
