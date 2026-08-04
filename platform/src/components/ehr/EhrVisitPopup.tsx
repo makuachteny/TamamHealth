@@ -176,6 +176,7 @@ export default function EhrVisitPopup({
             {onCreateNote && patientId && (
               <CreateNoteButton
                 compact
+                tone="neutral"
                 defaultType={defaultNoteTypeFor({
                   telehealth: appointment?.appointmentType === 'telehealth',
                   reason: appointment?.reason || triage?.chiefComplaint,
