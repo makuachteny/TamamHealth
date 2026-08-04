@@ -34,9 +34,16 @@ interface MedicationsSectionProps {
   patientId: string;
   canPrescribe: boolean;
   onAdd: () => void;
+  /** "No known medications", attested at a medication review. */
+  noKnownMedications?: boolean;
+  /** Reconciliation outcome and when it was recorded, from the same review. */
+  reconciliation?: string;
+  reconciledAt?: string;
 }
 
-export default function MedicationsSection({ patientId, canPrescribe, onAdd }: MedicationsSectionProps) {
+export default function MedicationsSection({
+  patientId, canPrescribe, onAdd, noKnownMedications, reconciliation, reconciledAt,
+}: MedicationsSectionProps) {
   const { prescriptions } = usePrescriptions(patientId);
   const [page, setPage] = useState(1);
 
@@ -56,9 +63,21 @@ export default function MedicationsSection({ patientId, canPrescribe, onAdd }: M
       onAdd={canPrescribe ? onAdd : undefined}
       pagination={{ page, pageSize: PAGE_SIZE, total: patientRx.length, onPageChange: setPage }}
     >
-      {patientRx.length === 0 ? (
+      {/* What the medication review concluded, when it concluded something.
+          Without this the chart cannot tell "nobody has asked" from "asked,
+          and the patient takes nothing". */}
+      {(reconciliation || (patientRx.length === 0 && noKnownMedications)) && (
+        <p className="omrs-attestation">
+          {patientRx.length === 0 && noKnownMedications && <strong>No known medications. </strong>}
+          {reconciliation && (
+            <>Medication reconciliation: {reconciliation}{reconciledAt ? ` · ${formatDate(reconciledAt)}` : ''}.</>
+          )}
+        </p>
+      )}
+
+      {patientRx.length === 0 && !noKnownMedications ? (
         <OmrsEmptyState itemLabel="medications" actionLabel="Record medications" onAction={canPrescribe ? onAdd : undefined} disabledReason={canPrescribe ? undefined : 'Requires prescribing permission'} />
-      ) : (
+      ) : patientRx.length === 0 ? null : (
         <table className="omrs-table">
           <thead>
             <tr>

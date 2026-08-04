@@ -59,6 +59,26 @@ export function isHrefAllowed(href: string, allowedRoutes: readonly string[]) {
   return allowedRoutes.some(route => path === route || path.startsWith(route + '/'));
 }
 
+/**
+ * Which module the user is currently in — the single answer the trigger icon,
+ * the module dropdown and the shortcut row all read from.
+ *
+ * Longest match wins, because nav lists nest: a role holding both `/dashboard`
+ * and `/dashboard/lab` is inside Lab when the path is `/dashboard/lab`, not
+ * inside both. Matching on a bare prefix per-surface is what let the dropdown
+ * highlight two rows while the trigger showed a third icon.
+ *
+ * A query string never decides the module (`/patients/x?tab=labs` is still
+ * Patients), matching how `isHrefAllowed` reads a path.
+ */
+export function activeNavItem(items: NavItem[], pathname: string | null): NavItem | null {
+  if (!pathname) return null;
+  const path = pathname.split('?')[0];
+  return items
+    .filter(item => !!item.href && (path === item.href || path.startsWith(item.href + '/')))
+    .sort((a, b) => b.href.length - a.href.length)[0] || null;
+}
+
 export function uniqueAllowedNavItems(items: NavItem[], allowedRoutes: readonly string[]) {
   const seen = new Set<string>();
   return items.filter(item => {

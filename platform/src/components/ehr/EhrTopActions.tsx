@@ -5,11 +5,20 @@ import type { NavItem } from '@/lib/permissions';
 export default function EhrTopActions({
   items,
   navLabel,
+  activeHref,
   onOpenModule,
   badges,
 }: {
   items: NavItem[];
   navLabel: (item: NavItem) => string;
+  /**
+   * The module currently open, resolved once in EhrTopRail so this row, the
+   * module dropdown, and the trigger icon all name the same place. These
+   * shortcuts previously had no current state at all: every icon looked
+   * equally unvisited, so the row said where you could go but never where
+   * you were.
+   */
+  activeHref?: string | null;
   onOpenModule: (href: string) => void;
   /** href → count of open work in that module. Omitted hrefs show no badge. */
   badges?: Record<string, number>;
@@ -22,6 +31,7 @@ export default function EhrTopActions({
         const ItemIcon = item.icon;
         const label = navLabel(item);
         const count = badges?.[item.href] ?? 0;
+        const active = item.href === activeHref;
         return (
           <button
             key={item.href}
@@ -29,7 +39,8 @@ export default function EhrTopActions({
             onClick={() => onOpenModule(item.href)}
             title={count > 0 ? `${label} · ${count} waiting` : label}
             aria-label={count > 0 ? `${label}, ${count} waiting` : label}
-            className="relative"
+            aria-current={active ? 'page' : undefined}
+            className={active ? 'relative is-active' : 'relative'}
           >
             <ItemIcon className="w-5 h-5" />
             {count > 0 && (

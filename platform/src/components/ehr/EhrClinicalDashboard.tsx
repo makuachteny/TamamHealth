@@ -792,17 +792,26 @@ export default function EhrClinicalDashboard({
   }, [overdueLabRows, visiblePatientRows, queueEntryByPatient, router]);
 
   // A visit opened from the alert rail may belong to a lane the worklist is
-  // filtered away from — the panel would then expand a row nobody can see.
-  // Switch to the row's own lane and scroll it into view so the panel is where
-  // the click implied it would be.
+  // filtered away from — the panel would then expand a row nobody can see. So
+  // opening a row jumps to that row's lane and scrolls it into view.
+  //
+  // Keyed on the row id, and only once per row: re-running it whenever the
+  // filter changed made the lane tabs unusable. Choosing another lane hid the
+  // open row, which this read as "the row is not visible" and snapped the
+  // filter straight back — so with a row expanded, the tabs did nothing.
   const visitRowGroup = visitRow ? rowStatusGroup(visitRow) : null;
+  const followedRowId = useRef<string | null>(null);
   useEffect(() => {
-    if (!visitRow || !visitRowGroup) return;
-    const visible = filteredPatientRows.some(row => row.id === visitRow.id);
-    if (!visible) { setWorklistFilter(visitRowGroup); return; }
-    const el = document.getElementById(`worklist-row-${visitRow.id}`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [visitRow, visitRowGroup, filteredPatientRows]);
+    if (!visitRow || !visitRowGroup) { followedRowId.current = null; return; }
+    if (followedRowId.current === visitRow.id) return;
+    followedRowId.current = visitRow.id;
+    setWorklistFilter(visitRowGroup);
+    // Let the lane switch paint before scrolling to the row inside it.
+    requestAnimationFrame(() => {
+      document.getElementById(`worklist-row-${visitRow.id}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }, [visitRow, visitRowGroup]);
 
   const [moveEntry, setMoveEntry] = useState<QueueEntry | null>(null);
   const [moveSaving, setMoveSaving] = useState(false);
@@ -1320,9 +1329,12 @@ export default function EhrClinicalDashboard({
                   type="button"
                   className={worklistFilter === group ? 'active' : undefined}
                   aria-pressed={worklistFilter === group}
-                  onClick={() => setWorklistFilter(group)}
+                  // Collapse the expanded row: it belongs to the lane being
+                  // left, so keeping it open would leave a panel hanging under
+                  // a list that no longer contains its row.
+                  onClick={() => { setVisitRow(null); setWorklistFilter(group); }}
                 >
-                  {APPOINTMENT_STATUS_GROUP_LABELS[group]} · {groupCounts[group]}
+                  <strong>{groupCounts[group]}</strong> {APPOINTMENT_STATUS_GROUP_LABELS[group]}
                 </button>
               ))}
 	            </div>

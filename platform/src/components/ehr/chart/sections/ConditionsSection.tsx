@@ -36,13 +36,19 @@ const STATUS_OPTIONS: ProblemStatus[] = ['active', 'chronic', 'inactive', 'resol
 interface ConditionsSectionProps {
   patientId: string;
   patientName: string;
+  /** "No known problems", attested at a problem review in a note. */
+  noKnownProblems?: boolean;
+  /** When "Problem reconciliation performed" was last ticked. */
+  reconciledAt?: string;
   /** One-shot request from the chart (e.g. the Facesheet Problems card's
    *  "Add") to open the add-condition modal as soon as this tab mounts. */
   autoOpenAdd?: boolean;
   onAutoOpenHandled?: () => void;
 }
 
-export default function ConditionsSection({ patientId, patientName, autoOpenAdd, onAutoOpenHandled }: ConditionsSectionProps) {
+export default function ConditionsSection({
+  patientId, patientName, autoOpenAdd, onAutoOpenHandled, noKnownProblems, reconciledAt,
+}: ConditionsSectionProps) {
   const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { problems, create, setStatus } = useProblems(patientId);
@@ -117,9 +123,18 @@ export default function ConditionsSection({ patientId, patientName, autoOpenAdd,
   return (
     <>
       <ChartSection title="Conditions" addLabel="Add" onAdd={() => setAdding(true)}>
-        {ordered.length === 0 ? (
+        {/* Attested at a problem review in a note: an empty list means nobody
+            has asked, this means someone asked and the answer was none. */}
+        {(reconciledAt || (ordered.length === 0 && noKnownProblems)) && (
+          <p className="omrs-attestation">
+            {ordered.length === 0 && noKnownProblems && <strong>No known problems. </strong>}
+            {reconciledAt && <>Problem reconciliation performed · {formatDate(reconciledAt)}.</>}
+          </p>
+        )}
+
+        {ordered.length === 0 && !noKnownProblems ? (
           <OmrsEmptyState itemLabel="conditions" actionLabel="Record conditions" onAction={() => setAdding(true)} />
-        ) : (
+        ) : ordered.length === 0 ? null : (
           <table className="omrs-table omrs-table--conditions">
             {/* Explicit widths: the three columns used to be sized by their
                 content, which left the condition name hard against a date and
