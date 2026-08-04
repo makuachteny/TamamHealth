@@ -13,9 +13,8 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import EhrListHeader, { LIST_STAT_COLORS, EhrListHeaderButton } from '@/components/ehr/EhrListHeader';
+import EhrListHeader, { LIST_STAT_COLORS, EhrListFilters, EhrListHeaderButton } from '@/components/ehr/EhrListHeader';
 import EmptyState from '@/components/EmptyState';
-import FilterTabs from '@/components/FilterTabs';
 import { Bell, BellOff, Check, ChevronRight, RefreshCw } from '@/components/icons/lucide';
 import {
   useNotifications,
@@ -35,6 +34,9 @@ import {
 
 /** Rows rendered before "Show more" — long feeds stay responsive. */
 const PAGE_SIZE = 60;
+
+/** Shared control styling inside the header's Filters popover. */
+const filterFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
 
 type SourceFilter = 'all' | NotificationType;
 type StatusFilter = 'all' | 'unread' | NotificationSeverity;
@@ -119,26 +121,6 @@ function NotificationsPageInner() {
 
   const open = (n: NotificationItem) => { markRead(n.id); router.push(n.href); };
 
-  const sourceTabs = useMemo(() => [
-    { key: 'all', label: 'All sources', count },
-    ...NOTIFICATION_TYPE_ORDER
-      .filter(type => (sourceCounts.get(type) || 0) > 0)
-      .map(type => ({
-        key: type,
-        label: NOTIFICATION_META[type].label,
-        count: sourceCounts.get(type) || 0,
-        tint: NOTIFICATION_META[type].color,
-      })),
-  ], [count, sourceCounts]);
-
-  const statusTabs = useMemo(() => [
-    { key: 'all', label: 'Everything', count },
-    { key: 'unread', label: 'Unread', count: unreadCount },
-    { key: 'critical', label: 'Critical', count: severityCounts.critical, tint: SEVERITY_META.critical.color },
-    { key: 'warning', label: 'Needs action', count: severityCounts.warning, tint: SEVERITY_META.warning.color },
-    { key: 'info', label: 'For information', count: severityCounts.info, tint: SEVERITY_META.info.color },
-  ], [count, unreadCount, severityCounts]);
-
   return (
     <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
       <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
@@ -158,6 +140,50 @@ function NotificationsPageInner() {
           }}
           actions={
             <>
+              {/* State and source were two rows of counted chips across the top
+                  of the feed — nineteen of them, a whole band of chrome above
+                  the thing being read. They are the same two choices in the
+                  header's shared Filters popover now, counts and all, and the
+                  pill's badge says when the list is narrowed. */}
+              <EhrListFilters
+                activeCount={(status !== 'all' ? 1 : 0) + (source !== 'all' ? 1 : 0)}
+                onClear={() => { applyStatus('all'); applySource('all'); }}
+                panelWidth={280}
+              >
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>State</span>
+                  <select
+                    value={status}
+                    onChange={e => applyStatus(e.target.value as StatusFilter)}
+                    className="w-full text-sm py-2 px-3"
+                    style={filterFieldStyle}
+                  >
+                    <option value="all">Everything ({count})</option>
+                    <option value="unread">Unread ({unreadCount})</option>
+                    <option value="critical">Critical ({severityCounts.critical})</option>
+                    <option value="warning">Needs action ({severityCounts.warning})</option>
+                    <option value="info">For information ({severityCounts.info})</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Source</span>
+                  <select
+                    value={source}
+                    onChange={e => applySource(e.target.value as SourceFilter)}
+                    className="w-full text-sm py-2 px-3"
+                    style={filterFieldStyle}
+                  >
+                    <option value="all">All sources ({count})</option>
+                    {NOTIFICATION_TYPE_ORDER
+                      .filter(type => (sourceCounts.get(type) || 0) > 0)
+                      .map(type => (
+                        <option key={type} value={type}>
+                          {NOTIFICATION_META[type].label} ({sourceCounts.get(type)})
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              </EhrListFilters>
               {unreadCount > 0 && (
                 <button
                   type="button"
@@ -184,23 +210,6 @@ function NotificationsPageInner() {
             </>
           }
         />
-
-        <div className="px-4 py-3 flex items-center gap-2 flex-wrap flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-          <FilterTabs
-            tabs={statusTabs}
-            active={status}
-            onChange={key => applyStatus(key as StatusFilter)}
-            size="sm"
-            ariaLabel="Filter notifications by state"
-          />
-          <FilterTabs
-            tabs={sourceTabs}
-            active={source}
-            onChange={key => applySource(key as SourceFilter)}
-            size="sm"
-            ariaLabel="Filter notifications by source"
-          />
-        </div>
 
         <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: 16 }}>
           {loading ? (
