@@ -10,7 +10,7 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, AppointmentStatus, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
 import {
-  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
+  APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
   APPOINTMENT_PENDING_STATUSES, appointmentStatusLabel,
 } from '@/lib/appointment-status';
 import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
@@ -21,6 +21,7 @@ import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
 import PatientCheckInForm from '@/components/check-in/PatientCheckInForm';
+import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
 import { PatientRegistrationForm } from '@/app/(dashboard)/patients/new/page';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -28,7 +29,7 @@ import { useSettings } from '@/lib/settings/SettingsProvider';
 import { getRoleConfig } from '@/lib/permissions';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMetric, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
-  Calendar, CalendarClock, ClipboardCheck, ArrowRightLeft,
+  Calendar, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList,
   MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
   Send, Stethoscope, FileText, Ban, RotateCcw, type LucideIcon,
@@ -754,10 +755,10 @@ export default function FrontDeskDashboardPage() {
                 set a status (check-in opens a visit, no-show asks for a note).
                 This is for every other rung — reminded, confirmed, arrived,
                 roomed, checked out, rescheduled. */}
-            <AppointmentStatusPicker
-              appointment={appointment}
+            <AppointmentStatusSelect
+              status={appointment.status}
               disabled={!canSetAppointmentStatus}
-              onChange={handleAppointmentStatusChange}
+              onChange={status => handleAppointmentStatusChange(appointment, status)}
             />
             <FrontDeskDetailFacts facts={[
               { label: 'Reason', value: appointment.reason || 'Scheduled visit' },
@@ -974,9 +975,11 @@ export default function FrontDeskDashboardPage() {
     return [...appointmentRows, ...queueRows];
   }, [
     canConsult,
+    canSetAppointmentStatus,
     currentUser?.hospitalName,
     filteredQueue,
     filteredRegisteredPatients,
+    handleAppointmentStatusChange,
     handleSaveRoom,
     handleUndoCheckout,
     patients,
@@ -1284,50 +1287,6 @@ function FrontDeskDetailActions({ actions }: {
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-/**
- * The appointment's rung on the desk's ladder, as one dropdown: Scheduled,
- * Reminder Sent, Confirmed, Arrived, Checked In, Roomed, Checked Out, then the
- * three exits (No Show, Rescheduled, Cancelled). Options and order come from
- * the shared vocabulary, so this control and the clinician's chart offer the
- * same list.
- *
- * A `requested` booking (patient-portal ask) keeps its own option while it is
- * the current value — reception answers it by picking a real rung — but
- * `requested` is never offered as a destination.
- */
-function AppointmentStatusPicker({ appointment, disabled, onChange }: {
-  appointment: AppointmentDoc;
-  disabled?: boolean;
-  onChange: (appointment: AppointmentDoc, status: AppointmentStatus) => Promise<void> | void;
-}) {
-  const [saving, setSaving] = useState(false);
-  const options = APPOINTMENT_STATUS_OPTIONS.includes(appointment.status)
-    ? APPOINTMENT_STATUS_OPTIONS
-    : [appointment.status, ...APPOINTMENT_STATUS_OPTIONS];
-  return (
-    <div className="ehr-care-rooming">
-      <CalendarClock className="w-4 h-4" />
-      <span>Appointment status</span>
-      <select
-        value={appointment.status}
-        disabled={disabled || saving}
-        aria-label="Appointment status"
-        onChange={async (event) => {
-          const next = event.target.value as AppointmentStatus;
-          if (next === appointment.status) return;
-          setSaving(true);
-          try { await onChange(appointment, next); } finally { setSaving(false); }
-        }}
-      >
-        {options.map(status => (
-          <option key={status} value={status}>{appointmentStatusLabel(status)}</option>
-        ))}
-      </select>
-      {saving && <span>Saving…</span>}
     </div>
   );
 }
