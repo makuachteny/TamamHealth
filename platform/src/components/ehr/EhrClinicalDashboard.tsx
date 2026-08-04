@@ -1589,57 +1589,63 @@ export default function EhrClinicalDashboard({
               (KAN-75 started this as an unreviewed-results card). Placed BELOW
               "Outstanding items" at the user's direction. Note the trade-off
               this accepts: a breached critical result now sits under routine
-              outstanding work rather than leading the rail. It still only
-              renders when there is something to act on. */}
-          {railActions.length > 0 && (
-            <section className="ehr-side-card ehr-action-feed-card">
-              <div className="ehr-side-card-head">
-                <ClipboardCheck className="w-5 h-5" />
-                <h2>Needs your attention</h2>
-              </div>
-              {/* Three rows tall, the rest on a scroll: the card is a glance
-                  surface in a fixed-height rail, so a clinician with hundreds
-                  of open items gets a bounded card rather than one that runs
-                  off the rail. Capped at 25 rows here; the full queue lives on
-                  /notifications. */}
-              <ul className="ehr-action-feed is-scrollable">
-                {railActions.slice(0, 25).map(action => {
-                  const meta = NOTIFICATION_META[action.type];
-                  const severity = SEVERITY_META[action.severity];
-                  const Icon = meta.icon;
-                  return (
-                    <li key={action.key}>
-                      <button
-                        type="button"
-                        className={`ehr-action-row is-${action.severity}`}
-                        onClick={action.onOpen}
-                        title={`${meta.label} · ${severity.label}`}
-                      >
-                        {/* Bare icon, no tinted chip: globals.css strips the
-                            background off any `span:has(> svg:only-child)` —
-                            the flat-clinical direction — so the glyph carries
-                            the source colour on its own. */}
-                        <span className="ehr-action-icon">
-                          {/* The icon set hardcodes a stroke attribute, so the
-                              colour must be forced via the stroke property. */}
-                          <Icon className="w-3.5 h-3.5" style={{ stroke: meta.color, color: meta.color }} />
-                        </span>
-                        <span className="ehr-action-text">
-                          <span className="ehr-action-title">{action.title}</span>
-                          <span className="ehr-action-meta">{action.meta}</span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {/* These rows ARE notifications — the same items the bell raises
-                  — so "view all" opens the notifications feed. */}
-              <button type="button" className="ehr-action-more" onClick={() => router.push('/notifications')}>
-                {`View all ${railActions.length} in notifications`}
-              </button>
-            </section>
-          )}
+              outstanding work rather than leading the rail. The card stays
+              mounted when the feed is empty — at the user's direction — so the
+              rail keeps a stable shape and "nothing to act on" is stated
+              rather than inferred from a missing card. */}
+          <section className="ehr-side-card ehr-action-feed-card">
+            <div className="ehr-side-card-head">
+              <ClipboardCheck className="w-5 h-5" />
+              <h2>Needs your attention</h2>
+            </div>
+            {railActions.length === 0 ? (
+              <p className="ehr-action-empty">All caught up — nothing needs your attention right now.</p>
+            ) : (
+              <>
+                {/* Three rows tall, the rest on a scroll: the card is a glance
+                    surface in a fixed-height rail, so a clinician with hundreds
+                    of open items gets a bounded card rather than one that runs
+                    off the rail. Capped at 25 rows here; the full queue lives on
+                    /notifications. */}
+                <ul className="ehr-action-feed is-scrollable">
+                  {railActions.slice(0, 25).map(action => {
+                    const meta = NOTIFICATION_META[action.type];
+                    const severity = SEVERITY_META[action.severity];
+                    const Icon = meta.icon;
+                    return (
+                      <li key={action.key}>
+                        <button
+                          type="button"
+                          className={`ehr-action-row is-${action.severity}`}
+                          onClick={action.onOpen}
+                          title={`${meta.label} · ${severity.label}`}
+                        >
+                          {/* Bare icon, no tinted chip: globals.css strips the
+                              background off any `span:has(> svg:only-child)` —
+                              the flat-clinical direction — so the glyph carries
+                              the source colour on its own. */}
+                          <span className="ehr-action-icon">
+                            {/* The icon set hardcodes a stroke attribute, so the
+                                colour must be forced via the stroke property. */}
+                            <Icon className="w-3.5 h-3.5" style={{ stroke: meta.color, color: meta.color }} />
+                          </span>
+                          <span className="ehr-action-text">
+                            <span className="ehr-action-title">{action.title}</span>
+                            <span className="ehr-action-meta">{action.meta}</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {/* These rows ARE notifications — the same items the bell raises
+                    — so "view all" opens the notifications feed. */}
+                <button type="button" className="ehr-action-more" onClick={() => router.push('/notifications')}>
+                  {`View all ${railActions.length} in notifications`}
+                </button>
+              </>
+            )}
+          </section>
         </aside>
         )}
       </section>

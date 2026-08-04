@@ -5830,14 +5830,13 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   list-style: none;
 }
 
-/* Five rows, then scroll (measured: 54.7px row + 4px gap → 5 rows = 290px).
-   Keeps the card a fixed size no matter how deep the backlog is, so the cards
-   below stay reachable in the rail; a sixth row peeks under the fifth as the
-   scroll cue. Raised from four at the user's direction: the "view all" footer
-   sat close enough to the header that the card read as mostly empty chrome,
-   so the list now carries one more row of real work before it. */
+/* Three rows, then scroll (measured: 54.7px row + 4px gap → 3 rows = 172px,
+   plus 8px so the top of the fourth row peeks in as the scroll cue). Keeps the
+   card a fixed size no matter how deep the backlog is, so the cards below stay
+   reachable in the rail. Cut from five at the user's direction: three rows is
+   the glance, the scroll and the "view all" footer carry the depth. */
 .ehr-action-feed.is-scrollable {
-  max-height: 290px;
+  max-height: 180px;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Overlay scrollbar: with the rows now edge-to-edge there is no gutter to
@@ -5852,6 +5851,17 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   border-radius: 999px;
 }
 .ehr-action-feed.is-scrollable::-webkit-scrollbar-track { background: transparent; }
+
+/* Empty state: the card stays mounted when there is nothing to act on, so the
+   rail keeps its shape and the quiet is stated, not inferred from a missing
+   card. Muted ink — "all caught up" is the one row that should not compete. */
+.ehr-action-empty {
+  margin: 0;
+  padding: 14px 2px 8px;
+  color: var(--ehr-text-muted, var(--text-secondary));
+  font-size: 13px;
+  font-weight: 500;
+}
 
 .ehr-action-row {
   width: 100%;
@@ -24902,4 +24912,29 @@ table.patient-data-table.patient-data-table {
   font-size: 12.5px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* Telehealth marker beside a patient's name in a worklist row, and the "Get
+   started" button the edit form shows once a visit is set to telehealth. */
+.ehr-row-telehealth {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  color: var(--ehr-blue, var(--accent-primary));
+  vertical-align: middle;
+}
+
+.appt-telehealth-join {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ehr-blue, var(--accent-primary));
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
 }
