@@ -2,7 +2,7 @@
 
 import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { ClipboardList, Search, Stethoscope, Video, X, type LucideIcon } from '@/components/icons/lucide';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
@@ -82,6 +82,8 @@ export type EhrCareDashboardRow = {
    * pill stays a read-only chip — which is right for rows whose state is
    * derived (a walk-in's "Waiting" comes from triage, not a settable ladder).
    */
+  /** Remote visit — the row shows a telehealth mark beside the patient's name. */
+  telehealth?: boolean;
   statusValue?: string;
   statusOptions?: { value: string; label: string }[];
   onStatusChange?: (value: string) => void | Promise<void>;
@@ -582,6 +584,13 @@ export default function EhrCareDashboard({
                               >
                                 {row.title}
                               </button>
+                              {/* Marks a remote visit where the name is read,
+                                  so the desk can see it without opening a row. */}
+                              {row.telehealth && (
+                                <span className="ehr-row-telehealth" title="Telehealth visit" aria-label="Telehealth visit">
+                                  <Video className="w-3.5 h-3.5" aria-hidden />
+                                </span>
+                              )}
                               <p>{row.subtitle}</p>
                             </div>
                           </div>

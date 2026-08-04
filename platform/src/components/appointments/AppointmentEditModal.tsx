@@ -21,6 +21,8 @@ import { useToast } from '@/components/Toast';
 import { useAuth } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { appointmentStatusLabel } from '@/lib/appointment-status';
+import { useRouter } from 'next/navigation';
+import { Video } from '@/components/icons/lucide';
 import type { AppointmentDoc, AppointmentPriority, AppointmentStatus, AppointmentType, PatientDoc } from '@/lib/db-types';
 
 const TYPE_OPTIONS: { value: AppointmentType; label: string }[] = [
@@ -63,6 +65,7 @@ export default function AppointmentEditModal({
    */
   inline?: boolean;
 }) {
+  const router = useRouter();
   const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { departments } = useSettings();
@@ -170,12 +173,30 @@ export default function AppointmentEditModal({
             section="mode"
             {...detailProps}
             modeSlot={(
+              <>
+              {/* Telehealth needs a way in, not just a radio: the visit room is
+                  the whole point of choosing it. */}
+              {detail.mode === 'telehealth' && (
+                <div>
+                  <label>Telehealth</label>
+                  <button
+                    type="button"
+                    className="appt-telehealth-join"
+                    title="Start the telehealth visit"
+                    aria-label="Start the telehealth visit"
+                    onClick={() => router.push(`/telehealth/visit/${encodeURIComponent(appointment._id)}`)}
+                  >
+                    <Video className="w-4 h-4" aria-hidden />
+                  </button>
+                </div>
+              )}
               <div>
                 <label>Visit type</label>
                 <select value={type} onChange={e => setType(e.target.value as AppointmentType)}>
                   {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </div>
+              </>
             )}
           />
 

@@ -177,10 +177,18 @@ export default function EhrVisitPopup({
                 <ArrowRightLeft className="w-4 h-4" aria-hidden />
               </button>
             )}
-            {onCreateNote && patientId && (
+            {/* One control, not two: the stethoscope starts the consultation and
+                the caret on its right picks a note type. They were a neutral
+                note split-button beside a primary stethoscope, which read as two
+                unrelated buttons doing similar things. */}
+            {onCreateNote && patientId ? (
               <CreateNoteButton
                 compact
-                tone="neutral"
+                tone="primary"
+                mainIcon={<Stethoscope className="w-4 h-4" aria-hidden />}
+                mainTitle={callLabel}
+                caretLabel="Create clinical note"
+                onMainAction={onCall}
                 defaultType={defaultNoteTypeFor({
                   telehealth: appointment?.appointmentType === 'telehealth',
                   reason: appointment?.reason || triage?.chiefComplaint,
@@ -188,16 +196,17 @@ export default function EhrVisitPopup({
                 disabled={creatingNote}
                 onCreate={onCreateNote}
               />
+            ) : (
+              <button
+                type="button"
+                className="ehr-visit-pop-icon is-primary"
+                onClick={onCall}
+                aria-label={callLabel}
+                title={callLabel}
+              >
+                <Stethoscope className="w-4 h-4" aria-hidden />
+              </button>
             )}
-            <button
-              type="button"
-              className="ehr-visit-pop-icon is-primary"
-              onClick={onCall}
-              aria-label={callLabel}
-              title={callLabel}
-            >
-              <Stethoscope className="w-4 h-4" aria-hidden />
-            </button>
           </div>
         </div>
 

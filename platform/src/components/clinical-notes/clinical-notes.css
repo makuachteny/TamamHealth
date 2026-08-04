@@ -106,11 +106,21 @@
 }
 
 /* ── Body layout ────────────────────────────────────────────────────────── */
+/* The rail spans the full viewport height; the header and toolbar live inside
+   the note column (.cn-main), so nothing of the note chrome stretches over
+   the rail. */
 .cn-body {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 268px minmax(0, 1fr);
   gap: 0;
   flex: 1 1 auto;
+  min-height: 0;
+}
+
+.cn-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -119,35 +129,92 @@
   .cn-sidebar { display: none; }
 }
 
+/* Design: white cards on a warm gray canvas — each card is a header row over a
+   hairline, then its body. Flat: separation comes from the background, not
+   shadows. */
 .cn-sidebar {
-  border-right: 1px solid var(--color-border, #e2e8f0);
-  padding: 12px;
+  padding: 14px 12px;
   overflow-y: auto;
-  background: var(--color-surface-muted, #f8fafc);
+  background: #f1efec;
 }
 
 .cn-sidebar-card {
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: var(--radius-card, 8px);
-  background: var(--color-surface, #fff);
-  padding: 10px 12px;
-  margin-bottom: 12px;
+  border: 1px solid #eceae5;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0;
+  margin-bottom: 14px;
+  overflow: hidden;
 }
 
-.cn-sidebar-title {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: none;
-  letter-spacing: 0;
-  margin: 0 0 8px;
+.cn-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin: 0;
+  padding: 11px 14px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #3d4a52;
+  border-bottom: 1px solid #eceae5;
 }
 
-.cn-patient-name { font-size: 14px; font-weight: 700; margin: 0 0 4px; }
-.cn-patient-line { font-size: 12px; color: var(--color-text-muted, #64748b); margin: 0; }
+.cn-card-head-action {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary, #0f766e);
+}
+.cn-card-head-action:hover { text-decoration: underline; }
+
+.cn-card-body { padding: 10px 14px 12px; }
+/* Notes/labs cards keep the reference's airy height even when short. */
+.cn-card-body-roomy { min-height: 132px; }
+
+.cn-card-empty {
+  margin: 0;
+  padding: 34px 10px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #98a09b;
+}
+
+.cn-patient-id {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 2px 0 6px;
+}
+
+.cn-patient-photo {
+  width: 54px;
+  height: 54px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  background: #edecea;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #a2aaa5;
+}
+
+.cn-patient-line {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #55605c;
+  margin: 0;
+}
+
+.cn-sidebar-links { margin-top: 2px; }
 
 .cn-sidebar-link {
   display: flex;
@@ -155,18 +222,56 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 6px 0;
-  font-size: 13px;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
   color: var(--color-primary, #0f766e);
   background: none;
   border: none;
   cursor: pointer;
   text-align: left;
 }
-
 .cn-sidebar-link:hover { text-decoration: underline; }
+.cn-sidebar-link svg { color: #adb4af; flex: 0 0 auto; }
+
+/* Date/lab rows in the Patient Notes and Labs/Studies cards. */
+.cn-rail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-primary, #0f766e);
+  text-align: left;
+}
+.cn-rail-row:hover { text-decoration: underline; }
+.cn-rail-row-main {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cn-rail-row-meta {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: #98a09b;
+}
 
 .cn-section-nav { display: flex; flex-direction: column; gap: 2px; }
+
+.cn-section-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cn-section-nav-row .cn-section-nav-item { flex: 1 1 auto; min-width: 0; }
 
 .cn-section-nav-item {
   display: flex;
@@ -174,18 +279,18 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 6px;
   border: none;
   border-radius: var(--radius-control, 6px);
   background: none;
   font: inherit;
-  font-size: 13px;
-  color: inherit;
+  font-size: 13.5px;
+  color: #3d4a52;
   cursor: pointer;
   text-align: left;
 }
 
-.cn-section-nav-item:hover { background: var(--color-surface-muted, #f1f5f9); }
+.cn-section-nav-item:hover { background: #f5f3f0; }
 .cn-section-nav-item[aria-current='true'] {
   background: var(--color-primary-soft, #ccfbf1);
   font-weight: 600;
@@ -196,8 +301,31 @@
   color: var(--color-text-muted, #94a3b8);
 }
 
+/* The ⊟ remove control on rows the clinician added. */
+.cn-section-nav-remove {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e0ddd7;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  color: #a2aaa5;
+  padding: 0;
+}
+.cn-section-nav-remove:hover {
+  color: var(--color-danger, #dc2626);
+  border-color: var(--color-danger, #dc2626);
+}
+
 /* ── Note canvas ────────────────────────────────────────────────────────── */
 .cn-canvas {
+  /* Flex-fills .cn-main so the canvas scrolls inside whatever hosts the
+     editor (the /notes page or the chart drawer) instead of growing past it. */
+  flex: 1 1 auto;
   overflow-y: auto;
   padding: 16px 20px 24px;
   min-height: 0;
@@ -616,8 +744,35 @@
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   border-left: none;
-  padding-left: 8px;
-  padding-right: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* The primary split reads as one salmon capsule: flat rose fill, dark ink
+   label, fully rounded ends, hairline ink divider ahead of the caret. Scoped
+   under .cn-split so the note editor's Sign/Save .cn-btn-primary keeps the
+   standard action color; the neutral (toolbar) tone keeps its square look. */
+.cn-split .cn-btn-primary {
+  --cn-split-fill: #e8937e;
+  --cn-split-fill-hover: #e28169;
+  --cn-split-ink: #33424b;
+  background: var(--cn-split-fill);
+  border-color: var(--cn-split-fill);
+  color: var(--cn-split-ink);
+}
+.cn-split .cn-btn-primary:hover:not(:disabled) {
+  background: var(--cn-split-fill-hover);
+  border-color: var(--cn-split-fill-hover);
+  filter: none;
+}
+.cn-split .cn-btn-primary.cn-split-main {
+  border-radius: 999px 0 0 999px;
+  padding-left: 16px;
+  border-right-color: rgba(51, 66, 75, 0.28);
+}
+.cn-split .cn-btn-primary.cn-split-caret {
+  border-radius: 0 999px 999px 0;
+  padding-right: 12px;
 }
 
 /*
@@ -681,3 +836,453 @@
   color: var(--color-text-muted, #94a3b8);
   font-size: 13.5px;
 }
+
+/* ── Medications popup ──────────────────────────────────────────────────── */
+.cn-meds { display: flex; flex-direction: column; max-height: 84vh; }
+
+.cn-meds-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 10px;
+}
+.cn-meds-title { margin: 0; font-size: 17px; font-weight: 700; }
+.cn-meds-close {
+  border: none; background: none; cursor: pointer; padding: 4px;
+  color: var(--color-text-muted, #64748b);
+}
+
+.cn-meds-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  min-height: 0;
+  overflow: hidden;
+}
+@media (max-width: 1000px) {
+  .cn-meds-body { grid-template-columns: minmax(0, 1fr); }
+  .cn-meds-right { border-top: 1px solid var(--color-border, #e2e8f0); }
+}
+
+.cn-meds-left {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 18px 16px;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border, #e2e8f0);
+}
+.cn-meds-right { padding: 14px 18px 16px; overflow-y: auto; }
+
+.cn-meds-controlrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cn-meds-adders { display: flex; gap: 8px; }
+
+.cn-meds-nkm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.cn-meds-reconcile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 13px;
+  text-transform: none;
+}
+.cn-meds-reconcile > span:first-child { color: var(--color-text-muted, #64748b); }
+.cn-meds-reconcile-at { font-size: 12px; color: var(--color-text-muted, #94a3b8); }
+
+.cn-meds-add {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px dashed var(--color-border, #cbd5e1);
+  border-radius: 8px;
+}
+
+.cn-meds-listhead { margin: 16px 0 8px; font-size: 14px; font-weight: 700; }
+
+.cn-meds-list {
+  flex: 1 1 auto;
+  min-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.cn-meds-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  cursor: pointer;
+}
+.cn-meds-row:last-child { border-bottom: none; }
+.cn-meds-row:hover { background: var(--color-surface-muted, #f8fafc); }
+.cn-meds-row.is-selected { background: var(--color-primary-soft, #ccfbf1); }
+
+.cn-meds-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+.cn-meds-row-meta { font-size: 12px; color: var(--color-text-muted, #64748b); }
+.cn-meds-row-stage {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+}
+
+.cn-meds-footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+}
+
+.cn-meds-histhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 12px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.cn-meds-histhead svg { color: var(--color-text-muted, #94a3b8); }
+
+.cn-consent-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+}
+.cn-consent-card h4 { margin: 0 0 10px; font-size: 14.5px; font-weight: 600; }
+.cn-consent-card p { margin: 0 0 10px; font-size: 12.5px; line-height: 1.6; }
+.cn-consent-question { font-size: 13px !important; font-weight: 600; margin-top: 14px !important; }
+.cn-consent-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+  text-transform: none;
+  cursor: pointer;
+}
+.cn-consent-card .cn-btn { margin-top: 10px; }
+.cn-consent-note { font-size: 12px; color: var(--color-text-muted, #64748b); margin: 8px 0; }
+
+.cn-meds-history { display: flex; flex-direction: column; }
+.cn-meds-histrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  font-size: 13px;
+}
+.cn-meds-histrow:last-child { border-bottom: none; }
+.cn-meds-histdate { flex: 0 0 78px; color: var(--color-text-muted, #64748b); font-size: 12px; }
+.cn-meds-histmed { flex: 1 1 auto; min-width: 0; }
+
+/* The medications snapshot doubles as the button into the popup. */
+.cn-derived-clickable { cursor: pointer; }
+.cn-derived-clickable:hover {
+  background: var(--color-surface-muted, #f8fafc);
+  border-radius: var(--radius-control, 6px);
+}
+
+/* ── Assessment diagnosis cards ─────────────────────────────────────────── */
+.cn-dx { margin-bottom: 10px; }
+
+.cn-dx-search { max-width: 440px; margin-bottom: 10px; }
+
+.cn-dx-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+
+.cn-dx-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  padding: 10px 12px;
+}
+
+.cn-dx-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cn-dx-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cn-dx-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted, #64748b);
+  background: var(--color-surface-muted, #f1f5f9);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.cn-dx-remove {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--color-text-muted, #94a3b8);
+}
+.cn-dx-remove:hover { color: var(--color-danger, #dc2626); }
+
+.cn-dx-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.cn-dx-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  text-transform: none;
+}
+.cn-dx-field > span {
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+.cn-dx-date { min-height: 30px; padding: 3px 8px; font-size: 12.5px; }
+
+/* Mini acute/chronic segmented toggle. */
+.cn-dx-acuity {
+  display: inline-flex;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  overflow: hidden;
+}
+.cn-dx-acuity button {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--color-text-muted, #64748b);
+}
+.cn-dx-acuity button + button { border-left: 1px solid var(--color-border, #cbd5e1); }
+.cn-dx-acuity button[aria-pressed='true'] {
+  background: var(--color-primary, #0f766e);
+  color: #fff;
+  font-weight: 600;
+}
+.cn-dx-acuity button:disabled { cursor: default; }
+
+.cn-dx-spacer { flex: 1 1 auto; }
+
+.cn-dx-problem {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary, #0f766e);
+}
+.cn-dx-problem:hover { text-decoration: underline; }
+
+.cn-dx-on-list {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-success, #16a34a);
+  white-space: nowrap;
+}
+
+/* ── Documents rail card ────────────────────────────────────────────────── */
+.cn-card-head-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+}
+.cn-card-head-filter select {
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  background: none;
+  color: var(--color-primary, #0f766e);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  max-width: 110px;
+}
+
+.cn-rail-row-stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.cn-rail-row-sub {
+  font-size: 12px;
+  color: #55605c;
+}
+
+/* ── Problems / Allergies popups (share the Medications chrome) ─────────── */
+.cn-meds-body--single { grid-template-columns: minmax(0, 1fr); }
+.cn-meds-body--single .cn-meds-left { border-right: none; }
+
+.cn-meds-dxsearch { margin-top: 12px; max-width: 440px; }
+
+.cn-allergy-add {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px dashed var(--color-border, #cbd5e1);
+  border-radius: 8px;
+}
+.cn-allergy-add-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ── Include Problems popup ─────────────────────────────────────────────── */
+.cn-dx-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  font-size: 13px;
+}
+.cn-dx-line:last-child { border-bottom: none; margin-bottom: 6px; }
+.cn-dx-line-meta { color: var(--color-text-muted, #94a3b8); font-size: 12px; }
+
+.cn-inc-tablewrap {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  overflow-x: auto;
+  min-height: 180px;
+}
+.cn-inc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.cn-inc-table th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-muted, #64748b);
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  white-space: nowrap;
+}
+.cn-inc-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  vertical-align: top;
+}
+.cn-inc-table tbody tr { cursor: pointer; }
+.cn-inc-table tbody tr:hover { background: var(--color-surface-muted, #f8fafc); }
+.cn-inc-table tbody tr.is-checked { background: var(--color-primary-soft, #ccfbf1); }
+.cn-inc-name { font-weight: 600; }
+.cn-inc-code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11.5px; }
+.cn-inc-comments { max-width: 160px; }
+.cn-inc-empty {
+  text-align: center;
+  color: var(--color-text-muted, #94a3b8);
+  padding: 42px 10px !important;
+}
+
+.cn-inc-add {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-surface-muted, #f8fafc);
+}
+.cn-inc-add h4 { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+.cn-inc-add-status { display: flex; gap: 16px; margin-bottom: 10px; }
+.cn-inc-add-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-transform: none;
+  font-size: 12.5px;
+}
+.cn-inc-add-search > span { font-weight: 600; white-space: nowrap; }
+.cn-inc-add-search .cn-input { flex: 1 1 auto; max-width: 460px; }
+.cn-inc-results {
+  margin: 6px 0 0 74px;
+  max-width: 460px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-surface, #fff);
+  overflow: hidden;
+}
+.cn-inc-results button {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--color-border-light, #f1f5f9);
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.cn-inc-results button:last-child { border-bottom: none; }
+.cn-inc-results button:hover { background: var(--color-surface-muted, #f8fafc); }
+
+.cn-inc-details-toggle { display: inline-block; margin-top: 10px; }
+.cn-inc-details {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.cn-inc-details .cn-input { min-width: 220px; }

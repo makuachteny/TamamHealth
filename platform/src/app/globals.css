@@ -24924,17 +24924,45 @@ table.patient-data-table.patient-data-table {
   vertical-align: middle;
 }
 
+/* Icon only, and sized to itself — as a text button it inherited the panel's
+   full-width control rule and ran the whole row. */
 .appt-telehealth-join {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 0 12px;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 9px;
   background: var(--ehr-blue, var(--accent-primary));
   color: #fff;
+  cursor: pointer;
+}
+
+/* The icon set hardcodes a `stroke` attribute, so on a blue fill the glyph was
+   blue-on-blue and invisible — the colour has to be forced on the property. */
+.appt-telehealth-join svg,
+.appt-telehealth-join svg * {
+  stroke: #fff;
+  color: #fff;
+  fill: none;
+}
+
+.appt-telehealth-join:hover {
+  filter: brightness(1.06);
+}
+
+/* Spelled-out note action on the split button's caret half. */
+.cn-split-caret .cn-split-caret-label {
+  margin-right: 6px;
   font-size: 12.5px;
   font-weight: 700;
-  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ehr-visit-pop-actions .cn-split-caret {
+  width: auto;
+  padding: 0 10px;
 }

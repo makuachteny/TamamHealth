@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -99,6 +100,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default function PatientIntakePage() {
+  const router = useRouter();
   const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { forms, loading, merge, reject, sendRequest } = useIntakeForms();
@@ -235,9 +237,17 @@ export default function PatientIntakePage() {
         const key = MERGEABLE_FIELDS[field.label];
         if (key && checkedFields[field.label]) updates[key] = field.value;
       }
+      const patientName = reviewing.patientName;
       await merge(reviewing._id, updates, currentUser?.name || currentUser?.username || 'Staff');
-      showToast(`${reviewing.patientName}'s form merged into their chart.`, 'success');
+      showToast(`${patientName}'s form merged into their chart.`, 'success');
       setReviewing(null);
+      // A merged form means the paperwork is done and the visit is next: land
+      // on the reception board's Scheduled lane with this patient's booking in
+      // front of the desk. Clinician roles reviewing intake stay here — the
+      // reception board is not theirs to open.
+      if (currentUser && isRouteAllowed(currentUser.role, '/dashboard/front-desk')) {
+        router.push(`/dashboard/front-desk?lane=scheduled&q=${encodeURIComponent(patientName)}`);
+      }
     } catch {
       showToast('Could not merge this form. Try again.', 'error');
     } finally {

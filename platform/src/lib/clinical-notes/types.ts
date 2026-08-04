@@ -18,11 +18,32 @@ import type { TemplateSelection } from './section-templates';
 
 export type NoteStatus = 'draft' | 'signed' | 'amended' | 'awaiting_cosign';
 
+/**
+ * A coded diagnosis attached to the Assessment section — one card in the
+ * editor. Coded (ICD-11) when picked from the catalog; free-text entries keep
+ * `icd11Code` empty rather than inventing a code.
+ */
+export interface NoteDiagnosis {
+  id: string;
+  name: string;
+  /** Full diagnosis description line, when it differs from the short name. */
+  description?: string;
+  icd11Code?: string;
+  acuity?: 'acute' | 'chronic';
+  /** Onset/start date (YYYY-MM-DD). */
+  startDate?: string;
+  addedAt: string;
+  /** Problem-list doc this line was included from (or pushed to). */
+  problemId?: string;
+}
+
 /** One section's captured content inside a note. */
 export interface NoteSectionContent {
   sectionId: NoteSectionId;
   /** Narrative body. May contain the template block delimiters. */
   text?: string;
+  /** Coded diagnoses (Assessment section only) — the cards above the narrative. */
+  diagnoses?: NoteDiagnosis[];
   /** Ticks behind the section's template, kept so reopening restores the tree. */
   templateSelection?: TemplateSelection;
   /**

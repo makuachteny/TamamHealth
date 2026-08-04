@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -154,6 +154,20 @@ export default function FrontDeskDashboardPage() {
   const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered'>('all');
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
+
+  // Deep link: ?lane= lands on a specific lane tab and ?q= prefills the queue
+  // search — how "merge intake → land on the patient's Scheduled row" works
+  // from /patient-intake (and any other surface that wants to point here).
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const lane = searchParams?.get('lane');
+    if (lane === 'scheduled' || lane === 'in_office' || lane === 'finished') {
+      setQueueFilter(lane);
+      setPanelView('all');
+    }
+    const q = searchParams?.get('q');
+    if (q) setQueueSearch(q);
+  }, [searchParams]);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   // The appointment open in the shared edit form, if any.
   const [editAppointment, setEditAppointment] = useState<AppointmentDoc | null>(null);
@@ -809,6 +823,7 @@ export default function FrontDeskDashboardPage() {
         statusLabel: appointmentStatusLabel(appointment.status),
         // The pill itself is the picker for appointment-backed rows: reception
         // moves a booking along the ladder from the list, no expanding needed.
+        telehealth: appointment.appointmentMode === 'telehealth' || appointment.appointmentType === 'telehealth',
         statusValue: appointment.status,
         statusOptions: canSetAppointmentStatus
           ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))

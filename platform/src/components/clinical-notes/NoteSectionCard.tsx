@@ -21,6 +21,7 @@ import {
 } from '@/components/icons/lucide';
 import TextShortcutPicker from './TextShortcutPicker';
 import TemplatePicker from './TemplatePicker';
+import AssessmentSection from './assessment/AssessmentSection';
 import { getSectionDef, type NoteSectionId } from '@/lib/clinical-notes/note-catalog';
 import {
   templateForSection, composeNarrative, composeTemplateText, stripTemplateMarkers,
@@ -44,6 +45,10 @@ interface NoteSectionCardProps {
   onChange: (patch: Partial<NoteSectionContent>) => void;
   /** Re-read the chart for a derived section. */
   onRefreshDerived?: (sectionId: NoteSectionId) => void;
+  /** Open the full working view behind a derived section (Medications popup). */
+  onOpenDerived?: (sectionId: NoteSectionId) => void;
+  /** Assessment only: open the Include Problems popup from the tool row. */
+  onOpenProblems?: () => void;
   /** Raise an order from the Plan section. */
   onPlanAction?: (request: PlanActionRequest) => void;
   /** Remove an optional section the clinician added. */
@@ -53,7 +58,8 @@ interface NoteSectionCardProps {
 
 export default function NoteSectionCard({
   sectionId, content, readOnly, userId, orgId, active,
-  onFocus, onChange, onRefreshDerived, onPlanAction, onRemove, removable,
+  onFocus, onChange, onRefreshDerived, onOpenDerived, onPlanAction, onRemove, removable,
+  onOpenProblems,
 }: NoteSectionCardProps) {
   const def = getSectionDef(sectionId);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -98,9 +104,26 @@ export default function NoteSectionCard({
             </div>
           )}
         </div>
-        <div className={`cn-derived${content?.snapshot ? '' : ' cn-derived-empty'}`}>
-          {content?.snapshot || `No ${def.label.toLowerCase()} recorded for this patient.`}
-        </div>
+        {onOpenDerived ? (
+          // The whole snapshot is the door into the working view — clicking a
+          // medication line opens the Medications popup, not a text cursor.
+          <div
+            className={`cn-derived cn-derived-clickable${content?.snapshot ? '' : ' cn-derived-empty'}`}
+            role="button"
+            tabIndex={0}
+            title={`Open ${def.label.toLowerCase()}`}
+            onClick={() => onOpenDerived(sectionId)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenDerived(sectionId); }
+            }}
+          >
+            {content?.snapshot || `No ${def.label.toLowerCase()} recorded for this patient.`}
+          </div>
+        ) : (
+          <div className={`cn-derived${content?.snapshot ? '' : ' cn-derived-empty'}`}>
+            {content?.snapshot || `No ${def.label.toLowerCase()} recorded for this patient.`}
+          </div>
+        )}
       </section>
     );
   }
@@ -115,6 +138,11 @@ export default function NoteSectionCard({
 
         {!readOnly && (
           <div className="cn-section-tools">
+            {onOpenProblems && (
+              <button type="button" className="cn-tool" onClick={onOpenProblems}>
+                Include Problems
+              </button>
+            )}
             <div style={{ position: 'relative' }}>
               <button
                 type="button"
@@ -190,6 +218,16 @@ export default function NoteSectionCard({
           </div>
         )}
       </div>
+
+      {/* Assessment leads with the problems included from the popup, rendered
+          as diagnosis lines. The textarea below stays the narrative. */}
+      {sectionId === 'assessment' && (
+        <AssessmentSection
+          diagnoses={content?.diagnoses || []}
+          readOnly={readOnly}
+          onChangeDiagnoses={diagnoses => onChange({ diagnoses })}
+        />
+      )}
 
       {readOnly ? (
         <div className="cn-derived">

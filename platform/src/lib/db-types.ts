@@ -86,6 +86,23 @@ export interface OnboardingState {
 export interface PatientDoc extends BaseDoc, Omit<Patient, 'id'> {
   type: 'patient';
   orgId?: string;
+  /** Medications review: clinician attested the patient takes no medications. */
+  noKnownMedications?: boolean;
+  /** Problems review: clinician attested the patient has no known problems. */
+  noKnownProblems?: boolean;
+  /** "Problem reconciliation performed" attestation (Include Problems popup). */
+  problemReconciledAt?: string;
+  /** Allergies review: clinician attested no known drug allergies (NKDA). */
+  noKnownDrugAllergies?: boolean;
+  /** Medication reconciliation status recorded in the Medications popup. */
+  medReconciliation?: string;
+  medReconciliationAt?: string;
+  /**
+   * Consent gate for viewing the patient's network medication history (their
+   * prescriptions across facilities). PHI: viewing is recorded, not assumed —
+   * the record keeps who obtained the answer and when, whichever way it went.
+   */
+  medHistoryConsent?: { granted: boolean; byId?: string; byName?: string; at: string };
 }
 
 /**
@@ -421,6 +438,16 @@ export interface PrescriptionDoc extends BaseDoc {
   stoppedByName?: string;
   /** Source of the stop: 'clinician' | 'patient_reported' */
   stoppedSource?: 'clinician' | 'patient_reported';
+  /** Clinical indication (Reason for Rx), e.g. "1A40 · Malaria". */
+  indication?: string;
+  /** Prescriber allowed generic substitution at the pharmacy. */
+  allowSubstitution?: boolean;
+  /** Number of refills authorised (0 = none). */
+  refills?: number;
+  /** Date the prescription becomes effective (YYYY-MM-DD). */
+  effectiveOn?: string;
+  /** Free-text note to the dispensing pharmacy. */
+  pharmacyInstructions?: string;
   /** Granular pharmacy dispensing lifecycle (Stage 8): prescribed →
    *  received_in_pharmacy_queue → under_review → cleared_for_dispensing →
    *  dispensed → counseled → complete, plus stockout/held/recalled branches.
