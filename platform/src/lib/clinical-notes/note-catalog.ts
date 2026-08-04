@@ -52,7 +52,17 @@ export type NoteSectionId =
   | 'goals'
   | 'interventions'
   | 'obstetric_history'
-  | 'fetal_assessment';
+  | 'fetal_assessment'
+  | 'reason_for_consultation'
+  | 'recommendations'
+  | 'preop_diagnosis'
+  | 'postop_diagnosis'
+  | 'estimated_blood_loss'
+  | 'telehealth_attestation'
+  | 'admission_reason'
+  | 'discharge_diagnosis'
+  | 'discharge_condition'
+  | 'response_to_care';
 
 export interface NoteSectionDef {
   id: NoteSectionId;
@@ -120,6 +130,65 @@ export const NOTE_SECTIONS: Readonly<Record<NoteSectionId, NoteSectionDef>> = {
     id: 'fetal_assessment', label: 'Fetal Assessment', kind: 'narrative',
     placeholder: 'Fundal height, lie and presentation, fetal heart rate, movements…',
   },
+
+  // A consultation note exists to answer another clinician's question. Without
+  // the question recorded and an explicit recommendation back, it is just
+  // another progress note and the referring provider learns nothing.
+  reason_for_consultation: {
+    id: 'reason_for_consultation', label: 'Reason for Consultation', kind: 'narrative',
+    placeholder: 'Referring provider and the specific question asked…',
+  },
+  recommendations: {
+    id: 'recommendations', label: 'Recommendations', kind: 'narrative',
+    placeholder: 'Advice to the referring provider, and who owns each next step…',
+  },
+
+  // Operative-note elements. Pre- and post-operative diagnoses are recorded
+  // separately on purpose: the difference between them is the finding, and
+  // collapsing them into one line loses it.
+  preop_diagnosis: {
+    id: 'preop_diagnosis', label: 'Pre-operative Diagnosis', kind: 'narrative',
+    placeholder: 'Diagnosis the patient came to theatre with…',
+  },
+  postop_diagnosis: {
+    id: 'postop_diagnosis', label: 'Post-operative Diagnosis', kind: 'narrative',
+    placeholder: 'Diagnosis after the procedure — state if unchanged…',
+  },
+  estimated_blood_loss: {
+    id: 'estimated_blood_loss', label: 'Estimated Blood Loss', kind: 'narrative',
+    placeholder: 'e.g. 150 mL, or “minimal”…',
+  },
+
+  /**
+   * Telehealth attestation. A remote encounter has to record that the patient
+   * consented and where both parties were: without it the note does not
+   * evidence a billable, lawful telehealth visit, and in a referral network
+   * spanning states the originating site decides which rules applied.
+   */
+  telehealth_attestation: {
+    id: 'telehealth_attestation', label: 'Telehealth Attestation', kind: 'narrative',
+    placeholder: 'Modality (video/phone), patient location, provider location, consent obtained…',
+  },
+
+  // Discharge-summary elements. These are the parts a receiving clinician reads
+  // first and the parts an auditor checks for.
+  admission_reason: {
+    id: 'admission_reason', label: 'Reason for Admission', kind: 'narrative',
+    placeholder: 'Why the patient was admitted…',
+  },
+  discharge_diagnosis: {
+    id: 'discharge_diagnosis', label: 'Discharge Diagnosis', kind: 'narrative',
+    placeholder: 'Principal and secondary diagnoses at discharge…',
+  },
+  discharge_condition: {
+    id: 'discharge_condition', label: 'Condition at Discharge', kind: 'narrative',
+    placeholder: 'Clinical condition, mobility, and where the patient is going…',
+  },
+
+  response_to_care: {
+    id: 'response_to_care', label: 'Response to Care', kind: 'narrative',
+    placeholder: 'How the patient responded to the intervention…',
+  },
 };
 
 export type NoteTypeId =
@@ -172,8 +241,11 @@ export const NOTE_TYPES: Readonly<Record<NoteTypeId, NoteTypeDef>> = {
   telehealth_soap: {
     id: 'telehealth_soap',
     label: 'Telehealth SOAP',
-    description: 'SOAP note for a video or phone visit; records the telehealth modality.',
-    sections: CORE_SOAP,
+    description: 'SOAP note for a video or phone visit, with the telehealth attestation.',
+    // The attestation is a default section, not an optional one: a remote
+    // encounter without recorded consent and both parties' locations does not
+    // evidence a lawful, billable telehealth visit.
+    sections: [...CORE_SOAP, 'telehealth_attestation'],
     optionalSections: COMMON_OPTIONAL,
     telehealth: true,
   },
@@ -192,9 +264,13 @@ export const NOTE_TYPES: Readonly<Record<NoteTypeId, NoteTypeDef>> = {
     id: 'telehealth_hp',
     label: 'Telehealth H&P',
     description: 'History and physical conducted over a telehealth connection.',
+    // No physical_exam by default: what can be examined remotely is limited to
+    // observation, and pre-printing an exam section invites a normal-exam
+    // shortcut for findings nobody could have elicited down a video link.
     sections: [
       'cc', 'hpi', 'past_medical_history', 'family_history', 'social_history',
       'medications', 'allergies', 'ros', 'vitals', 'assessment', 'plan',
+      'telehealth_attestation',
     ],
     optionalSections: ['subjective', 'objective', 'physical_exam', 'mental_functional', 'follow_up'],
     telehealth: true,
@@ -202,19 +278,26 @@ export const NOTE_TYPES: Readonly<Record<NoteTypeId, NoteTypeDef>> = {
   consultation: {
     id: 'consultation',
     label: 'Consultation',
-    description: 'Specialist opinion requested by another provider.',
+    description: 'Specialist opinion answering another provider’s question.',
+    // Opens with the referring question and closes with an explicit
+    // recommendation — the two things that make it a consultation rather than
+    // another progress note.
     sections: [
-      'cc', 'indications', 'hpi', 'medications', 'allergies', 'vitals',
-      'physical_exam', 'assessment', 'plan',
+      'reason_for_consultation', 'hpi', 'past_medical_history', 'medications',
+      'allergies', 'vitals', 'physical_exam', 'assessment', 'recommendations', 'plan',
     ],
-    optionalSections: ['ros', 'past_medical_history', 'family_history', 'social_history', 'follow_up'],
+    optionalSections: ['cc', 'ros', 'family_history', 'social_history', 'follow_up', 'patient_education'],
   },
   procedure: {
     id: 'procedure',
     label: 'Procedure',
     description: 'Operative or bedside procedure record.',
+    // Standard operative-note elements: pre- and post-operative diagnoses,
+    // indication, what was done, anaesthesia, findings, specimens, blood loss,
+    // complications, and where the patient went.
     sections: [
-      'indications', 'procedure', 'anesthesia', 'findings', 'specimens',
+      'preop_diagnosis', 'postop_diagnosis', 'indications', 'procedure',
+      'anesthesia', 'findings', 'specimens', 'estimated_blood_loss',
       'complications', 'disposition', 'plan',
     ],
     optionalSections: ['cc', 'medications', 'allergies', 'vitals', 'follow_up', 'patient_education'],
@@ -223,17 +306,26 @@ export const NOTE_TYPES: Readonly<Record<NoteTypeId, NoteTypeDef>> = {
     id: 'discharge_summary',
     label: 'Discharge Summary',
     description: 'Summary of an admission, its course, and what happens next.',
+    // Ordered the way a receiving clinician reads it: why they came in, what
+    // happened, what they are leaving with, and who does what next.
     sections: [
-      'cc', 'hospital_course', 'assessment', 'discharge_medications',
-      'discharge_instructions', 'follow_up',
+      'admission_reason', 'hospital_course', 'discharge_diagnosis',
+      'discharge_condition', 'discharge_medications', 'discharge_instructions',
+      'follow_up',
     ],
-    optionalSections: ['allergies', 'vitals', 'procedure', 'patient_education', 'social_history'],
+    optionalSections: ['allergies', 'vitals', 'procedure', 'patient_education', 'social_history', 'assessment'],
   },
   nurse_visit: {
     id: 'nurse_visit',
     label: 'Nurse Visit',
-    description: 'Nurse-led visit: observations, care given, escalation.',
-    sections: ['cc', 'subjective', 'vitals', 'objective', 'interventions', 'plan'],
+    description: 'Nurse-led visit: observations, care given, and the response.',
+    // Nursing documentation is assessment → intervention → response. Dropping
+    // the response leaves no evidence the care worked or that escalation was
+    // needed.
+    sections: [
+      'cc', 'subjective', 'vitals', 'objective', 'interventions',
+      'response_to_care', 'plan',
+    ],
     optionalSections: ['medications', 'allergies', 'mental_functional', 'patient_education', 'follow_up'],
   },
   ob_evaluation: {
@@ -287,6 +379,8 @@ export const NOTE_TYPES: Readonly<Record<NoteTypeId, NoteTypeDef>> = {
  */
 const SECTION_RANK: Readonly<Record<NoteSectionId, number>> = {
   cc: 0,
+  reason_for_consultation: 0.4,
+  admission_reason: 0.6,
   call_reason: 1,
   caller: 2,
   subjective: 3,
@@ -303,16 +397,24 @@ const SECTION_RANK: Readonly<Record<NoteSectionId, number>> = {
   objective: 13,
   physical_exam: 14,
   fetal_assessment: 14.5,
+  preop_diagnosis: 14.7,
   indications: 15,
   procedure: 16,
   anesthesia: 17,
   findings: 18,
   specimens: 19,
+  estimated_blood_loss: 19.3,
+  postop_diagnosis: 19.6,
   complications: 20,
   hospital_course: 21,
   assessment: 22,
+  discharge_diagnosis: 22.3,
+  recommendations: 22.6,
   plan: 23,
   interventions: 24,
+  response_to_care: 24.5,
+  telehealth_attestation: 25.5,
+  discharge_condition: 26.5,
   advice_given: 25,
   discharge_medications: 26,
   discharge_instructions: 27,

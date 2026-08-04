@@ -610,10 +610,60 @@
   padding-right: 8px;
 }
 
-.cn-split-menu {
-  top: calc(100% + 4px);
+/*
+ * The type list is deliberately narrow — one label per row, no descriptions.
+ * A wide menu with subtitles reads as a settings screen; this is a pick-one
+ * list a clinician scans in a second, so width tracks the longest label rather
+ * than the longest sentence. Descriptions move to the row's title tooltip.
+ */
+.cn-type-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
   right: 0;
-  min-width: 260px;
+  min-width: 184px;
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 10px;
+  background: var(--color-surface, #fff);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.cn-type-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.25;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cn-type-item:hover,
+.cn-type-item:focus-visible { background: var(--color-surface-muted, #f1f5f9); }
+
+/* The type already in play is marked, so the menu opens on what is selected
+   rather than making the clinician remember what they picked. */
+.cn-type-item.is-selected {
+  background: var(--color-primary-soft, #e6f4f1);
+  font-weight: 600;
+}
+
+.cn-type-tick {
+  width: 12px;
+  flex: 0 0 12px;
+  font-size: 11px;
+  color: var(--color-primary, #0f766e);
 }
 
 .cn-empty {

@@ -54,6 +54,21 @@ export default function CreateNoteButton({
 
   const choose = (type: NoteTypeId) => { setOpen(false); onCreate(type); };
 
+  /**
+   * Selected type first, then the rest alphabetically.
+   *
+   * The type in play sits at the top so the list opens on what is already
+   * chosen and a mis-click reverts in one move; everything below is
+   * alphabetical because with thirteen entries and no frequency data,
+   * alphabetical is the only order a clinician can predict.
+   */
+  function menuOrder(selected: NoteTypeId): NoteTypeId[] {
+    const rest = NOTE_TYPE_ORDER
+      .filter(id => id !== selected)
+      .sort((a, b) => NOTE_TYPES[a].label.localeCompare(NOTE_TYPES[b].label));
+    return [selected, ...rest];
+  }
+
   return (
     <div className={`cn-split ${className}`} ref={boxRef}>
       <button
@@ -80,19 +95,22 @@ export default function CreateNoteButton({
       </button>
 
       {open && (
-        <div className="cn-popover cn-split-menu" role="menu">
-          {NOTE_TYPE_ORDER.map((id) => {
+        <div className="cn-type-menu" role="menu">
+          {menuOrder(defaultType).map((id) => {
             const def = NOTE_TYPES[id];
+            const selected = id === defaultType;
             return (
               <button
                 key={id}
                 type="button"
-                role="menuitem"
-                className="cn-popover-item"
+                role="menuitemradio"
+                aria-checked={selected}
+                className={`cn-type-item${selected ? ' is-selected' : ''}`}
+                title={def.description}
                 onClick={(e) => { e.stopPropagation(); choose(id); }}
               >
+                <span className="cn-type-tick" aria-hidden>{selected ? '✓' : ''}</span>
                 {def.label}
-                <span className="cn-popover-item-body">{def.description}</span>
               </button>
             );
           })}
