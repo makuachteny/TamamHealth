@@ -593,6 +593,29 @@
   font-weight: 600;
 }
 
+/* ── Split "Create Clinical Note" button ────────────────────────────────── */
+.cn-split { position: relative; display: inline-flex; }
+
+.cn-split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right-color: rgba(255, 255, 255, 0.35);
+}
+
+.cn-split-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.cn-split-menu {
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 260px;
+}
+
 .cn-empty {
   padding: 28px 16px;
   text-align: center;

@@ -50,7 +50,9 @@ export type NoteSectionId =
   | 'addendum_reason'
   | 'patient_education'
   | 'goals'
-  | 'interventions';
+  | 'interventions'
+  | 'obstetric_history'
+  | 'fetal_assessment';
 
 export interface NoteSectionDef {
   id: NoteSectionId;
@@ -110,6 +112,14 @@ export const NOTE_SECTIONS: Readonly<Record<NoteSectionId, NoteSectionDef>> = {
   patient_education: { id: 'patient_education', label: 'Patient Education', kind: 'narrative', placeholder: 'Education provided…' },
   goals: { id: 'goals', label: 'Goals', kind: 'narrative', placeholder: 'Treatment goals…' },
   interventions: { id: 'interventions', label: 'Interventions', kind: 'narrative', placeholder: 'Interventions…' },
+  obstetric_history: {
+    id: 'obstetric_history', label: 'Obstetric History', kind: 'narrative',
+    placeholder: 'Gravida/para, previous deliveries, complications, LMP, EDD…',
+  },
+  fetal_assessment: {
+    id: 'fetal_assessment', label: 'Fetal Assessment', kind: 'narrative',
+    placeholder: 'Fundal height, lie and presentation, fetal heart rate, movements…',
+  },
 };
 
 export type NoteTypeId =
@@ -121,6 +131,7 @@ export type NoteTypeId =
   | 'procedure'
   | 'discharge_summary'
   | 'nurse_visit'
+  | 'ob_evaluation'
   | 'phone'
   | 'memo_to_record'
   | 'office_form'
@@ -225,6 +236,16 @@ export const NOTE_TYPES: Readonly<Record<NoteTypeId, NoteTypeDef>> = {
     sections: ['cc', 'subjective', 'vitals', 'objective', 'interventions', 'plan'],
     optionalSections: ['medications', 'allergies', 'mental_functional', 'patient_education', 'follow_up'],
   },
+  ob_evaluation: {
+    id: 'ob_evaluation',
+    label: 'OB Evaluation',
+    description: 'Antenatal or obstetric review: obstetric history, fetal assessment, plan.',
+    sections: [
+      'cc', 'obstetric_history', 'subjective', 'medications', 'allergies',
+      'vitals', 'fetal_assessment', 'objective', 'assessment', 'plan',
+    ],
+    optionalSections: ['hpi', 'ros', 'past_medical_history', 'family_history', 'social_history', 'patient_education', 'follow_up'],
+  },
   phone: {
     id: 'phone',
     label: 'Phone',
@@ -272,6 +293,7 @@ const SECTION_RANK: Readonly<Record<NoteSectionId, number>> = {
   hpi: 4,
   ros: 5,
   past_medical_history: 6,
+  obstetric_history: 6.5,
   family_history: 7,
   social_history: 8,
   medications: 9,
@@ -280,6 +302,7 @@ const SECTION_RANK: Readonly<Record<NoteSectionId, number>> = {
   vitals: 12,
   objective: 13,
   physical_exam: 14,
+  fetal_assessment: 14.5,
   indications: 15,
   procedure: 16,
   anesthesia: 17,
@@ -306,7 +329,7 @@ const SECTION_RANK: Readonly<Record<NoteSectionId, number>> = {
 /** Stable display order for the note type picker. */
 export const NOTE_TYPE_ORDER: readonly NoteTypeId[] = [
   'soap', 'telehealth_soap', 'hp', 'telehealth_hp', 'consultation',
-  'procedure', 'discharge_summary', 'nurse_visit', 'phone',
+  'procedure', 'discharge_summary', 'nurse_visit', 'ob_evaluation', 'phone',
   'memo_to_record', 'office_form', 'amendment',
 ];
 

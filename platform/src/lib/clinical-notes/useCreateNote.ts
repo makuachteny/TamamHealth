@@ -69,6 +69,8 @@ export function useCreateNote(currentUser: CurrentUserLike | null) {
       }
 
       const now = new Date();
+      // An explicit choice from the type dropdown always wins; the telehealth
+      // fallback only applies when the caller did not pick.
       const noteType: NoteTypeId = input.noteType
         ?? (input.telehealth ? 'telehealth_soap' : 'soap');
 

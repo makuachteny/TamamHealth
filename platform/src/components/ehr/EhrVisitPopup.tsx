@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, ArrowRightLeft, ClipboardPen, Clock, FileText, Stethoscope, X } from '@/components/icons/lucide';
+import { ArrowRight, ArrowRightLeft, Clock, FileText, Stethoscope, X } from '@/components/icons/lucide';
+import CreateNoteButton, { defaultNoteTypeFor } from '@/components/clinical-notes/CreateNoteButton';
 import Modal from '@/components/Modal';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { STAGE_LABELS, type QueueEntry, type QueueStage } from '@/lib/services/patient-queue-service';
@@ -97,7 +98,7 @@ export default function EhrVisitPopup({
    * note header needs — creating from the chart makes the clinician re-select
    * all of it.
    */
-  onCreateNote?: () => void;
+  onCreateNote?: (noteType: import('@/lib/clinical-notes/note-catalog').NoteTypeId) => void;
   creatingNote?: boolean;
   /** Render the panel in the flow of the list, under the row it belongs to,
    *  rather than as an overlay. The content is identical — only the frame
@@ -173,19 +174,15 @@ export default function EhrVisitPopup({
               </button>
             )}
             {onCreateNote && patientId && (
-              <button
-                type="button"
-                className="ehr-visit-pop-icon"
-                // The panel renders inside a clickable queue row, so without
-                // stopping propagation the row's own handler runs too and its
-                // re-render cancels the navigation this click started.
-                onClick={(e) => { e.stopPropagation(); onCreateNote(); }}
+              <CreateNoteButton
+                compact
+                defaultType={defaultNoteTypeFor({
+                  telehealth: appointment?.appointmentType === 'telehealth',
+                  reason: appointment?.reason || triage?.chiefComplaint,
+                })}
                 disabled={creatingNote}
-                aria-label="Create clinical note"
-                title="Create clinical note"
-              >
-                <ClipboardPen className="w-4 h-4" aria-hidden />
-              </button>
+                onCreate={onCreateNote}
+              />
             )}
             <button
               type="button"
