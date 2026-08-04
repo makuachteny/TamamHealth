@@ -35,6 +35,11 @@ interface NotesListProps {
   users?: Array<{ _id: string; name: string }>;
   /** Hides the create controls where the caller has its own. */
   showCreate?: boolean;
+  /** Open a note in place (the chart's drawer) instead of the /notes route. */
+  onOpenNote?: (noteId: string) => void;
+  /** Bump to reload — the chart increments this when its note drawer closes,
+   *  since the autosaving editor may have changed what the rows should say. */
+  refreshToken?: number;
 }
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
@@ -46,6 +51,7 @@ const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
 
 export default function NotesList({
   patientId, patientName, mrn, patientDob, currentUser, users = [], showCreate = true,
+  onOpenNote, refreshToken,
 }: NotesListProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -75,7 +81,7 @@ export default function NotesList({
     }
   }, [patientId, userId, display, sortBy, noteType]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, refreshToken]);
 
   const handleCreate = async (noteType: NoteTypeId = newType) => {
     if (!patientId || !patientName) return;
@@ -97,7 +103,8 @@ export default function NotesList({
         hospitalName: currentUser?.hospitalName,
         orgId: currentUser?.orgId,
       });
-      router.push(`/notes/${note._id}`);
+      if (onOpenNote) { onOpenNote(note._id); setCreating(false); void load(); }
+      else router.push(`/notes/${note._id}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not start the note.', 'error');
       setCreating(false);
@@ -218,7 +225,7 @@ export default function NotesList({
             <button
               type="button"
               className="cn-btn"
-              onClick={() => router.push(`/notes/${note._id}`)}
+              onClick={() => (onOpenNote ? onOpenNote(note._id) : router.push(`/notes/${note._id}`))}
             >
               {unsigned ? 'Open' : 'View'}
             </button>

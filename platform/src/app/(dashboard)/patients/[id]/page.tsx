@@ -49,6 +49,7 @@ import BillingTab from '@/components/patients/BillingTab';
 import PatientSBAR from '@/components/patients/PatientSBAR';
 import DirectiveList from '@/components/patients/DirectiveList';
 import NotesList from '@/components/clinical-notes/NotesList';
+import { useCreateNote } from '@/lib/clinical-notes/useCreateNote';
 import PhoneNotes from '@/components/patients/PhoneNotes';
 import AssessmentsPanel from '@/components/patients/AssessmentsPanel';
 import ScreeningsPanel from '@/components/patients/ScreeningsPanel';
@@ -204,8 +205,11 @@ export default function PatientDetailPage() {
   const [showNurseVitals, setShowNurseVitals] = useState(false);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   // One-shot request for the chart shell to open a workspace drawer panel
-  // (e.g. header "+ Note" → the persisting visit-note panel).
+  // (e.g. header "+ Note" → `clinical-note:<id>`, the note editor drawer).
   const [chartPanelRequest, setChartPanelRequest] = useState<string | null>(null);
+  // Bumped when the note drawer closes so the Notes tab under it reloads —
+  // the editor autosaves, so whatever was typed is already on disk by then.
+  const [notesRefreshToken, setNotesRefreshToken] = useState(0);
   // One-shot request for a tab's ChartSection to pop its own "Add" form open
   // (e.g. the Facesheet Problems card's "Add" → Conditions tab + add modal).
   const [sectionAddRequest, setSectionAddRequest] = useState<'problems' | 'allergies' | null>(null);
@@ -322,6 +326,33 @@ export default function PatientDetailPage() {
       .catch(() => { /* best-effort */ });
     return () => { cancelled = true; };
   }, [patientIdForNotes]);
+
+  // ── "+ Note" → the clinical-notes module, edited in the chart's drawer. ──
+  // Reopen today's unsigned draft when one exists (a second click must not
+  // fork the record — the same rule useCreateNote applies per appointment),
+  // otherwise start a SOAP draft. Documentation happens beside the chart; the
+  // /notes/[id] route stays for the cross-patient queue.
+  const { createNote: createClinicalNoteDraft } = useCreateNote(currentUser ?? null);
+  const openClinicalNoteDrawer = useCallback(async () => {
+    if (!patient) return;
+    try {
+      const { listClinicalNotes } = await import('@/lib/clinical-notes/note-service');
+      const today = toIsoDate(new Date());
+      const drafts = await listClinicalNotes({ patientId: patient._id, display: 'unsigned' });
+      const note = drafts.find(n => n.serviceDate === today)
+        ?? await createClinicalNoteDraft({
+          patientId: patient._id,
+          patientName: patientFullName(patient),
+          mrn: patient.hospitalNumber,
+          patientDob: patient.dateOfBirth,
+        }, { navigate: false });
+      if (note) setChartPanelRequest(`clinical-note:${note._id}`);
+    } catch {
+      // The drawer could not be readied — land on the Notes tab so the click
+      // still goes somewhere useful.
+      setActiveTab('notes');
+    }
+  }, [patient, createClinicalNoteDraft]);
 
   // Outstanding balance for the most recent encounter — surfaced as a chip on
   // the "Most Recent Record" hero so clinicians see if the visit is settled.
@@ -1162,7 +1193,7 @@ export default function PatientDetailPage() {
             router={router}
             onOpenPrescribeModal={() => setShowPrescribeModal(true)}
             onOpenOrderLabModal={() => setShowOrderLabModal(true)}
-            onNoteSaved={reloadPatientNotes}
+            onNoteSaved={() => { reloadPatientNotes(); setNotesRefreshToken(t => t + 1); }}
             panelRequest={chartPanelRequest}
             onPanelRequestHandled={() => setChartPanelRequest(null)}
             header={
@@ -1181,7 +1212,7 @@ export default function PatientDetailPage() {
                   setMessageIsEducation(true);
                   setShowMessageModal(true);
                 }}
-                onNote={() => (canConsult ? setChartPanelRequest('visit-note') : setActiveTab('notes'))}
+                onNote={() => (canConsult ? void openClinicalNoteDrawer() : setActiveTab('notes'))}
                 onScripts={() => (canPrescribe ? setShowPrescribeModal(true) : setActiveTab('prescriptions'))}
                 onOrders={() => (canOrderLabs ? setShowOrderLabModal(true) : setActiveTab('labs'))}
                 onExchange={() => (canManageReferrals ? setShowReferModal(true) : setActiveTab('appointments'))}
@@ -1353,6 +1384,10 @@ export default function PatientDetailPage() {
                   patientDob={patient.dateOfBirth}
                   currentUser={currentUser}
                   showCreate={canConsult}
+                  // In chart context a note opens beside the chart, not on the
+                  // standalone /notes route.
+                  onOpenNote={id => setChartPanelRequest(`clinical-note:${id}`)}
+                  refreshToken={notesRefreshToken}
                 />
               </div>
               {/* Telephone contacts stay separate: they are care-team messages
