@@ -1765,6 +1765,17 @@ export interface Patient {
   assignmentAcceptedAt?: string;
   assignmentAcceptedBy?: string;
   assignmentAcceptedByName?: string;
+  /**
+   * The nurse covering this patient. Separate from `assignedBy`, which records
+   * who *made* the doctor assignment — the front desk was reading that field as
+   * "the nurse", which showed whoever last assigned a provider instead of who
+   * is actually looking after the patient.
+   */
+  assignedNurse?: string;
+  assignedNurseName?: string;
+  assignedNurseAt?: string;
+  assignedNurseBy?: string;
+  assignedNurseByName?: string;
   /** Department currently responsible for the patient (e.g. "Paediatrics"). */
   assignedDepartment?: string;
   /**

@@ -13,7 +13,7 @@ import Modal from '@/components/Modal';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
 import { checkNewPrescription, type DrugInteraction, type InteractionSeverity } from '@/lib/services/drug-interaction-service';
 import { formatMoney , formatRxSig } from '@/lib/format-utils';
-import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel, pharmacyStageTone } from '@/lib/pharmacy-workflow';
+import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageGroup, pharmacyStageLabel, pharmacyStageTone } from '@/lib/pharmacy-workflow';
 import type { PrescriptionDoc, PharmacyInventoryDoc, UserDoc } from '@/lib/db-types';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 import EhrCareDashboard, {
@@ -298,8 +298,11 @@ export default function PharmacyDashboardPage() {
   // Receive stock modal (record purchased drugs arriving)
   const [showReceiveStock, setShowReceiveStock] = useState(false);
   const [receivingStock, setReceivingStock] = useState(false);
-  // Prescription queue status filter
-  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'review' | 'payment' | 'ready' | 'dispensed' | 'controlled'>('all');
+  // Prescription queue lane filter — the shared three-lane vocabulary every
+  // role dashboard shows: Scheduled = ordered/awaiting pickup by the workflow,
+  // In Office = actively being worked (review → cleared/held), Finished =
+  // dispensed/counseled/complete.
+  const [queueFilter, setQueueFilter] = useState<'scheduled' | 'in_office' | 'finished'>('scheduled');
   // Which stat panel (header toggles) occupies the center instead of the Rx
   // queue; null = normal queue view.
   const [centerPanel, setCenterPanel] = useState<'pipeline' | 'stock' | 'charts' | null>(null);
@@ -313,7 +316,7 @@ export default function PharmacyDashboardPage() {
   useEffect(() => {
     if (!deepLinkPatientId && !deepLinkPatientName && !deepLinkRxId) return;
     setCenterPanel(null);
-    setQueueFilter('all');
+    setQueueFilter('scheduled');
     setQueueSearch('');
   }, [deepLinkPatientId, deepLinkPatientName, deepLinkRxId]);
 
@@ -463,28 +466,26 @@ export default function PharmacyDashboardPage() {
   const criticalCount = inventory.filter(i => i.status === 'critical').length;
   const expiredCount = inventory.filter(i => i.status === 'expired').length;
   const inStockCount = inventory.filter(i => i.status === 'adequate').length;
-  const controlledCount = rxQueue.filter(isControlled).length;
+  // Lane tab counts — the same three lanes as every other role dashboard.
+  // Finished reuses dispensedCount (dispensed/counseled/complete is exactly
+  // the finished lane).
+  const scheduledLaneCount = rxQueue.filter(r => pharmacyStageGroup(pharmacyStage(r)) === 'scheduled').length;
+  const inOfficeLaneCount = rxQueue.filter(r => pharmacyStageGroup(pharmacyStage(r)) === 'in_office').length;
 
   // Queue filtered by the selected status chip and the inline search query.
   const queueQuery = queueSearch.trim().toLowerCase();
   const visibleQueue = rxQueue.filter(rx => {
     const stage = pharmacyStage(rx);
-    const balance = patientBalanceFor(rx);
     const deepLinkOk =
       deepLinkRxId ? rx._id === deepLinkRxId :
       deepLinkPatientId ? rx.patientId === deepLinkPatientId :
       deepLinkPatientName ? rx.patientName.toLowerCase() === deepLinkPatientName.toLowerCase() :
       true;
     if (!deepLinkOk) return false;
-    const statusOk =
-      queueFilter === 'all' ? true :
-      queueFilter === 'controlled' ? isControlled(rx) :
-      queueFilter === 'pending' ? rx.status === 'pending' :
-      queueFilter === 'review' ? reviewStages.includes(stage) :
-      queueFilter === 'payment' ? stage === 'cleared_for_dispensing' && !isFinanciallyCleared(balance) :
-      queueFilter === 'ready' ? stage === 'cleared_for_dispensing' && isFinanciallyCleared(balance) :
-      queueFilter === 'dispensed' ? ['dispensed', 'counseled', 'complete'].includes(stage) :
-      true;
+    // A deep link targets one prescription/patient wherever it sits in the
+    // workflow — never let the lane tab hide the row the link promised.
+    const deepLinking = Boolean(deepLinkRxId || deepLinkPatientId || deepLinkPatientName);
+    const statusOk = deepLinking || pharmacyStageGroup(stage) === queueFilter;
     if (!statusOk) return false;
     if (!queueQuery) return true;
     return (
@@ -768,10 +769,9 @@ export default function PharmacyDashboardPage() {
           greetingName={currentUser?.name}
           dateLabel={dateLabel}
           tabs={[
-            { key: 'all', label: t('pharmacy.viewAll'), count: rxQueue.length },
-            { key: 'pending', label: t('pharmacy.pending'), count: pendingRx },
-            { key: 'dispensed', label: t('pharmacy.kpiDispensed'), count: dispensedCount },
-            { key: 'controlled', label: t('pharmacy.kpiControlled'), count: controlledCount },
+            { key: 'scheduled', label: 'Scheduled', count: scheduledLaneCount },
+            { key: 'in_office', label: 'In Office', count: inOfficeLaneCount },
+            { key: 'finished', label: 'Finished', count: dispensedCount },
           ]}
           activeTab={queueFilter}
           onTabChange={(k) => setQueueFilter(k as typeof queueFilter)}

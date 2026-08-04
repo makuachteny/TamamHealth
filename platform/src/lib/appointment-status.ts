@@ -131,6 +131,31 @@ export const APPOINTMENT_CLOSED_STATUSES: AppointmentStatus[] = ['completed', 'c
  */
 export const APPOINTMENT_PENDING_STATUSES: AppointmentStatus[] = ['scheduled', 'reminder_sent', 'confirmed', 'arrived'];
 
+/**
+ * The three-lane view every role dashboard files its queue into — the same
+ * lanes the mobile shell shows: Scheduled (booked, patient not yet with us),
+ * In Office (visit open at the facility), Finished (the slot is closed —
+ * checked out, cancelled, no-show or rescheduled, nothing further today).
+ */
+export type AppointmentStatusGroup = 'scheduled' | 'in_office' | 'finished';
+
+export const APPOINTMENT_STATUS_GROUPS: AppointmentStatusGroup[] = ['scheduled', 'in_office', 'finished'];
+
+export const APPOINTMENT_STATUS_GROUP_LABELS: Record<AppointmentStatusGroup, string> = {
+  scheduled: 'Scheduled',
+  in_office: 'In Office',
+  finished: 'Finished',
+};
+
+export function appointmentStatusGroup(status: AppointmentStatus): AppointmentStatusGroup {
+  if (status === 'checked_in' || status === 'in_progress') return 'in_office';
+  if (APPOINTMENT_CLOSED_STATUSES.includes(status)) return 'finished';
+  // requested/scheduled/reminder_sent/confirmed — and `arrived`: the patient is
+  // in the waiting room but the desk has not opened the visit yet, so they
+  // still belong to the expected lane, matching APPOINTMENT_PENDING_STATUSES.
+  return 'scheduled';
+}
+
 export function appointmentStatusLabel(status: AppointmentStatus): string {
   return APPOINTMENT_STATUS_LABELS[status]
     // A status written by an older client than this build still reads sanely.

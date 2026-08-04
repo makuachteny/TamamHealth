@@ -28,7 +28,11 @@ import { initials, stateTint, AVATAR_TINT_NEUTRAL } from '@/lib/patient-utils';
 import { NOTIFICATION_META, SEVERITY_META } from '@/lib/notification-meta';
 import type { NotificationSeverity, NotificationType } from '@/lib/hooks/useNotifications';
 import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
-import { APPOINTMENT_STATUS_OPTIONS, appointmentStatusLabel } from '@/lib/appointment-status';
+import {
+  APPOINTMENT_STATUS_OPTIONS, appointmentStatusLabel,
+  APPOINTMENT_STATUS_GROUPS, APPOINTMENT_STATUS_GROUP_LABELS,
+  appointmentStatusGroup, type AppointmentStatusGroup,
+} from '@/lib/appointment-status';
 import { useToast } from '@/components/Toast';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -706,19 +710,24 @@ export default function EhrClinicalDashboard({
     };
   };
 
-  // Daybar filter pills (design): Waiting = rows actively in a queue (arrived,
-  // not yet in service) or checked in; Scheduled = everything else (in
-  // service, booked appointments, registry-only assignments).
-  const [worklistFilter, setWorklistFilter] = useState<'all' | 'waiting' | 'scheduled'>('all');
-  const isWaitingRow = (row: UnifiedPatientRow) => {
+  // Daybar filter pills — the shared three-lane vocabulary every role
+  // dashboard uses: Scheduled (booked/assigned, patient not with us yet),
+  // In Office (in the building: live queue entry, checked in, or in service),
+  // Finished (visit closed — checked out, cancelled, no-show, rescheduled).
+  const [worklistFilter, setWorklistFilter] = useState<AppointmentStatusGroup>('scheduled');
+  const rowStatusGroup = (row: UnifiedPatientRow): AppointmentStatusGroup => {
+    const group = appointmentStatusGroup(row.status);
+    if (group !== 'scheduled') return group;
+    // A live queue entry means the patient is physically here even when the
+    // appointment rung still says scheduled/arrived (walk-ins, triage).
     const columns = rowQueueColumns(row);
-    return !columns.inService && (Boolean(columns.entry) || row.status === 'checked_in');
+    return columns.entry || columns.inService ? 'in_office' : 'scheduled';
   };
-  const waitingCount = visiblePatientRows.filter(isWaitingRow).length;
-  const scheduledCount = visiblePatientRows.length - waitingCount;
-  const filteredPatientRows = worklistFilter === 'all'
-    ? visiblePatientRows
-    : visiblePatientRows.filter(row => isWaitingRow(row) === (worklistFilter === 'waiting'));
+  const groupCounts = visiblePatientRows.reduce(
+    (counts, row) => { counts[rowStatusGroup(row)] += 1; return counts; },
+    { scheduled: 0, in_office: 0, finished: 0 } as Record<AppointmentStatusGroup, number>,
+  );
+  const filteredPatientRows = visiblePatientRows.filter(row => rowStatusGroup(row) === worklistFilter);
 
   // Row popup (visit info + actions) and the Move dialog it can open.
   const [visitRow, setVisitRow] = useState<UnifiedPatientRow | null>(null);
@@ -782,17 +791,18 @@ export default function EhrClinicalDashboard({
     return rows.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.weight - a.weight);
   }, [overdueLabRows, visiblePatientRows, queueEntryByPatient, router]);
 
-  // A visit opened from the alert rail may belong to a bucket the worklist is
-  // filtered away from — the panel would then expand a row nobody can see. Fall
-  // back to "all" and scroll the row into view so the panel is where the click
-  // implied it would be.
+  // A visit opened from the alert rail may belong to a lane the worklist is
+  // filtered away from — the panel would then expand a row nobody can see.
+  // Switch to the row's own lane and scroll it into view so the panel is where
+  // the click implied it would be.
+  const visitRowGroup = visitRow ? rowStatusGroup(visitRow) : null;
   useEffect(() => {
-    if (!visitRow) return;
+    if (!visitRow || !visitRowGroup) return;
     const visible = filteredPatientRows.some(row => row.id === visitRow.id);
-    if (!visible) { setWorklistFilter('all'); return; }
+    if (!visible) { setWorklistFilter(visitRowGroup); return; }
     const el = document.getElementById(`worklist-row-${visitRow.id}`);
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [visitRow, filteredPatientRows]);
+  }, [visitRow, visitRowGroup, filteredPatientRows]);
 
   const [moveEntry, setMoveEntry] = useState<QueueEntry | null>(null);
   const [moveSaving, setMoveSaving] = useState(false);
@@ -1304,30 +1314,17 @@ export default function EhrClinicalDashboard({
 	          <div className="ehr-daybar ehr-assigned-worklist-daybar">
 	            <h2>Patients assigned to you</h2>
 	            <div className="ehr-day-tabs">
-              <button
-                type="button"
-                className={worklistFilter === 'all' ? 'active' : undefined}
-                aria-pressed={worklistFilter === 'all'}
-                onClick={() => setWorklistFilter('all')}
-              >
-                All · {visiblePatientRows.length}
-              </button>
-              <button
-                type="button"
-                className={worklistFilter === 'waiting' ? 'active' : undefined}
-                aria-pressed={worklistFilter === 'waiting'}
-                onClick={() => setWorklistFilter('waiting')}
-              >
-                Waiting · {waitingCount}
-              </button>
-              <button
-                type="button"
-                className={worklistFilter === 'scheduled' ? 'active' : undefined}
-                aria-pressed={worklistFilter === 'scheduled'}
-                onClick={() => setWorklistFilter('scheduled')}
-              >
-                Scheduled · {scheduledCount}
-              </button>
+              {APPOINTMENT_STATUS_GROUPS.map(group => (
+                <button
+                  key={group}
+                  type="button"
+                  className={worklistFilter === group ? 'active' : undefined}
+                  aria-pressed={worklistFilter === group}
+                  onClick={() => setWorklistFilter(group)}
+                >
+                  {APPOINTMENT_STATUS_GROUP_LABELS[group]} · {groupCounts[group]}
+                </button>
+              ))}
 	            </div>
 	          </div>
 
@@ -1357,8 +1354,8 @@ export default function EhrClinicalDashboard({
                   </div>
                   {filteredPatientRows.length === 0 && (
                     <div className="ehr-empty-state">
-                      <strong>No {worklistFilter} patients</strong>
-                      <span>Nothing is in the {worklistFilter === 'waiting' ? 'waiting' : 'scheduled'} bucket right now.</span>
+                      <strong>No {APPOINTMENT_STATUS_GROUP_LABELS[worklistFilter].toLowerCase()} patients</strong>
+                      <span>Nothing is in the {APPOINTMENT_STATUS_GROUP_LABELS[worklistFilter].toLowerCase()} lane right now.</span>
                     </div>
                   )}
                   {filteredPatientRows.map((row) => {

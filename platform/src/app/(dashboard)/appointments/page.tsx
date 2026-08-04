@@ -1123,6 +1123,11 @@ export default function AppointmentsPage() {
                         appointmentType: formType, priority: formPriority, department: formDepartment,
                         providerName: formProvider, reason: formReason, notes: formNotes,
                       });
+                      // Status goes through updateStatus, not the field write
+                      // above: that path stamps confirmedAt/checkedInAt, appends
+                      // the status history, and enforces who may confirm. A raw
+                      // field write would skip all three.
+                      if (formStatus !== apt.status) await handleStatusChange(apt._id, formStatus);
                       showToast(t('appointments.toastUpdated'), 'success'); setEditingApt(null);
                     } catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
                   }}

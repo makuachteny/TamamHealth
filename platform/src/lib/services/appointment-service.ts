@@ -9,6 +9,7 @@ import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
 import { withPendingOfflineSync } from '../sync/offline-metadata';
 import { APPOINTMENT_PENDING_STATUSES } from '../appointment-status';
+import { isTimeOverlap } from '../appointment-time';
 
 export type AppointmentStatusUpdateExtra = {
   cancelledReason?: string;
@@ -328,19 +329,6 @@ export async function getAppointmentStats(scope?: DataScope) {
     byType: groupBy(all, 'appointmentType'),
     byDepartment: groupBy(all, 'department'),
   };
-}
-
-// Helper: check time overlap
-function isTimeOverlap(startA: string, durationA: number, startB: string, durationB: number): boolean {
-  const toMinutes = (t: string) => {
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  };
-  const a1 = toMinutes(startA);
-  const a2 = a1 + durationA;
-  const b1 = toMinutes(startB);
-  const b2 = b1 + durationB;
-  return a1 < b2 && b1 < a2;
 }
 
 function groupBy<T>(arr: T[], key: keyof T): Record<string, number> {

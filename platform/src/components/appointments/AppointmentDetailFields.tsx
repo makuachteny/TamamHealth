@@ -1,0 +1,181 @@
+'use client';
+
+/**
+ * The rest of an appointment, below its status: how and where the visit happens,
+ * who else is on it, which room it needs, and what the patient's cover looks
+ * like. Everything here was missing from the edit form, which had only
+ * date/time/duration/type/priority/department/provider/reason/notes.
+ *
+ * Split out of the appointments page rather than inlined: that page is already
+ * ~1,400 lines and is edited often, and these fields are a self-contained group
+ * with their own data (facilities, staff, rooms, insurance).
+ *
+ * Read-only by design: Billing & Insurance shows what the payer record already
+ * says. Cover is edited where policies are managed, not while moving a booking.
+ */
+import { useMemo } from 'react';
+import { useHospitals } from '@/lib/hooks/useHospitals';
+import { useUsers } from '@/lib/hooks/useUsers';
+import { usePatientPayments } from '@/lib/hooks/usePayments';
+import { useSettings } from '@/lib/settings/SettingsProvider';
+import { formatDate } from '@/lib/format-utils';
+import { isTimeOverlap } from '@/lib/appointment-time';
+import type { AppointmentDoc, PatientDoc } from '@/lib/db-types';
+import { AlertTriangle } from '@/components/icons/lucide';
+
+export interface AppointmentDetailFieldValues {
+  mode: 'in_office' | 'telehealth';
+  facilityId: string;
+  recurrence: '' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
+  staffId: string;
+  room: string;
+}
+
+export default function AppointmentDetailFields({
+  patient,
+  appointment,
+  appointments,
+  providerId,
+  providerName,
+  date,
+  time,
+  duration,
+  values,
+  onChange,
+}: {
+  patient?: PatientDoc;
+  /** The appointment being edited, so its own row is excluded from conflicts. */
+  appointment?: AppointmentDoc;
+  /** Every appointment already loaded by the page, for the conflict check. */
+  appointments: AppointmentDoc[];
+  providerId?: string;
+  providerName?: string;
+  date: string;
+  time: string;
+  duration: number;
+  values: AppointmentDetailFieldValues;
+  onChange: (patch: Partial<AppointmentDetailFieldValues>) => void;
+}) {
+  const { hospitals } = useHospitals();
+  const { users } = useUsers();
+  const { rooms } = useSettings();
+  const { policies, balance } = usePatientPayments(patient?._id);
+
+  // Staff who can be the second person on a visit — nursing and front-of-house
+  // roles, not the provider carrying it.
+  const staffOptions = useMemo(() => users
+    .filter(u => ['nurse', 'midwife', 'clinical_officer', 'front_desk', 'clinic_clerk'].includes(u.role || ''))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '')), [users]);
+
+  /**
+   * Does this slot collide with another booking for the same provider? Same rule
+   * the service enforces on create (`isTimeOverlap`, ignoring cancelled and
+   * no-show rows) — surfaced here so the clash is visible while editing instead
+   * of only as a thrown error on save.
+   */
+  const conflict = useMemo(() => {
+    if (!providerId || !date || !time) return null;
+    return appointments.find(other =>
+      other._id !== appointment?._id
+      && other.providerId === providerId
+      && other.appointmentDate === date
+      && other.status !== 'cancelled'
+      && other.status !== 'no_show'
+      && isTimeOverlap(other.appointmentTime, other.duration, time, duration)
+    ) || null;
+  }, [appointments, appointment?._id, providerId, date, time, duration]);
+
+  const primaryPolicy = policies.find(p => p.isPrimary) || policies[0];
+
+  return (
+    <>
+      {/* ── How and where ─────────────────────────────────────────────── */}
+      <div>
+        <label>Appointment mode</label>
+        <div style={{ display: 'flex', gap: 18, padding: '6px 0' }}>
+          {([['in_office', 'In office'], ['telehealth', 'Telehealth']] as const).map(([value, label]) => (
+            <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 7, textTransform: 'none', fontSize: 13, cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="appointment-mode"
+                checked={values.mode === value}
+                onChange={() => onChange({ mode: value })}
+                style={{ width: 15, height: 15 }}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
+        <div>
+          <label>Service location</label>
+          <select value={values.facilityId} onChange={e => onChange({ facilityId: e.target.value })}>
+            <option value="">Unchanged</option>
+            {hospitals.map(hospital => <option key={hospital._id} value={hospital._id}>{hospital.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label>Room</label>
+          <select value={values.room} onChange={e => onChange({ room: e.target.value })}>
+            <option value="">No room</option>
+            {rooms.map(room => <option key={room} value={room}>{room}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* ── Who else is on it ─────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
+        <div>
+          <label>Staff</label>
+          <select value={values.staffId} onChange={e => onChange({ staffId: e.target.value })}>
+            <option value="">None</option>
+            {staffOptions.map(person => (
+              <option key={person._id} value={person._id}>{person.name || person.username}{person.role ? ` · ${person.role.replace(/_/g, ' ')}` : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label>Recurrence</label>
+          <select value={values.recurrence} onChange={e => onChange({ recurrence: e.target.value as AppointmentDetailFieldValues['recurrence'] })}>
+            <option value="">Does not repeat</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Every 2 weeks</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+          </select>
+        </div>
+      </div>
+
+      {/* The provider clash, stated where the time is being chosen. */}
+      {conflict && (
+        <p
+          role="status"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0, fontSize: 12, fontWeight: 600, color: 'var(--color-danger)' }}
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          {providerName || 'This provider'} already has {conflict.patientName} at {conflict.appointmentTime} — conflicts with another appointment.
+        </p>
+      )}
+
+      {/* ── Billing & insurance, as recorded ──────────────────────────── */}
+      <div>
+        <label>Billing &amp; insurance</label>
+        <div className="appointment-billing-panel">
+          <div><dt>Balance</dt><dd>{balance ? `SSP ${balance.toLocaleString()}` : 'Nothing due'}</dd></div>
+          {primaryPolicy ? (
+            <>
+              <div><dt>Payer</dt><dd>{primaryPolicy.payerName}</dd></div>
+              <div><dt>Effective</dt><dd>{primaryPolicy.effectiveDate ? formatDate(primaryPolicy.effectiveDate) : 'Not specified'}</dd></div>
+              <div><dt>Copay</dt><dd>{typeof primaryPolicy.copayAmount === 'number' ? `SSP ${primaryPolicy.copayAmount.toLocaleString()}` : '—'}</dd></div>
+              <div><dt>Eligibility</dt><dd>{primaryPolicy.isActive ? 'Active' : 'Inactive — patient pays'}</dd></div>
+            </>
+          ) : (
+            <div><dt>Cover</dt><dd>Self-paying — no policy on file</dd></div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

@@ -1948,7 +1948,18 @@ export interface AppointmentDoc extends BaseDoc {
   endTime?: string;           // HH:MM estimated end
   duration: number;           // minutes
   appointmentType: AppointmentType;
+  /**
+   * How the visit happens, independent of what kind of visit it is. Legacy rows
+   * carry no mode and are read as in-office unless `appointmentType` is
+   * 'telehealth', which is how a remote visit used to be recorded.
+   */
+  appointmentMode?: 'in_office' | 'telehealth';
   priority: AppointmentPriority;
+  /** Second staff member on the visit (rooming nurse, interpreter, scribe). */
+  staffId?: string;
+  staffName?: string;
+  /** Exam room or bay this visit is booked into. */
+  room?: string;
   department: string;
   // Clinical context
   reason: string;             // Chief complaint or reason for visit

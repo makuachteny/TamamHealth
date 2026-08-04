@@ -17,6 +17,9 @@ import {
   APPOINTMENT_CHECKED_IN_STATUSES,
   APPOINTMENT_CLOSED_STATUSES,
   APPOINTMENT_PENDING_STATUSES,
+  APPOINTMENT_STATUS_GROUPS,
+  APPOINTMENT_STATUS_GROUP_LABELS,
+  appointmentStatusGroup,
   appointmentStatusLabel,
   priorAppointmentStatus,
 } from '../lib/appointment-status';
@@ -107,6 +110,33 @@ describe('appointment status groups', () => {
     ]) {
       for (const status of group) expect(ALL_STATUSES).toContain(status);
     }
+  });
+});
+
+describe('appointmentStatusGroup', () => {
+  it('files every status into exactly one of the three dashboard lanes', () => {
+    for (const status of ALL_STATUSES) {
+      expect(APPOINTMENT_STATUS_GROUPS).toContain(appointmentStatusGroup(status));
+    }
+  });
+
+  it('keeps arrived in the scheduled lane until the desk opens the visit', () => {
+    for (const status of ['requested', ...APPOINTMENT_PENDING_STATUSES] as AppointmentStatus[]) {
+      expect(appointmentStatusGroup(status)).toBe('scheduled');
+    }
+  });
+
+  it('puts the open visit in office and every closed slot in finished', () => {
+    expect(appointmentStatusGroup('checked_in')).toBe('in_office');
+    expect(appointmentStatusGroup('in_progress')).toBe('in_office');
+    for (const status of APPOINTMENT_CLOSED_STATUSES) {
+      expect(appointmentStatusGroup(status)).toBe('finished');
+    }
+  });
+
+  it('labels all three lanes', () => {
+    expect(APPOINTMENT_STATUS_GROUPS.map(g => APPOINTMENT_STATUS_GROUP_LABELS[g]))
+      .toEqual(['Scheduled', 'In Office', 'Finished']);
   });
 });
 

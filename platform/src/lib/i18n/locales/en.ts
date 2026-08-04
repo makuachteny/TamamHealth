@@ -359,6 +359,7 @@ const en: TranslationMap = {
   'appointments.labelNotes': 'Notes',
   'appointments.labelPatient': 'Patient *',
   'appointments.labelPriority': 'Priority',
+  'appointments.labelStatus': 'Status',
   'appointments.labelProvider': 'Provider',
   'appointments.labelReason': 'Reason *',
   'appointments.labelReasonForVisit': 'Reason for Visit *',

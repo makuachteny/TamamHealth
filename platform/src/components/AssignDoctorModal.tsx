@@ -85,61 +85,20 @@ export default function AssignDoctorModal({
     }
     setSaving(true);
     try {
-      const now = new Date().toISOString();
-      const { updatePatient } = await import('@/lib/services/patient-service');
-      await updatePatient(target.patientId, {
-        assignedDoctor: doctor._id,
-        assignedDoctorName: doctor.name,
-        assignedAt: now,
-        assignedBy: currentUser?._id,
-        assignedByName: currentUser?.name,
-        assignmentNote: note.trim() || undefined,
-        assignmentStatus: 'assigned',
-        assignmentAcceptedAt: undefined,
-        assignmentAcceptedBy: undefined,
-        assignmentAcceptedByName: undefined,
+      // One shared assignment path (patient fields → progress tracker → triage
+      // handoff), so this modal and the front desk's inline picker cannot drift.
+      const { assignProviderToPatient } = await import('@/lib/services/patient-assignment-service');
+      await assignProviderToPatient({
+        patientId: target.patientId,
+        patientName: target.patientName,
+        provider: { id: doctor._id, name: doctor.name, role: doctor.role },
+        actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
+        hospitalId: currentUser?.hospitalId,
+        hospitalName: currentUser?.hospital?.name || currentUser?.hospitalName,
+        orgId: currentUser?.orgId,
+        triageId: target.triageId,
+        note,
       });
-
-      // Create the shared operational tracker at the moment responsibility is
-      // handed to the provider. The patient assignment remains the source of
-      // truth; tracker failure must not block care routing.
-      try {
-        const { ensureConsultationProgress, assignProgressOwner, updateProgressStage } = await import('@/lib/services/consultation-progress-service');
-        const tracker = await ensureConsultationProgress({
-          patientId: target.patientId,
-          patientName: target.patientName,
-          hospitalId: currentUser?.hospitalId || '',
-          hospitalName: currentUser?.hospital?.name || currentUser?.hospitalName || '',
-          orgId: currentUser?.orgId,
-          actor: { id: currentUser?._id, name: currentUser?.name, role: currentUser?.role },
-        });
-        await assignProgressOwner(tracker._id, { id: doctor._id, name: doctor.name, role: doctor.role }, {
-          id: currentUser?._id,
-          name: currentUser?.name,
-          role: currentUser?.role,
-        });
-        await updateProgressStage(tracker._id, 'waiting_for_provider', {
-          id: currentUser?._id,
-          name: currentUser?.name,
-          role: currentUser?.role,
-        }, 'Provider to accept assignment');
-      } catch {
-        // Operational tracking is additive and must not prevent assignment.
-      }
-
-      // Stamp the triage handoff too, so the triage record shows who took over.
-      if (target.triageId) {
-        try {
-          const { updateTriage } = await import('@/lib/services/triage-service');
-          await updateTriage(target.triageId, {
-            handoffTo: doctor._id,
-            handoffToName: doctor.name,
-            handoffAt: now,
-          });
-        } catch {
-          // non-fatal — the patient assignment is the source of truth
-        }
-      }
 
       showToast(`${target.patientName} assigned to ${doctor.name}`, 'success');
       onAssigned?.({ id: doctor._id, name: doctor.name });
