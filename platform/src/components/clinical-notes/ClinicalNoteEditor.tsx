@@ -21,7 +21,10 @@ import {
 } from '@/components/icons/lucide';
 import { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
-import NoteSectionCard, { type PlanActionRequest } from './NoteSectionCard';
+import NoteSectionCard from './NoteSectionCard';
+import AssignPicker from './AssignPicker';
+import PrescribeModal from './prescribe/PrescribeModal';
+import type { NoteSectionActionId } from '@/lib/clinical-notes/section-actions';
 import MedicationsModal from './MedicationsModal';
 import IncludeProblemsModal from './assessment/IncludeProblemsModal';
 import AllergiesModal from './AllergiesModal';
@@ -36,14 +39,16 @@ import {
 import {
   getClinicalNoteById, updateClinicalNote, saveNoteSection, addNoteSection,
   removeNoteSection, changeNoteType, clearNote, signClinicalNote,
-  addNoteAddendum, recordPlanAction, copyNoteForward, isNoteLocked,
+  addNoteAddendum, recordPlanAction, isNoteLocked,
   listClinicalNotes,
 } from '@/lib/clinical-notes/note-service';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 import type { PatientDoc, PatientDocumentDoc } from '@/lib/db-types';
 import { loadChartSnapshot, snapshotForSection, formatProblems } from '@/lib/clinical-notes/chart-snapshot';
 import { stripTemplateMarkers } from '@/lib/clinical-notes/section-templates';
-import type { ClinicalNoteDoc, NoteSectionContent, NoteDiagnosis } from '@/lib/clinical-notes/types';
+import type {
+  ClinicalNoteDoc, NoteSectionContent, NoteDiagnosis, NotePlanAction,
+} from '@/lib/clinical-notes/types';
 import './clinical-notes.css';
 
 const AUTOSAVE_MS = 900;
@@ -96,6 +101,7 @@ export default function ClinicalNoteEditor({
   const [showMedications, setShowMedications] = useState(false);
   const [showProblems, setShowProblems] = useState(false);
   const [showAllergies, setShowAllergies] = useState(false);
+  const [showPrescribe, setShowPrescribe] = useState(false);
   const [problems, setProblems] = useState<SummaryProblem[]>([]);
   const [socialHistory, setSocialHistory] = useState<SummarySocialHistory[]>([]);
 
@@ -280,53 +286,55 @@ export default function ClinicalNoteEditor({
     showToast('Note cleared.', 'success');
   };
 
-  const handleSalt = async () => {
+  // ── Section actions ─────────────────────────────────────────────────────
+  // Actions that open a popup do so here; actions that hand the work to
+  // another module are recorded on the note first (so the note itself shows
+  // what was raised from it) and then navigate.
+  const ROUTED_ACTIONS: Partial<Record<NoteSectionActionId, {
+    kind: NotePlanAction['kind']; label: string; href: (patientId: string) => string;
+  }>> = useMemo(() => ({
+    order_lab: {
+      kind: 'lab', label: 'Lab/study ordered from the note',
+      href: id => `/lab?patientId=${id}&action=order`,
+    },
+    order_vaccine: {
+      kind: 'vaccine', label: 'Vaccine ordered from the note',
+      href: id => `/immunizations?patientId=${id}`,
+    },
+    patient_education: {
+      kind: 'patient_education', label: 'Patient education sent from the note',
+      href: id => `/messages?patientId=${id}&kind=education`,
+    },
+    refer: {
+      kind: 'referral', label: 'Referral raised from the note',
+      href: id => `/referrals?patientId=${id}`,
+    },
+  }), []);
+
+  const handleSectionAction = useCallback(async (actionId: NoteSectionActionId) => {
     if (!note) return;
-    const created = await copyNoteForward(note._id, {
-      patientId: note.patientId,
-      patientName: note.patientName,
-      mrn: note.mrn,
-      patientDob: note.patientDob,
-      serviceDate: new Date().toISOString().slice(0, 10),
-      assignedToId: note.assignedToId,
-      assignedToName: note.assignedToName,
-      authorId: currentUser?._id,
-      authorName: userName,
-      hospitalId: note.hospitalId,
-      hospitalName: note.hospitalName,
-      orgId: note.orgId,
-    });
-    if (created) {
-      showToast('Copied forward into a new draft.', 'success');
-      router.push(`/notes/${created._id}`);
+    switch (actionId) {
+      case 'include_problems': setShowProblems(true); return;
+      case 'review_medications': setShowMedications(true); return;
+      case 'manage_allergies': setShowAllergies(true); return;
+      case 'prescribe': setShowPrescribe(true); return;
+      case 'record_vitals':
+        router.push(`/patients/${note.patientId}?tab=vitals`);
+        return;
+      case 'schedule_followup':
+        router.push(`/appointments?patientId=${note.patientId}`);
+        return;
+      default: break;
     }
-  };
-
-  // ── Plan actions ────────────────────────────────────────────────────────
-  const handlePlanAction = async (request: PlanActionRequest) => {
-    if (!note) return;
-    const destinations: Record<string, string> = {
-      medication: `/pharmacy?patientId=${note.patientId}`,
-      lab: `/lab?patientId=${note.patientId}&action=order`,
-      vaccine: `/immunizations?patientId=${note.patientId}`,
-      patient_education: `/messages?patientId=${note.patientId}&kind=education`,
-    };
-    const labels: Record<string, string> = {
-      medication: 'Prescription raised from the plan',
-      lab: 'Lab/study ordered from the plan',
-      vaccine: 'Vaccine ordered from the plan',
-      patient_education: 'Patient education sent from the plan',
-    };
-
+    const routed = ROUTED_ACTIONS[actionId];
+    if (!routed) return;
     await persist(() => recordPlanAction(noteId, {
-      kind: request.kind,
-      label: labels[request.kind] ?? request.kind,
+      kind: routed.kind,
+      label: routed.label,
       createdBy: currentUser?._id,
     }));
-
-    const href = destinations[request.kind];
-    if (href) router.push(href);
-  };
+    router.push(routed.href(note.patientId));
+  }, [note, noteId, persist, router, currentUser?._id, ROUTED_ACTIONS]);
 
   // ── Assessment: problems checked in the Include Problems popup become
   //    diagnosis lines on the note, deduped against what is already there ──
@@ -598,15 +606,10 @@ export default function ClinicalNoteEditor({
           {note.mrn && <span className="cn-header-meta">, MRN: {note.mrn}</span>}
           {note.patientDob && <span className="cn-header-meta"> • DOB: {note.patientDob}</span>}
         </h1>
+        {/* The note's identity fields — type, date/time of service, assignee —
+            sit in the header beside the patient they belong to, rather than on
+            a second toolbar strip below it. One band of chrome, not two. */}
         <div className="cn-header-actions">
-          <button type="button" className="cn-btn" onClick={handleSalt} disabled={saving}>
-            <Copy size={14} /> SALT Note
-          </button>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="cn-toolbar">
         <label className="cn-field">
           <span className="cn-label">Note type</span>
           <select
@@ -650,25 +653,25 @@ export default function ClinicalNoteEditor({
           />
         </label>
 
-        <label className="cn-field">
+        <div className="cn-field">
           <span className="cn-label">Assigned to</span>
-          <select
-            className="cn-select"
-            value={note.assignedToId || ''}
-            onChange={(e) => {
-              const picked = assignableUsers.find(u => u._id === e.target.value);
-              void persist(() => updateClinicalNote(noteId, {
-                assignedToId: e.target.value || undefined,
+          {/* Each provider in the menu is its own assign button — picking one
+              writes the assignment immediately, so handing a note to a
+              colleague is one click rather than a select plus a save. */}
+          <AssignPicker
+            value={note.assignedToId}
+            valueName={note.assignedToName}
+            options={assignableUsers}
+            disabled={locked}
+            onAssign={async (picked) => {
+              await persist(() => updateClinicalNote(noteId, {
+                assignedToId: picked?._id,
                 assignedToName: picked?.name,
               }));
             }}
-            disabled={locked}
-            aria-label="Assigned to"
-          >
-            <option value="">Unassigned</option>
-            {assignableUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-          </select>
-        </label>
+          />
+        </div>
+        </div>
       </div>
 
       {/* Note canvas */}
@@ -702,8 +705,7 @@ export default function ClinicalNoteEditor({
                   : section.sectionId === 'allergies' ? () => setShowAllergies(true)
                   : undefined
                 }
-                onOpenProblems={section.sectionId === 'assessment' && !locked ? () => setShowProblems(true) : undefined}
-                onPlanAction={handlePlanAction}
+                onAction={locked ? undefined : handleSectionAction}
                 removable={isOptional}
                 onRemove={() => void persist(() => removeNoteSection(noteId, section.sectionId))}
               />
@@ -909,6 +911,20 @@ export default function ClinicalNoteEditor({
           onClose={() => {
             setShowAllergies(false);
             if (!locked) void refreshDerived('allergies');
+          }}
+        />
+      )}
+
+      {showPrescribe && (
+        <PrescribeModal
+          patientId={note.patientId}
+          patientName={note.patientName}
+          currentUser={currentUser}
+          onClose={() => {
+            setShowPrescribe(false);
+            // A prescription written from the note belongs in its medication
+            // snapshot, not just in the pharmacy queue.
+            if (!locked) void refreshDerived('medications');
           }}
         />
       )}

@@ -16,13 +16,14 @@
  * patient/current-user/permission/router context they need down to them.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import {
   ShoppingCart, Stethoscope, ClipboardCheck, FileText, Users, X, Maximize2,
 } from '@/components/icons/lucide';
 import type { PatientDoc } from '@/lib/db-types';
 import ClinicalNoteEditor from '@/components/clinical-notes/ClinicalNoteEditor';
+import { useUsers } from '@/lib/hooks/useUsers';
 import OrderBasketPanel from './panels/OrderBasketPanel';
 import VisitNotePanel from './panels/VisitNotePanel';
 import TaskListPanel from './panels/TaskListPanel';
@@ -102,6 +103,13 @@ export default function OpenmrsChartShell({
   const [openPanel, setOpenPanel] = useState<string | null>(null);
   // Note being edited by the clinical-note panel, set by an id-carrying request.
   const [drawerNoteId, setDrawerNoteId] = useState<string | null>(null);
+  // Providers the note editor's "Assigned to" picker offers. Scoped by
+  // useUsers, so a clinician can only hand a note to their own facility.
+  const { users } = useUsers();
+  const assignableUsers = useMemo(
+    () => (users || []).map(u => ({ _id: u._id, name: u.name || u.username })),
+    [users],
+  );
   // Drawer expand toggle — widens the workspace drawer to near-full-width.
   const [drawerMaximized, setDrawerMaximized] = useState(false);
 
@@ -179,6 +187,9 @@ export default function OpenmrsChartShell({
           <div className="omrs-drawer-note-body">
             <ClinicalNoteEditor
               noteId={drawerNoteId}
+              // Without this the drawer's "Assigned to" picker has nobody to
+              // offer — the standalone /notes route passes the same list.
+              assignableUsers={assignableUsers}
               // ChartPanelUser allows a missing _id; the editor does not — an
               // id-less session gets the editor's own signed-out handling.
               currentUser={currentUser?._id ? {

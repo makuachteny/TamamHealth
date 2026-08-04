@@ -20,9 +20,9 @@
  * when it would otherwise run off the bottom of the window.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, FileText } from '@/components/icons/lucide';
+import { ChevronDown, ClipboardPen } from '@/components/icons/lucide';
 import {
   NOTE_TYPE_ORDER, NOTE_TYPES, type NoteTypeId,
 } from '@/lib/clinical-notes/note-catalog';
@@ -30,22 +30,10 @@ import './clinical-notes.css';
 
 interface CreateNoteButtonProps {
   onCreate: (noteType: NoteTypeId) => void;
-  /** Type the main half uses. Defaults to SOAP. */
+  /** Type the main half creates. Defaults to SOAP. */
   defaultType?: NoteTypeId;
   disabled?: boolean;
   label?: string;
-  /** Icon-only main half, for dense toolbars like the visit card's action row. */
-  compact?: boolean;
-  /** Replace the document glyph on the split button's main half — used where the
-   *  button doubles as the consultation action and the caret only picks a note
-   *  type. */
-  mainIcon?: ReactNode;
-  /** Runs instead of creating a note when the main half is pressed. */
-  onMainAction?: () => void;
-  mainTitle?: string;
-  /** Text on the caret half. Spelled out where the caret alone would leave the
-   *  note action as a guess — the main half is the consultation, not the note. */
-  caretLabel?: string;
   /** Match a neutral toolbar instead of using the primary fill. */
   tone?: 'primary' | 'neutral';
   className?: string;
@@ -71,8 +59,8 @@ export function noteTypeMenuOrder(selected: NoteTypeId): NoteTypeId[] {
 }
 
 export default function CreateNoteButton({
-  onCreate, defaultType = 'soap', disabled, label = 'Create Clinical Note',
-  compact = false, tone = 'primary', className = '', mainIcon, onMainAction, mainTitle, caretLabel,
+  onCreate, defaultType = 'soap', disabled, label = 'Create clinical note',
+  tone = 'primary', className = '',
 }: CreateNoteButtonProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -153,18 +141,19 @@ export default function CreateNoteButton({
 
   return (
     <div className={`cn-split ${className}`} ref={wrapRef}>
+      {/* The label states the action and the glyph repeats it, so the half a
+          clinician reads and the half they press are the same one. The type it
+          will use is in the tooltip rather than the label — the word that has to
+          survive a glance is "note", not "SOAP". */}
       <button
         type="button"
         className={`cn-btn ${toneClass} cn-split-main`}
-        onClick={(e) => { e.stopPropagation(); if (onMainAction) onMainAction(); else choose(defaultType); }}
+        onClick={(e) => { e.stopPropagation(); choose(defaultType); }}
         disabled={disabled}
-        title={mainTitle || (compact ? `New ${NOTE_TYPES[defaultType].label} note` : undefined)}
-        aria-label={mainTitle || (compact ? `Create clinical note (${NOTE_TYPES[defaultType].label})` : undefined)}
+        title={`New ${NOTE_TYPES[defaultType].label} note`}
       >
-        {/* Full-label halves carry the label alone (the capsule design reads
-            text-only); icon-only halves still need a glyph to exist. */}
-        {mainIcon ?? (compact ? <FileText size={14} /> : null)}
-        {!compact && label}
+        <ClipboardPen size={15} aria-hidden />
+        {label}
       </button>
 
       <button
@@ -175,8 +164,8 @@ export default function CreateNoteButton({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Choose note type"
+        title="Choose note type"
       >
-        {caretLabel && <span className="cn-split-caret-label">{caretLabel}</span>}
         <ChevronDown size={13} />
       </button>
 

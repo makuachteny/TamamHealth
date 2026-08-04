@@ -19,6 +19,7 @@ import { usePatientPayments } from '@/lib/hooks/usePayments';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { formatDate } from '@/lib/format-utils';
 import { isTimeOverlap } from '@/lib/appointment-time';
+import { staffOptionLabel, type StaffSlotContext } from '@/lib/appointment-staff';
 import type { AppointmentDoc, PatientDoc } from '@/lib/db-types';
 import { AlertTriangle } from '@/components/icons/lucide';
 
@@ -33,6 +34,8 @@ export interface AppointmentDetailFieldValues {
 export default function AppointmentDetailFields({
   section,
   modeSlot,
+  onAssignStaff,
+  staffAssignDisabled,
   patient,
   appointment,
   appointments,
@@ -61,6 +64,9 @@ export default function AppointmentDetailFields({
   /** Rendered directly under the mode radios — the caller owns the field, this
    *  just decides where in the group it belongs. */
   modeSlot?: ReactNode;
+  /** Commits the staff choice on its own, without saving the whole form. */
+  onAssignStaff?: () => void;
+  staffAssignDisabled?: boolean;
 }) {
   const { users } = useUsers();
   const { rooms } = useSettings();
@@ -89,6 +95,12 @@ export default function AppointmentDetailFields({
       && isTimeOverlap(other.appointmentTime, other.duration, time, duration)
     ) || null;
   }, [appointments, appointment?._id, providerId, date, time, duration]);
+
+  // Shared by every person dropdown here, so "free" always means free at the
+  // slot currently being edited rather than at the appointment's saved time.
+  const slotContext: StaffSlotContext = useMemo(() => ({
+    appointments, date, time, duration, excludeAppointmentId: appointment?._id,
+  }), [appointments, date, time, duration, appointment?._id]);
 
   const primaryPolicy = policies.find(p => p.isPrimary) || policies[0];
 
@@ -145,7 +157,8 @@ export default function AppointmentDetailFields({
       {/* ── Who else is on it ─────────────────────────────────────────── */}
         <div>
           <label>Staff</label>
-          <select
+          <span className="appt-assign-field">
+<select
             value={values.staffId}
             onChange={e => {
               const person = staffOptions.find(candidate => candidate._id === e.target.value);
@@ -153,10 +166,17 @@ export default function AppointmentDetailFields({
             }}
           >
             <option value="">None</option>
+            {/* Role/department, whether they are free at this slot, and how
+                many visits they already hold today — the facts the pick turns
+                on, rather than a wall of interchangeable names. */}
             {staffOptions.map(person => (
-              <option key={person._id} value={person._id}>{person.name || person.username}{person.role ? ` · ${person.role.replace(/_/g, ' ')}` : ''}</option>
+              <option key={person._id} value={person._id}>{staffOptionLabel(person, slotContext)}</option>
             ))}
           </select>
+            {onAssignStaff && (
+              <button type="button" className="appt-assign-btn" onClick={onAssignStaff} disabled={staffAssignDisabled}>Assign</button>
+            )}
+          </span>
         </div>
 
       {/* The provider clash, stated where the time is being chosen. */}

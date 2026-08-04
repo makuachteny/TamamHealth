@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Info, Plus, X } from '@/components/icons/lucide';
-import PrescribeModal from './PrescribeModal';
+import PrescribeModal from './prescribe/PrescribeModal';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';

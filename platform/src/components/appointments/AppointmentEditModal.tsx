@@ -13,15 +13,17 @@
  * write: that path stamps confirmedAt/checkedInAt, appends the status history,
  * and enforces who may confirm.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Modal from '@/components/Modal';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
 import AppointmentDetailFields, { type AppointmentDetailFieldValues } from '@/components/appointments/AppointmentDetailFields';
+import { staffOptionLabel, type StaffSlotContext } from '@/lib/appointment-staff';
 import { useToast } from '@/components/Toast';
 import { useAuth } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { appointmentStatusLabel } from '@/lib/appointment-status';
 import { useRouter } from 'next/navigation';
+import { useUsers } from '@/lib/hooks/useUsers';
 import { Video } from '@/components/icons/lucide';
 import type { AppointmentDoc, AppointmentPriority, AppointmentStatus, AppointmentType, PatientDoc } from '@/lib/db-types';
 
@@ -69,6 +71,12 @@ export default function AppointmentEditModal({
   const { currentUser } = useAuth();
   const { showToast } = useToast();
   const { departments } = useSettings();
+  const { users } = useUsers();
+  // Providers who can carry a visit at this facility.
+  const providerOptions = useMemo(() => users
+    .filter(u => (u.role === 'doctor' || u.role === 'clinical_officer')
+      && (!currentUser?.hospitalId || u.hospitalId === currentUser.hospitalId))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '')), [users, currentUser?.hospitalId]);
   const [saving, setSaving] = useState(false);
   /* In a row dropdown the form is tabbed, the way the doctor dashboard's visit
      panel is: one tab of fields at a time on the row's own line, instead of a
@@ -92,6 +100,12 @@ export default function AppointmentEditModal({
     staffName: appointment.staffName || '',
     room: appointment.room || '',
   });
+
+  // Availability is judged against the date/time being edited, not the saved
+  // one, so moving the slot re-reads who is free before the provider is picked.
+  const providerSlotContext: StaffSlotContext = useMemo(() => ({
+    appointments, date, time, duration, excludeAppointmentId: appointment._id,
+  }), [appointments, date, time, duration, appointment._id]);
 
   // Opening the modal on a different row re-seeds the draft.
   useEffect(() => { setStatus(appointment.status); }, [appointment._id, appointment.status]);
@@ -213,8 +227,31 @@ export default function AppointmentEditModal({
         {(!inline || tab === 'care') && (
         <div className="appt-edit-col">
           {!inline && <h4 className="appt-edit-section">Provider &amp; staff</h4>}
-          <div><label>Provider</label><input value={provider} onChange={e => setProvider(e.target.value)} placeholder="Assigned provider" /></div>
-          <AppointmentDetailFields section="provider" {...detailProps} />
+          {/* A picker, not free text, with its own Assign so the change can be
+              committed without saving the whole form. */}
+          <div>
+            <label>Provider</label>
+            <span className="appt-assign-field">
+              <select value={provider} onChange={e => setProvider(e.target.value)}>
+                <option value="">Unassigned</option>
+                {provider && !providerOptions.some(p => (p.name || p.username) === provider) && (
+                  <option value={provider}>{provider}</option>
+                )}
+                {/* Specialty/department, free-or-busy at this slot, and the
+                    day's load — so a clash is visible before the pick, not
+                    after saving. */}
+                {providerOptions.map(person => (
+                  <option key={person._id} value={person.name || person.username || ''}>
+                    {staffOptionLabel(person, providerSlotContext)}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="appt-assign-btn" onClick={save} disabled={saving || provider === appointment.providerName}>
+                {saving ? '…' : 'Assign'}
+              </button>
+            </span>
+          </div>
+          <AppointmentDetailFields section="provider" {...detailProps} onAssignStaff={save} staffAssignDisabled={saving || detail.staffId === (appointment.staffId || '')} />
 
           {!inline && <h4 className="appt-edit-section">Visit detail</h4>}
           <div>

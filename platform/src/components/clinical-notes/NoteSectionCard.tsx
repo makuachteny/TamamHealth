@@ -1,38 +1,46 @@
 'use client';
 
 /**
- * One section of a clinical note: its heading, its tool row, and its body.
+ * One section of a clinical note: its heading, its action row, and its body.
  *
- * Narrative sections get a textarea plus Text Shortcut and Template. Derived
- * sections (vitals, medications, allergies) render a snapshot of the chart as
- * it stood when the note was written, with a refresh control — a note records
- * what the clinician saw, so it must not silently change when the chart later
- * does.
+ * Narrative sections get a textarea plus Text Shortcut. Derived sections
+ * (vitals, medications, allergies) render a snapshot of the chart as it stood
+ * when the note was written, with a refresh control — a note records what the
+ * clinician saw, so it must not silently change when the chart later does.
  *
- * The Plan section additionally carries the ordering actions (medications,
- * labs/studies, vaccines, patient education), because that is where a clinician
- * decides what happens next and the order should be raised from the sentence
- * that justifies it rather than a separate screen.
+ * Every section additionally offers the actions that belong to it (see
+ * section-actions.ts): Assessment cites problems, Plan raises orders,
+ * Medications reaches the medication list. The section reports which action was
+ * pressed; the editor owns what happens next.
  */
 
-import { useRef, useState } from 'react';
 import {
-  Zap, FileText, Pill, FlaskConical, Syringe, Heart, RefreshCw, X,
+  Pill, FlaskConical, Syringe, Heart, RefreshCw, X,
+  ClipboardList, Plus, AlertTriangle, Activity, Send, Calendar,
 } from '@/components/icons/lucide';
-import TextShortcutPicker from './TextShortcutPicker';
-import TemplatePicker from './TemplatePicker';
+import ShortcutSearchInput from './shortcuts/ShortcutSearchInput';
+import ShortcutResults from './shortcuts/ShortcutResults';
+import { useShortcutSearch } from './shortcuts/useShortcutSearch';
 import AssessmentSection from './assessment/AssessmentSection';
 import { getSectionDef, type NoteSectionId } from '@/lib/clinical-notes/note-catalog';
-import {
-  templateForSection, composeNarrative, composeTemplateText, stripTemplateMarkers,
-  type TemplateSelection,
-} from '@/lib/clinical-notes/section-templates';
+import { actionsForSection, type NoteSectionActionId } from '@/lib/clinical-notes/section-actions';
+import { stripTemplateMarkers } from '@/lib/clinical-notes/section-templates';
 import { applyShortcut } from '@/lib/clinical-notes/text-shortcut-service';
-import type { NoteSectionContent, NotePlanAction } from '@/lib/clinical-notes/types';
+import type { NoteSectionContent } from '@/lib/clinical-notes/types';
 
-export interface PlanActionRequest {
-  kind: NotePlanAction['kind'];
-}
+/** Icons live here, not in the catalog — the catalog stays React-free. */
+const ACTION_ICONS: Record<NoteSectionActionId, typeof Pill> = {
+  include_problems: ClipboardList,
+  review_medications: Pill,
+  prescribe: Plus,
+  manage_allergies: AlertTriangle,
+  record_vitals: Activity,
+  order_lab: FlaskConical,
+  order_vaccine: Syringe,
+  patient_education: Heart,
+  refer: Send,
+  schedule_followup: Calendar,
+};
 
 interface NoteSectionCardProps {
   sectionId: NoteSectionId;
@@ -47,10 +55,8 @@ interface NoteSectionCardProps {
   onRefreshDerived?: (sectionId: NoteSectionId) => void;
   /** Open the full working view behind a derived section (Medications popup). */
   onOpenDerived?: (sectionId: NoteSectionId) => void;
-  /** Assessment only: open the Include Problems popup from the tool row. */
-  onOpenProblems?: () => void;
-  /** Raise an order from the Plan section. */
-  onPlanAction?: (request: PlanActionRequest) => void;
+  /** Run one of the section's actions. Omitted while the note is locked. */
+  onAction?: (actionId: NoteSectionActionId) => void;
   /** Remove an optional section the clinician added. */
   onRemove?: () => void;
   removable?: boolean;
@@ -58,28 +64,40 @@ interface NoteSectionCardProps {
 
 export default function NoteSectionCard({
   sectionId, content, readOnly, userId, orgId, active,
-  onFocus, onChange, onRefreshDerived, onOpenDerived, onPlanAction, onRemove, removable,
-  onOpenProblems,
+  onFocus, onChange, onRefreshDerived, onOpenDerived, onAction, onRemove, removable,
 }: NoteSectionCardProps) {
   const def = getSectionDef(sectionId);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const [showTemplate, setShowTemplate] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const text = content?.text ?? '';
+
+  // Hooks run before the early return: a section id the catalog no longer
+  // knows must not change how many hooks this component calls.
+  const shortcuts = useShortcutSearch({
+    userId,
+    orgId,
+    sectionId,
+    onPick: s => onChange({ text: applyShortcut(text, s.body) }),
+  });
 
   if (!def) return null;
 
-  const text = content?.text ?? '';
-  const selection = content?.templateSelection ?? {};
-  const isPlan = sectionId === 'plan';
-  const template = templateForSection(sectionId);
+  const actions = actionsForSection(sectionId);
 
-  const applyTemplateSelection = (next: TemplateSelection) => {
-    const generated = composeTemplateText(template, next);
-    onChange({
-      templateSelection: next,
-      text: composeNarrative(text, generated),
-    });
-  };
+  const actionButtons = !readOnly && onAction && actions.length > 0
+    ? actions.map((action) => {
+        const Icon = ACTION_ICONS[action.id];
+        return (
+          <button
+            key={action.id}
+            type="button"
+            className="cn-tool"
+            onClick={() => onAction(action.id)}
+            title={action.description}
+          >
+            <Icon size={13} /> {action.label}
+          </button>
+        );
+      })
+    : null;
 
   // Derived sections render the snapshot rather than an editable body.
   if (def.kind === 'derived') {
@@ -91,16 +109,19 @@ export default function NoteSectionCard({
       >
         <div className="cn-section-head">
           <h3 className="cn-section-name">{def.label}</h3>
-          {!readOnly && onRefreshDerived && (
+          {!readOnly && (
             <div className="cn-section-tools">
-              <button
-                type="button"
-                className="cn-tool"
-                onClick={() => onRefreshDerived(sectionId)}
-                title={`Re-read ${def.label.toLowerCase()} from the chart`}
-              >
-                <RefreshCw size={13} /> Refresh
-              </button>
+              {actionButtons}
+              {onRefreshDerived && (
+                <button
+                  type="button"
+                  className="cn-tool"
+                  onClick={() => onRefreshDerived(sectionId)}
+                  title={`Re-read ${def.label.toLowerCase()} from the chart`}
+                >
+                  <RefreshCw size={13} /> Refresh
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -138,71 +159,9 @@ export default function NoteSectionCard({
 
         {!readOnly && (
           <div className="cn-section-tools">
-            {onOpenProblems && (
-              <button type="button" className="cn-tool" onClick={onOpenProblems}>
-                Include Problems
-              </button>
-            )}
-            <div style={{ position: 'relative' }}>
-              <button
-                type="button"
-                className="cn-tool"
-                onClick={() => { setShowShortcuts(v => !v); setShowTemplate(false); }}
-                aria-expanded={showShortcuts}
-              >
-                <Zap size={13} /> Text Shortcut
-              </button>
-              {showShortcuts && (
-                <TextShortcutPicker
-                  userId={userId}
-                  orgId={orgId}
-                  sectionId={sectionId}
-                  onPick={s => onChange({ text: applyShortcut(text, s.body) })}
-                  onClose={() => setShowShortcuts(false)}
-                />
-              )}
-            </div>
+            {actionButtons}
 
-            {isPlan && onPlanAction && (
-              <>
-                <button type="button" className="cn-tool" onClick={() => onPlanAction({ kind: 'patient_education' })}>
-                  <Heart size={13} /> Patient Education
-                </button>
-              </>
-            )}
-
-            <div style={{ position: 'relative' }}>
-              <button
-                type="button"
-                className="cn-tool"
-                onClick={() => { setShowTemplate(v => !v); setShowShortcuts(false); }}
-                aria-expanded={showTemplate}
-              >
-                <FileText size={13} /> Template
-              </button>
-              {showTemplate && (
-                <TemplatePicker
-                  template={template}
-                  selection={selection}
-                  onChange={applyTemplateSelection}
-                  onClose={() => setShowTemplate(false)}
-                />
-              )}
-            </div>
-
-            {isPlan && onPlanAction && (
-              <>
-                <button type="button" className="cn-tool" onClick={() => onPlanAction({ kind: 'medication' })}>
-                  <Pill size={13} /> Medications
-                </button>
-                <button type="button" className="cn-tool" onClick={() => onPlanAction({ kind: 'vaccine' })}>
-                  <Syringe size={13} /> Vaccines
-                </button>
-                <button type="button" className="cn-tool" onClick={() => onPlanAction({ kind: 'lab' })}>
-                  <FlaskConical size={13} /> Labs/Studies
-                </button>
-              </>
-            )}
+            <ShortcutSearchInput search={shortcuts} />
 
             {removable && onRemove && (
               <button
@@ -218,6 +177,10 @@ export default function NoteSectionCard({
           </div>
         )}
       </div>
+
+      {/* In flow, between the heading and the body — the list never covers the
+          note underneath it. */}
+      {!readOnly && <ShortcutResults search={shortcuts} />}
 
       {/* Assessment leads with the problems included from the popup, rendered
           as diagnosis lines. The textarea below stays the narrative. */}
@@ -237,7 +200,6 @@ export default function NoteSectionCard({
         </div>
       ) : (
         <textarea
-          ref={textareaRef}
           className="cn-textarea"
           value={text}
           placeholder={def.placeholder}

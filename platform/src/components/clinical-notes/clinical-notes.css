@@ -43,21 +43,16 @@
   color: var(--color-text-muted, #64748b);
 }
 
+/* Holds the note's identity fields (type, date/time, assignee) beside the
+   title. There is no second toolbar strip under the header any more, so this
+   row carries them: it wraps under the title when the editor is narrow — in
+   the chart drawer, for instance — rather than squeezing the controls. */
 .cn-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* ── Toolbar (type, date, assignment) ───────────────────────────────────── */
-.cn-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  justify-content: flex-end;
 }
 
 .cn-field {
@@ -353,7 +348,10 @@
   border: 1px solid transparent;
 }
 
-.cn-section:hover,
+/* Only the section being worked in is tinted. There is deliberately no hover
+   state: a note is a wall of sections the pointer crosses on its way to the
+   one being written, and lighting each one up on the way is movement that
+   means nothing. */
 .cn-section.is-active {
   border-color: var(--color-border, #e2e8f0);
   background: var(--color-surface-muted, #f8fafc);
@@ -433,28 +431,57 @@
 .cn-derived-empty { color: var(--color-text-muted, #94a3b8); font-style: italic; }
 
 /* ── Popovers (shortcut + template pickers) ─────────────────────────────── */
-.cn-popover {
+/* The search box is one of the section's tools, sized like the buttons beside
+   it — same padding, border and radius as .cn-tool, so the row reads as one
+   set of controls rather than a form field wedged among buttons. */
+.cn-shortcut-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 112px;
+}
+.cn-shortcut-field svg {
   position: absolute;
-  z-index: 40;
-  min-width: 260px;
-  max-width: 380px;
-  max-height: 340px;
-  overflow-y: auto;
-  border: 1px solid var(--color-border, #cbd5e1);
-  border-radius: var(--radius-card, 8px);
-  background: var(--color-surface, #fff);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
-  padding: 8px;
+  left: 8px;
+  opacity: 0.45;
+  pointer-events: none;
 }
 
-.cn-popover-search {
+/* Scoped through .cn-section-tools on purpose. globals.css styles bare inputs
+   (`input:not([type])`, `input[type="text"]` …) with `padding: 10px 16px` and
+   `width: 100%`, and those selectors outrank a lone class — unscoped, this box
+   rendered 168×42 and wrapped onto its own line instead of sitting in the tool
+   row. The descendant selector wins the specificity, and the height is pinned
+   to .cn-tool's so the box lines up with the buttons beside it. */
+.cn-section-tools .cn-shortcut-input {
+  box-sizing: border-box;
   width: 100%;
+  height: 29px;
+  min-height: 0;
   font: inherit;
-  font-size: 13px;
-  padding: 7px 10px;
+  font-size: 12px;
+  padding: 4px 9px 4px 24px;
   border: 1px solid var(--color-border, #cbd5e1);
   border-radius: var(--radius-control, 6px);
-  margin-bottom: 6px;
+  background: var(--color-surface, #fff);
+  color: inherit;
+}
+.cn-section-tools .cn-shortcut-input:focus-visible {
+  outline: 2px solid var(--color-primary, #0f766e);
+  outline-offset: 1px;
+}
+
+/* The list drops under the heading in normal flow: it pushes the note down
+   while it is open and gives the space straight back when it closes, so the
+   document is never hidden behind it. */
+.cn-shortcut-results {
+  margin: 0 0 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-card, 8px);
+  background: var(--color-surface, #fff);
+  padding: 6px;
 }
 
 .cn-popover-item {
@@ -775,6 +802,16 @@
   padding-right: 12px;
 }
 
+/* The icon set writes its colour out as a literal `stroke` attribute, so the
+   note glyph and the caret arrived brand-blue on the salmon fill — legible only
+   because the fill is light. Repaint both to the capsule's own ink. */
+.cn-split .cn-btn svg.lucide,
+.cn-split .cn-btn svg.lucide * {
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}
+
 /*
  * The type list is deliberately narrow — one label per row, no descriptions.
  * A wide menu with subtitles reads as a settings screen; this is a pick-one
@@ -828,6 +865,49 @@
   flex: 0 0 12px;
   font-size: 11px;
   color: var(--color-primary, #0f766e);
+}
+
+/* ── Assign picker (reuses the portalled menu above) ─────────────────────── */
+.cn-assign { display: inline-flex; }
+
+/* Matches .cn-select so the assignee reads as one more field in the header
+   row, not a button that happens to sit beside them. */
+.cn-assign-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 168px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.cn-assign-trigger:disabled { cursor: default; opacity: 0.6; }
+.cn-assign-trigger:focus-visible {
+  outline: 2px solid var(--color-primary, #0f766e);
+  outline-offset: 1px;
+}
+.cn-assign-trigger svg { flex: 0 0 auto; color: var(--color-text-muted, #64748b); }
+
+.cn-assign-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cn-assign-empty {
+  margin: 0;
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--color-text-muted, #64748b);
 }
 
 .cn-empty {
@@ -1371,3 +1451,118 @@
 }
 .cn-rx-warnings li { margin-bottom: 6px; }
 .cn-rx-currentmeds { color: var(--color-text-muted, #64748b); }
+
+/* ── Prescribe: collapsible blocks + monograph rail ─────────────────────── */
+.cn-rx-block { border-bottom: 1px solid var(--color-border-light, #f1f5f9); }
+.cn-rx-block:last-of-type { border-bottom: none; }
+
+.cn-rx-blockhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cn-rx-blocktoggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  gap: 8px;
+  padding: 12px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  text-align: left;
+}
+.cn-rx-blocktoggle svg { transition: transform 0.15s ease; }
+.cn-rx-blocktoggle svg.is-open { transform: rotate(180deg); }
+
+.cn-rx-blockbody { padding: 0 0 14px; }
+
+.cn-rx-inlinerow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 2px 0 10px;
+}
+.cn-rx-inlinerow .cn-meds-nkm { margin-top: 0; }
+
+.cn-rx-qtynote {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.cn-rx-favorite {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary, #0f766e);
+}
+.cn-rx-favorite:disabled { opacity: 0.5; cursor: not-allowed; }
+.cn-rx-favorite[aria-pressed='true'] { color: var(--color-warning, #d97706); }
+
+.cn-rx-cost {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+/* Monograph rail */
+.cn-rx-drugform {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+}
+.cn-rx-panelbody {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-text, #0f172a);
+}
+
+.cn-rx-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 14px 0 10px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+.cn-rx-tabs button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 8px;
+  color: var(--color-text-muted, #64748b);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.cn-rx-tabs button[aria-selected='true'] {
+  color: var(--color-primary, #0f766e);
+  border-bottom-color: var(--color-primary, #0f766e);
+}
+
+.cn-rx-warnings li[data-severity='contraindicated'],
+.cn-rx-warnings li[data-severity='allergy'] {
+  color: var(--color-danger, #dc2626);
+  font-weight: 600;
+}
+.cn-rx-warnings li[data-severity='serious'] { color: var(--color-danger, #dc2626); }
+.cn-rx-warnings li[data-severity='moderate'] { color: var(--color-warning, #b45309); }
+.cn-rx-note { color: var(--color-text-muted, #94a3b8); font-style: italic; }
