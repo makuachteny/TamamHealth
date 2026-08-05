@@ -5,12 +5,15 @@ import type { PrescriptionDoc } from '../db-types';
 import { prescriptionsDB } from '../db';
 import { makeCoalescer } from './live-reload';
 import { useDataScope } from './useDataScope';
+import { useApp } from '../context';
 
 export function usePrescriptions(patientId?: string) {
   const [prescriptions, setPrescriptions] = useState<PrescriptionDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const scope = useDataScope();
+  // Only used to supply advance()'s actor id automatically below — see there.
+  const { currentUser } = useApp();
 
   const loadPrescriptions = useCallback(async () => {
     try {
@@ -117,10 +120,14 @@ export function usePrescriptions(patientId?: string) {
     extra?: Partial<import('../db-types').PrescriptionDoc>,
   ) => {
     const { advancePrescription } = await import('../services/prescription-service');
-    const result = await advancePrescription(id, to, extra);
+    // The signed-in user, not a caller-supplied value — advancePrescription
+    // resolves this directory-first and only enforces it for the
+    // 'cleared_for_dispensing' transition, so this is a no-op for every
+    // other call site and every other `to` value.
+    const result = await advancePrescription(id, to, extra, currentUser?._id);
     await loadPrescriptions();
     return result;
-  }, [loadPrescriptions]);
+  }, [loadPrescriptions, currentUser?._id]);
 
   const discontinue = useCallback(async (
     id: string,

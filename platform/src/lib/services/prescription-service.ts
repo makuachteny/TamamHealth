@@ -1,6 +1,6 @@
 import { prescriptionsDB } from '../db';
 import { findByType } from './db-query';
-import type { PrescriptionDoc, MedicationAdministration } from '../db-types';
+import type { PrescriptionDoc, MedicationAdministration, UserRole } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
@@ -10,6 +10,16 @@ import { validatePrescription, ValidationError } from '../validation';
 import { checkNewPrescription, type InteractionCheckResult } from './drug-interaction-service';
 import { prescription as rxLifecycle, type PrescriptionStatus } from '../clinical-flow/order-lifecycles';
 import { withPendingOfflineSync } from '../sync/offline-metadata';
+import { getUserById } from './user-service';
+
+/**
+ * Roles allowed to clear a medication order for dispensing — the one state
+ * dispenseMedication() (dispensing-service.ts) trusts as its sole proof that
+ * review already happened. Kept as its own constant here (rather than
+ * imported from dispensing-service.ts) because that file already imports
+ * from this one — importing it back would be circular.
+ */
+const CLEARANCE_ROLES: UserRole[] = ['pharmacist'];
 
 /** Granular pharmacy lifecycle stage, defaulting legacy docs from coarse status. */
 export function effectivePrescriptionStatus(
@@ -34,17 +44,34 @@ function coarseFromRxStatus(s: PrescriptionStatus): PrescriptionDoc['status'] {
  * Advance a prescription to the next lifecycle stage, validated against
  * PRESCRIPTION_TRANSITIONS. Keeps the coarse `status` in sync. Throws on an
  * illegal transition.
+ *
+ * Lifecycle legality alone used to be the only check here — this validated
+ * that `cleared_for_dispensing` was a legal move FROM the order's current
+ * stage, but never checked WHO was making it. dispenseMedication() treats
+ * `cleared_for_dispensing` as its sole proof that stock/safety review already
+ * happened, so any caller able to reach this function (any script, any
+ * future UI surface) could clear an order it never reviewed. `actorId` is
+ * resolved directory-first — same pattern as the witness/dispenser identity
+ * checks in dispensing-service.ts — so the check can't be satisfied by a
+ * caller-supplied role string.
  */
 export async function advancePrescription(
   id: string,
   to: PrescriptionStatus,
   extra?: Partial<PrescriptionDoc>,
+  actorId?: string,
 ): Promise<PrescriptionDoc | null> {
   const db = prescriptionsDB();
   const existing = await db.get(id) as PrescriptionDoc;
   const from = effectivePrescriptionStatus(existing);
   if (from !== to && !rxLifecycle.can(from, to)) {
     throw new Error(`Illegal prescription transition: ${from} → ${to}`);
+  }
+  if (to === 'cleared_for_dispensing') {
+    const actor = actorId ? await getUserById(actorId) : null;
+    if (!actor || actor.isActive === false || !CLEARANCE_ROLES.includes(actor.role)) {
+      throw new Error('Only a pharmacist may clear a medication order for dispensing.');
+    }
   }
   return updatePrescription(id, { ...extra, orderStatus: to, status: coarseFromRxStatus(to) });
 }
@@ -172,6 +199,32 @@ export async function updatePrescription(id: string, data: Partial<PrescriptionD
   }
 }
 
+/**
+ * @deprecated Do not call this from any UI or API surface, and do not add
+ * new callers. It marks a prescription 'dispensed' with NO stock movement,
+ * NO controlled-substance register entry, and NO actor/role check —
+ * `dispenseMedication()` in dispensing-service.ts is the only sanctioned way
+ * to dispense medication (stock gate, FEFO decrement, register, rollback on
+ * failure, and — since the actor-authorization fix — a directory-verified
+ * pharmacist).
+ *
+ * Confirmed (by grep) to have zero production callers: nothing under
+ * src/app or src/components references it. Every real caller today is a
+ * test fixture — src/__tests__/integration/{pharmacy-dispensing,
+ * patient-journey,triage-to-discharge}.test.ts and
+ * src/__tests__/services/{prescription-service,checkout-gate}.test.ts —
+ * using it as a shortcut to fake an "already dispensed" prescription for
+ * something else the test is actually exercising (billing, MAR, etc.),
+ * predating dispenseMedication() existing at all.
+ *
+ * Intentionally NOT deleted or hardened to throw here: either would break
+ * those five test files, which sit outside this change's scope (owned by
+ * other in-flight work) and would need a real rewrite — cleared_for_dispensing
+ * state, a matching in-stock batch, and a directory-verified pharmacist actor —
+ * to go through dispenseMedication() instead. That rewrite is legitimate
+ * follow-up work, not something to do opportunistically as a side effect of
+ * closing the dispensing-authorization hole this file's other changes address.
+ */
 export async function dispensePrescription(id: string, dispensedBy?: string): Promise<PrescriptionDoc | null> {
   const now = new Date().toISOString();
   const result = await updatePrescription(id, {

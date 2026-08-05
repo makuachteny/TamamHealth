@@ -91,11 +91,13 @@ jest.mock('@/lib/services/controlled-substance-service', () => ({
 }));
 
 /**
- * Staff directory backing the witness check. A controlled dispense now
- * verifies the witness is a real, active user at the dispensing facility, so
- * these tests need a directory to verify against.
+ * Staff directory backing the witness check AND the actor-authorization
+ * check. A controlled dispense verifies the witness is a real, active user
+ * at the dispensing facility; every dispense verifies the dispenser is a
+ * real, active pharmacist. Both resolve directory-first, so these tests need
+ * a directory to verify against.
  */
-let userStore: Record<string, { _id: string; name: string; isActive: boolean; hospitalId?: string; orgId?: string }> = {};
+let userStore: Record<string, { _id: string; name: string; role: string; isActive: boolean; hospitalId?: string; orgId?: string }> = {};
 const getUserById = jest.fn(async (id: string) => userStore[id] || null);
 jest.mock('@/lib/services/user-service', () => ({
   getUserById: (...args: unknown[]) =>
@@ -140,8 +142,8 @@ beforeEach(() => {
   );
   recordMovement.mockImplementation(async () => ({ _id: 'cslog-1' }));
   userStore = {
-    'u-pharm': { _id: 'u-pharm', name: 'Rose Pharmacist', isActive: true, hospitalId: 'hosp-001' },
-    'u-2': { _id: 'u-2', name: 'Witness Nurse', isActive: true, hospitalId: 'hosp-001' },
+    'u-pharm': { _id: 'u-pharm', name: 'Rose Pharmacist', role: 'pharmacist', isActive: true, hospitalId: 'hosp-001' },
+    'u-2': { _id: 'u-2', name: 'Witness Nurse', role: 'nurse', isActive: true, hospitalId: 'hosp-001' },
   };
   getUserById.mockImplementation(async (id: string) => userStore[id] || null);
 });
@@ -606,6 +608,72 @@ describe('clearance gate', () => {
 
     await expect(dispenseMedication({ ...input, prescription: stopped, quantity: 21 }))
       .rejects.toMatchObject({ code: 'NOT_CLEARED' });
+
+    expect(store['inv-1'].stockLevel).toBe(100);
+  });
+});
+
+// ── Actor authorization ─────────────────────────────────────────────────
+// Every UI surface offering a "Dispense" action (the pharmacy queue, the
+// clinician dashboard's dispense modal, the API route) is a courtesy gate;
+// this is the real one — resolved directory-first, exactly like the witness
+// identity above, so a hole in any one of those surfaces cannot itself move
+// stock or write a dispense record.
+describe('actor authorization', () => {
+  it('refuses a non-pharmacist actor and moves no stock', async () => {
+    store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
+    userStore['u-pharm'].role = 'doctor';
+
+    await expect(dispenseMedication(input)).rejects.toMatchObject({ code: 'NOT_AUTHORISED' });
+
+    expect(store['inv-1'].stockLevel).toBe(100);
+    expect(updatePrescription).not.toHaveBeenCalled();
+  });
+
+  it('refuses a deactivated dispenser account', async () => {
+    store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
+    userStore['u-pharm'].isActive = false;
+
+    await expect(dispenseMedication(input)).rejects.toMatchObject({ code: 'NOT_AUTHORISED' });
+
+    expect(store['inv-1'].stockLevel).toBe(100);
+    expect(updatePrescription).not.toHaveBeenCalled();
+  });
+
+  it('refuses a directory-absent actor with no dispenserRole supplied', async () => {
+    store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
+
+    await expect(dispenseMedication({ ...input, dispenserId: 'ghost-user' }))
+      .rejects.toMatchObject({ code: 'NOT_AUTHORISED' });
+
+    expect(store['inv-1'].stockLevel).toBe(100);
+    expect(updatePrescription).not.toHaveBeenCalled();
+  });
+
+  // The fallback exists for the API route: the server passes the verified
+  // JWT's role so the write path never depends on the directory read
+  // succeeding.
+  it('accepts a directory-absent actor when a pharmacist dispenserRole is supplied', async () => {
+    store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
+
+    const result = await dispenseMedication({
+      ...input, dispenserId: 'ghost-user', dispenserRole: 'pharmacist',
+    });
+
+    expect(result.outcome).toBe('full');
+    expect(store['inv-1'].stockLevel).toBe(79);
+  });
+
+  // The fallback must NOT let a caller claim a role for an account that
+  // exists in the directory — a real account's directory role always wins,
+  // or `dispenserRole` would be a way to bypass a demoted/deactivated
+  // pharmacist's actual current role.
+  it('lets the directory role override a caller-supplied dispenserRole for an existing account', async () => {
+    store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
+    userStore['u-pharm'].role = 'doctor';
+
+    await expect(dispenseMedication({ ...input, dispenserRole: 'pharmacist' }))
+      .rejects.toMatchObject({ code: 'NOT_AUTHORISED' });
 
     expect(store['inv-1'].stockLevel).toBe(100);
   });
