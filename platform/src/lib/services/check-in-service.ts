@@ -7,9 +7,9 @@
  * checked_in in the same action. Full ETAT ABCC assessment is left to the nurse
  * triage station; the front desk captures arrival context + an acuity flag.
  */
-import type { TriageDoc, TriagePriority, EncounterDoc } from '../db-types';
+import type { AppointmentDoc, TriageDoc, TriagePriority, EncounterDoc } from '../db-types';
 import { createTriage } from './triage-service';
-import { getAppointmentsByPatient, updateAppointmentStatus } from './appointment-service';
+import { createAppointment, getAppointmentsByPatient, updateAppointmentStatus } from './appointment-service';
 import { jubaDate } from '../time-juba';
 import { APPOINTMENT_PENDING_STATUSES } from '../appointment-status';
 import { createArrivalEncounter, findOpenEncounterForPatient, hasClosedEncounterForPatient, PRE_CLINICIAN_STATUSES } from './encounter-service';
@@ -126,6 +126,47 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
     : input.modeOfArrival === 'referral'
       ? 'referral'
       : 'walk_in';
+
+  // A walk-in gets a booking of its own, created at the moment they are
+  // checked in. Without one, half the patients in the building had no
+  // appointment record, so every surface that reasons about a visit — the
+  // front desk's status ladder, its detail panel, the day's schedule — had two
+  // kinds of patient to special-case, and the walk-in always got the poorer
+  // half. The triage record is untouched: that is where the ETAT assessment
+  // lives, and this is a slot, not an assessment.
+  let walkInAppointmentId: string | undefined;
+  if (!appointmentId) {
+    try {
+      const now = new Date();
+      const created = await createAppointment({
+        patientId: input.patientId,
+        patientName: input.patientName,
+        // The desk does not choose a clinician at check-in; the queue assigns
+        // one. Left unassigned rather than guessed.
+        providerId: '',
+        providerName: '',
+        facilityId: input.facilityId ?? '',
+        facilityName: input.facilityName ?? '',
+        facilityLevel: 'county',
+        appointmentDate: jubaDate(),
+        appointmentTime: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+        duration: 15,
+        // Recorded as what it is. The status is already `checked_in`: the
+        // patient is at the desk, not expected later.
+        appointmentType: 'walk_in',
+        status: 'checked_in',
+        priority: acuity === 'emergency' ? 'emergency' : 'routine',
+        department: 'OPD',
+        reason: input.chiefComplaint || 'Walk-in visit',
+        orgId: input.orgId,
+        createdBy: input.checkedInById,
+      } as Omit<AppointmentDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
+      walkInAppointmentId = created._id;
+    } catch {
+      // Non-fatal: a walk-in must still be able to check in if the booking
+      // cannot be written. Their row falls back to the queue's own stage.
+    }
+  }
 
   const attendanceType = input.attendanceType ?? await deriveAttendanceType(input.patientId);
 

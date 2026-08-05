@@ -964,7 +964,10 @@ export default function FrontDeskDashboardPage() {
       // way for every patient in the building.
       const queueAppointment = entry.id.startsWith('appt-')
         ? todaysAppointments.find(a => a._id === entry.sourceId)
-        : undefined;
+        // A triage-sourced row still belongs to a booking when the patient has
+        // one today — check-in now creates one for every walk-in, so the row
+        // gets the same ladder and the same panel as anyone else.
+        : todaysAppointments.find(a => a.patientId === entry.patientId);
       const queueTriage = entry.id.startsWith('triage-')
         ? triages.find(tr => tr._id === entry.sourceId)
         : undefined;
