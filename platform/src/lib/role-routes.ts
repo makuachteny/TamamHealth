@@ -19,7 +19,9 @@ export interface RoleRouteConfig {
 }
 
 const NURSE_MODULE_ROUTES = [
-  '/dashboard/nurse', '/patients', '/messages',
+  // `/triage` is the per-patient triage page the station's queue rows open —
+  // the same ETAT assessment, pinned to one patient.
+  '/dashboard/nurse', '/patients', '/triage', '/messages',
   '/lab', '/immunizations', '/anc', '/births', '/deaths',
   '/settings', '/appointments', '/patient-intake',
   // Nurses document their own encounters (the Nurse Visit note type), so the
@@ -118,7 +120,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // no payment handling, and no laboratory operations page — ANC lab results
     // are reviewed inside the patient/ANC record, not the lab orders queue.
     allowed: [
-      '/dashboard/nurse', '/patients', '/messages',
+      '/dashboard/nurse', '/patients', '/triage', '/messages',
       '/anc', '/births', '/deaths', '/immunizations',
       '/wards', '/referrals', '/appointments', '/patient-intake',
       '/notes', '/settings',

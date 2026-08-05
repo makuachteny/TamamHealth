@@ -64,6 +64,15 @@
 }
 .omrs-rail-card:last-child { margin-bottom: 0; }
 
+/* The first card runs into the header band above it — no top hairline and no
+   top corners, so the rail starts as a continuation of the header rather than
+   as a card floating a pixel beneath it. */
+.omrs-rail-card:first-child {
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 .omrs-rail-cardhead {
   margin: 0;
   padding: 10px 14px;

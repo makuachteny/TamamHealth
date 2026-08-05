@@ -1320,6 +1320,9 @@ const nus: TranslationMap = {
   'patientNew.nokAddressPlaceholder': 'Tedun mär thiɛk',
   'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'Cuŋ',
+  // No settled Nuer term for the triage rung yet — the English label stands in
+  // rather than inventing one; the clinic uses "triage" in speech.
+  'appointments.statusTriaged': 'Triaged',
   'anc.view': 'Nɛn',
   'patientNew.payam': 'Payam',
   'anc.riskAssessment': 'Liep Riɛk',
@@ -1592,6 +1595,9 @@ const nus: TranslationMap = {
   'patientNew.contactLocationHeading': 'Wël & Tedun',
   'births.placeOfBirth': 'Te Dhiɛth',
   'ward.subtitleSingular': '{{facility}} · {{count}} duɛ̈l',
+  'patientNew.sectionHasErrors': 'This section needs attention',
+  'patientNew.jumpTo': 'Jump to',
+  'patientNew.allFieldsRequiredNote': 'All fields are required unless marked optional',
   'patientNew.cancel': 'Wäŋ',
   'patients.scanQrDesc': 'Lät camera bä scan QR code raan',
   'referrals.statPending': 'Tɔ̈u',

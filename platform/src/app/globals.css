@@ -5796,6 +5796,28 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   overflow: hidden;
 }
 
+/* The shell's own attention rail — shown on every module that does not build a
+   right-hand column of its own, so "what needs me" sits in the same place
+   whether the clinician is in Pharmacy, Wards or their dashboard. Matches the
+   dashboards' rail width so the column does not shift as you move between
+   modules. */
+.ehr-global-rail {
+  flex: 0 0 300px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 16px 16px 16px 0;
+  overflow-y: auto;
+}
+
+/* Below this the module body needs the full width more than the rail needs to
+   be permanent; the bell and /notifications still carry the same feed. */
+@media (max-width: 1279px) {
+  .ehr-global-rail { display: none; }
+}
+
 .ehr-side-card {
   flex: 0 0 auto;
   padding: 14px;
@@ -25048,4 +25070,180 @@ table.patient-data-table.patient-data-table {
 .ehr-visit-pop-actions .cn-split-main {
   width: auto;
   padding: 0 12px;
+}
+
+/* ── Create new patient: OpenMRS O3 layout ──────────────────────────────────
+   A sticky left rail carrying the form's table of contents and its two
+   actions, beside one long scrolling form. This replaces a six-step wizard:
+   registration is a form a clerk fills top to bottom with the patient in
+   front of them, and gating it a step at a time meant they could not answer
+   a question out of order or see what was still to come. */
+.omrs-reg {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .omrs-reg { grid-template-columns: minmax(0, 1fr); }
+  .omrs-reg-rail { position: static !important; }
+}
+
+.omrs-reg-rail {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.omrs-reg-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 14px;
+  line-height: 1.25;
+}
+
+.omrs-reg-jump {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+
+.omrs-reg-nav { display: flex; flex-direction: column; }
+
+/* The marker line is the rail: each item hangs off one continuous rule, so
+   the list reads as a route through the form rather than five loose links. */
+.omrs-reg-navitem {
+  position: relative;
+  padding: 8px 0 8px 16px;
+  font-size: 13.5px;
+  color: var(--text-secondary, var(--text-primary));
+  text-decoration: none;
+  border-left: 2px solid var(--border-light, #E2E8F0);
+}
+.omrs-reg-navitem:hover {
+  color: var(--accent-primary);
+  border-left-color: var(--accent-primary);
+}
+
+.omrs-reg-railactions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 22px;
+}
+.omrs-reg-railactions .btn { width: 100%; justify-content: center; }
+
+.omrs-reg-cancel {
+  border: none;
+  background: none;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: center;
+}
+.omrs-reg-cancel:hover { color: var(--color-danger, #dc2626); text-decoration: underline; }
+
+/* Each section is its own card. The shell used to be one big elevated panel;
+   with every section on the page at once that read as one undifferentiated
+   wall of inputs, so the card boundary is what separates "Demographics" from
+   "Contact & Location" now. */
+.omrs-reg-section {
+  scroll-margin-top: 16px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-light, #E2E8F0);
+  border-radius: 12px;
+  padding: 20px 22px 24px;
+  box-shadow: var(--card-shadow, 0 1px 2px rgba(16, 42, 67, 0.06));
+}
+
+.omrs-reg-sectionhead {
+  margin: 0 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light, #E2E8F0);
+}
+.omrs-reg-sectionhead h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.omrs-reg-sectionhead p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* Every section is on the page at once now; they need air between them. The
+   selector is loose on purpose — the sections are not always direct children
+   of the body wrapper. */
+.omrs-reg-form .omrs-reg-section + .omrs-reg-section { margin-top: 18px; }
+
+/* The shell is now just a column: the cards carry the surface. */
+.omrs-reg-form.patient-registration-shell {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+.omrs-reg-form .patient-registration-card-body {
+  display: block;
+  padding: 0;
+  background: transparent;
+}
+
+/* globals.css shouts every bare <label> in caps with letter-spacing. The
+   reference writes field labels as plain sentence case ("Middle Name
+   (optional)"), and on a form this long the caps read as a wall of shouting.
+   Scoped to this form only. */
+.omrs-reg label,
+.omrs-reg .registration-field label,
+.omrs-reg .registration-field > span {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  margin-bottom: 6px;
+}
+
+/* Inputs sit on white cards now, so they need their own edge to stay legible. */
+.omrs-reg input,
+.omrs-reg select,
+.omrs-reg textarea {
+  background: var(--bg-card-solid, #fff);
+}
+
+/* A section the last submit couldn't accept. The rail is where the Register
+   button lives, so the rail is where the answer to "why didn't it save?"
+   belongs. */
+.omrs-reg-navitem.has-errors {
+  color: var(--color-danger, #dc2626);
+  border-left-color: var(--color-danger, #dc2626);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.omrs-reg-navitem.has-errors span {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
 }

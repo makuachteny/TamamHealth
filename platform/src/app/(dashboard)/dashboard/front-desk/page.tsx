@@ -675,6 +675,21 @@ export default function FrontDeskDashboardPage() {
     }
   }, [updateAppointmentStatus, showToast, currentUser]);
 
+  // ── A walk-in has no booking, so its rung lives on the triage record. The
+  //    desk sets it from the same dropdown a booked patient uses; triage's own
+  //    clinical `status` is only touched when the visit actually closes, which
+  //    is the one place the two vocabularies genuinely agree. ──
+  const handleWalkInStatusChange = useCallback(async (triage: TriageDoc, status: AppointmentStatus) => {
+    try {
+      const patch: Partial<TriageDoc> = { visitStatus: status };
+      if (status === 'completed') patch.status = 'discharged';
+      await updateTriage(triage._id, patch);
+      showToast(`${triage.patientName} — ${appointmentStatusLabel(status).toLowerCase()}`, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not update the status', 'error');
+    }
+  }, [updateTriage, showToast]);
+
   // ── Move an appointment to a new date/time without leaving the desk. ──
   const openReschedule = useCallback((appt: AppointmentDoc) => {
     setRescheduleDate(isoDateKey(appt.appointmentDate));
@@ -944,6 +959,24 @@ export default function FrontDeskDashboardPage() {
       }
       const hasAllergies = Boolean(patient?.allergies?.length) && patient?.allergies[0] !== 'None known';
 
+      // Whatever this row is really about: a booking, or a walk-in's triage
+      // record. Both carry the same ladder, so the desk sets status the same
+      // way for every patient in the building.
+      const queueAppointment = entry.id.startsWith('appt-')
+        ? todaysAppointments.find(a => a._id === entry.sourceId)
+        : undefined;
+      const queueTriage = entry.id.startsWith('triage-')
+        ? triages.find(tr => tr._id === entry.sourceId)
+        : undefined;
+      // Until a clerk sets it explicitly, read the walk-in's rung off the
+      // stage the queue already computed, so the pill never starts blank.
+      const walkInStatus: AppointmentStatus | undefined = queueTriage
+        ? queueTriage.visitStatus
+          ?? (entry.status === 'DONE' ? 'completed'
+            : entry.status === 'IN CONSULT' ? 'in_progress'
+            : 'checked_in')
+        : undefined;
+      const ladderStatus = queueAppointment?.status ?? walkInStatus;
       return {
         id: entry.id,
         photoUrl: (patient as { photoUrl?: string } | undefined)?.photoUrl,
@@ -955,15 +988,26 @@ export default function FrontDeskDashboardPage() {
         timeSecondary: entry.waitMinutes != null ? waitLabel(entry.waitMinutes) : entry.calendarDate,
         timeAt: entry.timeAt,
         status: entry.status.toLowerCase(),
-        statusLabel,
+        statusLabel: ladderStatus ? appointmentStatusLabel(ladderStatus) : statusLabel,
         statusSecondary: statusContext,
-        statusTone,
-        // No status picker on these rows. The ladder is set on the Scheduled
-        // tab, where a booking is still being managed; once a patient is in the
-        // building their row's pill reports the queue's own stage (Waiting, In
-        // consult, Done), which is derived from triage and the encounter — a
-        // ladder picker here would have offered ten options that disagreed with
-        // the word next to them.
+        statusTone: ladderStatus ? APPOINTMENT_STATUS_TONES[ladderStatus] : statusTone,
+        // In Office and Finished rows carry the SAME ladder as Scheduled, so a
+        // patient's status is set the same way wherever they are in the day.
+        // Only rows backed by a booking can: a walk-in has no appointment to
+        // move, so its row still reports the queue's own stage (Waiting, In
+        // consult, Done) derived from triage and the encounter.
+        statusValue: ladderStatus,
+        statusOptions: ladderStatus && canSetAppointmentStatus
+          ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))
+          : undefined,
+        onStatusChange: canSetAppointmentStatus
+          ? (value: string) => {
+              const next = value as AppointmentStatus;
+              if (queueAppointment) return handleAppointmentStatusChange(queueAppointment, next);
+              if (queueTriage) return handleWalkInStatusChange(queueTriage, next);
+              return undefined;
+            }
+          : undefined,
         priority: acuity,
         room: entry.assignedRoom,
         careTeam: entry.assignedDoctorName || 'Doctor unassigned',

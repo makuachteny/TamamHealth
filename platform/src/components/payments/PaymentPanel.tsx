@@ -365,6 +365,14 @@ export default function PaymentPanel({
           }
           .pp-pay label { font-size:11px !important; font-weight:700 !important; letter-spacing:.03em; text-transform:uppercase; color:var(--text-muted) !important; }
           .pp-pay .pp-field-label { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; display:block; }
+          /* The method chooser. Full width so it lines up with the amount and
+             the fields under it, and sized like the panel's other inputs. */
+          .pp-pay .pp-method-select {
+            width:100%; min-height:42px; padding:0 12px; font-size:14px; font-weight:600;
+            color:var(--text-primary); background:var(--bg-card, #fff);
+            border:1px solid var(--border-light); border-radius:10px; cursor:pointer;
+          }
+          .pp-pay .pp-method-select:focus-visible { outline:2px solid var(--accent-primary); outline-offset:1px; }
         `}</style>
 
         {/* Header */}
@@ -389,27 +397,19 @@ export default function PaymentPanel({
         {/* Payment method selector */}
         <div style={{ padding: '16px 22px 4px' }}>
           <span className="pp-field-label">Payment method</span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))', gap: 8 }}>
-            {tabs.map(tabItem => {
-              const Icon = tabItem.icon;
-              const active = tab === tabItem.key;
-              return (
-                <button key={tabItem.key} type="button" onClick={() => setTab(tabItem.key)} style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  padding: '12px 6px', borderRadius: 12, cursor: 'pointer', minHeight: 72, textAlign: 'center', lineHeight: 1.2,
-                  border: active ? '1.5px solid var(--accent-primary)' : '1px solid var(--border-light)',
-                  background: active ? 'var(--accent-light)' : 'var(--bg-card, #fff)',
-                  color: active ? 'var(--accent-text)' : 'var(--text-secondary)',
-                  fontSize: 11, fontWeight: 600, transition: 'all .15s',
-                }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: active ? 'var(--accent-primary)' : 'var(--overlay-subtle)', color: active ? '#fff' : 'var(--text-muted)' }}>
-                    <Icon size={16} />
-                  </span>
-                  <span>{tabItem.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* A select, not a grid of tiles: the five methods are one
+              mutually-exclusive choice, and the tiles took a whole band of the
+              panel to say what one line says. */}
+          <select
+            className="pp-method-select"
+            value={tab}
+            onChange={e => setTab(e.target.value as TabType)}
+            aria-label={t('payments.methodLabel')}
+          >
+            {tabs.map(tabItem => (
+              <option key={tabItem.key} value={tabItem.key}>{tabItem.label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Form */}

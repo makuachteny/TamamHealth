@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
+import { useAppointments } from '@/lib/hooks/useAppointments';
+import { APPOINTMENT_STATUS_FLOW, APPOINTMENT_CLOSED_STATUSES } from '@/lib/appointment-status';
+import { jubaDate } from '@/lib/time-juba';
 import { useToast } from '@/components/Toast';
 import { patientFullName, patientGenderAge, initials } from '@/lib/patient-utils';
 import { isVitalInRange, VITAL_RANGES } from '@/lib/clinical/vitals';
@@ -33,7 +36,20 @@ function modeOfArrivalLabel(mode: string | undefined, t: (key: string) => string
   }
 }
 
-export default function TriageWorkflow({ initialPatientId }: { initialPatientId?: string }) {
+export default function TriageWorkflow({
+  initialPatientId,
+  lockedPatientId,
+}: {
+  initialPatientId?: string;
+  /**
+   * Pin the form to one patient — the per-patient triage page at
+   * `/triage/[patientId]`. The picker becomes a read-only identity chip, Reset
+   * and a completed save keep the patient instead of clearing it, and "Recent
+   * triages" narrows to that patient's own history. Without it the component is
+   * the station: pick anyone, and the list is the whole facility's.
+   */
+  lockedPatientId?: string;
+}) {
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useAuth();
@@ -49,7 +65,34 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
     return map;
   }, [patients]);
   const { triages: triageHistory, create: createTriageRecord, update: updateTriageRecord } = useTriage();
+  const { appointments, updateStatus: updateAppointmentStatus } = useAppointments();
   const { showToast } = useToast();
+
+  /**
+   * Move today's visit onto the Triaged rung once the assessment is saved.
+   *
+   * The board and the front desk read the appointment's status, so without this
+   * a patient the nurse had just assessed still read "Checked In" — the same as
+   * everyone still waiting for one. Only ever forward: a visit already roomed or
+   * checked out is not walked back by a late correction to its triage record.
+   */
+  const markVisitTriaged = async (patientId: string) => {
+    const today = jubaDate();
+    const visit = appointments.find(appointment =>
+      appointment.patientId === patientId &&
+      appointment.appointmentDate === today &&
+      !APPOINTMENT_CLOSED_STATUSES.includes(appointment.status));
+    if (!visit) return;
+    const rung = (status: string) => APPOINTMENT_STATUS_FLOW.indexOf(status as typeof APPOINTMENT_STATUS_FLOW[number]);
+    if (rung(visit.status) >= rung('triaged')) return;
+    try {
+      await updateAppointmentStatus(visit._id, 'triaged');
+    } catch {
+      // The triage record itself is saved; a failed status hop must not read as
+      // a failed triage.
+      showToast('Triage saved, but the visit status could not be updated.', 'error');
+    }
+  };
 
   // When set, the form is correcting an already-saved triage record rather
   // than creating a new one. Lets a nurse fix a mistyped vital / mis-tapped
@@ -59,7 +102,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
   const [triageData, setTriageData] = useState<TriageResult>({
     airway: '', breathing: '', circulation: '', consciousness: '', priority: '',
   });
-  const [triagePatientId, setTriagePatientId] = useState(initialPatientId ?? '');
+  const [triagePatientId, setTriagePatientId] = useState(lockedPatientId ?? initialPatientId ?? '');
   const [triagePatientSearch, setTriagePatientSearch] = useState('');
   // Inline search for the "Recent Triages" list (right column).
   const [historySearch, setHistorySearch] = useState('');
@@ -187,6 +230,20 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
     }
   };
 
+  // Empty the form. On the per-patient page the patient survives the clear —
+  // the nurse is there to triage that one person, and dropping the selection
+  // would leave a form with no subject on a page that is about them.
+  const clearForm = () => {
+    setEditingTriageId(null);
+    setTriageData({ airway: '', breathing: '', circulation: '', consciousness: '', priority: '' });
+    setTriagePatientId(lockedPatientId ?? '');
+    setTriagePatientSearch('');
+    setTriageVitals({ temperature: '', pulse: '', respiratoryRate: '', systolic: '', diastolic: '', oxygenSaturation: '', weight: '', painScore: '', bloodGlucose: '', gcs: '', muac: '' });
+    setTriageContext({ modeOfArrival: '', symptomDuration: '', referralSource: '', knownAllergies: '' });
+    setTriageComplaint('');
+    setTriageNotes('');
+  };
+
   const triagePriorityColor = (priority: string) => {
     switch (priority) {
       case 'RED': return { bg: 'var(--color-danger)', text: '#FFF', label: t('nurse.priorityRedLabel') };
@@ -277,6 +334,8 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
           status: 'pending',
         });
       }
+      // Triaged, and now waiting on a room — the nurse's next move.
+      await markVisitTriaged(selectedTriagePatient._id);
       void import('@/lib/services/consultation-progress-service').then(({ syncConsultationProgressStage }) =>
         syncConsultationProgressStage({
           patientId: selectedTriagePatient._id,
@@ -291,14 +350,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
       ).catch(() => { /* queue save remains successful if progress sync is offline */ });
       showToast(t('nurse.triageSaved', { priority: triageData.priority, name: patientFullName(selectedTriagePatient) }), 'success');
       // Reset form only on success
-      setEditingTriageId(null);
-      setTriageData({ airway: '', breathing: '', circulation: '', consciousness: '', priority: '' });
-      setTriagePatientId('');
-      setTriagePatientSearch('');
-      setTriageVitals({ temperature: '', pulse: '', respiratoryRate: '', systolic: '', diastolic: '', oxygenSaturation: '', weight: '', painScore: '', bloodGlucose: '', gcs: '', muac: '' });
-      setTriageContext({ modeOfArrival: '', symptomDuration: '', referralSource: '', knownAllergies: '' });
-      setTriageComplaint('');
-      setTriageNotes('');
+      clearForm();
     } catch (err) {
       console.error(err);
       // Keep form data intact so the nurse can retry
@@ -308,10 +360,15 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
     }
   };
 
+  // On the per-patient page the list is that patient's own triage history —
+  // every other person's is noise on a page about one of them.
+  const scopedHistory = lockedPatientId
+    ? triageHistory.filter(ti => ti.patientId === lockedPatientId)
+    : triageHistory;
   const histQ = historySearch.trim().toLowerCase();
   const filteredHistory = histQ
-    ? triageHistory.filter(ti => (ti.patientName || '').toLowerCase().includes(histQ) || (ti.chiefComplaint || '').toLowerCase().includes(histQ))
-    : triageHistory;
+    ? scopedHistory.filter(ti => (ti.patientName || '').toLowerCase().includes(histQ) || (ti.chiefComplaint || '').toLowerCase().includes(histQ))
+    : scopedHistory;
 
   return (
     <div className="flex flex-col lg:flex-row gap-4" style={{ flex: 1, minHeight: 0 }}>
@@ -340,9 +397,13 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
                     {selectedTriagePatient.hospitalNumber} · {patientGenderAge(selectedTriagePatient)}
                   </p>
                 </div>
-                <button onClick={() => { setTriagePatientId(''); setTriagePatientSearch(''); }} className="p-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--overlay-subtle)' }}>
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                {/* No clear button on the per-patient page: the patient is the
+                    page, not a field on it. */}
+                {!lockedPatientId && (
+                  <button onClick={() => { setTriagePatientId(''); setTriagePatientSearch(''); }} className="p-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--overlay-subtle)' }}>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -644,16 +705,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
             <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(33,145,208,0.25))' }}>
               <span className="text-[11px] font-semibold" style={{ color: ACCENT }}>{t('action.edit')}</span>
               <button
-                onClick={() => {
-                  setEditingTriageId(null);
-                  setTriageData({ airway: '', breathing: '', circulation: '', consciousness: '', priority: '' });
-                  setTriagePatientId('');
-                  setTriagePatientSearch('');
-                  setTriageVitals({ temperature: '', pulse: '', respiratoryRate: '', systolic: '', diastolic: '', oxygenSaturation: '', weight: '', painScore: '', bloodGlucose: '', gcs: '', muac: '' });
-                  setTriageContext({ modeOfArrival: '', symptomDuration: '', referralSource: '', knownAllergies: '' });
-                  setTriageComplaint('');
-                  setTriageNotes('');
-                }}
+                onClick={clearForm}
                 className="text-[10px] font-semibold inline-flex items-center gap-1"
                 style={{ color: 'var(--text-muted)' }}
               >
@@ -665,16 +717,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
           {/* Actions */}
           <div className="flex gap-2">
             <button
-              onClick={() => {
-                setEditingTriageId(null);
-                setTriageData({ airway: '', breathing: '', circulation: '', consciousness: '', priority: '' });
-                setTriagePatientId('');
-                setTriagePatientSearch('');
-                setTriageVitals({ temperature: '', pulse: '', respiratoryRate: '', systolic: '', diastolic: '', oxygenSaturation: '', weight: '', painScore: '', bloodGlucose: '', gcs: '', muac: '' });
-                setTriageContext({ modeOfArrival: '', symptomDuration: '', referralSource: '', knownAllergies: '' });
-                setTriageComplaint('');
-                setTriageNotes('');
-              }}
+              onClick={clearForm}
               className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
               style={{
                 background: 'var(--overlay-subtle)',
@@ -700,9 +743,11 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4" style={{ color: ACCENT }} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.recentTriages')}</h3>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {lockedPatientId ? 'Triage history' : t('nurse.recentTriages')}
+            </h3>
           </div>
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.total', { count: triageHistory.length })}</span>
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.total', { count: scopedHistory.length })}</span>
         </div>
         <div className="px-3 py-2.5 flex items-center border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
           <ListSearch value={historySearch} onChange={setHistorySearch} placeholder={t('nurse.searchPatientPlaceholder')} />
@@ -752,9 +797,19 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
                           : initials(ti.patientName)}
                       </span>
                       <div className="ehr-queue-patient-text">
-                        <button type="button" className="ehr-queue-name" onClick={() => router.push(`/patients/${ti.patientId}`)} title={t('nurse.viewPatientRecord')}>
-                          {ti.patientName}
-                        </button>
+                        {/* Clicking a patient in a triage list opens their own
+                            triage page — this list is a queue of people to
+                            triage, so the name leads to triaging them rather
+                            than to the chart. The chart is still one row-menu
+                            entry away. On that page itself the name is already
+                            the subject, so it is plain text. */}
+                        {lockedPatientId ? (
+                          <span className="ehr-queue-name">{ti.patientName}</span>
+                        ) : (
+                          <button type="button" className="ehr-queue-name" onClick={() => router.push(`/triage/${ti.patientId}`)} title={`Triage ${ti.patientName}`}>
+                            {ti.patientName}
+                          </button>
+                        )}
                         <p>{ti.chiefComplaint || t('nurse.noComplaintRecorded')}</p>
                       </div>
                     </div>

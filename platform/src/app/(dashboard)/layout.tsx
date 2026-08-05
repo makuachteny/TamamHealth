@@ -19,6 +19,27 @@ import { useIsMobileViewport } from '@/lib/hooks/useIsMobileViewport';
 import { getMobileShellArchetype } from '@/lib/mobile-shell/dashboard-strategy';
 import MobileAppShell from '@/components/mobile/MobileAppShell';
 import UsageTracker from '@/components/UsageTracker';
+import EhrAttentionRail from '@/components/ehr/EhrAttentionRail';
+import { AttentionRailProvider, useAttentionRailOwnedByPage } from '@/lib/attention-rail';
+
+/**
+ * The module body and the shared "Needs your attention" rail, side by side.
+ * Split into its own component so it can read the rail-ownership context that
+ * the provider below it establishes — a screen with its own right rail (the
+ * doctor and care dashboards) suppresses this one instead of showing two.
+ */
+function DashboardBody({ children }: { children: React.ReactNode }) {
+  const pageOwnsRail = useAttentionRailOwnedByPage();
+  return (
+    <div className="dashboard-content-area flex-1 flex min-w-0 overflow-hidden">
+      <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
+        <RoleGuard>{children}</RoleGuard>
+        <GetStartedCard />
+      </main>
+      {!pageOwnsRail && <EhrAttentionRail />}
+    </div>
+  );
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -59,6 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <SettingsProvider>
     <TourProvider>
+    <AttentionRailProvider>
     <div className="flex h-screen overflow-hidden tamam-solid-bg tamam-ehr-app">
       {isLocked && currentUser && (
         <LockScreen
@@ -81,12 +103,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div
             className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10 transition-all duration-300 ease-in-out tamam-ehr-content-frame"
           >
-            <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden">
-              <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
-                <RoleGuard>{children}</RoleGuard>
-                <GetStartedCard />
-              </main>
-            </div>
+            <DashboardBody>{children}</DashboardBody>
           </div>
         </>
       )}
@@ -95,6 +112,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <ConnectivityNotice />
       <UsageTracker />
     </div>
+    </AttentionRailProvider>
     </TourProvider>
     </SettingsProvider>
   );

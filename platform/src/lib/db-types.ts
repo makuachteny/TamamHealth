@@ -1559,6 +1559,14 @@ export interface TriageDoc extends BaseDoc {
   type: 'triage';
   patientId: string;
   patientName: string;
+  /**
+   * Where this walk-in sits on the front desk's visit ladder (the same
+   * vocabulary a booked appointment uses: arrived → checked_in → in_progress →
+   * completed). Kept separate from `status`, which is triage's own clinical
+   * state — a desk clerk moving someone to "Checked Out" must not silently
+   * rewrite the ETAT record. Absent on older docs; the queue stage stands in.
+   */
+  visitStatus?: AppointmentStatus;
   hospitalNumber?: string;
   // ETAT ABCC. 'not_assessed' means exactly that — no clinician has examined
   // this dimension yet (e.g. a clerical check-in). It must never be defaulted
@@ -1954,7 +1962,11 @@ export interface BloodBankDoc extends BaseDoc {
  */
 export type AppointmentStatus =
   | 'requested' | 'scheduled' | 'reminder_sent' | 'confirmed' | 'arrived'
-  | 'checked_in' | 'in_progress' | 'completed'
+  // `triaged` sits between check-in and the room: the nurse has assessed the
+  // patient (ETAT/ABCC + vitals) and they are waiting to be roomed. Before it
+  // existed a triaged patient still read "Checked In", so the ward board could
+  // not tell who had been assessed from who was still waiting for a nurse.
+  | 'checked_in' | 'triaged' | 'in_progress' | 'completed'
   | 'cancelled' | 'no_show' | 'rescheduled';
 export type AppointmentType = 'general' | 'follow_up' | 'specialist' | 'anc' | 'immunization' | 'lab' | 'telehealth' | 'surgical' | 'dental' | 'mental_health' | 'walk_in';
 export type AppointmentPriority = 'routine' | 'urgent' | 'emergency';

@@ -24,6 +24,11 @@ import type { AppointmentStatus } from './db-types';
  * `arrived` and `checked_in` are deliberately distinct: a patient can be
  * standing in the waiting room (arrived) before the desk has taken payment,
  * verified insurance and opened the visit (checked in).
+ *
+ * `triaged` is the nurse's rung between them and the room: the ETAT assessment
+ * is recorded and the patient is waiting to be roomed. Saving a triage sets it,
+ * so the board shows assessed-and-waiting apart from not-yet-seen, and the next
+ * option in this same dropdown is the one the nurse takes next — Roomed.
  */
 export const APPOINTMENT_STATUS_FLOW: AppointmentStatus[] = [
   'scheduled',
@@ -31,6 +36,7 @@ export const APPOINTMENT_STATUS_FLOW: AppointmentStatus[] = [
   'confirmed',
   'arrived',
   'checked_in',
+  'triaged',
   'in_progress',
   'completed',
 ];
@@ -56,6 +62,7 @@ export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   confirmed: 'Confirmed',
   arrived: 'Arrived',
   checked_in: 'Checked In',
+  triaged: 'Triaged',
   in_progress: 'Roomed',
   completed: 'Checked Out',
   no_show: 'No Show',
@@ -71,6 +78,7 @@ export const APPOINTMENT_STATUS_I18N_KEYS: Record<AppointmentStatus, string> = {
   confirmed: 'appointments.statusConfirmed',
   arrived: 'appointments.statusArrived',
   checked_in: 'appointments.statusCheckedIn',
+  triaged: 'appointments.statusTriaged',
   in_progress: 'appointments.statusInProgress',
   completed: 'appointments.statusCompleted',
   no_show: 'appointments.statusNoShow',
@@ -90,6 +98,7 @@ export const APPOINTMENT_STATUS_COLORS: Record<AppointmentStatus, { color: strin
   confirmed:     { color: '#015697', bg: 'rgba(1,86,151,0.10)' },
   arrived:       { color: '#B45309', bg: 'rgba(180,83,9,0.10)' },
   checked_in:    { color: '#D97706', bg: 'rgba(217,119,6,0.10)' },
+  triaged:       { color: '#0E7490', bg: 'rgba(14,116,144,0.10)' },
   in_progress:   { color: '#059669', bg: 'rgba(5,150,105,0.10)' },
   completed:     { color: '#047857', bg: 'rgba(4,120,87,0.10)' },
   no_show:       { color: '#64748B', bg: 'rgba(100,116,139,0.10)' },
@@ -105,6 +114,7 @@ export const APPOINTMENT_STATUS_TONES: Record<AppointmentStatus, 'scheduled' | '
   confirmed: 'ready',
   arrived: 'warning',
   checked_in: 'warning',
+  triaged: 'ready',
   in_progress: 'active',
   completed: 'done',
   no_show: 'danger',
@@ -117,10 +127,10 @@ export const APPOINTMENT_STATUS_TONES: Record<AppointmentStatus, 'scheduled' | '
  * means — so anything keyed off presence (queues, wait timers) picks it up
  * without a second list to maintain.
  */
-export const APPOINTMENT_PRESENT_STATUSES: AppointmentStatus[] = ['arrived', 'checked_in', 'in_progress', 'completed'];
+export const APPOINTMENT_PRESENT_STATUSES: AppointmentStatus[] = ['arrived', 'checked_in', 'triaged', 'in_progress', 'completed'];
 
 /** The visit has been opened at the desk: reception's work on it is done. */
-export const APPOINTMENT_CHECKED_IN_STATUSES: AppointmentStatus[] = ['checked_in', 'in_progress', 'completed'];
+export const APPOINTMENT_CHECKED_IN_STATUSES: AppointmentStatus[] = ['checked_in', 'triaged', 'in_progress', 'completed'];
 
 /** The slot is no longer live — nothing further will happen at this time. */
 export const APPOINTMENT_CLOSED_STATUSES: AppointmentStatus[] = ['completed', 'cancelled', 'no_show', 'rescheduled'];
@@ -148,7 +158,7 @@ export const APPOINTMENT_STATUS_GROUP_LABELS: Record<AppointmentStatusGroup, str
 };
 
 export function appointmentStatusGroup(status: AppointmentStatus): AppointmentStatusGroup {
-  if (status === 'checked_in' || status === 'in_progress') return 'in_office';
+  if (status === 'checked_in' || status === 'triaged' || status === 'in_progress') return 'in_office';
   if (APPOINTMENT_CLOSED_STATUSES.includes(status)) return 'finished';
   // requested/scheduled/reminder_sent/confirmed — and `arrived`: the patient is
   // in the waiting room but the desk has not opened the visit yet, so they

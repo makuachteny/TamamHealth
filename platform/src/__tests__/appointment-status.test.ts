@@ -36,6 +36,7 @@ describe('appointment status dropdown', () => {
       'Confirmed',
       'Arrived',
       'Checked In',
+      'Triaged',
       'Roomed',
       'Checked Out',
       'No Show',
@@ -146,7 +147,9 @@ describe('priorAppointmentStatus', () => {
     expect(priorAppointmentStatus('confirmed')).toBe('reminder_sent');
     expect(priorAppointmentStatus('arrived')).toBe('confirmed');
     expect(priorAppointmentStatus('checked_in')).toBe('arrived');
-    expect(priorAppointmentStatus('in_progress')).toBe('checked_in');
+    // The nurse's ETAT assessment sits between check-in and the room.
+    expect(priorAppointmentStatus('triaged')).toBe('checked_in');
+    expect(priorAppointmentStatus('in_progress')).toBe('triaged');
     expect(priorAppointmentStatus('completed')).toBe('in_progress');
   });
 

@@ -4,6 +4,7 @@ import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from '
 import { useRouter } from 'next/navigation';
 import { ClipboardList, Search, Stethoscope, Video, X, type LucideIcon } from '@/components/icons/lucide';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
+import { useOwnsAttentionRail } from '@/lib/attention-rail';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
@@ -272,6 +273,9 @@ export default function EhrCareDashboard({
   children?: ReactNode;
 }) {
   const router = useRouter();
+  // This dashboard renders its own right rail, so the shell suppresses the
+  // shared attention rail here rather than stacking two columns.
+  useOwnsAttentionRail();
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   // The calendar main-view toggle was removed — the dashboard is the only view
   // for all users. Typed as the union so the (now-inert) calendar branches below
@@ -703,6 +707,12 @@ export default function EhrCareDashboard({
               </button>
             ))}
           </div>
+          {/* No "Needs your attention" card here: ProgressFeedCard below is
+              already this rail's version of it, built from the same triages,
+              labs and prescriptions, and the two side by side simply restated
+              each other. Stations get their feed role-tuned ("Patient flow");
+              modules with no rail of their own get the shell's shared card. */}
+
           {/* "Who moved where, just now" — the station equivalent of the
               clinician's "Awaiting review". Rendered here so every dashboard
               built on this shell gets it without wiring it seven times; the

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, ArrowLeft, ArrowRight, Trash2, UserPlus, MapPin, Users, ScanLine, Wallet, ClipboardList, Camera } from '@/components/icons/lucide';
+import { ArrowLeft, Trash2, Camera } from '@/components/icons/lucide';
 import FingerprintCapture, { type CapturedFingerprint } from '@/components/FingerprintCapture';
 import PhotoCaptureModal from '@/components/patients/PhotoCaptureModal';
 import { statesAndCounties, states, tribes, languages } from '@/data/mock';
@@ -19,30 +19,15 @@ interface PatientRegistrationFormProps {
   onRegistered?: () => void;
 }
 
+/** Anchor ids for the rail's Jump-to links, in the same order as `steps`. */
+const SECTION_ANCHORS = ['demographics', 'contact', 'nextofkin', 'biometrics', 'coverage', 'review'] as const;
+
 export function PatientRegistrationForm({ embedded = false, onCancel, onRegistered }: PatientRegistrationFormProps = {}) {
   const { t } = useTranslation();
   const steps = [t('patientNew.stepDemographics'), t('patientNew.stepContactLocation'), t('patientNew.stepNextOfKin'), t('patientNew.stepBiometrics'), t('patientNew.stepPaymentCoverage'), t('patientNew.stepReview')];
-  const stepDescriptions = [
-    t('patientNew.stepDescDemographics'),
-    t('patientNew.stepDescContactLocation'),
-    t('patientNew.stepDescNextOfKin'),
-    t('patientNew.stepDescBiometrics'),
-    t('patientNew.stepDescPaymentCoverage'),
-    t('patientNew.stepDescReview'),
-  ];
   // Short per-step hint shown once in the card header. Previously each step
   // also rendered its own section header with a near-duplicate title, so the
   // heading appeared twice ("Demographics" / "Patient Demographics"). The note
-  // is the only non-redundant part of that section header, so we keep it here.
-  const stepNotes = [
-    t('patientNew.requiredFieldsNote'),
-    t('patientNew.phoneOptionalNote'),
-    t('patientNew.nokContactsNote'),
-    t('patientNew.optionalButRecommended'),
-    t('patientNew.usedAtCheckout'),
-    '',
-  ];
-  const stepIcons = [UserPlus, MapPin, Users, ScanLine, Wallet, ClipboardList];
   const relationshipOptions = [
     { value: 'Spouse', labelKey: 'patientNew.relSpouse' },
     { value: 'Parent', labelKey: 'patientNew.relParent' },
@@ -58,7 +43,6 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
   const { create: createPatient } = usePatients();
   const { currentUser } = useAuth();
   const { showToast } = useToast();
-  const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     firstName: '', middleName: '', surname: '', maidenName: '',
     dateOfBirth: '', estimatedAge: '', gender: '', tribe: '', primaryLanguage: '',
@@ -87,6 +71,8 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  /** Sections whose fields failed the last submit — flagged in the rail. */
+  const [errorSections, setErrorSections] = useState<Set<number>>(new Set());
   const [submitIntent, setSubmitIntent] = useState<'profile' | 'check-in' | null>(null);
   // Fingerprint templates captured during registration (consent-gated inside
   // the component). Persisted AFTER the patient doc exists, in handleSubmit.
@@ -168,25 +154,30 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
     return errs;
   };
 
-  const goNext = () => {
-    const stepErrors = validateStep(step);
-    if (Object.keys(stepErrors).length > 0) {
-      setErrors(stepErrors);
-      showToast(t('patientNew.toastFillRequired'), 'error');
-      return;
-    }
-    setErrors({});
-    setStep(step + 1);
-  };
-
   const handleSubmit = async (nextAction: 'profile' | 'check-in' = 'profile') => {
     // Validate all steps before submitting
-    const allErrors = { ...validateStep(0), ...validateStep(1), ...validateStep(2) };
+    // Which section each failure belongs to, not just that something failed.
+    // On one long form the button is in the rail and the offending field can be
+    // two screens down: without this, pressing Register looked like it did
+    // nothing at all.
+    const perSection = [validateStep(0), validateStep(1), validateStep(2)];
+    const allErrors = Object.assign({}, ...perSection);
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
+      const failed = perSection
+        .map((errs, i) => (Object.keys(errs).length > 0 ? i : -1))
+        .filter(i => i >= 0);
+      setErrorSections(new Set(failed));
       showToast(t('patientNew.toastFillRequired'), 'error');
+      // Take the clerk to the first thing that needs them.
+      const firstField = Object.keys(perSection[failed[0]])[0];
+      const target =
+        document.querySelector<HTMLElement>(`[data-field="${firstField}"]`) ??
+        document.getElementById(`reg-${SECTION_ANCHORS[failed[0]]}`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    setErrorSections(new Set());
 
     setSubmitting(true);
     setSubmitIntent(nextAction);
@@ -317,50 +308,66 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
           <button onClick={() => router.push('/patients')} className="patient-registration-back">
             <ArrowLeft className="w-4 h-4" /> {t('patientNew.backToPatients')}
           </button>
-          <div className="patient-registration-context" aria-live="polite">
-            <span>{t('patientNew.stepProgress', { current: step + 1, total: steps.length })}</span>
-            <strong>{steps[step]}</strong>
-          </div>
           </div>
         )}
 
-        {/* Step Indicator — stretches across the full width of the form below */}
-        <div className="patient-registration-stepper" aria-label={t('patientNew.registrationProgressAriaLabel')}>
-          {steps.map((s, i) => (
-            <div key={s} className={`patient-registration-step ${i === step ? 'is-active' : i < step ? 'is-complete' : ''}`}>
-              <div className={`step-dot ${i === step ? 'step-dot-active' : i < step ? 'step-dot-completed' : ''}`}>
-                {i < step ? <Check className="w-4 h-4" /> : i + 1}
-              </div>
-              <span>{s}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="card-elevated patient-registration-shell">
-          <div className="patient-registration-card-header">
-            <div className="patient-registration-card-title">
-              {(() => {
-                const StepIcon = stepIcons[step];
-                return (
-                  <span className="patient-registration-icon" aria-hidden="true">
-                    <StepIcon className="w-5 h-5" />
-                  </span>
-                );
-              })()}
-              <div>
-                <p>{t('patientNew.topBarTitle')}</p>
-                <h2>{steps[step]}</h2>
-              </div>
-            </div>
-            <div className="patient-registration-card-meta">
-              <p className="patient-registration-card-description">{stepDescriptions[step]}</p>
-              {stepNotes[step] && <span className="patient-registration-card-note">{stepNotes[step]}</span>}
-            </div>
+        <div className="omrs-reg">
+        {/* Left rail: the form's table of contents and its two actions. The
+            wizard's step dots are gone — every section is on the page now, so
+            the rail jumps between them rather than gating them. */}
+        <aside className="omrs-reg-rail" aria-label={t('patientNew.registrationProgressAriaLabel')}>
+          <h1 className="omrs-reg-title">{t('patientNew.topBarTitle')}</h1>
+          <p className="omrs-reg-jump">{t('patientNew.jumpTo')}</p>
+          <nav className="omrs-reg-nav">
+            {steps.map((label, i) => (
+              <a
+                key={label}
+                href={`#reg-${SECTION_ANCHORS[i]}`}
+                className={`omrs-reg-navitem${errorSections.has(i) ? ' has-errors' : ''}`}
+              >
+                {label}
+                {errorSections.has(i) && <span aria-label={t('patientNew.sectionHasErrors')}>!</span>}
+              </a>
+            ))}
+          </nav>
+          <div className="omrs-reg-railactions">
+            <button
+              type="button"
+              onClick={() => handleSubmit('profile')}
+              disabled={submitting}
+              className="btn btn-primary"
+            >
+              {submitting && submitIntent === 'profile'
+                ? t('patientNew.saving')
+                : t('patientNew.registerPatient')}
+            </button>
+            {!onRegistered && (
+              <button
+                type="button"
+                onClick={() => handleSubmit('check-in')}
+                disabled={submitting}
+                className="btn btn-secondary"
+              >
+                {submitting && submitIntent === 'check-in'
+                  ? t('patientNew.saving')
+                  : t('patientNew.registerAndCheckIn')}
+              </button>
+            )}
+            <button type="button" onClick={handleCancel} className="omrs-reg-cancel">
+              {t('patientNew.cancel')}
+            </button>
           </div>
+        </aside>
+
+        <div className="patient-registration-shell omrs-reg-form">
           <div className="patient-registration-card-body">
             {/* Step 0: Demographics */}
-            {step === 0 && (
-              <div className="registration-section">
+            {(
+              <section className="registration-section omrs-reg-section" id="reg-demographics">
+                <header className="omrs-reg-sectionhead">
+                  <h2>1. {steps[0]}</h2>
+                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                </header>
                 <div className="flex gap-3 items-start">
                   <div className="registration-field-grid registration-field-grid--three flex-1">
                     <div>
@@ -420,12 +427,16 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     {errors.primaryLanguage && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.primaryLanguage}</p>}
                   </div>
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Step 1: Contact & Location */}
-            {step === 1 && (
-              <div className="registration-section">
+            {(
+              <section className="registration-section omrs-reg-section" id="reg-contact">
+                <header className="omrs-reg-sectionhead">
+                  <h2>2. {steps[1]}</h2>
+                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                </header>
                 <div className="registration-field-grid registration-field-grid--three">
                   <div>
                     <label htmlFor="pt-phone">{t('patientNew.phone')}</label>
@@ -505,12 +516,16 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     <textarea id="pt-address" value={form.address} onChange={e => update('address', e.target.value)} rows={2} placeholder={t('patientNew.residentialAddressPlaceholder')} />
                   </div>
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Step 2: Next of Kin (multiple contacts supported) */}
-            {step === 2 && (
-              <div className="registration-section">
+            {(
+              <section className="registration-section omrs-reg-section" id="reg-nextofkin">
+                <header className="omrs-reg-sectionhead">
+                  <h2>3. {steps[2]}</h2>
+                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                </header>
                 <p className="registration-section-note">
                   {t('patientNew.nokSectionNote')}
                 </p>
@@ -586,12 +601,16 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     + {t('patientNew.addAnotherContact')}
                   </button>
                 )}
-              </div>
+              </section>
             )}
 
             {/* Step 3: Biometrics — patient photo and fingerprint enrollment */}
-            {step === 3 && (
-              <div className="registration-section">
+            {(
+              <section className="registration-section omrs-reg-section" id="reg-biometrics">
+                <header className="omrs-reg-sectionhead">
+                  <h2>4. {steps[3]}</h2>
+                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                </header>
                 <p className="registration-section-note">
                   {t('patientNew.biometricsNote')}
                 </p>
@@ -629,12 +648,16 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                 </div>
 
                 <FingerprintCapture value={fingerprints} onChange={setFingerprints} />
-              </div>
+              </section>
             )}
 
             {/* Step 4: Payment Coverage */}
-            {step === 4 && (
-              <div className="registration-section">
+            {(
+              <section className="registration-section omrs-reg-section" id="reg-coverage">
+                <header className="omrs-reg-sectionhead">
+                  <h2>5. {steps[4]}</h2>
+                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                </header>
                 <p className="registration-section-note">
                     {t('patientNew.coverageNote')}
                 </p>
@@ -699,12 +722,16 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     {t('patientNew.medicalHistoryDeferredNote')}
                   </p>
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Step 5: Review */}
-            {step === 5 && (
-              <div className="registration-section">
+            {(
+              <section className="registration-section omrs-reg-section" id="reg-review">
+                <header className="omrs-reg-sectionhead">
+                  <h2>6. {steps[5]}</h2>
+                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                </header>
                 <div className="registration-review-heading">
                   <div style={{ width: 60, height: 60, borderRadius: 12, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--border-light)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {patientPhotoUrl ? (
@@ -753,35 +780,12 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     </div>
                   </div>
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* Navigation */}
-            <div className="patient-registration-actions">
-              <button onClick={() => step > 0 ? setStep(step - 1) : handleCancel()} className="btn btn-secondary">
-                <ArrowLeft className="w-4 h-4" /> {step === 0 ? t('patientNew.cancel') : t('patientNew.previous')}
-              </button>
-              {step < steps.length - 1 ? (
-                <button onClick={goNext} className="btn btn-primary">
-                  {t('patientNew.next')} <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : onRegistered ? (
-                <button onClick={() => handleSubmit('profile')} disabled={submitting} className="btn btn-success" style={{ opacity: submitting ? 0.7 : 1 }}>
-                  {submitting ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : <><Check className="w-4 h-4" /> {t('patientNew.registerPatient')}</>}
-                </button>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <button onClick={() => handleSubmit('profile')} disabled={submitting} className="btn btn-secondary" style={{ opacity: submitting ? 0.7 : 1 }}>
-                    {submitting && submitIntent === 'profile' ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : t('patientNew.registerPatient')}
-                  </button>
-                  <button onClick={() => handleSubmit('check-in')} disabled={submitting} className="btn btn-success" style={{ opacity: submitting ? 0.7 : 1 }}>
-                    {submitting && submitIntent === 'check-in' ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : <><Check className="w-4 h-4" /> {t('patientNew.registerAndCheckIn')}</>}
-                  </button>
-                </div>
-              )}
-            </div>
             </div>
           </div>
+        </div>
       </main>
 
       {showPhotoModal && (

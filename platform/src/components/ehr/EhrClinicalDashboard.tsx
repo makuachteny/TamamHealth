@@ -26,6 +26,7 @@ import {
 import { initials, stateTint, AVATAR_TINT_NEUTRAL } from '@/lib/patient-utils';
 // One palette for "what is this and how urgent" across the bell and the rail.
 import { NOTIFICATION_META, SEVERITY_META } from '@/lib/notification-meta';
+import { useOwnsAttentionRail } from '@/lib/attention-rail';
 import type { NotificationSeverity, NotificationType } from '@/lib/hooks/useNotifications';
 import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
 import {
@@ -48,6 +49,8 @@ import {
 } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import EhrVisitPopup, { EhrQueueMoveDialog, PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
+import PatientDispenseModal from '@/components/pharmacy/PatientDispenseModal';
+import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
 import { useCreateNote } from '@/lib/clinical-notes/useCreateNote';
 import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -264,6 +267,11 @@ export default function EhrClinicalDashboard({
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   const [view, setView] = useState<'dashboard' | 'calendar'>('dashboard');
   const [railOpen, setRailOpen] = useState(false);
+  // This dashboard builds its own right rail (Outstanding items + the
+  // attention feed), so the shell must not stack a second one beside it. Only
+  // the dashboard view renders that rail — the chart/worklist views get the
+  // shared one like every other module.
+  useOwnsAttentionRail(view === 'dashboard');
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [openAppointment, setOpenAppointment] = useState<AppointmentDoc | null>(null);
   // Which action dropdown (if any) is open in the appointment detail popup.
@@ -293,10 +301,14 @@ export default function EhrClinicalDashboard({
   const [outstandingView, setOutstandingView] = useState<string | null>(null);
 
   // "Dispense" header action — searches the full patient register (not just
-  // today's worklist) and hands off to the pharmacy dispense queue for the
-  // chosen patient.
+  // today's worklist), then opens that patient's prescriptions and dispensing
+  // steps in a dialog over this page.
   const [findPatientOpen, setFindPatientOpen] = useState(false);
   const [findPatientQuery, setFindPatientQuery] = useState('');
+  const [dispensePatient, setDispensePatient] = useState<{ id: string; name: string } | null>(null);
+  // "New appointments" — the booking form as a dialog; it used to route to
+  // /appointments?new=1 and leave the clinician on the schedule module.
+  const [bookingOpen, setBookingOpen] = useState(false);
   // Inline search under the mini-calendar that filters the day's appointment list.
   const [appointmentSearch, setAppointmentSearch] = useState('');
   const findPatientInputRef = useRef<HTMLInputElement>(null);
@@ -326,10 +338,11 @@ export default function EhrClinicalDashboard({
 
   const openFoundPatient = (patient: (typeof findPatientResults)[number]) => {
     setFindPatientOpen(false);
-    // Hand off to the pharmacy workbench with the exact patient selected so
-    // their dispense workflow opens with the step-by-step popup ready.
+    // Their prescriptions and the dispensing steps open here, over the
+    // worklist — the pharmacy workbench was a whole role dashboard loaded to
+    // answer one question about one patient.
     const name = [patient.firstName, patient.middleName, patient.surname].filter(Boolean).join(' ');
-    router.push(`/dashboard/pharmacy?patientId=${encodeURIComponent(patient._id)}&patient=${encodeURIComponent(name)}`);
+    setDispensePatient({ id: patient._id, name });
   };
 
   const activeOutstanding = outstandingView
@@ -1064,7 +1077,7 @@ export default function EhrClinicalDashboard({
         <div className="ehr-clinical-dashboard-tabs">
           {canBookAppointments && (
             <div className="ehr-segmented ehr-segmented-single">
-              <button type="button" className="active" aria-label="New appointments" onClick={() => router.push('/appointments?new=1')}>
+              <button type="button" className="active" aria-label="New appointments" onClick={() => setBookingOpen(true)}>
                 <Plus className="w-4 h-4" /> New appointments
               </button>
             </div>
@@ -1567,6 +1580,21 @@ export default function EhrClinicalDashboard({
                 )}
               </div>
             </Modal>
+          )}
+
+          {dispensePatient && (
+            <PatientDispenseModal
+              patientId={dispensePatient.id}
+              patientName={dispensePatient.name}
+              onClose={() => setDispensePatient(null)}
+            />
+          )}
+
+          {bookingOpen && (
+            <BookAppointmentModal
+              defaultDate={selectedDate}
+              onClose={() => setBookingOpen(false)}
+            />
           )}
         </main>
 

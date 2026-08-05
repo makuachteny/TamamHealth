@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@/lib/context';
@@ -23,8 +23,13 @@ import TriageWorkflow from './TriageWorkflow';
 import RoomingWorkflow from './RoomingWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
 
-type StationTab = 'ward' | 'mar' | 'triage' | 'rooming' | 'handoff';
-const STATION_TABS: readonly StationTab[] = ['ward', 'mar', 'triage', 'rooming', 'handoff'];
+/* Handoff is no longer a station: it is a dialog raised by "Start handoff", so
+   it has no tab and no board of its own. Triage and rooming remain addressable
+   stations — the "New triage" action and queue deep links open them — but they
+   are not offered as tabs either; the strip is the two boards a nurse parks on
+   for a shift. */
+type StationTab = 'ward' | 'mar' | 'triage' | 'rooming';
+const STATION_TABS: readonly StationTab[] = ['ward', 'mar', 'triage', 'rooming'];
 
 function isStationTab(value: string | null): value is StationTab {
   return !!value && STATION_TABS.includes(value as StationTab);
@@ -89,12 +94,20 @@ export default function NurseDashboard() {
   // the board has no inline search bar of its own.
   const [railSearch, setRailSearch] = useState('');
 
+  // The shift handoff, as a dialog over whichever board the nurse is on.
+  // `?station=handoff` still opens it, so the /dashboard/nurse/handoff redirect,
+  // the shift tour and any existing bookmark all land on the same thing they
+  // used to — it is a dialog now rather than a fifth board.
+  const [handoffOpen, setHandoffOpen] = useState(urlStation === 'handoff');
+  useEffect(() => {
+    if (urlStation === 'handoff') setHandoffOpen(true);
+  }, [urlStation]);
+
   const stationLabel = useMemo<Record<StationTab, string>>(() => ({
     ward: t('nurse.tabWard'),
     mar: t('nurse.tabMar'),
     triage: t('nurse.tabTriage'),
     rooming: 'Rooming',
-    handoff: 'Handoff',
   }), [t]);
 
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
@@ -104,6 +117,10 @@ export default function NurseDashboard() {
   // roster is thin in demo mode — mirror that rule here so the tab never says
   // "0" above a visibly populated board.
   const wardBoardCount = (patients.length >= 10 || !IS_DEMO) ? patients.length : DEMO_WARD_PATIENTS.length;
+  // The two boards a nurse works a shift from. Triage, rooming and handoff came
+  // off this strip: each is a task you start and finish, not a place to sit, and
+  // the three of them pushed the two standing boards to the far left of a
+  // five-tab row.
   const stationTabs = useMemo(() => ([
     { key: 'ward' as const, label: stationLabel.ward, count: wardBoardCount },
     // MAR carries no count: its board lists medication entries (built inside
@@ -111,13 +128,7 @@ export default function NurseDashboard() {
     // routinely disagrees with what the board displays. No count beats a
     // wrong one.
     { key: 'mar' as const, label: stationLabel.mar },
-    { key: 'triage' as const, label: stationLabel.triage, count: triageToday.length },
-    // Rooming carries no count here: its queue is built from encounters inside
-    // RoomingWorkflow, and any number derived at this level would disagree
-    // with the board whenever an encounter moved. Same reasoning as MAR.
-    { key: 'rooming' as const, label: stationLabel.rooming },
-    { key: 'handoff' as const, label: stationLabel.handoff },
-  ]), [wardBoardCount, stationLabel.handoff, stationLabel.mar, stationLabel.rooming, stationLabel.triage, stationLabel.ward, triageToday.length]);
+  ]), [wardBoardCount, stationLabel.mar, stationLabel.ward]);
 
   const selectStation = useCallback((station: StationTab) => {
     setFallbackStation(station);
@@ -138,7 +149,7 @@ export default function NurseDashboard() {
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
     { label: 'New triage', icon: Plus, onClick: () => selectStation('triage'), tone: 'primary' },
     { label: 'Print', icon: Printer, onClick: () => window.print(), tone: 'neutral' },
-    { label: 'Start handoff', icon: ArrowRightLeft, onClick: () => selectStation('handoff'), tone: 'primary' },
+    { label: 'Start handoff', icon: ArrowRightLeft, onClick: () => setHandoffOpen(true), tone: 'primary' },
   ]), [selectStation]);
 
   // Patient portraits by id, so triage and ward rows show the same face as the
@@ -372,9 +383,15 @@ export default function NurseDashboard() {
             {activeTab === 'mar' && <MarWorkflow />}
             {activeTab === 'triage' && <TriageWorkflow initialPatientId={initialTriagePatientId} />}
             {activeTab === 'rooming' && <RoomingWorkflow />}
-            {activeTab === 'handoff' && <HandoffWorkflow variant="page" />}
           </div>
         </EhrCareDashboard>
+
+        {handoffOpen && (
+          <HandoffWorkflow
+            variant="modal"
+            onClose={() => setHandoffOpen(false)}
+          />
+        )}
       </main>
     </>
   );

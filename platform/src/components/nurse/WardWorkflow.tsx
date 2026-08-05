@@ -8,6 +8,9 @@ import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils'
 import { patientFullName, patientAgeLabel, initials, stateTint } from '@/lib/patient-utils';
 import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
+import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
+import { APPOINTMENT_STATUS_TONES, appointmentStatusLabel } from '@/lib/appointment-status';
+import type { AppointmentStatus } from '@/lib/db-types';
 
 // Nurse-station acuity vocabulary (design 02): Critical / Watch / Stable —
 // deliberately different from the clinic-facing Emergency/Urgent/Routine
@@ -33,7 +36,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
 
   const { wardPatients, patientTriageMap } = useWardRoster();
   const { activeAdmissions } = useWards();
-  const { appointments } = useAppointments();
+  const { appointments, updateStatus } = useAppointments();
   const today = new Date().toISOString().slice(0, 10);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -199,12 +202,20 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
 
                   const priority: 'RED' | 'YELLOW' | 'GREEN' = triage?.priority || 'GREEN';
                   const inService = Boolean(entry?.assignedToId);
-                  const waiting = !inService && Boolean(entry || demoTriage);
-                  const notTriaged = !entry && !demoTriage && !appointment;
-                  const statusText = inService
-                    ? t('nurse.statusInConsult')
-                    : (entry || demoTriage) ? (demoTriage && !entry && demoTriage.status === 'seen' ? t('nurse.statusInConsult') : t('nurse.statusWaiting'))
-                    : appointment ? 'Scheduled' : t('nurse.statusNotTriaged');
+                  // The board speaks the front desk's vocabulary now — Checked
+                  // In, Triaged, Roomed — rather than a private set ("Waiting",
+                  // "In consult", "Not triaged") that named the same rungs
+                  // differently and could not be acted on. Where the patient has
+                  // a visit today, the cell IS the shared status dropdown, so a
+                  // nurse rooms a triaged patient from the board. Where there is
+                  // no visit (an inpatient on the roster), the queue stage stands
+                  // in as a plain pill — there is no ladder to move.
+                  const visitStatus: AppointmentStatus | null = appointment?.status ?? null;
+                  const fallbackStatusText = entry
+                    ? STAGE_LABELS[entry.stage]
+                    : demoTriage
+                      ? (demoTriage.status === 'pending' ? STAGE_LABELS.awaiting_triage : STAGE_LABELS.awaiting_rooming)
+                      : admission ? 'Admitted' : '—';
                   const statusSubtext = entry?.acuity === 'RED'
                     ? 'Critical'
                     : entry?.acuity === 'YELLOW'
@@ -242,10 +253,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                     : appointment?.department || '';
                   const careTeamDoctor = admission?.attendingPhysicianName || patient.assignedDoctorName || 'Doctor unassigned';
                   const careTeamNurse = admission?.nurseAssignedName || entry?.assignedToName || 'Nurse unassigned';
-                  const statusPillClass = inService ? 'status-checked-in'
-                    : waiting ? 'status-attention'
-                    : notTriaged ? 'status-attention'
-                    : appointment ? '' : '';
+                  const statusPillClass = inService ? 'status-checked-in' : 'status-attention';
                   return (
                     <div
                       key={patient._id}
@@ -287,8 +295,27 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                         <span>{admission ? location : appointment ? 'Appointment' : 'Ward'}</span>
                       </div>
 
-                        <div className="appointment-card-status">
-                          <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText}</span>
+                        <div
+                          className="appointment-card-status"
+                          // The row navigates to the chart; the picker inside it
+                          // must not take the nurse there mid-change.
+                          onClick={event => event.stopPropagation()}
+                          onKeyDown={event => event.stopPropagation()}
+                        >
+                          {visitStatus && appointment && !patient._demo ? (
+                            <AppointmentStatusSelect
+                              status={visitStatus}
+                              layout="bare"
+                              label={`Visit status for ${patientFullName(patient)}`}
+                              onChange={status => updateStatus(appointment._id, status)}
+                            />
+                          ) : (
+                            <span
+                              className={`appointment-status-pill ${visitStatus ? `status-${APPOINTMENT_STATUS_TONES[visitStatus]}` : statusPillClass}`.trim()}
+                            >
+                              {visitStatus ? appointmentStatusLabel(visitStatus) : fallbackStatusText}
+                            </span>
+                          )}
                           <small>{statusSubtext}</small>
                         </div>
                       </div>

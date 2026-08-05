@@ -459,7 +459,9 @@ export default function HandoffWorkflow({
   if (variant === 'modal') {
     return (
       <Modal onClose={() => onClose?.()} width={768}>
-        <div className="ehr-handoff-modal" role="dialog" aria-modal="true" aria-label={t('nurse.shiftHandoffReport')}>
+        {/* The shift tour targets this node; it moved with the report when
+            handoff stopped being a board and became this dialog. */}
+        <div data-tour="handoff-sbar" className="ehr-handoff-modal" role="dialog" aria-modal="true" aria-label={t('nurse.shiftHandoffReport')}>
           {header}
           {body}
         </div>
