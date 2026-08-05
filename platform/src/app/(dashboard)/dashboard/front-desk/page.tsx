@@ -1018,7 +1018,19 @@ export default function FrontDeskDashboardPage() {
         locationLabel: entry.stage ? 'Stage' : entry.type === 'appointment' ? 'Department' : 'Location',
         date: entry.calendarDate,
         patientId: entry.patientId,
-        popupDetail: (
+        // The same panel a Scheduled row opens — tabs for the appointment,
+        // provider & staff, and status & billing — so a patient's row looks
+        // and behaves the same wherever they are in the day. A walk-in has no
+        // booking behind it, so it keeps the facts panel.
+        popupDetail: queueAppointment ? (
+          <AppointmentEditModal
+            inline
+            appointment={queueAppointment}
+            appointments={appointments}
+            patient={patient}
+            onClose={() => undefined}
+          />
+        ) : (
           <>
             <FrontDeskDetailActions actions={popupActions} />
             <FrontDeskDetailFacts facts={[
