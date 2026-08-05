@@ -37,6 +37,7 @@ const ORG_SCOPED_DATABASES = [
   'tamamhealth_births',
   'tamamhealth_deaths',
   'tamamhealth_facility_assessments',
+  'tamamhealth_facility_census',
   'tamamhealth_immunizations',
   'tamamhealth_anc',
   'tamamhealth_boma_visits',
@@ -46,6 +47,10 @@ const ORG_SCOPED_DATABASES = [
   'tamamhealth_triage',
   'tamamhealth_appointments',
   'tamamhealth_telehealth',
+  // Clinical-notes module (KAN — clinical-notes-sync-coverage fix). See
+  // platform/src/lib/clinical-notes/note-service.ts and text-shortcut-service.ts.
+  'tamamhealth_clinical_notes',
+  'tamamhealth_text_shortcuts',
   // Operational / facility
   'tamamhealth_pharmacy_inventory',
   'tamamhealth_wards',
@@ -129,7 +134,7 @@ const ORG_SCOPED_VALIDATE_FN = `function (newDoc, oldDoc, userCtx, secObj) {
   }
 
   // ── Role-based write permission, by document type ──────────────────────
-  var WRITE_ROLES = {"patient":["super_admin","org_admin","doctor","clinical_officer","clinician","nurse","midwife","front_desk","medical_superintendent","hrio","data_entry_clerk"],"medical_record":["super_admin","doctor","clinical_officer","clinician","medical_superintendent"],"lab_result":["super_admin","doctor","clinical_officer","clinician","nurse","lab_tech","medical_superintendent"],"prescription":["super_admin","doctor","clinical_officer","clinician","medical_superintendent"],"triage":["super_admin","doctor","clinical_officer","clinician","nurse","front_desk","medical_superintendent"],"referral":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent"],"birth":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"death":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"anc_visit":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"immunization":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"telehealth_session":["super_admin","org_admin","doctor","clinical_officer","clinician","nurse"],"patient_transfer":["super_admin","org_admin","medical_superintendent","hospital_manager","doctor","clinician","clinical_officer","nurse","midwife","triage_nurse","rooming_nurse","nutritionist"]};
+  var WRITE_ROLES = {"patient":["super_admin","org_admin","doctor","clinical_officer","clinician","nurse","midwife","front_desk","medical_superintendent","hrio","data_entry_clerk"],"medical_record":["super_admin","doctor","clinical_officer","clinician","medical_superintendent"],"clinical_note":["super_admin","doctor","clinical_officer","clinician","medical_superintendent"],"lab_result":["super_admin","doctor","clinical_officer","clinician","nurse","lab_tech","medical_superintendent"],"prescription":["super_admin","doctor","clinical_officer","clinician","medical_superintendent"],"triage":["super_admin","doctor","clinical_officer","clinician","nurse","front_desk","medical_superintendent"],"referral":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent"],"birth":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"death":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"anc_visit":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"immunization":["super_admin","doctor","clinical_officer","clinician","nurse","midwife","medical_superintendent","data_entry_clerk"],"telehealth_session":["super_admin","org_admin","doctor","clinical_officer","clinician","nurse"],"patient_transfer":["super_admin","org_admin","medical_superintendent","hospital_manager","doctor","clinician","clinical_officer","nurse","midwife","triage_nurse","rooming_nurse","nutritionist"]};
   var allowed = WRITE_ROLES[newDoc.type];
 
   // Unknown type: no rule to apply. See the note in write-permissions.ts.

@@ -15,7 +15,7 @@
 import type { AllergyEntry } from '../types/patient-clinical';
 import type { PrescriptionDoc, ProblemDoc, MedicalRecordDoc, TriageDoc } from '../db-types';
 import type { NoteSectionId } from './note-catalog';
-import { filterByScope, type DataScope } from '../services/data-scope';
+import type { DataScope } from '../services/data-scope';
 
 /** "38.1 °C · 150/90 · HR 92" — the line a clinician scans, not a table. */
 export function formatVitals(record: Partial<Pick<MedicalRecordDoc, 'vitalSigns' | 'triageVitals'>> | null): string {
@@ -173,7 +173,7 @@ async function newestVitals(
     }, null as { at: string; record: MedicalRecordDoc } | null),
     safely(async () => {
       const { getTriageByPatient } = await import('../services/triage-service');
-      const rows = scope ? filterByScope(await getTriageByPatient(patientId), scope) : await getTriageByPatient(patientId);
+      const rows = await getTriageByPatient(patientId, scope);
       const withVitals = rows
         .filter(t => t.temperature || t.pulse || t.respiratoryRate || t.systolic || t.diastolic || t.oxygenSaturation || t.weight)
         .sort((a, b) => (b.triagedAt || '').localeCompare(a.triagedAt || ''));

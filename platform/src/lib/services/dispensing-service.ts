@@ -28,7 +28,7 @@
  */
 import { pharmacyInventoryDB } from '../db';
 import type {
-  PharmacyInventoryDoc, PrescriptionDoc, DispenseAllocation,
+  PharmacyInventoryDoc, PrescriptionDoc, DispenseAllocation, UserRole,
 } from '../db-types';
 import { findByType } from './db-query';
 import { recordMovement } from './controlled-substance-service';
@@ -48,7 +48,8 @@ export type DispenseErrorCode =
   | 'AMBIGUOUS_MEDICATION'
   | 'PARTIAL_NOT_ALLOWED'
   | 'REGISTER_FAILED'
-  | 'WRITE_FAILED';
+  | 'WRITE_FAILED'
+  | 'NOT_AUTHORISED';
 
 export class DispenseError extends Error {
   constructor(
@@ -68,6 +69,13 @@ export interface DispenseInput {
   quantity: number;
   dispenserId: string;
   dispenserName: string;
+  /**
+   * Trusted fallback role, used only when the directory has no account for
+   * `dispenserId` at all (see the actor-authorization check below). Never
+   * overrides a real account's role — a directory hit always wins, exactly
+   * like the witness identity resolution later in this file.
+   */
+  dispenserRole?: UserRole;
   facilityId: string;
   facilityName?: string;
   orgId?: string;
@@ -92,6 +100,11 @@ export interface DispenseResult {
 
 /** Stages from which a dispense is legal — mirrors PRESCRIPTION_TRANSITIONS. */
 const DISPENSABLE_STAGES = new Set(['cleared_for_dispensing']);
+
+/** Roles allowed to actually move stock. Every UI surface that offers a
+ *  dispense action is a courtesy in front of this — the real gate is here,
+ *  so a hole in any one surface's role check cannot itself dispense a drug. */
+const DISPENSING_ROLES: UserRole[] = ['pharmacist'];
 
 /** Dose strengths ("500mg", "5mg/mL", "80/480mg", "10 IU") and pack forms. */
 const STRENGTH_RE = /\b\d+(?:[./]\d+)*\s*(?:mg|mcg|g|ml|l|iu|units?|%)(?:\s*\/\s*\d*\s*(?:ml|l|mg|dose))?\b/gi;
@@ -401,6 +414,34 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
 
   // ── 1. Validate. Nothing is written before every check passes. ──
   //
+  // Who is dispensing, resolved directory-first — mirrors the witness
+  // resolution further down ("authoritative name, not the caller's string").
+  // Every UI gate that offers a dispense action (the pharmacy queue, the
+  // clinician dashboard's dispense modal, the API route) is a courtesy; this
+  // is the real check, so a hole in any one of them cannot itself move stock.
+  // `input.dispenserRole` is trusted ONLY when the directory has no record
+  // at all for `dispenserId` — a real account's directory role always wins,
+  // so a caller cannot claim a different role for an account that exists.
+  const dispenserDoc = await getUserById(input.dispenserId);
+  let dispenserRole: UserRole | undefined;
+  if (dispenserDoc) {
+    if (dispenserDoc.isActive === false) {
+      throw new DispenseError(
+        'The dispensing staff member account is inactive.',
+        'NOT_AUTHORISED',
+      );
+    }
+    dispenserRole = dispenserDoc.role;
+  } else {
+    dispenserRole = input.dispenserRole;
+  }
+  if (!dispenserRole || !DISPENSING_ROLES.includes(dispenserRole)) {
+    throw new DispenseError(
+      'Only a pharmacist may dispense medication.',
+      'NOT_AUTHORISED',
+    );
+  }
+
   // Legacy prescriptions carry no `orderStatus`. The gate used to read the raw
   // field as `if (stage && !DISPENSABLE_STAGES.has(stage))`, so an absent value
   // skipped the check completely and an uncleared order could be dispensed

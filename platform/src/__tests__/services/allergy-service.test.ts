@@ -18,6 +18,7 @@ import {
   getActiveAllergies,
   migrateLegacyAllergies,
 } from '@/lib/services/allergy-service';
+import type { DataScope } from '@/lib/services/data-scope';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
@@ -129,5 +130,21 @@ describe('Allergy service (P0.3)', () => {
     const p = await makePatient({ allergies: ['Iodine', 'None known'] });
     const list = await getAllergies(p._id);
     expect(list.map((a) => a.substance)).toEqual(['Iodine']);
+  });
+
+  test('getActiveAllergies scopes to the owning patient — a different org sees nothing', async () => {
+    const p = await makePatient({ registrationHospital: 'hosp-001', orgId: 'org-a' });
+    await addAllergy(p._id, { substance: 'Penicillin', criticality: 'severe' });
+
+    const otherOrg: DataScope = { role: 'doctor', orgId: 'org-b', hospitalId: 'hosp-999' };
+    expect(await getActiveAllergies(p._id, otherOrg)).toHaveLength(0);
+
+    const sameOrg: DataScope = { role: 'doctor', orgId: 'org-a', hospitalId: 'hosp-001' };
+    const inScope = await getActiveAllergies(p._id, sameOrg);
+    expect(inScope).toHaveLength(1);
+    expect(inScope[0].substance).toBe('Penicillin');
+
+    // Unscoped callers (internal reads, no `scope` passed) are unaffected.
+    expect(await getActiveAllergies(p._id)).toHaveLength(1);
   });
 });

@@ -14,6 +14,7 @@ import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { patientFullName, patientAge } from '@/lib/patient-utils';
 import { getDefaultDashboard } from '@/lib/permissions';
+import { getNoteType } from '@/lib/clinical-notes/note-catalog';
 import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
 import { useTransferQueue } from '@/lib/hooks/usePatientTransfers';
 import { describeAssignment, isTransferOverdue } from '@/lib/services/patient-transfer-service';
@@ -32,7 +33,7 @@ export default function DashboardPage() {
   // Consultations this clinician paused while waiting on lab/imaging results.
   const { encounters: resumableEncounters } = useResumableEncounters();
   // Documents awaiting signature / co-signature — the "to sign" inbox.
-  const { unsignedDrafts, awaitingCosign, heldAssessments } = useSigningInbox();
+  const { unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes } = useSigningInbox();
   // Open patient phone notes routed to me — callbacks worklist.
   const { notes: phoneNotesInbox } = usePhoneNotesInbox();
   // Referrals — drives the "My Referrals" / "Open referrals" outstanding item.
@@ -177,7 +178,7 @@ export default function DashboardPage() {
   });
 
   // Total documents awaiting the clinician's signature.
-  const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length;
+  const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length + unsignedNotes.length;
 
   // All of this clinician's appointments, closed ones included, for the
   // schedule board — its Finished lane is fed by completed/cancelled/no-show
@@ -219,6 +220,14 @@ export default function DashboardPage() {
       subtitle: 'Outcome assessment — review & sign',
       meta: shortDate(a.createdAt),
       href: `/patients/${a.patientId}`,
+    })),
+    ...unsignedNotes.map(n => ({
+      id: n._id,
+      title: n.patientName,
+      subtitle: `${getNoteType(n.noteType).label} note — needs signature`,
+      meta: shortDate(n.serviceDate || n.createdAt),
+      tone: 'warning' as const,
+      href: `/notes/${n._id}`,
     })),
   ];
 

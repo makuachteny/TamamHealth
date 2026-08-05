@@ -17,6 +17,8 @@ import type { PatientDoc } from '../db-types';
 import { getPatientById } from './patient-service';
 import { isNoAllergySentinel } from '../clinical-roles';
 import { mutatePatientListField } from './patient-list-field';
+import type { DataScope } from './data-scope';
+import { filterByScope } from './data-scope';
 
 /** Active substance names, for the denormalised `Patient.allergies` mirror. */
 function activeSubstanceNames(entries: AllergyEntry[]): string[] {
@@ -58,9 +60,23 @@ export async function getAllergies(patientId: string): Promise<AllergyEntry[]> {
   return entriesOf(patient);
 }
 
-/** Active allergies only — the clinically relevant set for decision support. */
-export async function getActiveAllergies(patientId: string): Promise<AllergyEntry[]> {
-  return (await getAllergies(patientId)).filter((e) => e.status === 'active');
+/**
+ * Active allergies only — the clinically relevant set for decision support.
+ *
+ * `scope`, when passed, is checked against the OWNING PATIENT record rather
+ * than the individual entries: unlike `PrescriptionDoc`/`ProblemDoc`, an
+ * `AllergyEntry` carries no `hospitalId`/`orgId` of its own (it lives embedded
+ * in `PatientDoc.structuredAllergies`), so `filterByScope` cannot be applied to
+ * the entries directly — every entry would fail the org check and the list
+ * would come back empty. Scoping the patient instead matches this data's real
+ * boundary: a patient out of scope returns no allergies rather than resolving
+ * PHI for another org/facility's patient.
+ */
+export async function getActiveAllergies(patientId: string, scope?: DataScope): Promise<AllergyEntry[]> {
+  const patient = await getPatientById(patientId);
+  if (!patient) return [];
+  if (scope && filterByScope([patient], scope).length === 0) return [];
+  return entriesOf(patient).filter((e) => e.status === 'active');
 }
 
 function patchFor(entries: AllergyEntry[]): Partial<PatientDoc> {

@@ -75,7 +75,10 @@ export function buildQueueFromTriage(
   const entries: QueueEntry[] = [];
 
   for (const triage of triageDocs) {
-    if (triage.status === 'admitted' || triage.status === 'discharged' || triage.status === 'referred') continue;
+    // 'lwbs' belongs with the other terminal outcomes: the patient has left.
+    // Without it a RED-acuity walk-away sorts to the top of the queue as the
+    // most urgent patient in the building for the next 24 hours.
+    if (triage.status === 'admitted' || triage.status === 'discharged' || triage.status === 'referred' || triage.status === 'lwbs') continue;
 
     const acuity = (triage.priority as 'RED' | 'YELLOW' | 'GREEN') ?? 'GREEN';
     const consultStatus = consultationStatusByPatient?.[triage.patientId];

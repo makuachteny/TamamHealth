@@ -31,8 +31,8 @@ export async function getAllProblems(scope?: DataScope): Promise<ProblemDoc[]> {
   return scope ? filterByScope(all, scope) : all;
 }
 
-export async function getProblemsByPatient(patientId: string): Promise<ProblemDoc[]> {
-  const all = await getAllProblems();
+export async function getProblemsByPatient(patientId: string, scope?: DataScope): Promise<ProblemDoc[]> {
+  const all = await getAllProblems(scope);
   return all.filter(p => p.patientId === patientId);
 }
 

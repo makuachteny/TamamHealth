@@ -16,9 +16,28 @@ import {
   getUnpaidBills,
   recordPayment,
   settleOpenBillsWithPayment,
+  unsettleBillsForPayment,
   waiveBill,
   getBillingSummary,
 } from '@/lib/services/billing-service';
+
+let settlePaymentIdCounter = 0;
+/** Every settleOpenBillsWithPayment call needs a unique PaymentDoc id in
+ *  real usage (payment-service.ts always supplies `doc._id`) — generate a
+ *  fresh one per call by default so unrelated tests don't collide on the
+ *  idempotency/back-link key, while still letting a test pass an explicit
+ *  `paymentId` when it wants to exercise a retry of the *same* payment. */
+const settle = (overrides: Partial<Parameters<typeof settleOpenBillsWithPayment>[0]> = {}) =>
+  settleOpenBillsWithPayment({
+    patientId: 'pat-001',
+    amount: 0,
+    currency: 'SSP',
+    method: 'cash',
+    receivedBy: 'user-001',
+    receivedByName: 'Desk Amira',
+    paymentId: `pmt-settle-${++settlePaymentIdCounter}`,
+    ...overrides,
+  });
 
 const makeBillData = (overrides = {}) => ({
   patientId: 'pat-001',
@@ -56,6 +75,7 @@ const makeBillData = (overrides = {}) => ({
 afterEach(async () => {
   await teardownTestDBs();
   uuidCounter = 0;
+  settlePaymentIdCounter = 0;
 });
 
 describe('billing-service', () => {
@@ -112,6 +132,21 @@ describe('billing-service', () => {
     expect(bills[0].patientName).toBe('Achol Deng');
   });
 
+  test('getBillsByPatient without a scope returns bills across every org (unscoped)', async () => {
+    await createBill(makeBillData({ orgId: 'org-juba' }));
+    await createBill(makeBillData({ orgId: 'org-mercy' }));
+    const bills = await getBillsByPatient('pat-001');
+    expect(bills).toHaveLength(2);
+  });
+
+  test('getBillsByPatient with a scope only returns the caller\'s own org', async () => {
+    await createBill(makeBillData({ orgId: 'org-juba' }));
+    await createBill(makeBillData({ orgId: 'org-mercy' }));
+    const bills = await getBillsByPatient('pat-001', { role: 'cashier', orgId: 'org-juba' });
+    expect(bills).toHaveLength(1);
+    expect(bills[0].orgId).toBe('org-juba');
+  });
+
   test('recordPayment updates bill correctly', async () => {
     const bill = await createBill(makeBillData());
     const updated = await recordPayment(
@@ -136,9 +171,7 @@ describe('billing-service', () => {
 
   test('settleOpenBillsWithPayment marks a fully-covered bill paid without a second ledger entry', async () => {
     const bill = await createBill(makeBillData());
-    const { settledBills, unapplied } = await settleOpenBillsWithPayment(
-      'pat-001', 7000, 'SSP', 'cash', 'user-001', 'Desk Amira', 'REC-100'
-    );
+    const { settledBills, unapplied } = await settle({ amount: 7000, reference: 'REC-100' });
     expect(unapplied).toBe(0);
     expect(settledBills).toHaveLength(1);
     expect(settledBills[0]._id).toBe(bill._id);
@@ -155,9 +188,7 @@ describe('billing-service', () => {
     const bill2 = await createBill(makeBillData());
     // 7000 due on each; pay 10000 total — bill1 (created first) is fully
     // covered, bill2 only gets the 3000 remainder and stays partial.
-    const { settledBills, unapplied } = await settleOpenBillsWithPayment(
-      'pat-001', 10000, 'SSP', 'cash', 'user-001', 'Desk Amira'
-    );
+    const { settledBills, unapplied } = await settle({ amount: 10000 });
     expect(unapplied).toBe(0);
     expect(settledBills.map(b => b._id)).toEqual([bill1._id, bill2._id]);
 
@@ -172,17 +203,13 @@ describe('billing-service', () => {
 
   test('settleOpenBillsWithPayment reports the unapplied remainder when it exceeds every open bill', async () => {
     await createBill(makeBillData());
-    const { unapplied } = await settleOpenBillsWithPayment(
-      'pat-001', 10000, 'SSP', 'cash', 'user-001', 'Desk Amira'
-    );
+    const { unapplied } = await settle({ amount: 10000 });
     expect(unapplied).toBe(3000);
   });
 
   test('settleOpenBillsWithPayment ignores bills in a different currency', async () => {
     await createBill(makeBillData({ currency: 'USD' }));
-    const { settledBills, unapplied } = await settleOpenBillsWithPayment(
-      'pat-001', 7000, 'SSP', 'cash', 'user-001', 'Desk Amira'
-    );
+    const { settledBills, unapplied } = await settle({ amount: 7000 });
     expect(settledBills).toHaveLength(0);
     expect(unapplied).toBe(7000);
   });
@@ -191,11 +218,82 @@ describe('billing-service', () => {
     const bill = await createBill(makeBillData());
     await recordPayment(bill._id, bill.totalAmount, 'cash', 'user-001', 'Admin');
 
-    const { settledBills, unapplied } = await settleOpenBillsWithPayment(
-      'pat-001', 500, 'SSP', 'cash', 'user-001', 'Desk Amira'
-    );
+    const { settledBills, unapplied } = await settle({ amount: 500 });
     expect(settledBills).toHaveLength(0);
     expect(unapplied).toBe(500);
+  });
+
+  test('settleOpenBillsWithPayment stores a back-link to the PaymentDoc on each settled bill', async () => {
+    await createBill(makeBillData());
+    await settle({ amount: 7000, paymentId: 'pmt-abc123' });
+    const [bill] = await getBillsByPatient('pat-001');
+    expect(bill.payments[0].sourcePaymentId).toBe('pmt-abc123');
+  });
+
+  test('settleOpenBillsWithPayment only touches bills in the payer\'s own org (cross-tenant isolation)', async () => {
+    // pat-001 has a bill at their home org AND one at a different org (a
+    // patient can genuinely be seen at more than one facility/org — see
+    // db-seed.ts appointment-12). A payment collected in org-juba must never
+    // pay down org-mercy's receivable.
+    const juba = await createBill(makeBillData({ orgId: 'org-juba', facilityId: 'hosp-juba' }));
+    const mercy = await createBill(makeBillData({ orgId: 'org-mercy', facilityId: 'hosp-mercy' }));
+
+    const { settledBills, unapplied } = await settle({
+      amount: 14000,
+      paymentId: 'pmt-scoped-1',
+      scope: { role: 'org_admin', orgId: 'org-juba' },
+    });
+
+    // Only the org-juba bill settles; the org-mercy bill is untouched and the
+    // rest of the payment is reported unapplied rather than silently
+    // crossing the tenant boundary.
+    expect(settledBills.map(b => b._id)).toEqual([juba._id]);
+    expect(unapplied).toBe(7000);
+
+    const freshMercy = await getBillById(mercy._id);
+    expect(freshMercy!.status).toBe('pending');
+    expect(freshMercy!.amountPaid).toBe(0);
+    expect(freshMercy!.payments).toHaveLength(0);
+  });
+
+  test('settleOpenBillsWithPayment retried after a partial failure does not double-settle the bill it already reached', async () => {
+    // Simulates payment-service.ts retrying settlement for the SAME
+    // PaymentDoc after a prior attempt settled bill1 but never reached
+    // bill2 (a 409 on bill2's write, forced here by making the second
+    // db.put in the pass reject). The retry must pick up only the
+    // unsettled remainder — not re-apply money to bill1.
+    const bill1 = await createBill(makeBillData());
+    const bill2 = await createBill(makeBillData());
+    const paymentId = 'pmt-retry-1';
+
+    const billingDb = require('@/lib/db').billingDB();
+    const originalPut = billingDb.put.bind(billingDb);
+    const spy = jest.spyOn(billingDb, 'put').mockImplementationOnce(originalPut) // bill1 succeeds
+      .mockImplementationOnce(() => Promise.reject(new Error('Document update conflict'))); // bill2 fails
+
+    await expect(settle({ amount: 10000, paymentId })).rejects.toThrow('Document update conflict');
+    spy.mockRestore();
+
+    // bill1 really did settle before the simulated failure on bill2.
+    const afterFirstPass = await getBillById(bill1._id);
+    expect(afterFirstPass!.status).toBe('paid');
+    const bill2BeforeRetry = await getBillById(bill2._id);
+    expect(bill2BeforeRetry!.status).toBe('pending');
+
+    // Retry with the exact same payment identity and original amount.
+    const retry = await settle({ amount: 10000, paymentId });
+
+    // bill1 already carries this payment's back-link, so it's skipped this
+    // time; only bill2 (never reached before) gets the remaining 3000.
+    expect(retry.settledBills.map(b => b._id)).toEqual([bill2._id]);
+    expect(retry.unapplied).toBe(0);
+
+    const freshBill1 = await getBillById(bill1._id);
+    const freshBill2 = await getBillById(bill2._id);
+    expect(freshBill1!.amountPaid).toBe(7000); // unchanged by the retry
+    expect(freshBill1!.payments).toHaveLength(1); // not double-applied
+    expect(freshBill2!.amountPaid).toBe(3000);
+    expect(freshBill2!.status).toBe('partial');
   });
 
   test('waiveBill sets status to waived', async () => {
@@ -486,5 +584,84 @@ describe('billing-service ↔ ledger reconciliation', () => {
     // 50% coverage on a 7000 bill → patient owes 3500 on the ledger.
     await createBill(makeBillData({ insuranceProvider: 'CIC', insuranceCoveragePercent: 50 }));
     expect(await getPatientBalance('pat-001')).toBe(3500);
+  });
+});
+
+describe('unsettleBillsForPayment', () => {
+  test('restores a fully-paid bill to unpaid, undoing exactly what the payment settled', async () => {
+    const bill = await createBill(makeBillData());
+    await settle({ amount: 7000, paymentId: 'pmt-rev-1' });
+
+    const paid = await getBillById(bill._id);
+    expect(paid!.status).toBe('paid');
+
+    const { unsettledBills, failedBillIds } = await unsettleBillsForPayment(
+      'pmt-rev-1', 'pat-001', 'user-001', 'Finance Officer'
+    );
+    expect(failedBillIds).toEqual([]);
+    expect(unsettledBills.map(b => b._id)).toEqual([bill._id]);
+
+    const reversed = await getBillById(bill._id);
+    expect(reversed!.status).toBe('pending');
+    expect(reversed!.amountPaid).toBe(0);
+    expect(reversed!.balanceDue).toBe(7000);
+    // The receipt itself is kept for the audit trail, just flagged reversed —
+    // not deleted from the bill's payment history.
+    expect(reversed!.payments).toHaveLength(1);
+    expect(reversed!.payments[0].reversed).toBe(true);
+    expect(reversed!.payments[0].sourcePaymentId).toBe('pmt-rev-1');
+  });
+
+  test('restores a partially-paid bill to its pre-settlement balance', async () => {
+    const bill = await createBill(makeBillData());
+    await settle({ amount: 3000, paymentId: 'pmt-rev-2' });
+
+    const partial = await getBillById(bill._id);
+    expect(partial!.status).toBe('partial');
+    expect(partial!.amountPaid).toBe(3000);
+
+    await unsettleBillsForPayment('pmt-rev-2', 'pat-001', 'user-001', 'Finance Officer');
+
+    const reversed = await getBillById(bill._id);
+    expect(reversed!.status).toBe('pending');
+    expect(reversed!.amountPaid).toBe(0);
+    expect(reversed!.balanceDue).toBe(7000);
+  });
+
+  test('only undoes the bill(s) this specific payment settled, leaving other payments on the same bill alone', async () => {
+    const bill = await createBill(makeBillData({
+      items: [{ id: 'item-1', category: 'consultation', description: 'Consult', quantity: 1, unitPrice: 10000, totalPrice: 10000 }],
+    }));
+    await settle({ amount: 4000, paymentId: 'pmt-rev-3a' });
+    await settle({ amount: 6000, paymentId: 'pmt-rev-3b' });
+
+    const bothApplied = await getBillById(bill._id);
+    expect(bothApplied!.status).toBe('paid');
+    expect(bothApplied!.amountPaid).toBe(10000);
+
+    await unsettleBillsForPayment('pmt-rev-3a', 'pat-001', 'user-001', 'Finance Officer');
+
+    const afterOneReversal = await getBillById(bill._id);
+    expect(afterOneReversal!.amountPaid).toBe(6000); // the 3b payment still stands
+    expect(afterOneReversal!.status).toBe('partial');
+    expect(afterOneReversal!.payments.find(p => p.sourcePaymentId === 'pmt-rev-3a')!.reversed).toBe(true);
+    expect(afterOneReversal!.payments.find(p => p.sourcePaymentId === 'pmt-rev-3b')!.reversed).toBeFalsy();
+  });
+
+  test('a payment that never settled any bill (or one already reversed) unsettles nothing', async () => {
+    const bill = await createBill(makeBillData());
+    const { unsettledBills } = await unsettleBillsForPayment('pmt-never-settled', 'pat-001', 'user-001', 'Finance Officer');
+    expect(unsettledBills).toHaveLength(0);
+
+    const untouched = await getBillById(bill._id);
+    expect(untouched!.status).toBe('pending');
+
+    // Calling it twice for the same payment is a no-op the second time —
+    // nothing left to reverse.
+    await settle({ amount: 7000, paymentId: 'pmt-rev-4' });
+    const first = await unsettleBillsForPayment('pmt-rev-4', 'pat-001', 'user-001', 'Finance Officer');
+    expect(first.unsettledBills).toHaveLength(1);
+    const second = await unsettleBillsForPayment('pmt-rev-4', 'pat-001', 'user-001', 'Finance Officer');
+    expect(second.unsettledBills).toHaveLength(0);
   });
 });

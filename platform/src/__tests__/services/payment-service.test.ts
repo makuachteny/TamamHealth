@@ -16,8 +16,8 @@ jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
 
 import { getDB } from '@/lib/db';
 import { teardownTestDBs } from '../helpers/test-db';
-import { collectPayment, updatePaymentStatus } from '@/lib/services/payment-service';
-import { createBill, getBillById } from '@/lib/services/billing-service';
+import { collectPayment, updatePaymentStatus, reversePayment } from '@/lib/services/payment-service';
+import { createBill, getBillById, getBillsByPatient } from '@/lib/services/billing-service';
 import { getPatientBalance } from '@/lib/services/ledger-service';
 import type { PaymentDoc } from '@/lib/db-types-payments';
 
@@ -131,5 +131,95 @@ describe('collectPayment settles open bills', () => {
 
     const balance = await getPatientBalance('pat-500');
     expect(balance).toBe(0);
+  });
+
+  test('does not settle a bill belonging to a different org than the payer', async () => {
+    // pat-500 has a bill in their home org (org-001, matching paymentInput's
+    // orgId) and, separately, one in a different org — a patient can
+    // genuinely have bills across orgs (seen at more than one facility). The
+    // payment must only ever pay down the org it was collected in.
+    await createBill(makeBillData({ orgId: 'org-001' }));
+    await createBill(makeBillData({ orgId: 'org-999' }));
+
+    await collectPayment(paymentInput({ amount: 8000 }));
+
+    const bills = await getBillsByPatient('pat-500');
+    const own = bills.find(b => b.orgId === 'org-001')!;
+    const other = bills.find(b => b.orgId === 'org-999')!;
+    expect(own.status).toBe('paid');
+    expect(other.status).toBe('pending');
+    expect(other.amountPaid).toBe(0);
+    expect(other.payments).toHaveLength(0);
+  });
+
+  test('surfaces a bill-settlement failure on the payment doc without unwinding the already-succeeded ledger credit', async () => {
+    await createBill(makeBillData()); // bill1: 4000
+    await createBill(makeBillData()); // bill2: 4000
+
+    const billingDb = getDB('tamamhealth_billing');
+    const originalPut = billingDb.put.bind(billingDb);
+    let settlementPutCount = 0;
+     
+    const spy = jest.spyOn(billingDb, 'put').mockImplementation((doc: any) => {
+      settlementPutCount++;
+      // First put settles bill1 for real; the second (bill2) simulates the
+      // 409 a concurrent cashier/tab would produce.
+      if (settlementPutCount === 2) return Promise.reject(new Error('Document update conflict'));
+      return originalPut(doc);
+    });
+
+    const pmt = await collectPayment(paymentInput({ amount: 8000 }));
+    spy.mockRestore();
+
+    expect(pmt.billSettlementError).toBeTruthy();
+    expect(pmt.billSettlementError).toContain('conflict');
+
+    // The ledger credit for the full 8000 must stand regardless — it's
+    // already the record of money actually received.
+    const balance = await getPatientBalance('pat-500');
+    expect(balance).toBe(0);
+
+    // bill1 (the first put) really did settle before bill2 failed.
+    const bills = await getBillsByPatient('pat-500');
+    expect(bills.filter(b => b.status === 'paid')).toHaveLength(1);
+    expect(bills.filter(b => b.status === 'pending')).toHaveLength(1);
+  });
+});
+
+describe('reversePayment unsettles the bill(s) it had paid down', () => {
+  test('reversing a payment that fully paid a bill restores it to unpaid, and the ledger', async () => {
+    const bill = await createBill(makeBillData());
+    const pmt = await collectPayment(paymentInput({ amount: 4000 }));
+
+    const settled = await getBillById(bill._id);
+    expect(settled!.status).toBe('paid');
+
+    const reversed = await reversePayment(pmt._id, 'Bounced transfer', 'finance-1', 'Finance Officer');
+    expect(reversed!.status).toBe('reversed');
+
+    const bounced = await getBillById(bill._id);
+    expect(bounced!.status).toBe('pending');
+    expect(bounced!.amountPaid).toBe(0);
+    expect(bounced!.balanceDue).toBe(4000);
+
+    // The ledger no longer disagrees with the bill: the patient owes the
+    // full amount again on both.
+    const balance = await getPatientBalance('pat-500');
+    expect(balance).toBe(4000);
+  });
+
+  test('reversing a payment that only partially covered a bill restores its prior partial balance', async () => {
+    const bill = await createBill(makeBillData());
+    const pmt = await collectPayment(paymentInput({ amount: 1500 }));
+
+    const partial = await getBillById(bill._id);
+    expect(partial!.status).toBe('partial');
+
+    await reversePayment(pmt._id, 'Chargeback', 'finance-1', 'Finance Officer');
+
+    const bounced = await getBillById(bill._id);
+    expect(bounced!.status).toBe('pending');
+    expect(bounced!.amountPaid).toBe(0);
+    expect(bounced!.balanceDue).toBe(4000);
   });
 });

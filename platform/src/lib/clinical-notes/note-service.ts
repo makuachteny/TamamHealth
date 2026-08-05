@@ -17,6 +17,7 @@ import { logAuditSafe } from '../services/audit-service';
 import { emitSyncEvent } from '../services/sync-event-service';
 import type { DataScope } from '../services/data-scope';
 import { filterByScope } from '../services/data-scope';
+import { isProviderRole } from '../clinical-roles';
 import {
   getNoteType, resolveSections, isNoteTypeId,
   type NoteTypeId, type NoteSectionId,
@@ -38,6 +39,38 @@ export class NoteLockedError extends Error {
 
 export function isNoteLocked(note: Pick<ClinicalNoteDoc, 'status'>): boolean {
   return note.status === 'signed' || note.status === 'amended';
+}
+
+/**
+ * Thrown when the acting user is not permitted to sign or co-sign a note.
+ * Enforced here (not just in the UI) so the medico-legal attestation rule
+ * can't be bypassed by another caller. Mirrors
+ * `medical-record-service.SigningAuthorizationError`.
+ */
+export class NoteSigningAuthorizationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoteSigningAuthorizationError';
+  }
+}
+
+/**
+ * A signature attests to an encounter the signer actually documented, so only
+ * the note's author or its assignee may sign it as themselves. A user who
+ * holds a provider role (doctor / clinical officer / clinician / medical
+ * superintendent — see `clinical-roles.ts`) additionally has standing
+ * attestation authority and may sign a note even when it was not explicitly
+ * authored by or assigned to them (e.g. picking up an unassigned draft).
+ * Anyone else — including workflow-station roles such as a rooming or triage
+ * nurse who merely opened someone else's chart — may not.
+ */
+function canAttestNote(
+  note: Pick<ClinicalNoteDoc, 'authorId' | 'assignedToId'>,
+  signerId?: string,
+  signerRole?: string,
+): boolean {
+  if (signerId && (signerId === note.authorId || signerId === note.assignedToId)) return true;
+  return isProviderRole(signerRole);
 }
 
 function nowIso(): string {
@@ -139,9 +172,18 @@ export async function createClinicalNote(input: CreateNoteInput): Promise<Clinic
   return { ...doc, _rev: resp.rev };
 }
 
-export async function getClinicalNoteById(id: string): Promise<ClinicalNoteDoc | null> {
+/**
+ * Fetch one note by id. `scope`, like the sibling reads below, is optional so
+ * internal call sites within this module (which already trust the id they
+ * hold) are unaffected — but any caller reaching in from outside with an
+ * externally-supplied id (e.g. a URL param) should pass one so a note from
+ * another org/facility resolves to "not found" rather than rendering.
+ */
+export async function getClinicalNoteById(id: string, scope?: DataScope): Promise<ClinicalNoteDoc | null> {
   try {
-    return await clinicalNotesDB().get(id) as ClinicalNoteDoc;
+    const doc = await clinicalNotesDB().get(id) as ClinicalNoteDoc;
+    if (scope && filterByScope([doc], scope).length === 0) return null;
+    return doc;
   } catch {
     return null;
   }
@@ -327,6 +369,12 @@ export async function clearNote(id: string): Promise<ClinicalNoteDoc | null> {
 export interface SignNoteInput {
   signedBy: string;
   signedByName: string;
+  /**
+   * Acting user's role. Checked against attestation authority when the
+   * signer is neither the note's author nor its assignee — see
+   * {@link canAttestNote}.
+   */
+  signerRole?: string;
   /** Trainee signature that still needs a supervisor's countersignature. */
   awaitingCosign?: boolean;
 }
@@ -334,6 +382,11 @@ export interface SignNoteInput {
 /**
  * Attest the note. Refuses an empty note: a signature asserts that the content
  * is a true record, and there is nothing to assert about a blank document.
+ *
+ * Also refuses a signer who is neither the note's author/assignee nor holding
+ * a provider role — without this, any role with `/notes` route access could
+ * open and sign a colleague's draft, permanently attesting to an examination
+ * they never performed (correctable only by addendum thereafter).
  */
 export async function signClinicalNote(
   id: string,
@@ -347,6 +400,12 @@ export async function signClinicalNote(
     return null;
   }
   if (isNoteLocked(existing)) throw new NoteLockedError(id);
+  if (!canAttestNote(existing, input.signedBy, input.signerRole)) {
+    throw new NoteSigningAuthorizationError(
+      `${input.signedByName || 'This user'} may not sign note ${id} — only its author, its assignee, ` +
+      'or a user holding a provider role may attest it.',
+    );
+  }
   if (!hasContent(existing)) {
     throw new Error('Cannot sign an empty note — document the encounter first.');
   }
@@ -374,11 +433,17 @@ export async function signClinicalNote(
   return { ...updated, _rev: resp.rev };
 }
 
-/** Countersign a trainee's note. */
+/**
+ * Countersign a trainee's note. Requires a supervising provider role — that
+ * is the entire point of a co-signature — and, when the original signer's id
+ * is known, requires the co-signer to be someone else: a note cannot be its
+ * own supervision.
+ */
 export async function cosignClinicalNote(
   id: string,
   cosignedBy: string,
   cosignedByName: string,
+  cosignerRole?: string,
 ): Promise<ClinicalNoteDoc | null> {
   const db = clinicalNotesDB();
   let existing: ClinicalNoteDoc;
@@ -388,6 +453,14 @@ export async function cosignClinicalNote(
     return null;
   }
   if (existing.status !== 'awaiting_cosign') return existing;
+  if (!isProviderRole(cosignerRole)) {
+    throw new NoteSigningAuthorizationError(
+      `${cosignedByName || 'This user'} may not co-sign note ${id} — co-signature requires a supervising provider role.`,
+    );
+  }
+  if (cosignedBy && existing.signedBy && cosignedBy === existing.signedBy) {
+    throw new NoteSigningAuthorizationError('A note must be co-signed by a different provider than the one who signed it.');
+  }
 
   const ts = nowIso();
   const updated: ClinicalNoteDoc = {

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     if (!auth) return unauthorized();
     if (!hasRole(auth, READ_ROLES)) return forbidden();
     const { getAllBills, getBillsByPatient, getUnpaidBills, getBillingSummary } = await import('@/lib/services/billing-service');
-    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    const { buildScopeFromAuth } = await import('@/lib/services/data-scope');
     const url = new URL(request.url);
     const patientId = url.searchParams.get('patientId');
     const status = url.searchParams.get('status');
@@ -34,8 +34,10 @@ export async function GET(request: NextRequest) {
     }
     let bills;
     if (patientId) {
-      const rows = await getBillsByPatient(patientId);
-      bills = filterByScope(rows, buildScopeFromAuth(auth));
+      // Scoped inside getBillsByPatient itself now — a patient can have
+      // bills in more than one org, and this is a staff request (unlike the
+      // patient-portal route), so it must never see another org's bill.
+      bills = await getBillsByPatient(patientId, buildScopeFromAuth(auth));
     } else if (status === 'unpaid') {
       const scope = buildScopeFromAuth(auth);
       bills = await getUnpaidBills(scope);

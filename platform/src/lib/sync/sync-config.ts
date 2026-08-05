@@ -31,6 +31,9 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_births',                direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_deaths',                direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_facility_assessments',  direction: 'both', orgScoped: true },
+  // Periodic per-facility census submissions (data-entry dashboard). Same
+  // shape of PHI-adjacent operational data as facility_assessments above.
+  { localName: 'tamamhealth_facility_census',       direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_immunizations',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_anc',                   direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_follow_ups',            direction: 'both', orgScoped: true },
@@ -44,6 +47,10 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_announcements',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_conversations',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_patient_notes',         direction: 'both', orgScoped: true },
+  // Clinical-notes module (SOAP/H&P/consult/etc.) — the signed encounter
+  // record; see src/lib/clinical-notes/note-service.ts. PHI, org-scoped like
+  // every other note/record type above.
+  { localName: 'tamamhealth_clinical_notes',        direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_encounters',            direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_consultation_progress', direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_handoffs',              direction: 'both', orgScoped: true },
@@ -53,6 +60,9 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_assessments',           direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_clinical_favorites',    direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_consultation_templates', direction: 'both', orgScoped: true },
+  // Per-clinician text shortcuts ("dot phrases") for the notes module. Owned
+  // by a user but optionally org-shared, like consultation_templates above.
+  { localName: 'tamamhealth_text_shortcuts',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_clinician_tasks',        direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_patient_documents',      direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_patient_reminders',      direction: 'both', orgScoped: true },

@@ -7,6 +7,7 @@ import { useLabResults } from '@/lib/hooks/useLabResults';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import Modal from '@/components/Modal';
 import type { LabResultDoc } from '@/lib/db-types';
 import {
@@ -84,6 +85,25 @@ function labStatusLabel(status: 'pending' | 'in_progress' | 'completed'): string
   return 'Pending';
 }
 
+// Juba is UTC+3 — a result filed in the first three hours of the local day has
+// a UTC instant that still reads as the previous day. `completedAt`/`orderedAt`
+// stay full ISO instants (correct, and how the SLA math elsewhere needs them);
+// only the CALENDAR DATE shown/bucketed here must be derived in local time
+// (this repo's client-side convention — raw UTC slicing is for app/api only).
+function localDatePart(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : toIsoDate(d);
+}
+
+// Rendered lists are capped so a long-lived, never-date-scoped queue (see
+// `filterRowsByDate={false}` below) can't unbounded-render thousands of rows.
+// Every tab count below is derived from the SAME capped, search-filtered array
+// that actually renders, so the badge can never claim more than what's on
+// screen — and `centerSubtitle` spells out "Showing N of M" whenever the cap
+// actually trims something, so a bigger backlog is never silently invisible.
+const LAB_QUEUE_ROW_CAP = 40;
+
 type CompletedDiseaseRow = {
   id: string;
   lab: LabResultDoc;
@@ -119,6 +139,29 @@ function diseasesForCompletedLab(lab: LabResultDoc): Omit<CompletedDiseaseRow, '
       detail: `${lab.testName}${lab.result ? `: ${lab.result}` : ''}`,
       severity: lab.critical ? 'critical' : lab.abnormal ? 'abnormal' : 'normal',
     }));
+}
+
+// Shared between the tab counts and the rendered rows (see LAB_QUEUE_ROW_CAP
+// above) so a count can never promise a row that the search box has actually
+// excluded.
+function matchesLabQueueSearch(order: Pick<LabResultDoc, 'patientName' | 'testName' | 'specimen' | 'orderedBy'>, query: string): boolean {
+  if (!query) return true;
+  return (
+    (order.patientName || '').toLowerCase().includes(query) ||
+    (order.testName || '').toLowerCase().includes(query) ||
+    (order.specimen || '').toLowerCase().includes(query) ||
+    (order.orderedBy || '').toLowerCase().includes(query)
+  );
+}
+
+function matchesLabDiseaseSearch(row: CompletedDiseaseRow, query: string): boolean {
+  if (!query) return true;
+  return (
+    row.disease.toLowerCase().includes(query) ||
+    row.lab.patientName.toLowerCase().includes(query) ||
+    row.lab.testName.toLowerCase().includes(query) ||
+    row.detail.toLowerCase().includes(query)
+  );
 }
 
 interface BatchEntry {
@@ -166,14 +209,10 @@ export default function LabDashboardPage() {
   const [batchEntries, setBatchEntries] = useState<BatchEntry[]>([]);
   const [batchSaving, setBatchSaving] = useState(false);
 
-  // --- Derived KPIs ---
-  const kpis = useMemo(() => {
-    const pending = results.filter(r => r.status === 'pending').length;
-    const inProgress = results.filter(r => r.status === 'in_progress').length;
-    return { pending, inProgress };
-  }, [results]);
-
   // --- Categorized results ---
+  // Every pending/in-progress order regardless of search or the render cap —
+  // feeds batch entry's test-type picker, which must offer every order on the
+  // bench, not just the ones the current queue search happens to match.
   const allPendingOrders = useMemo(() => results.filter(r => r.status === 'pending' || r.status === 'in_progress'), [results]);
   const completedDiseaseRows = useMemo<CompletedDiseaseRow[]>(() => {
     return results
@@ -185,44 +224,52 @@ export default function LabDashboardPage() {
       .sort((a, b) => a.disease.localeCompare(b.disease) || a.lab.patientName.localeCompare(b.lab.patientName));
   }, [results]);
 
+  const queueQuery = queueSearch.trim().toLowerCase();
+
+  // Search-filtered matches per lane, BEFORE the LAB_QUEUE_ROW_CAP render cap.
+  // Every tab count below is `Math.min(matches.length, LAB_QUEUE_ROW_CAP)` —
+  // exactly the number of rows that lane would render if selected — so a tab
+  // count can never promise a row that the search box or the cap has actually
+  // excluded.
+  const scheduledMatches = useMemo(
+    () => results.filter(r => r.status === 'pending' && matchesLabQueueSearch(r, queueQuery)),
+    [results, queueQuery],
+  );
+  const inOfficeMatches = useMemo(
+    () => results.filter(r => r.status === 'in_progress' && matchesLabQueueSearch(r, queueQuery)),
+    [results, queueQuery],
+  );
+  const finishedMatches = useMemo(
+    () => completedDiseaseRows.filter(row => matchesLabDiseaseSearch(row, queueQuery)),
+    [completedDiseaseRows, queueQuery],
+  );
+
   // Work queue rendered by the shared shell: filtered by the selected status
-  // chip and the inline search query. Pending / in-progress orders sort first
-  // so the most actionable work is at the top of the list.
-  const visibleQueue = useMemo(() => {
-    const query = queueSearch.trim().toLowerCase();
-    if (queueFilter === 'finished') {
-      return results.filter(r => r.status === 'completed' && (
-        !query ||
-        (r.patientName || '').toLowerCase().includes(query) ||
-        (r.testName || '').toLowerCase().includes(query) ||
-        (r.result || '').toLowerCase().includes(query) ||
-        (r.clinicalNotes || '').toLowerCase().includes(query)
-      )).slice(0, 40);
-    }
-    return results.filter(r => {
-      const statusOk = r.status === (queueFilter === 'in_office' ? 'in_progress' : 'pending');
-      if (!statusOk) return false;
-      if (!query) return true;
-      return (
-        (r.patientName || '').toLowerCase().includes(query) ||
-        (r.testName || '').toLowerCase().includes(query) ||
-        (r.specimen || '').toLowerCase().includes(query) ||
-        (r.orderedBy || '').toLowerCase().includes(query)
-      );
-    }).slice(0, 40);
-  }, [results, queueFilter, queueSearch]);
-  const visibleCompletedDiseaseRows = useMemo(() => {
-    const query = queueSearch.trim().toLowerCase();
-    return completedDiseaseRows.filter(row => {
-      if (!query) return true;
-      return (
-        row.disease.toLowerCase().includes(query) ||
-        row.lab.patientName.toLowerCase().includes(query) ||
-        row.lab.testName.toLowerCase().includes(query) ||
-        row.detail.toLowerCase().includes(query)
-      );
-    }).slice(0, 40);
-  }, [completedDiseaseRows, queueSearch]);
+  // chip and the inline search query, then capped at LAB_QUEUE_ROW_CAP.
+  // Pending / in-progress orders sort first so the most actionable work is at
+  // the top of the list.
+  const visibleQueue = useMemo(
+    () => (queueFilter === 'in_office' ? inOfficeMatches : scheduledMatches).slice(0, LAB_QUEUE_ROW_CAP),
+    [queueFilter, scheduledMatches, inOfficeMatches],
+  );
+  const visibleCompletedDiseaseRows = useMemo(
+    () => finishedMatches.slice(0, LAB_QUEUE_ROW_CAP),
+    [finishedMatches],
+  );
+
+  // The active tab's own "Showing N of M" affordance: undefined (no cap in
+  // effect) falls through to the shell's default "N active items" subtitle.
+  // Nothing is ever hidden silently — when the cap trims a lane, the center
+  // panel says so.
+  const activeTabMatchTotal =
+    queueFilter === 'finished' ? finishedMatches.length :
+    queueFilter === 'in_office' ? inOfficeMatches.length :
+    scheduledMatches.length;
+  const activeTabShownCount =
+    queueFilter === 'finished' ? visibleCompletedDiseaseRows.length : visibleQueue.length;
+  const centerSubtitle = activeTabMatchTotal > activeTabShownCount
+    ? `Showing ${activeTabShownCount} of ${activeTabMatchTotal}`
+    : undefined;
   // Unique test types for batch mode
   const pendingTestTypes = useMemo(() => {
     const types = new Set(allPendingOrders.map(o => o.testName));
@@ -323,9 +370,9 @@ export default function LabDashboardPage() {
           greetingName={currentUser?.name}
           dateLabel={dateLabel}
           tabs={[
-            { key: 'scheduled', label: 'Scheduled', count: kpis.pending },
-            { key: 'in_office', label: 'In Office', count: kpis.inProgress },
-            { key: 'finished', label: 'Finished', count: completedDiseaseRows.length },
+            { key: 'scheduled', label: 'Scheduled', count: Math.min(scheduledMatches.length, LAB_QUEUE_ROW_CAP) },
+            { key: 'in_office', label: 'In Office', count: Math.min(inOfficeMatches.length, LAB_QUEUE_ROW_CAP) },
+            { key: 'finished', label: 'Finished', count: Math.min(finishedMatches.length, LAB_QUEUE_ROW_CAP) },
           ]}
           activeTab={queueFilter}
           onTabChange={(k) => setQueueFilter(k as typeof queueFilter)}
@@ -336,6 +383,10 @@ export default function LabDashboardPage() {
           // the bench across days — the calendar's selected day must not hide
           // it while the tab counts (which are not date-scoped) still show it.
           filterRowsByDate={false}
+          // Undefined falls through to the shell's default "N active items";
+          // set only when LAB_QUEUE_ROW_CAP actually trimmed this lane, so a
+          // bigger backlog is never silently invisible.
+          centerSubtitle={centerSubtitle}
           filters={[]}
           actions={[
             // Single results are entered in the chart's bench workflow. What is
@@ -361,8 +412,8 @@ export default function LabDashboardPage() {
               careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
-              date: (lab.completedAt || lab.orderedAt || '').slice(0, 10),
-              timeSecondary: lab.completedAt ? lab.completedAt.slice(0, 10) : 'Resulted',
+              date: localDatePart(lab.completedAt || lab.orderedAt),
+              timeSecondary: lab.completedAt ? localDatePart(lab.completedAt) : 'Resulted',
               status: 'completed',
               statusLabel: 'Complete',
               statusSecondary: row.severity === 'critical' ? 'Critical' : row.severity === 'abnormal' ? 'Abnormal' : 'Normal',
@@ -377,6 +428,11 @@ export default function LabDashboardPage() {
               // for this specific order.
               patientId: lab.patientId,
               onOpen: () => openBenchWorkflow(lab),
+              // Complete/Abnormal/Critical IS this screen's whole point — a
+              // same-day visit must not paint over a CRITICAL result's red
+              // pill with the visit's own tone. The shared shell still
+              // surfaces the visit status on the line under the pill.
+              lockStatus: true,
             };
           }) : visibleQueue.map((order): EhrCareDashboardRow => {
             const time = order.status === 'completed'
@@ -392,10 +448,10 @@ export default function LabDashboardPage() {
               careTeamLabel: 'Ordered by',
               compactMeta: time,
               time,
-              date: (order.completedAt || order.orderedAt || '').slice(0, 10),
+              date: localDatePart(order.completedAt || order.orderedAt),
               timeSecondary: order.status === 'completed'
-                ? (order.completedAt ? order.completedAt.slice(0, 10) : 'Completed')
-                : (order.orderedAt ? order.orderedAt.slice(0, 10) : 'Ordered'),
+                ? (order.completedAt ? localDatePart(order.completedAt) : 'Completed')
+                : (order.orderedAt ? localDatePart(order.orderedAt) : 'Ordered'),
               status: order.status,
               statusLabel: labStatusLabel(order.status),
               statusSecondary: order.critical ? 'Critical' : order.abnormal ? 'Abnormal' : order.specimen,
@@ -408,6 +464,11 @@ export default function LabDashboardPage() {
               priority: order.critical ? 'RED' : undefined,
               patientId: order.patientId,
               onOpen: () => openBenchWorkflow(order),
+              // Pending/In Progress/Complete (and a CRITICAL flag) IS the
+              // bench queue's whole point — a same-day visit must not paint
+              // over it. The shared shell still surfaces the visit status on
+              // the line under the pill.
+              lockStatus: true,
             };
           })}
           metrics={[

@@ -94,6 +94,20 @@
  *                                     (Cross-FACILITY patient movement that IS
  *                                     nationally meaningful already flows via
  *                                     tamamhealth_referrals.)
+ *   - tamamhealth_clinical_notes      Clinical-notes module (SOAP/H&P/consult/
+ *                                     etc. — the signed encounter record; see
+ *                                     lib/clinical-notes/note-service.ts).
+ *                                     Facility-operational PHI narrative, like
+ *                                     patient_notes above; not a national
+ *                                     analytics target.
+ *   - tamamhealth_text_shortcuts      Per-clinician "dot phrase" shortcuts for
+ *                                     the notes module. Personal/operational
+ *                                     preference data, like clinical_favorites
+ *                                     above; not a national analytics target.
+ *   - tamamhealth_facility_census     Per-facility periodic census submissions
+ *                                     (data-entry dashboard). Facility-
+ *                                     operational reporting; not yet wired to
+ *                                     a national analytics table.
  *
  * (tamamhealth_nutrition_screenings now HAS a national projection —
  * SAM/MAM is a DHIS2 MCH indicator — via DB_TABLE_MAP + FIELD_MAPPER +

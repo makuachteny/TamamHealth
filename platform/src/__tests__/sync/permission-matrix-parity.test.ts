@@ -46,6 +46,22 @@ const DERIVED_FROM_SHARED_CONSTANT: Record<string, { constant: readonly string[]
   },
 };
 
+/**
+ * Types with NO API route to compare against, because there isn't one: the
+ * client writes these documents straight to its local PouchDB replica
+ * (offline-first) and replication carries them to CouchDB without ever
+ * passing through a Next.js API route. `validate_doc_update` (KAN-94) exists
+ * precisely to cover this gap — see the module docstring on
+ * lib/sync/write-permissions.ts. So for these types the CouchDB matrix row
+ * IS the entire enforcement, not one of two layers to keep in sync, and a
+ * missing `TYPE_TO_ROUTE` entry is not a coverage hole.
+ */
+const NO_API_ROUTE = new Set<string>([
+  // lib/clinical-notes/note-service.ts — notes are created/edited/signed
+  // entirely client-side against PouchDB.
+  'clinical_note',
+]);
+
 function routeSource(routeDir: string): string {
   return readFileSync(join(process.cwd(), 'src', 'app', 'api', routeDir, 'route.ts'), 'utf8');
 }
@@ -61,15 +77,16 @@ function routeWriteRoles(routeDir: string): string[] | null {
 }
 
 describe('permission matrix parity', () => {
-  test('every matrix type maps to a real route', () => {
+  test('every matrix type maps to a real route (or is documented as CouchDB-only)', () => {
     for (const docType of Object.keys(DOC_WRITE_ROLES)) {
+      if (NO_API_ROUTE.has(docType)) continue;
       expect(TYPE_TO_ROUTE[docType]).toBeDefined();
       if (DERIVED_FROM_SHARED_CONSTANT[docType]) continue;
       expect(routeWriteRoles(TYPE_TO_ROUTE[docType])).not.toBeNull();
     }
   });
 
-  test.each(Object.keys(DOC_WRITE_ROLES))(
+  test.each(Object.keys(DOC_WRITE_ROLES).filter((t) => !NO_API_ROUTE.has(t)))(
     '%s: CouchDB matrix matches the API route guard',
     (docType) => {
       const fromMatrix = [...DOC_WRITE_ROLES[docType]].sort();

@@ -23,7 +23,8 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
-import { APPOINTMENT_CLOSED_STATUSES } from '@/lib/appointment-status';
+import { APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_STATUS_FLOW, APPOINTMENT_STATUS_EXITS, APPOINTMENT_STATUS_TONES, appointmentStatusLabel } from '@/lib/appointment-status';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import { jubaDate } from '@/lib/time-juba';
 import { patientFullName, patientGenderAge, initials, stateTint } from '@/lib/patient-utils';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -40,6 +41,21 @@ export default function PatientTriagePage() {
   const { patients, loading } = usePatients();
   const { triages } = useTriage();
   const { appointments, updateStatus } = useAppointments();
+  const {
+    canConfirmAppointments, canCheckInAppointments, canAdvanceAppointments, canManageAppointmentSchedule,
+  } = usePermissions();
+  // Same split the appointments list and ward board use: forward progression
+  // for anyone who can move a visit along, the exits reserved for
+  // schedule-management roles — a triage nurse here has check-in/advance
+  // permission but no business cancelling or no-showing the visit she is
+  // actively assessing. `cancelled` stays off this control entirely: it needs
+  // a reason, which only the dedicated Cancel flow (on the appointments list)
+  // collects.
+  const canChangeVisitStatus = canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments;
+  const visitStatusOptions = useMemo(() => [
+    ...APPOINTMENT_STATUS_FLOW,
+    ...(canManageAppointmentSchedule ? APPOINTMENT_STATUS_EXITS.filter(s => s !== 'cancelled') : []),
+  ], [canManageAppointmentSchedule]);
 
   // Today's open visit, if there is one. Saving a triage puts it on the Triaged
   // rung; the nurse's next step — Roomed — is the next option in this same
@@ -119,12 +135,19 @@ export default function PatientTriagePage() {
         {visit && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Visit</span>
-            <AppointmentStatusSelect
-              status={visit.status}
-              layout="bare"
-              label={`Visit status for ${name}`}
-              onChange={status => updateStatus(visit._id, status)}
-            />
+            {canChangeVisitStatus ? (
+              <AppointmentStatusSelect
+                status={visit.status}
+                layout="bare"
+                label={`Visit status for ${name}`}
+                allowedStatuses={visitStatusOptions}
+                onChange={status => updateStatus(visit._id, status)}
+              />
+            ) : (
+              <span className={`appointment-status-pill status-${APPOINTMENT_STATUS_TONES[visit.status]}`}>
+                {appointmentStatusLabel(visit.status)}
+              </span>
+            )}
           </div>
         )}
         <button

@@ -9,7 +9,8 @@ import { patientFullName, patientAgeLabel, initials, stateTint } from '@/lib/pat
 import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
-import { APPOINTMENT_STATUS_TONES, appointmentStatusLabel } from '@/lib/appointment-status';
+import { APPOINTMENT_STATUS_TONES, APPOINTMENT_STATUS_FLOW, APPOINTMENT_STATUS_EXITS, appointmentStatusLabel } from '@/lib/appointment-status';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { AppointmentStatus } from '@/lib/db-types';
 
 // Nurse-station acuity vocabulary (design 02): Critical / Watch / Stable —
@@ -37,6 +38,20 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
   const { wardPatients, patientTriageMap } = useWardRoster();
   const { activeAdmissions } = useWards();
   const { appointments, updateStatus } = useAppointments();
+  const {
+    canConfirmAppointments, canCheckInAppointments, canAdvanceAppointments, canManageAppointmentSchedule,
+  } = usePermissions();
+  // Same split as the appointments list: anyone who can move a visit along
+  // gets the ladder as a picker, but the exits stay with schedule-management
+  // roles — a nurse tapping this cell mid-shift should not be able to cancel
+  // or no-show someone. `cancelled` never appears here even for those roles:
+  // it needs a reason, which only the dedicated Cancel flow collects, and this
+  // board has no room for that dialog.
+  const canChangeVisitStatus = canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments;
+  const visitStatusOptions = useMemo(() => [
+    ...APPOINTMENT_STATUS_FLOW,
+    ...(canManageAppointmentSchedule ? APPOINTMENT_STATUS_EXITS.filter(s => s !== 'cancelled') : []),
+  ], [canManageAppointmentSchedule]);
   const today = new Date().toISOString().slice(0, 10);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -302,11 +317,12 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                           onClick={event => event.stopPropagation()}
                           onKeyDown={event => event.stopPropagation()}
                         >
-                          {visitStatus && appointment && !patient._demo ? (
+                          {visitStatus && appointment && !patient._demo && canChangeVisitStatus ? (
                             <AppointmentStatusSelect
                               status={visitStatus}
                               layout="bare"
                               label={`Visit status for ${patientFullName(patient)}`}
+                              allowedStatuses={visitStatusOptions}
                               onChange={status => updateStatus(appointment._id, status)}
                             />
                           ) : (

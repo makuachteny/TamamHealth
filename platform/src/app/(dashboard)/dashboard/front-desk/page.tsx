@@ -593,9 +593,14 @@ export default function FrontDeskDashboardPage() {
         console.warn('Encounter discharge during checkout failed', e);
       }
 
+      // Both, never either/or: since check-in gives every walk-in a booking of
+      // its own, a walk-in row now carries an appointment AND a triage row.
+      // Completing only the appointment left the triage record active, and the
+      // queue builders kept re-showing a patient who had already gone home.
       if (target.appointmentId) {
         await updateAppointmentStatus(target.appointmentId, 'completed');
-      } else if (target.triageId) {
+      }
+      if (target.triageId) {
         // 'discharged' is the terminal status in the TriageDoc status union.
         await updateTriage(target.triageId, { status: 'discharged' });
       }
@@ -679,12 +684,14 @@ export default function FrontDeskDashboardPage() {
   //    desk sets it from the same dropdown a booked patient uses; triage's own
   //    clinical `status` is only touched when the visit actually closes, which
   //    is the one place the two vocabularies genuinely agree. ──
-  const handleWalkInStatusChange = useCallback(async (triage: TriageDoc, status: AppointmentStatus) => {
+  // `silent` is set when the row also has an appointment whose own handler has
+  // already reported the change — the two writes are one action to the clerk.
+  const handleWalkInStatusChange = useCallback(async (triage: TriageDoc, status: AppointmentStatus, silent = false) => {
     try {
       const patch: Partial<TriageDoc> = { visitStatus: status };
       if (status === 'completed') patch.status = 'discharged';
       await updateTriage(triage._id, patch);
-      showToast(`${triage.patientName} — ${appointmentStatusLabel(status).toLowerCase()}`, 'success');
+      if (!silent) showToast(`${triage.patientName} — ${appointmentStatusLabel(status).toLowerCase()}`, 'success');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not update the status', 'error');
     }
@@ -1011,11 +1018,13 @@ export default function FrontDeskDashboardPage() {
           ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))
           : undefined,
         onStatusChange: canSetAppointmentStatus
-          ? (value: string) => {
+          ? async (value: string) => {
               const next = value as AppointmentStatus;
-              if (queueAppointment) return handleAppointmentStatusChange(queueAppointment, next);
-              if (queueTriage) return handleWalkInStatusChange(queueTriage, next);
-              return undefined;
+              // A walk-in has both records. Advance the appointment and mirror
+              // the rung onto its triage row, so a patient moved to a terminal
+              // status stops being rebuilt into the queues from triage.
+              if (queueAppointment) await handleAppointmentStatusChange(queueAppointment, next);
+              if (queueTriage) await handleWalkInStatusChange(queueTriage, next, !!queueAppointment);
             }
           : undefined,
         priority: acuity,

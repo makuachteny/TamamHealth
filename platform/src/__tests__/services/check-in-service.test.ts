@@ -78,6 +78,34 @@ describe('Patient check-in (P-checkin)', () => {
     expect(res.appointmentCheckedIn).toBe(false);
     expect(res.triage.status).toBe('pending');
   });
+
+  test('does not match a same-day appointment booked at a different org/facility (cross-tenant)', async () => {
+    // The same patient has a booking today at a different org's facility
+    // (Mercy) — getAppointmentsByPatient is unscoped and returns it too, so
+    // the match must reject it on org/facility rather than date+status alone.
+    const mercyAppt = await createAppointment({
+      patientId: 'patient-001', patientName: 'Ayen Deng', providerId: 'u-dr-mercy', providerName: 'Dr. Mercy',
+      facilityId: 'hosp-mercy', facilityName: 'Mercy Hospital', facilityLevel: 'national',
+      appointmentDate: jubaDate(), appointmentTime: '09:00', appointmentType: 'general', priority: 'routine',
+      department: 'OPD', reason: 'Review', status: 'scheduled', bookedBy: 'u-desk-mercy', bookedByName: 'Mercy Desk',
+      state: 'Central Equatoria', orgId: 'org-mercy',
+    } as unknown as Parameters<typeof createAppointment>[0]);
+
+    // Walking in at Juba Teaching Hospital (org-juba), not Mercy.
+    const res = await checkInPatient({ ...base, orgId: 'org-juba' });
+
+    // The cross-tenant appointment must not be treated as this visit's match:
+    // no false "checked in" on it, and the walk-in booking path still fires.
+    expect(res.appointmentCheckedIn).toBe(false);
+    expect(res.appointmentId).not.toBe(mercyAppt._id);
+    expect(res.walkInAppointmentCreated).toBe(true);
+
+    // Mercy's board must not show a phantom check-in for a patient who never
+    // arrived there — the Mercy appointment is untouched.
+    const appts = await getAppointmentsByPatient('patient-001');
+    const stillAtMercy = appts.find(a => a._id === mercyAppt._id);
+    expect(stillAtMercy?.status).toBe('scheduled');
+  });
 });
 
 describe('Check-in creates the visit encounter (EMR-FIELD-AUDIT §3)', () => {

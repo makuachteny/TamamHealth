@@ -9,7 +9,6 @@ import { useTriage } from '@/lib/hooks/useTriage';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { priorityOrder } from '@/lib/clinical/triage-display';
-import { durationToDays } from '@/lib/clinical-flow/dispense-quantity';
 import type { MedicationAdministration, PrescriptionDoc } from '@/lib/db-types';
 
 // Re-export the shared vital-flagging helper so existing importers
@@ -204,8 +203,40 @@ export function doseExpansionCutoff(rx: Pick<PrescriptionDoc, 'stoppedAt' | 'cre
     if (Number.isFinite(stoppedMs)) return stoppedMs;
   }
   if (rx.createdAt && rx.duration) {
+    const days = statedDurationDays(rx.duration);
     const startMs = new Date(rx.createdAt).getTime();
-    if (Number.isFinite(startMs)) return startMs + durationToDays(rx.duration) * 24 * 60 * 60 * 1000;
+    if (days !== null && Number.isFinite(startMs)) return startMs + days * 24 * 60 * 60 * 1000;
+  }
+  return null;
+}
+
+/**
+ * Days the course explicitly runs for, or null when the text doesn't state one.
+ *
+ * Deliberately NOT `durationToDays`: that helper estimates a dispense quantity
+ * and falls back to "assume 1 day" for anything it can't parse. `duration` is
+ * free text that the chart's order modal merges with the instructions
+ * ("<duration> — <instructions>"), so an ongoing med prescribed with only
+ * instructions would inherit that 1-day default and silently stop coming due
+ * on the MAR after its first day. No stated duration means no cutoff.
+ */
+function statedDurationDays(duration: string): number | null {
+  const text = duration.trim().toLowerCase();
+  const m = text.match(/(\d+(?:\.\d+)?)\s*(day|week|month|hour|hr)/);
+  if (m) {
+    const value = parseFloat(m[1]);
+    const unit = m[2];
+    const days =
+      unit.startsWith('week') ? value * 7 :
+      unit.startsWith('month') ? value * 30 :
+      unit.startsWith('hour') || unit === 'hr' ? value / 24 :
+      value;
+    return Math.max(1, Math.ceil(days));
+  }
+  // A bare number is the one unambiguous shorthand: "7" means seven days.
+  if (/^\d+(?:\.\d+)?$/.test(text)) {
+    const n = parseFloat(text);
+    return n > 0 ? Math.ceil(n) : null;
   }
   return null;
 }

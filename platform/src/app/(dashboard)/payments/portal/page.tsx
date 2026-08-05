@@ -8,6 +8,7 @@ import {
   ArrowRight, Wallet, Copy, Check, Loader2, AlertCircle
 } from '@/components/icons/lucide';
 import { useAuth } from '@/lib/context';
+import { useDataScope } from '@/lib/hooks/useDataScope';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { BillingDoc } from '@/lib/db-types-billing';
 import type { PaymentMethodType, PaymentStatus } from '@/lib/db-types-payments';
@@ -127,6 +128,11 @@ const buildPaymentMethods = (bankDetails?: string): PaymentMethodDef[] => [
 export default function PatientPortalPage() {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
+  // This is the assisted-collection portal (cashier/medical_biller only, see
+  // role-routes.ts) — currentUser is the staff member running it, not the
+  // patient, so their own org/facility must gate which bills this can see or
+  // settle, the same as every other staff-facing billing screen.
+  const scope = useDataScope();
   const [selectedBill, setSelectedBill] = useState<PortalBill | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -156,7 +162,7 @@ export default function PatientPortalPage() {
     (async () => {
       try {
         const { getBillsByPatient } = await import('@/lib/services/billing-service');
-        const docs = await getBillsByPatient(patientId);
+        const docs = await getBillsByPatient(patientId, scope);
         if (cancelled) return;
         const sorted = docs
           .map(fromBillingDoc)
@@ -168,7 +174,7 @@ export default function PatientPortalPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [currentUser]);
+  }, [currentUser, scope]);
 
   // Use real bills when present; in demo mode fall back to canned invoices
   // so the portal still has something to show. In production we render an

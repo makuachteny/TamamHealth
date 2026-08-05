@@ -423,6 +423,8 @@ export default function ClinicalNoteEditor({
 
   const handleSaveAndClose = async () => {
     for (const t of Object.values(timers.current)) clearTimeout(t);
+    timers.current = {};
+    pendingSaves.current = {};
     if (note) {
       for (const section of note.sections) {
         await saveNoteSection(noteId, section.sectionId, {

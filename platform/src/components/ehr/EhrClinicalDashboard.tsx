@@ -214,8 +214,11 @@ export default function EhrClinicalDashboard({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
-  // Gate the "Start consultation" action to roles that can actually consult.
-  const { canConsult, canBookAppointments } = usePermissions();
+  // Gate the "Start consultation" action to roles that can actually consult,
+  // and the "Dispense" action (header button, patient search, and the modal
+  // itself) to roles that can actually dispense — a pharmacist working this
+  // dashboard is the only one who should ever reach the search/modal.
+  const { canConsult, canBookAppointments, canDispense } = usePermissions();
   // Inpatient = the appointment's patient currently holds an active ward
   // admission; everyone else counts as outpatient (day-activity chart).
   const { activeAdmissions } = useWards();
@@ -1010,13 +1013,15 @@ export default function EhrClinicalDashboard({
           </div>
         </div>
         <div className="ehr-schedule-actions">
-          <button
-            type="button"
-            aria-label="Dispense"
-            onClick={() => { setFindPatientQuery(''); setFindPatientOpen(true); }}
-          >
-            <Pill className="w-4 h-4" /> Dispense
-          </button>
+          {canDispense && (
+            <button
+              type="button"
+              aria-label="Dispense"
+              onClick={() => { setFindPatientQuery(''); setFindPatientOpen(true); }}
+            >
+              <Pill className="w-4 h-4" /> Dispense
+            </button>
+          )}
           <button
             type="button"
             aria-label="Print today's schedule"
@@ -1457,7 +1462,10 @@ export default function EhrClinicalDashboard({
             />
           )}
 
-          {findPatientOpen && (
+          {/* canDispense re-checked here (not just at the button that opens
+              this) so leftover `findPatientOpen` state — e.g. a role switch
+              mid-session — can't render the search itself for a non-pharmacist. */}
+          {canDispense && findPatientOpen && (
             <Modal onClose={() => setFindPatientOpen(false)} width={480} align="top" labelledBy="find-patient-title">
               <div className="ehr-find-patient">
                 <h3 id="find-patient-title">Dispense to patient</h3>
@@ -1503,7 +1511,9 @@ export default function EhrClinicalDashboard({
             </Modal>
           )}
 
-          {dispensePatient && (
+          {/* Same reasoning as the search modal above: gate the dialog itself,
+              not just its trigger, so leftover state can't render it. */}
+          {canDispense && dispensePatient && (
             <PatientDispenseModal
               patientId={dispensePatient.id}
               patientName={dispensePatient.name}

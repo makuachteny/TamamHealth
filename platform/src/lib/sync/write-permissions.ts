@@ -52,6 +52,13 @@ export const DOC_WRITE_ROLES: Readonly<Record<string, readonly UserRole[]>> = {
   medical_record: [
     'super_admin', 'doctor', 'clinical_officer', 'clinician', 'medical_superintendent',
   ],
+  // Clinical-notes module. Signing semantics deliberately mirror medical_record
+  // (see note-service.ts's docstring), so the write roles match it exactly —
+  // this is also the exact role set the chart UI gates note creation behind
+  // (`canConsult` in usePermissions.ts).
+  clinical_note: [
+    'super_admin', 'doctor', 'clinical_officer', 'clinician', 'medical_superintendent',
+  ],
   lab_result: [
     'super_admin', 'doctor', 'clinical_officer', 'clinician', 'nurse', 'lab_tech',
     'medical_superintendent',

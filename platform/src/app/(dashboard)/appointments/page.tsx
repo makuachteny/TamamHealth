@@ -6,7 +6,8 @@ import AppointmentStatusSelect from '@/components/appointments/AppointmentStatus
 import AppointmentDetailFields, { type AppointmentDetailFieldValues } from '@/components/appointments/AppointmentDetailFields';
 import {
   APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_I18N_KEYS,
-  APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_PENDING_STATUSES, priorAppointmentStatus,
+  APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_PENDING_STATUSES, APPOINTMENT_STATUS_FLOW,
+  APPOINTMENT_STATUS_EXITS, priorAppointmentStatus,
 } from '@/lib/appointment-status';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -143,6 +144,19 @@ export default function AppointmentsPage() {
   // Anyone who can move a booking along the ladder gets the pill-as-picker;
   // read-only roles keep a plain pill.
   const canChangeAppointmentStatus = canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments;
+  // The picker's own option list, independent of whether it renders at all:
+  // forward progression (arrived/checked in/roomed/in progress/completed…) is
+  // open to anyone above, but the exits are not — dropping a patient with
+  // Cancelled, No Show or Rescheduled belongs to reception/scheduling, same as
+  // the dedicated Reschedule and (former) Cancel actions beside it always
+  // required. `cancelled` is excluded even for schedule-management roles: it
+  // needs a reason, and only the dedicated Cancel button below (which still
+  // opens the reason dialog) collects one — the picker never writes it
+  // directly.
+  const statusPickerOptions = useMemo(() => [
+    ...APPOINTMENT_STATUS_FLOW,
+    ...(canManageAppointmentSchedule ? APPOINTMENT_STATUS_EXITS.filter(s => s !== 'cancelled') : []),
+  ], [canManageAppointmentSchedule]);
   const { showToast } = useToast();
   const { t } = useTranslation();
   const { departments: facilityDepartments } = useSettings();
@@ -576,6 +590,7 @@ export default function AppointmentsPage() {
           <AppointmentStatusSelect
             status={apt.status}
             layout="bare"
+            allowedStatuses={statusPickerOptions}
             onChange={status => { onDone(); handleStatusChange(apt._id, status); }}
           />
         )}
@@ -769,6 +784,7 @@ export default function AppointmentsPage() {
                             <AppointmentStatusSelect
                               status={apt.status}
                               layout="bare"
+                              allowedStatuses={statusPickerOptions}
                               onChange={status => handleStatusChange(apt._id, status)}
                             />
                           </span>

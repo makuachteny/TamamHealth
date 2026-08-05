@@ -82,8 +82,19 @@ export async function getBillById(id: string): Promise<BillingDoc | null> {
   }
 }
 
-export async function getBillsByPatient(patientId: string): Promise<BillingDoc[]> {
-  return findByType<BillingDoc>(billingDB(), 'billing', { patientId }, { indexFields: ['type', 'patientId'] });
+/**
+ * Bills for one patient. `scope` is optional (and left unscoped by callers
+ * like the patient-portal, where a patient legitimately sees their own bills
+ * across every org/facility they've been treated at) but any caller that has
+ * a real DataScope — a staff member, or anything about to mutate a bill —
+ * MUST pass it: a patient can have bills in more than one org (e.g. seen at
+ * both a public facility and a private one), and without scoping, a query by
+ * patientId alone returns every org's bills for that patient from the local
+ * replica, which holds all tenants' data.
+ */
+export async function getBillsByPatient(patientId: string, scope?: DataScope): Promise<BillingDoc[]> {
+  const rows = await findByType<BillingDoc>(billingDB(), 'billing', { patientId }, { indexFields: ['type', 'patientId'] });
+  return scope ? filterByScope(rows, scope) : rows;
 }
 
 export async function getUnpaidBills(scope?: DataScope): Promise<BillingDoc[]> {
@@ -258,6 +269,7 @@ function applyPaymentToBill(
   now: string,
   reference?: string,
   notes?: string,
+  sourcePaymentId?: string,
 ): PaymentRecord {
   const payment: PaymentRecord = {
     id: uuidv4().slice(0, 8),
@@ -268,6 +280,7 @@ function applyPaymentToBill(
     receivedByName,
     receivedAt: now,
     notes,
+    sourcePaymentId,
   };
 
   bill.payments.push(payment);
@@ -347,6 +360,37 @@ export async function recordPayment(
   }
 }
 
+export interface SettleOpenBillsInput {
+  patientId: string;
+  amount: number;
+  currency: string;
+  method: PaymentMethod;
+  receivedBy: string;
+  receivedByName: string;
+  /**
+   * The PaymentDoc `_id` (`tamamhealth_payments`) this settlement mirrors.
+   * Stored on each settled bill's PaymentRecord (`sourcePaymentId`) so a
+   * retried call for this exact payment is idempotent — a bill this already
+   * settled is skipped rather than double-applied — and so a later reversal
+   * (`unsettleBillsForPayment`) can find exactly what to undo.
+   */
+  paymentId: string;
+  reference?: string;
+  notes?: string;
+  /**
+   * Restricts settlement to the payer's own org. A patient can have bills in
+   * more than one org (e.g. seen at both a public facility and a private
+   * one on the same local replica, which holds every org's data) — without
+   * this, a payment collected in one org could silently pay down another
+   * org's receivable. Only the org boundary is enforced (not facility —
+   * `filterByScope` is driven with a synthetic 'org_admin' role below so a
+   * payment collected at any facility in the org can settle bills at any
+   * facility in that same org). Omit only when the caller genuinely has no
+   * org context; scoping is then skipped, not defaulted to "every org".
+   */
+  scope?: DataScope;
+}
+
 /**
  * Settle a patient-level payment (e.g. from PaymentPanel's `collectPayment`,
  * which collects against the patient's aggregate ledger balance rather than
@@ -360,6 +404,13 @@ export async function recordPayment(
  * 'partial') exactly like `recordPayment`, just spread across bills instead
  * of applied to one.
  *
+ * Idempotent per `paymentId`: bills already carrying a PaymentRecord for this
+ * exact payment are skipped, and the amount already applied to them (across
+ * every org-scoped bill, not just the still-open ones) is subtracted from
+ * `amount` up front — so a retry after a partial failure (one bill 409'd,
+ * the rest persisted) picks up exactly where it left off instead of
+ * re-applying money to a bill it already settled.
+ *
  * Deliberately does NOT post a ledger entry — the caller already posted one
  * for the full payment amount, and a second one here would double-credit the
  * patient's balance for the same real-world payment. Only bills whose
@@ -368,26 +419,33 @@ export async function recordPayment(
  *
  * Best-effort by callers, same as the ledger mirrors elsewhere in this file:
  * bills are already-persisted records of what was billed, so a failure here
- * must not unwind a payment that already succeeded.
+ * must not unwind a payment that already succeeded. A bill this can't
+ * persist to throws out of the loop — the caller decides how to report a
+ * partial settlement; already-settled bills before the throw are not undone.
  */
-export async function settleOpenBillsWithPayment(
-  patientId: string,
-  amount: number,
-  currency: string,
-  method: PaymentMethod,
-  receivedBy: string,
-  receivedByName: string,
-  reference?: string,
-  notes?: string,
-): Promise<{ settledBills: BillingDoc[]; unapplied: number }> {
+export async function settleOpenBillsWithPayment(input: SettleOpenBillsInput): Promise<{ settledBills: BillingDoc[]; unapplied: number }> {
+  const { patientId, amount, currency, method, receivedBy, receivedByName, paymentId, reference, notes, scope } = input;
   if (!(amount > 0)) return { settledBills: [], unapplied: amount };
 
   const db = billingDB();
-  const openBills = (await getBillsByPatient(patientId))
+  const allBills = await getBillsByPatient(patientId, scope);
+
+  // Idempotency: subtract whatever this exact payment already applied on a
+  // prior (possibly partially-failed) pass, across ALL of this patient's
+  // bills regardless of their current status — a bill this fully settled
+  // last time is now 'paid' and would otherwise fall out of the openBills
+  // filter below, silently losing track of the amount it already absorbed.
+  const alreadyApplied = allBills.reduce((sum, b) => {
+    const rec = b.payments.find(p => p.sourcePaymentId === paymentId);
+    return sum + (rec ? rec.amount : 0);
+  }, 0);
+
+  const openBills = allBills
     .filter(b => (b.status === 'pending' || b.status === 'partial') && b.currency === currency)
+    .filter(b => !b.payments.some(p => p.sourcePaymentId === paymentId))
     .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 
-  let remaining = Math.round(amount * 100) / 100;
+  let remaining = Math.round((amount - alreadyApplied) * 100) / 100;
   const settledBills: BillingDoc[] = [];
   const now = new Date().toISOString();
 
@@ -396,7 +454,7 @@ export async function settleOpenBillsWithPayment(
     const portion = Math.round(Math.min(remaining, bill.balanceDue) * 100) / 100;
     if (portion <= 0) continue;
 
-    applyPaymentToBill(bill, portion, method, receivedBy, receivedByName, now, reference, notes);
+    applyPaymentToBill(bill, portion, method, receivedBy, receivedByName, now, reference, notes, paymentId);
     const resp = await db.put(bill);
     bill._rev = resp.rev;
     settledBills.push(bill);
@@ -418,6 +476,86 @@ export async function settleOpenBillsWithPayment(
   }
 
   return { settledBills, unapplied: Math.max(0, remaining) };
+}
+
+/**
+ * Undo everything a specific payment (`paymentId`, the PaymentDoc `_id`)
+ * mirrored onto BillingDoc(s) via `settleOpenBillsWithPayment`. Before the
+ * settlement mirror was added, reversing/refunding a payment only touched
+ * the ledger — bills never moved, so nothing needed undoing on them. Now
+ * that a payment can flip a bill to 'partial'/'paid', a reversal that only
+ * credits the ledger back leaves the bill permanently showing paid while the
+ * ledger says the balance is owed again.
+ *
+ * Finds every bill carrying an unreversed PaymentRecord with this
+ * `sourcePaymentId`, marks that record reversed (kept, not deleted, as a
+ * receipt of what was actually collected and when), and recomputes the
+ * bill's amountPaid/balanceDue/status without it. A bill the original
+ * settlement never reached (it 409'd before persisting, or belongs to
+ * another org and was walled off by scope) has no matching record and is
+ * correctly left untouched.
+ *
+ * Best-effort per bill, same rule as settleOpenBillsWithPayment: the ledger
+ * reversal the caller already recorded is authoritative and must stand
+ * regardless of whether every bill could be updated — a bill that fails to
+ * persist (409, concurrently deleted) is reported in `failedBillIds`, not
+ * retried here and not treated as a reason to undo the ledger credit.
+ */
+export async function unsettleBillsForPayment(
+  paymentId: string,
+  patientId: string,
+  reversedBy: string,
+  reversedByName: string,
+): Promise<{ unsettledBills: BillingDoc[]; failedBillIds: string[] }> {
+  const db = billingDB();
+  const bills = await getBillsByPatient(patientId);
+  const now = new Date().toISOString();
+  const unsettledBills: BillingDoc[] = [];
+  const failedBillIds: string[] = [];
+
+  for (const bill of bills) {
+    const record = bill.payments.find(p => p.sourcePaymentId === paymentId && !p.reversed);
+    if (!record) continue;
+
+    record.reversed = true;
+    record.reversedAt = now;
+    bill.amountPaid = Math.max(0, Math.round((bill.amountPaid - record.amount) * 100) / 100);
+    bill.balanceDue = Math.max(0, Math.round((bill.totalAmount - bill.amountPaid) * 100) / 100);
+    if (bill.balanceDue <= 0 && bill.amountPaid > 0) {
+      bill.status = 'paid';
+      bill.balanceDue = 0;
+    } else if (bill.amountPaid > 0) {
+      bill.status = 'partial';
+    } else {
+      bill.status = 'pending';
+    }
+    bill.updatedAt = now;
+
+    try {
+      const resp = await db.put(bill);
+      bill._rev = resp.rev;
+      unsettledBills.push(bill);
+
+      await logAuditSafe(
+        'BILL_PAYMENT_UNSETTLED', reversedBy, reversedByName,
+        `Settlement of ${record.amount} ${bill.currency} on ${bill.invoiceNumber} reversed (payment ${paymentId})`
+      );
+
+      emitSyncEvent({
+        resourceType: 'billing',
+        resourceId: bill._id,
+        operation: 'update',
+        resourceVersion: bill._rev,
+        orgId: bill.orgId,
+        hospitalId: bill.facilityId,
+      });
+    } catch (err) {
+      console.warn('[billing] could not unsettle bill', bill._id, 'for reversed payment', paymentId, err);
+      failedBillIds.push(bill._id);
+    }
+  }
+
+  return { unsettledBills, failedBillIds };
 }
 
 /**

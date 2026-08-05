@@ -36,7 +36,7 @@ function todayIso(): string {
 export function useClinicalDashboardData(): MobileDashboardData {
   const { currentUser } = useApp();
   const { appointments, loading: apptLoading } = useAppointments();
-  const { unsignedDrafts, awaitingCosign, heldAssessments, loading: signLoading } = useSigningInbox();
+  const { unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes, loading: signLoading } = useSigningInbox();
   const { notes: phoneNotes, loading: phoneLoading } = usePhoneNotesInbox();
   const { referrals, loading: referralsLoading } = useReferrals();
   const { forms: intakeForms, loading: intakeLoading } = useIntakeForms();
@@ -67,7 +67,7 @@ export function useClinicalDashboardData(): MobileDashboardData {
   }, [appointments, today]);
 
   const outstanding = useMemo<MobileOutstandingItem[]>(() => {
-    const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length;
+    const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length + unsignedNotes.length;
     const myReferralsCount = referrals.filter((r) => r.createdBy === currentUser?._id).length;
     const pendingIntake = intakeForms.filter((f) => f.status === 'pending_review').length;
     const awaitingLabs = labResults.filter(
@@ -92,7 +92,7 @@ export function useClinicalDashboardData(): MobileDashboardData {
     }
 
     return items;
-  }, [unsignedDrafts, awaitingCosign, heldAssessments, referrals, intakeForms, labResults, telehealthSessions, currentUser, hasTelehealth, today]);
+  }, [unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes, referrals, intakeForms, labResults, telehealthSessions, currentUser, hasTelehealth, today]);
 
   const loading = apptLoading || signLoading || phoneLoading || referralsLoading || intakeLoading || labLoading || telehealthLoading;
 

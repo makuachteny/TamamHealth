@@ -13,6 +13,12 @@
  * Options and order come from `APPOINTMENT_STATUS_OPTIONS`. A status not on
  * that list (`requested`, written by the patient portal) is still shown while
  * it is the current value, so the control never misreports where a booking is.
+ *
+ * Permission is the caller's job, not this component's: it doesn't know which
+ * role is driving it, so it can't decide who may reach `cancelled` versus who
+ * may only advance the ladder. Pass `allowedStatuses` to narrow the list (the
+ * current value always stays visible even if it's outside that list, same as
+ * the `requested` handling above); omit it to offer the full ladder.
  */
 import { useState } from 'react';
 import { APPOINTMENT_STATUS_OPTIONS, appointmentStatusLabel } from '@/lib/appointment-status';
@@ -25,6 +31,7 @@ export default function AppointmentStatusSelect({
   onChange,
   layout = 'row',
   label = 'Appointment status',
+  allowedStatuses,
 }: {
   status: AppointmentStatus;
   disabled?: boolean;
@@ -34,11 +41,14 @@ export default function AppointmentStatusSelect({
    *  just the select, for an actions strip that already has its own labels. */
   layout?: 'row' | 'bare';
   label?: string;
+  /** Narrows the offered rungs to this set (see module doc above). */
+  allowedStatuses?: AppointmentStatus[];
 }) {
   const [saving, setSaving] = useState(false);
-  const options = APPOINTMENT_STATUS_OPTIONS.includes(status)
-    ? APPOINTMENT_STATUS_OPTIONS
-    : [status, ...APPOINTMENT_STATUS_OPTIONS];
+  const base = allowedStatuses
+    ? APPOINTMENT_STATUS_OPTIONS.filter(option => allowedStatuses.includes(option))
+    : APPOINTMENT_STATUS_OPTIONS;
+  const options = base.includes(status) ? base : [status, ...base];
 
   const select = (
     <select

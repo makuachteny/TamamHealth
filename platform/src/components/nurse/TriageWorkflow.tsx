@@ -817,8 +817,10 @@ export default function TriageWorkflow({
                 // Escalation and LWBS act on the visit's encounter, so they
                 // are only offered while the patient is still waiting and the
                 // triage is linked to one (KAN-100).
-                if (ti.status === 'pending' && ti.encounterId) {
-                  actions.push({ key: 'escalate', label: t('nurse.triageActionEscalate'), tone: 'danger', icon: <AlertTriangle />, onClick: () => escalateToEmergency(ti) });
+                // LWBS also applies once triage is done but no room or provider
+                // has freed up — that wait is exactly when patients walk away.
+                if ((ti.status === 'pending' || ti.status === 'seen') && ti.encounterId) {
+                  if (ti.status === 'pending') actions.push({ key: 'escalate', label: t('nurse.triageActionEscalate'), tone: 'danger', icon: <AlertTriangle />, onClick: () => escalateToEmergency(ti) });
                   actions.push({ key: 'lwbs', label: t('nurse.triageActionLwbs'), icon: <X />, onClick: () => markLeftWithoutBeingSeen(ti) });
                 }
                 return (

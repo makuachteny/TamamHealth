@@ -113,11 +113,21 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
   let appointmentId: string | undefined;
   try {
     const today = jubaDate();
+    // getAppointmentsByPatient is unscoped (matches across every org/facility
+    // the patient has ever visited), so the match below must apply its own
+    // org + facility filter — otherwise a booking at a different tenant's
+    // facility for the same patient gets treated as today's visit here: it
+    // is marked checked_in on THEIR board, this walk-in is silently linked to
+    // it, and the walk-in booking branch below never fires.
     const appts = await getAppointmentsByPatient(input.patientId);
     // Any rung that still expects the patient: booked, reminded, confirmed, or
     // marked arrived but not yet checked in at the desk.
     const match = appts.find(
-      (a) => a.appointmentDate === today && APPOINTMENT_PENDING_STATUSES.includes(a.status),
+      (a) =>
+        a.appointmentDate === today &&
+        APPOINTMENT_PENDING_STATUSES.includes(a.status) &&
+        a.orgId === input.orgId &&
+        a.facilityId === input.facilityId,
     );
     if (match) appointmentId = match._id;
   } catch {

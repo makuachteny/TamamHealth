@@ -20,6 +20,11 @@ export async function GET(req: NextRequest) {
       paymentMod.getPatientFinancialSummary(auth.sub),
       ledgerMod.getPatientBalance(auth.sub),
       ledgerMod.getPatientLedger(auth.sub, 30),
+      // Deliberately unscoped: this is the patient viewing their OWN bills
+      // (auth.sub is the patient id from their own portal token, which
+      // carries no org/role — a patient isn't tied to one org and can
+      // legitimately have bills from every facility they've been treated
+      // at). Scoping by org would hide a patient's own bill from themselves.
       billingMod.getBillsByPatient(auth.sub),
     ]);
 

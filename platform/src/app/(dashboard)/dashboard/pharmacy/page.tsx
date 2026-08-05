@@ -907,6 +907,11 @@ export default function PharmacyDashboardPage() {
               locationSecondary: location ? (controlled && !paymentDue ? 'Substance' : 'Payment') : 'Medication',
               locationLabel: location ? (controlled && !paymentDue ? 'Substance' : 'Payment') : undefined,
               popupDetail: renderWorkflowPopup(rx),
+              // New order/Ready/Dispensed (plus payment-due/discontinued) IS
+              // this screen's whole point — a same-day visit must not paint
+              // over the dispense-pipeline stage. The shared shell still
+              // surfaces the visit status on the line under the pill.
+              lockStatus: true,
             };
           })}
           autoOpenRowId={autoOpenRxId}

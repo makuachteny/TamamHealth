@@ -19,7 +19,8 @@ import { medicationMatches } from '@/lib/services/dispensing-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import PageInstructionCard from '@/components/PageInstructionCard';
 import { formatMoney } from '@/lib/format-utils';
-import { isActivePharmacyStage, isFinanciallyCleared, pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
+import { isActivePharmacyStage, pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
+import { usePatientBalances } from '@/lib/hooks/usePatientBalances';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 import { prescription as rxLifecycle } from '@/lib/clinical-flow/order-lifecycles';
 
@@ -84,7 +85,6 @@ export default function PharmacyPage() {
   const { patients } = usePatients();
   const patientById = useMemo(() => new Map(patients.map(patient => [patient._id, patient])), [patients]);
   const { users } = useUsers();
-  const [balanceByPatient, setBalanceByPatient] = useState<Map<string, number>>(new Map());
   const [workflowRxId, setWorkflowRxId] = useState<string | null>(null);
   // Controlled-substance dispense awaiting a witness sign-off.
   const [dispenseTarget, setDispenseTarget] = useState<{ rx: typeof rxQueue[number]; inv: typeof rawInventory[number]; qty: number } | null>(null);
@@ -135,25 +135,16 @@ export default function PharmacyPage() {
     rawInventory.map(item => ({ ...item, status: classifyStockStatus(item) })),
   [rawInventory]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const patientIds = Array.from(new Set(rxQueue.map(rx => rx.patientId).filter(Boolean)));
-    if (patientIds.length === 0) {
-      setBalanceByPatient(new Map());
-      return;
-    }
-    (async () => {
-      const { getPatientBalance } = await import('@/lib/services/ledger-service');
-      const balances = await Promise.all(patientIds.map(async patientId => [patientId, await getPatientBalance(patientId)] as const));
-      if (!cancelled) setBalanceByPatient(new Map(balances));
-    })().catch(() => {
-      if (!cancelled) setBalanceByPatient(new Map());
-    });
-    return () => { cancelled = true; };
-  }, [rxQueue]);
-
-  const patientBalanceFor = (rx: typeof rxQueue[number]) =>
-    rx.patientId ? balanceByPatient.get(rx.patientId) ?? 0 : 0;
+  // Shared fail-closed balance gate (src/lib/hooks/usePatientBalances.ts).
+  // Previously this page fetched with a single `Promise.all` and a `.catch()`
+  // that reset the WHOLE map to empty on any one patient's ledger hiccup —
+  // so one bad read silently defaulted every patient on the queue to a "no
+  // balance" 0, and `isFinanciallyCleared(0)` is true, waving every one of
+  // them through the payment gate. The hook fetches per-patient with
+  // `Promise.allSettled` and only ever marks a balance 'ready' once a real
+  // read for THAT patient has landed.
+  const rxPatientIds = useMemo(() => rxQueue.map(rx => rx.patientId), [rxQueue]);
+  const { balanceFor, isKnownFor, isClearedFor, confirmCleared } = usePatientBalances(rxPatientIds);
 
   // Distinct medication categories present in the current inventory, for the
   // header's "filter by category" select.
@@ -206,7 +197,10 @@ export default function PharmacyPage() {
       router.push(`/payments?patientId=${rx.patientId}`);
       return;
     }
-    showToast(`Payment due for ${rx.patientName}: ${formatMoney(patientBalanceFor(rx))}. Send the patient to cashier before dispensing.`, 'error');
+    const message = isKnownFor(rx.patientId)
+      ? `Payment due for ${rx.patientName}: ${formatMoney(balanceFor(rx.patientId))}. Send the patient to cashier before dispensing.`
+      : `Could not confirm ${rx.patientName}'s balance. Send the patient to cashier to verify before dispensing.`;
+    showToast(message, 'error');
   };
 
   const handleCounsel = (rx: typeof rxQueue[number]) =>
@@ -226,6 +220,23 @@ export default function PharmacyPage() {
     qty: number,
     witness: { id: string; name: string } | null,
   ): Promise<boolean> => {
+    // Live re-read of the ledger, immediately before the write it gates. The
+    // on-screen balance (what handleDispense checked to decide whether to
+    // even get here) can already be stale by the time this fires — a witness
+    // pick, a slow click, or just queue time passing. confirmCleared also
+    // refreshes the cached balance so the row reflects it on the next render.
+    if (rx.patientId) {
+      const clearance = await confirmCleared(rx.patientId);
+      if (!clearance.cleared) {
+        showToast(
+          clearance.reason === 'outstanding'
+            ? `Payment still due for ${rx.patientName}: ${formatMoney(clearance.balance)}. Send the patient to cashier before dispensing.`
+            : `Could not confirm ${rx.patientName}'s balance — balance unavailable. Dispense cancelled.`,
+          'error',
+        );
+        return false;
+      }
+    }
     try {
       const result = await dispense({
         prescription: rx,
@@ -283,7 +294,14 @@ export default function PharmacyPage() {
   const handleDispense = async (rxId: string, overrideQty?: number) => {
     const rx = rxQueue.find(r => r._id === rxId);
     if (!rx) return;
-    if (!isFinanciallyCleared(patientBalanceFor(rx))) {
+    // Checked before the cleared/outstanding branch: an unresolved balance
+    // (still loading, or the ledger fetch errored) is not "money owed" — it's
+    // "we don't know" — and must not fall through to the stock check below.
+    if (!isKnownFor(rx.patientId)) {
+      showToast(`Could not confirm ${rx.patientName}'s balance — balance unavailable. Try again before dispensing.`, 'error');
+      return;
+    }
+    if (!isClearedFor(rx.patientId)) {
       handlePaymentStep(rx);
       return;
     }
@@ -354,7 +372,6 @@ export default function PharmacyPage() {
   const workflowActionFor = (rx: typeof rxQueue[number]): { label?: string; onClick?: () => void; disabled?: boolean; disabledReason?: string } => {
     if (!canDispense) return {};
     const stage = pharmacyStage(rx);
-    const balance = patientBalanceFor(rx);
     if (stage === 'prescribed') {
       return { label: 'Receive order', onClick: () => handleStartReview(rx) };
     }
@@ -364,7 +381,7 @@ export default function PharmacyPage() {
     if (stage === 'under_review' || stage === 'held_awaiting_clarification' || stage === 'stockout_partial_referred' || stage === 'clinician_consultation_in_progress') {
       return { label: 'Clear', onClick: () => handleClearForDispense(rx) };
     }
-    if (stage === 'cleared_for_dispensing' && !isFinanciallyCleared(balance)) {
+    if (stage === 'cleared_for_dispensing' && !isClearedFor(rx.patientId)) {
       return { label: canAccess('/payments') ? 'Collect payment' : 'Send to cashier', onClick: () => handlePaymentStep(rx) };
     }
     if (stage === 'cleared_for_dispensing') {
@@ -402,11 +419,12 @@ export default function PharmacyPage() {
 
   const renderWorkflowPopup = (rx: typeof rxQueue[number]) => {
     const stage = pharmacyStage(rx);
-    const balance = patientBalanceFor(rx);
+    const balance = balanceFor(rx.patientId);
+    const balanceKnown = isKnownFor(rx.patientId);
     const inv = findInventoryFor(rx.medication);
     const qty = rx.quantityToDispense || 1;
     const stockOk = !!inv && inv.stockLevel >= qty;
-    const paymentClear = isFinanciallyCleared(balance);
+    const paymentClear = isClearedFor(rx.patientId);
     const action = workflowActionFor(rx);
     const completed = {
       received: stage !== 'prescribed',
@@ -430,7 +448,7 @@ export default function PharmacyPage() {
       { key: 'received', label: 'Medication order received', note: rx.prescribedBy ? `Ordered by ${rx.prescribedBy}` : 'Waiting in pharmacy queue', done: completed.received },
       { key: 'review', label: 'Check medication order', note: 'Confirm dose, frequency, patient and allergies.', done: completed.review },
       { key: 'checked', label: 'Stock and safety clearance', note: stockOk ? `${qty} ${inv?.unit || 'unit(s)'} available` : `Stock issue: ${inv?.stockLevel ?? 0} available, ${qty} needed`, done: completed.checked },
-      { key: 'payment', label: 'Receive / confirm payment', note: paymentClear ? 'Payment clear or no charge' : `${formatMoney(balance)} outstanding`, done: completed.payment },
+      { key: 'payment', label: 'Receive / confirm payment', note: !balanceKnown ? 'Balance unavailable — verify before dispensing' : paymentClear ? 'Payment clear or no charge' : `${formatMoney(balance)} outstanding`, done: completed.payment },
       { key: 'dispensed', label: 'Dispense medication', note: 'Issue the full course and update inventory.', done: completed.dispensed },
       { key: 'counseled', label: 'Counsel patient', note: 'Explain dose, timing, side effects and return precautions.', done: completed.counseled },
       { key: 'cleared', label: 'Clear patient from pharmacy', note: 'Medication workflow complete.', done: completed.cleared },
@@ -442,7 +460,7 @@ export default function PharmacyPage() {
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Ordered</span><strong>{rx.medication}</strong></div>
             <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dose</span><strong>{prescriptionSig(rx)}</strong></div>
-            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Payment</span><strong style={{ color: paymentClear ? 'var(--color-success)' : 'var(--color-warning)' }}>{paymentClear ? 'Clear' : formatMoney(balance)}</strong></div>
+            <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Payment</span><strong style={{ color: paymentClear ? 'var(--color-success)' : 'var(--color-warning)' }}>{paymentClear ? 'Clear' : balanceKnown ? formatMoney(balance) : 'Unknown'}</strong></div>
             <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Stage</span><strong>{pharmacyStageLabel(stage)}</strong></div>
           </div>
         </div>
@@ -569,8 +587,8 @@ export default function PharmacyPage() {
   };
 
   const pendingRx = rxQueue.filter(r => r.status === 'pending').length;
-  const paymentDueCount = rxQueue.filter(r => pharmacyStage(r) === 'cleared_for_dispensing' && !isFinanciallyCleared(patientBalanceFor(r))).length;
-  const readyCount = rxQueue.filter(r => pharmacyStage(r) === 'cleared_for_dispensing' && isFinanciallyCleared(patientBalanceFor(r))).length;
+  const paymentDueCount = rxQueue.filter(r => pharmacyStage(r) === 'cleared_for_dispensing' && !isClearedFor(r.patientId)).length;
+  const readyCount = rxQueue.filter(r => pharmacyStage(r) === 'cleared_for_dispensing' && isClearedFor(r.patientId)).length;
   const lowStock = inventory.filter(i => i.status === 'low' || i.status === 'critical').length;
   const totalDispensedToday = inventory.reduce((sum, i) => sum + (i.dispensedToday || 0), 0);
 
@@ -597,7 +615,7 @@ export default function PharmacyPage() {
       if (r.urgency === 'immediate') return 0;
       if (stage === 'received_in_pharmacy_queue') return 1;
       if (stage === 'under_review') return 2;
-      if (stage === 'cleared_for_dispensing' && !isFinanciallyCleared(patientBalanceFor(r))) return 3;
+      if (stage === 'cleared_for_dispensing' && !isClearedFor(r.patientId)) return 3;
       if (stage === 'cleared_for_dispensing') return 4;
       if (stage === 'dispensed') return 5;
       return 6;
@@ -720,7 +738,7 @@ export default function PharmacyPage() {
           rx.prescribedBy,
           rx.createdAt ? new Date(rx.createdAt).toLocaleString('en-GB') : '',
           pharmacyStageLabel(pharmacyStage(rx)),
-          isFinanciallyCleared(patientBalanceFor(rx)) ? 'Clear' : formatMoney(patientBalanceFor(rx)),
+          isClearedFor(rx.patientId) ? 'Clear' : isKnownFor(rx.patientId) ? formatMoney(balanceFor(rx.patientId)) : 'Unknown',
         ]);
         break;
       case 'inventory':
@@ -957,8 +975,9 @@ export default function PharmacyPage() {
                     </tr>
                   ) : filteredQueue.map(rx => {
                     const stage = pharmacyStage(rx);
-                    const balance = patientBalanceFor(rx);
-                    const paymentClear = isFinanciallyCleared(balance);
+                    const balance = balanceFor(rx.patientId);
+                    const balanceKnown = isKnownFor(rx.patientId);
+                    const paymentClear = isClearedFor(rx.patientId);
                     return (
                       <Fragment key={rx._id}>
                       <tr
@@ -1009,7 +1028,7 @@ export default function PharmacyPage() {
                         </td>
                         <td>
                           <span className={`badge text-[10px] ${paymentClear ? 'badge-normal' : 'badge-warning'}`}>
-                            {paymentClear ? 'Clear' : formatMoney(balance)}
+                            {paymentClear ? 'Clear' : balanceKnown ? formatMoney(balance) : 'Unknown'}
                           </span>
                         </td>
                       </tr>

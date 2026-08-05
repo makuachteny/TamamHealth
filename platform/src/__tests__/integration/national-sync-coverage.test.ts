@@ -11,14 +11,15 @@
  *   1. Every database registered for sync (DATABASE_SYNC_CONFIGS) either has a
  *      national PostgreSQL writeback (DB_TABLE_MAP in /api/sync/route.ts) or is
  *      one of the explicitly-documented exclusions.
- *   2. Every facility database declared in lib/db.ts is registered for sync
- *      (so nothing stays trapped in browser storage).
+ *   2. Every facility database opened anywhere under src/ (via getDB(), not
+ *      just in lib/db.ts) is registered for sync (so nothing stays trapped
+ *      in browser storage).
  *   3. The sync-worker's hardcoded fallback DB list covers every nationally-
  *      synced database (so national writeback still works if the worker can't
  *      read the platform source at runtime).
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { DATABASE_SYNC_CONFIGS } from '@/lib/sync/sync-config';
 
@@ -51,6 +52,9 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_procedures',            // bedside/theatre procedures — facility-operational clinical detail, not a national/DHIS2 indicator today
   'tamamhealth_nutrition_supplies',    // facility supply stock levels (RUTF/F-75/…) — facility-operational logistics, not national analytics
   'tamamhealth_patient_transfers',     // internal care-ownership transfers — facility-operational staffing detail naming individual clinicians; cross-facility movement flows via tamamhealth_referrals
+  'tamamhealth_clinical_notes',        // clinical-notes module (SOAP/H&P/consult/etc.) — facility-operational PHI narrative, not national analytics
+  'tamamhealth_text_shortcuts',        // per-clinician "dot phrase" shortcuts for the notes module — personal/operational preference data, not national analytics
+  'tamamhealth_facility_census',       // per-facility periodic census submissions — facility-operational reporting, not (yet) wired to a national analytics table
   // (tamamhealth_nutrition_screenings is NOT excluded — SAM/MAM now writes back
   //  to the `nutrition_screenings` national table via DB_TABLE_MAP + mapper.
   //  tamamhealth_program_enrollments is NOT excluded either — ART/TB/PMTCT/
@@ -77,10 +81,52 @@ function extractDbTableMapKeys(): string[] {
   return [...block[1].matchAll(/(tamamhealth_[a-z0-9_]+)\s*:/g)].map((m) => m[1]);
 }
 
-/** Every distinct `tamamhealth_*` database name referenced in lib/db.ts. */
+// Directories whose contents are never a database *declaration* — either
+// build output, or test code, which legitimately opens scratch/fixture
+// databases (see tamamhealth_test_counter in doc-counter.test.ts) that must
+// never be mistaken for a real facility database needing sync coverage.
+const EXCLUDED_DIR_NAMES = new Set(['node_modules', '__tests__', '.next']);
+
+/** Recursively list every .ts/.tsx source file under `dir`, tests excluded. */
+function listSourceFiles(dir: string): string[] {
+  const absDir = path.join(repoRoot, dir);
+  const files: string[] = [];
+  for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+    if (EXCLUDED_DIR_NAMES.has(entry.name)) continue;
+    const rel = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listSourceFiles(rel));
+    } else if (
+      /\.tsx?$/.test(entry.name) &&
+      !/\.(test|spec)\.tsx?$/.test(entry.name)
+    ) {
+      files.push(rel);
+    }
+  }
+  return files;
+}
+
+/**
+ * Every distinct `tamamhealth_*` database name opened anywhere under `src/`
+ * via `getDB('tamamhealth_...')`, excluding tests.
+ *
+ * Scans the whole tree rather than just lib/db.ts: a database accessor
+ * declared in its own module (e.g. `clinicalNotesDB` in
+ * lib/clinical-notes/note-service.ts) is exactly as real a database as one
+ * declared in db.ts, and must be just as covered by this guard. Scoping to
+ * db.ts alone let tamamhealth_clinical_notes, tamamhealth_text_shortcuts and
+ * tamamhealth_facility_census go undetected — each declared its own getDB()
+ * call outside db.ts and was never registered for sync.
+ */
 function extractDbRegistryNames(): Set<string> {
-  const src = readSource('src/lib/db.ts');
-  return new Set([...src.matchAll(/tamamhealth_[a-z0-9_]+/g)].map((m) => m[0]));
+  const names = new Set<string>();
+  for (const rel of listSourceFiles('src')) {
+    const src = readSource(rel);
+    for (const m of src.matchAll(/getDB\(\s*['"](tamamhealth_[a-z0-9_]+)['"]\s*\)/g)) {
+      names.add(m[1]);
+    }
+  }
+  return names;
 }
 
 /** The sync-worker's hardcoded FALLBACK_DBS list. */
@@ -135,7 +181,7 @@ describe('national sync coverage', () => {
     expect(dangling).toEqual([]);
   });
 
-  test('every facility database in lib/db.ts is registered for sync', () => {
+  test('every facility database opened anywhere under src/ is registered for sync', () => {
     const configured = new Set(syncConfigDbs);
     const unsynced = [...extractDbRegistryNames()].filter(
       (db) => !configured.has(db) && !LOCAL_ONLY_DBS.has(db),

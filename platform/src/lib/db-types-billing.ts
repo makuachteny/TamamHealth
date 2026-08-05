@@ -29,6 +29,22 @@ export interface PaymentRecord {
   receivedByName: string;
   receivedAt: string;
   notes?: string;
+  /**
+   * Back-link to the PaymentDoc (`tamamhealth_payments`) this record mirrors,
+   * set only when the payment was applied via `settleOpenBillsWithPayment`
+   * (a patient-level payment spread across bills) rather than `recordPayment`
+   * (a payment taken directly against this bill, which has no separate
+   * PaymentDoc). Lets a retried settlement of the same payment skip bills it
+   * already touched, and lets `unsettleBillsForPayment` find exactly which
+   * records a reversal must undo.
+   */
+  sourcePaymentId?: string;
+  /** Set when a reversal (see `unsettleBillsForPayment`) has undone this
+   *  specific record. The record is kept (not deleted) as a receipt of what
+   *  was actually collected and when; `reversed` is what stops it counting
+   *  toward the bill's amountPaid. */
+  reversed?: boolean;
+  reversedAt?: string;
 }
 
 export interface BillingDoc extends BaseDoc {

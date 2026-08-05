@@ -19,7 +19,7 @@
  * back — so a dispense from here is not a lighter-weight dispense.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -27,11 +27,12 @@ import { useToast } from '@/components/Toast';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { usePharmacyInventory } from '@/lib/hooks/usePharmacyInventory';
 import { useUsers } from '@/lib/hooks/useUsers';
+import { usePatientBalances } from '@/lib/hooks/usePatientBalances';
 import { medicationMatches } from '@/lib/services/dispensing-service';
 import { checkNewPrescription, type DrugInteraction } from '@/lib/services/drug-interaction-service';
 import { formatMoney, formatRxSig } from '@/lib/format-utils';
 import {
-  isFinanciallyCleared, pharmacyStage, pharmacyStageLabel, pharmacyStageTone,
+  pharmacyStage, pharmacyStageLabel, pharmacyStageTone,
 } from '@/lib/pharmacy-workflow';
 import type { PrescriptionDoc, PharmacyInventoryDoc } from '@/lib/db-types';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
@@ -109,26 +110,15 @@ export default function PatientDispenseModal({
   const { items: inventory } = usePharmacyInventory();
   const { users } = useUsers();
 
-  const [balance, setBalance] = useState(0);
   const [confirmTarget, setConfirmTarget] = useState<{ rx: PrescriptionDoc; inv: PharmacyInventoryDoc; qty: number } | null>(null);
   const [witnessId, setWitnessId] = useState('');
   const [dispensing, setDispensing] = useState(false);
 
   // The payment step needs what the patient actually owes, which lives in the
-  // ledger rather than on the prescription.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { getPatientBalance } = await import('@/lib/services/ledger-service');
-        const value = await getPatientBalance(patientId);
-        if (!cancelled) setBalance(value);
-      } catch {
-        /* Balance is advisory here; the dispense gate re-checks it. */
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [patientId, prescriptions]);
+  // ledger rather than on the prescription. Shared fail-closed gate: 'loading'
+  // and 'error' both read as unknown, never as a fabricated cleared balance —
+  // see usePatientBalances for why that distinction matters here.
+  const { balanceFor, isKnownFor, isClearedFor, confirmCleared } = usePatientBalances([patientId]);
 
   const rows = useMemo(
     () => prescriptions
@@ -190,7 +180,7 @@ export default function PatientDispenseModal({
   // No navigation from here — that is the point of the dialog. The outstanding
   // amount is what the person at this screen needs in order to act.
   const flagPayment = (rx: PrescriptionDoc) => {
-    showToast(`Payment due for ${rx.patientName}: ${formatMoney(balance)}. Send the patient to the cashier before dispensing.`, 'error');
+    showToast(`Payment due for ${rx.patientName}: ${formatMoney(balanceFor(patientId))}. Send the patient to the cashier before dispensing.`, 'error');
   };
 
   const startDispense = (rx: PrescriptionDoc) => {
@@ -198,7 +188,15 @@ export default function PatientDispenseModal({
       showToast('Check and clear the medication order before dispensing.', 'error');
       return;
     }
-    if (!isFinanciallyCleared(balance)) {
+    // Checked before the cleared/outstanding branch: an unknown balance is
+    // not "not cleared", it is "we don't know" — the honest message is
+    // different, and treating it as owed would misreport a ledger outage as
+    // the patient's debt.
+    if (!isKnownFor(patientId)) {
+      showToast('Balance unavailable — verify before dispensing.', 'error');
+      return;
+    }
+    if (!isClearedFor(patientId)) {
       flagPayment(rx);
       return;
     }
@@ -228,6 +226,20 @@ export default function PatientDispenseModal({
 
     setDispensing(true);
     try {
+      // Live re-read, immediately before the write it gates: the balance the
+      // UI last rendered may be several renders (or a whole review step)
+      // stale. confirmCleared also refreshes the cached balance so a later
+      // render of this same modal reflects it.
+      const clearance = await confirmCleared(patientId);
+      if (!clearance.cleared) {
+        showToast(
+          clearance.reason === 'outstanding'
+            ? `Payment due for ${rx.patientName}: ${formatMoney(clearance.balance)}. Send the patient to the cashier before dispensing.`
+            : 'Balance unavailable — could not verify payment before dispensing.',
+          'error',
+        );
+        return;
+      }
       const result = await dispense({
         prescription: rx,
         quantity: qty,
@@ -260,7 +272,13 @@ export default function PatientDispenseModal({
     const inv = findInventoryFor(rx.medication);
     const qty = rx.quantityToDispense || 1;
     const stockOk = !!inv && inv.stockLevel >= qty;
-    const paymentClear = isFinanciallyCleared(balance);
+    // isClearedFor fails closed on an unknown balance — the fabricated
+    // `useState(0)` this replaced made isFinanciallyCleared(0) read true
+    // while the real fetch was still in flight or had failed, so a payment
+    // step could complete itself and the row's action mislabelled as
+    // "Dispense" instead of "Send to cashier".
+    const paymentClear = isClearedFor(patientId);
+    const balanceKnown = isKnownFor(patientId);
     const completed = {
       received: stage !== 'prescribed',
       review: !['prescribed', 'received_in_pharmacy_queue'].includes(stage),
@@ -285,7 +303,12 @@ export default function PatientDispenseModal({
       received: { note: rx.prescribedBy ? `Ordered by ${rx.prescribedBy}` : 'Waiting in pharmacy queue', icon: ClipboardList, label: 'Receive order', onClick: () => startReview(rx) },
       review: { note: 'Confirm dose, frequency, patient, allergies and interactions.', icon: ClipboardList, label: 'Check order', onClick: () => startReview(rx) },
       checked: { note: stockOk ? `${qty} ${inv?.unit || 'unit(s)'} available` : `Stock issue: ${inv?.stockLevel ?? 0} available, ${qty} needed`, icon: ShieldCheck, label: 'Clear stock and safety', onClick: () => clearForDispense(rx) },
-      payment: { note: paymentClear ? 'Payment clear or no charge' : `${formatMoney(balance)} outstanding`, icon: Clock, label: 'Send to cashier', onClick: () => flagPayment(rx) },
+      payment: {
+        note: !balanceKnown
+          ? 'Balance unavailable — verify before dispensing'
+          : paymentClear ? 'Payment clear or no charge' : `${formatMoney(balanceFor(patientId))} outstanding`,
+        icon: Clock, label: 'Send to cashier', onClick: () => flagPayment(rx),
+      },
       dispensed: { note: 'Issue the full course and update inventory.', icon: Pill, label: t('pharmacy.dispense'), onClick: () => startDispense(rx) },
       counseled: { note: 'Explain dose, timing, side effects and return precautions.', icon: CheckCircle2, label: 'Record counseling', onClick: () => void advanceRx(rx, 'counseled', `Counseling recorded for ${rx.patientName}.`) },
       cleared: { note: 'Medication workflow complete.', icon: Check, label: 'Complete pharmacy visit', onClick: () => void advanceRx(rx, 'complete', `${rx.medication} workflow completed.`) },

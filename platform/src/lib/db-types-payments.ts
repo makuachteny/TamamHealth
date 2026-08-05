@@ -198,6 +198,23 @@ export interface PaymentDoc extends BaseDoc {
   notes?: string;
   facilityId: string;
   orgId?: string;
+  /**
+   * Outcome of best-effort mirroring this payment onto BillingDoc(s) via
+   * settleOpenBillsWithPayment (see payment-service.ts). Persisted — not just
+   * console.warn'd — so a caller can tell a cashier the underlying invoice
+   * didn't actually move even though the payment itself (and its ledger
+   * credit) succeeded, instead of an unqualified success toast masking a
+   * stuck bill. Undefined means settlement fully succeeded (or there was
+   * nothing to settle).
+   */
+  billSettlementError?: string;
+  /**
+   * Portion of `amount` that settleOpenBillsWithPayment could not match to
+   * any open bill for this patient/currency (overpayment, an advance, or no
+   * bill on file at all) — the ledger already reflects the full payment;
+   * this is just money that isn't pinned to one specific invoice.
+   */
+  billSettlementUnapplied?: number;
 }
 
 export interface PaymentAllocation {

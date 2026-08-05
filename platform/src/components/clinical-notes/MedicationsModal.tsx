@@ -61,7 +61,10 @@ function bucketOf(rx: PrescriptionDoc): MedTab {
 interface MedicationsModalProps {
   patientId: string;
   patientName: string;
-  currentUser: { _id: string; name?: string; username?: string; orgId?: string } | null;
+  currentUser: {
+    _id: string; name?: string; username?: string;
+    orgId?: string; hospitalId?: string; hospitalName?: string;
+  } | null;
   onClose: () => void;
 }
 
@@ -162,6 +165,8 @@ export default function MedicationsModal({
       status: 'pending',
       orderStatus: 'prescribed',
       orgId: currentUser?.orgId,
+      hospitalId: currentUser?.hospitalId,
+      hospitalName: currentUser?.hospitalName,
     } as Omit<PrescriptionDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
     if (result.interactionWarnings?.hasInteractions) {
       showToast(`Renewed with interaction warning: ${result.interactionWarnings.interactions.map(i => `${i.drug1} ↔ ${i.drug2}`).join(', ')}`, 'error');
@@ -215,6 +220,8 @@ export default function MedicationsModal({
       status: 'pending',
       orderStatus: 'prescribed',
       orgId: currentUser?.orgId,
+      hospitalId: currentUser?.hospitalId,
+      hospitalName: currentUser?.hospitalName,
     } as Omit<PrescriptionDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
     showToast(`${addMed.medication.trim()} added to the med list.`, 'success');
     setAddMed({ medication: '', dose: '', frequency: '' });

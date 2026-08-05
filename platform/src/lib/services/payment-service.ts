@@ -173,26 +173,51 @@ export async function collectPayment(input: CollectPaymentInput): Promise<Paymen
   // ledger balance — so without this, the ledger reads paid while the
   // invoice(s) it was actually paying stay 'pending'/'partial' forever and
   // the two permanently disagree. Best-effort: the ledger entry above is the
-  // record of the money received and must stand even if this mirror fails.
+  // record of the money received and must stand even if this mirror fails —
+  // but the outcome (a failure, or an amount that didn't match any open
+  // bill) is persisted onto the doc below rather than only console.warn'd, so
+  // a caller can tell the difference between "fully settled" and "the ledger
+  // moved but this invoice didn't" instead of an unqualified success.
+  let settlementError: string | undefined;
+  let settlementUnapplied = 0;
   try {
     const { settleOpenBillsWithPayment } = await import('./billing-service');
-    await settleOpenBillsWithPayment(
-      input.patientId,
-      input.amount,
-      doc.currency,
-      toBillingPaymentMethod(input.method),
-      input.processedBy,
-      input.processedByName,
-      doc.reference,
-      input.notes,
-    );
+    const result = await settleOpenBillsWithPayment({
+      patientId: input.patientId,
+      amount: input.amount,
+      currency: doc.currency,
+      method: toBillingPaymentMethod(input.method),
+      receivedBy: input.processedBy,
+      receivedByName: input.processedByName,
+      paymentId: doc._id,
+      reference: doc.reference,
+      notes: input.notes,
+      // 'org_admin' is synthetic — never a real user role here — chosen only
+      // because filterByScope treats it as org-scoped without the further
+      // per-facility narrowing it applies to ordinary staff roles: a payment
+      // collected at one facility must be free to settle a bill at any other
+      // facility in the SAME org, just never in a different org.
+      scope: input.orgId ? ({ role: 'org_admin', orgId: input.orgId } as DataScope) : undefined,
+    });
+    settlementUnapplied = result.unapplied;
   } catch (err) {
+    settlementError = err instanceof Error ? err.message : String(err);
     console.warn('[payment] could not settle open bills for', input.patientId, err);
+  }
+
+  if (settlementError || settlementUnapplied > 0) {
+    doc.billSettlementError = settlementError;
+    doc.billSettlementUnapplied = settlementUnapplied > 0 ? settlementUnapplied : undefined;
+    doc.updatedAt = new Date().toISOString();
+    const resp2 = await db.put(doc);
+    doc._rev = resp2.rev;
   }
 
   await logAuditSafe(
     'PAYMENT_COLLECTED', input.processedBy, input.processedByName,
     `${input.amount} ${doc.currency} via ${input.method} from ${input.patientName} (ref: ${doc.reference})`
+      + (settlementError ? ` — bill settlement failed: ${settlementError}` : '')
+      + (settlementUnapplied > 0 ? ` — ${settlementUnapplied} ${doc.currency} unapplied to any open bill` : '')
   );
 
   emitSyncEvent({
@@ -289,21 +314,40 @@ export async function updatePaymentStatus(
     // this is a patient-balance payment, not one earmarked to a bill, and
     // without it a webhook-confirmed payment credits the ledger but leaves
     // the BillingDoc(s) it paid down stuck 'pending'/'partial'. Best-effort —
-    // the ledger entry above is the record of the money received.
+    // the ledger entry above is the record of the money received — but the
+    // outcome is persisted onto the doc (see collectPayment) rather than only
+    // console.warn'd, so it isn't silently lost.
+    let settlementError: string | undefined;
+    let settlementUnapplied = 0;
     try {
       const { settleOpenBillsWithPayment } = await import('./billing-service');
-      await settleOpenBillsWithPayment(
-        pmt.patientId,
-        pmt.amount,
-        pmt.currency,
-        toBillingPaymentMethod(pmt.method),
-        pmt.processedBy,
-        pmt.processedByName,
-        pmt.reference,
-        pmt.notes,
-      );
+      const result = await settleOpenBillsWithPayment({
+        patientId: pmt.patientId,
+        amount: pmt.amount,
+        currency: pmt.currency,
+        method: toBillingPaymentMethod(pmt.method),
+        receivedBy: pmt.processedBy,
+        receivedByName: pmt.processedByName,
+        paymentId: pmt._id,
+        reference: pmt.reference,
+        notes: pmt.notes,
+        // See the matching comment in collectPayment — 'org_admin' is a
+        // synthetic scope, not a real role, used only to get org-only
+        // (not facility-narrowed) filtering out of filterByScope.
+        scope: pmt.orgId ? ({ role: 'org_admin', orgId: pmt.orgId } as DataScope) : undefined,
+      });
+      settlementUnapplied = result.unapplied;
     } catch (err) {
+      settlementError = err instanceof Error ? err.message : String(err);
       console.warn('[payment] could not settle open bills for', pmt.patientId, err);
+    }
+
+    if (settlementError || settlementUnapplied > 0) {
+      pmt.billSettlementError = settlementError;
+      pmt.billSettlementUnapplied = settlementUnapplied > 0 ? settlementUnapplied : undefined;
+      pmt.updatedAt = new Date().toISOString();
+      const resp2 = await db.put(pmt);
+      pmt._rev = resp2.rev;
     }
   }
 
@@ -349,6 +393,28 @@ export async function reversePayment(
       facilityId: pmt.facilityId,
       orgId: pmt.orgId,
     });
+
+    // Undo whatever this payment mirrored onto BillingDoc(s) (see
+    // settleOpenBillsWithPayment). Before that mirror existed this was
+    // symmetric — payments never touched bills, so a reversal had nothing to
+    // undo there. Now a payment can flip a bill to 'partial'/'paid', so
+    // without this a reversed payment credits the ledger back (patient owes
+    // again) while every bill-reading screen still shows the invoice paid —
+    // permanently and silently contradictory. Best-effort: the ledger
+    // reversal above is authoritative and must stand even if a bill can't be
+    // updated; a failure is recorded on the payment doc, not retried here.
+    try {
+      const { unsettleBillsForPayment } = await import('./billing-service');
+      const { failedBillIds } = await unsettleBillsForPayment(pmt._id, pmt.patientId, reversedBy, reversedByName);
+      if (failedBillIds.length > 0) {
+        pmt.billSettlementError = `Reversal could not update bill(s): ${failedBillIds.join(', ')}`;
+        pmt.updatedAt = new Date().toISOString();
+        const resp2 = await db.put(pmt);
+        pmt._rev = resp2.rev;
+      }
+    } catch (err) {
+      console.warn('[payment] could not unsettle bills for reversed payment', pmt._id, err);
+    }
 
     await logAuditSafe('PAYMENT_REVERSED', reversedBy, reversedByName,
       `Reversed ${pmt.amount} ${pmt.currency} — ${reason}`);

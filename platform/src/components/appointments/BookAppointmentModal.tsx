@@ -109,7 +109,13 @@ export default function BookAppointmentModal({
         patientId: patient._id,
         patientName: `${patient.firstName} ${patient.surname}`,
         patientPhone: patient.phone || undefined,
-        providerId: currentUser?._id || '',
+        // `provider` is free text. Only file the booking under the current
+        // user's id when it still names them: otherwise the appointment lands
+        // on the wrong schedule and the conflict check tests the wrong
+        // person's diary.
+        providerId: !provider.trim() || provider.trim() === (currentUser?.name ?? '').trim()
+          ? currentUser?._id || ''
+          : '',
         providerName: provider || currentUser?.name || '',
         facilityId: currentUser?.hospitalId || '',
         facilityName: currentUser?.hospitalName || '',

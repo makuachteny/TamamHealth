@@ -52,6 +52,17 @@ async function patchHandler(
           quantity: Number(body.quantity) || existingRx.quantityToDispense || 1,
           dispenserId: auth.sub,
           dispenserName: auth.name,
+          // From the verified JWT, not the directory — dispenseMedication()
+          // resolves the directory role first and only falls back to this
+          // when no user record exists at all, but the API path should not
+          // depend on that directory read succeeding. WRITE_ROLES above is
+          // intentionally broader than dispensing (it also covers stock_out,
+          // request_clarification and the generic update below); the actual
+          // dispense-role restriction to 'pharmacist' lives in
+          // dispenseMedication() itself, which is what makes this PATCH now
+          // correctly refuse a dispense from a doctor/clinical_officer/
+          // medical_superintendent/super_admin caller.
+          dispenserRole: auth.role,
           facilityId: existingRx.hospitalId || auth.hospitalId || '',
           facilityName: existingRx.hospitalName,
           orgId: existingRx.orgId ?? auth.orgId,

@@ -30,6 +30,31 @@ const APPOINTMENT_CONFIRM_ROLES: UserRole[] = [
   'super_admin',
 ];
 
+/**
+ * Same roster, for the exits: only reception/scheduling can take a visit off
+ * the board without it being seen (cancel, no-show). Mirrors
+ * canManageAppointmentSchedule in usePermissions.ts — a triage nurse or
+ * clinician can advance a visit but has no business closing the book on it.
+ */
+const APPOINTMENT_EXIT_ROLES: UserRole[] = APPOINTMENT_CONFIRM_ROLES;
+
+/**
+ * Who may check a visit out as completed: reception (the front-desk checkout
+ * path, which completes a walk-in's appointment) plus every clinical role
+ * that can carry a visit to its end. Mirrors canManageAppointmentSchedule ||
+ * canAdvanceAppointments in usePermissions.ts.
+ */
+const APPOINTMENT_COMPLETE_ROLES: UserRole[] = [
+  ...APPOINTMENT_CONFIRM_ROLES,
+  'doctor',
+  'clinical_officer',
+  'nurse',
+  'midwife',
+  'clinician',
+  'triage_nurse',
+  'rooming_nurse',
+];
+
 export async function getAllAppointments(scope?: DataScope): Promise<AppointmentDoc[]> {
   const db = appointmentsDB();
   const all = (await findByType<AppointmentDoc>(db, 'appointment'))
@@ -154,6 +179,20 @@ export async function updateAppointmentStatus(
     const actorName = extra?.actorName || extra?.cancelledByName || extra?.cancelledBy;
     if (status === 'confirmed' && extra?.actorRole && !APPOINTMENT_CONFIRM_ROLES.includes(extra.actorRole)) {
       throw new Error('Only reception, scheduling, or administrator roles can confirm appointments');
+    }
+    // A UI picker gate is not enough on its own — a client that skips it (or a
+    // surface that forgot to apply it) could still write these. Cancel/no-show
+    // drop the patient off the day's board without being seen, so only
+    // reception/scheduling may set them; completing a visit is open to
+    // reception's checkout too, plus whichever clinical role actually carried
+    // the visit. Both stay silent (fall through to the generic null return
+    // below) rather than surfacing the reason, matching the 'confirmed' assert
+    // above — callers already treat a null result as "the write didn't happen".
+    if ((status === 'cancelled' || status === 'no_show') && extra?.actorRole && !APPOINTMENT_EXIT_ROLES.includes(extra.actorRole)) {
+      throw new Error('Only reception, scheduling, or administrator roles can cancel or mark an appointment no-show');
+    }
+    if (status === 'completed' && extra?.actorRole && !APPOINTMENT_COMPLETE_ROLES.includes(extra.actorRole)) {
+      throw new Error('Only reception or the clinical care team can complete an appointment');
     }
     const actorPatch = {
       ...(actorId ? { by: actorId } : {}),

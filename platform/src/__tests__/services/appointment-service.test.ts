@@ -23,6 +23,7 @@ import {
   updateAppointment,
   rescheduleAppointment,
   getAppointmentStats,
+  getAppointmentById,
 } from '@/lib/services/appointment-service';
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
@@ -406,5 +407,79 @@ describe('Appointment Service', () => {
     const stats = await getAppointmentStats();
     expect(stats.byType).toBeDefined();
     expect(stats.byDepartment).toBeDefined();
+  });
+
+  // ── Actor-role gating on the exits ──
+  // A UI-only picker gate widened who could cancel/no-show/complete a visit
+  // (any check-in/advance role, not just reception/scheduling). These assert
+  // the server rejects the write even if a client skips the gate — mirroring
+  // the pre-existing 'confirmed' assert above, which only fires when an
+  // actorRole is actually supplied (so system/service callers that pass none,
+  // like telehealth's auto-completion, are unaffected).
+  test('cancel is rejected for a non-scheduling role and leaves the appointment untouched', async () => {
+    const apt = await createAppointment(validAppointment());
+    const result = await updateAppointmentStatus(apt._id, 'cancelled', {
+      actorRole: 'nurse',
+      cancelledReason: 'Patient requested',
+    });
+    expect(result).toBeNull();
+    const unchanged = await getAppointmentById(apt._id);
+    expect(unchanged!.status).toBe('scheduled');
+  });
+
+  test('cancel succeeds for a front-desk (schedule-management) role', async () => {
+    const apt = await createAppointment(validAppointment());
+    const result = await updateAppointmentStatus(apt._id, 'cancelled', {
+      actorRole: 'front_desk',
+      cancelledReason: 'Patient requested',
+    });
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('cancelled');
+  });
+
+  test('no-show is rejected for a non-scheduling role', async () => {
+    const apt = await createAppointment(validAppointment());
+    const result = await updateAppointmentStatus(apt._id, 'no_show', { actorRole: 'triage_nurse' });
+    expect(result).toBeNull();
+    const unchanged = await getAppointmentById(apt._id);
+    expect(unchanged!.status).toBe('scheduled');
+  });
+
+  test('no-show succeeds for a registration-clerk role', async () => {
+    const apt = await createAppointment(validAppointment());
+    const result = await updateAppointmentStatus(apt._id, 'no_show', { actorRole: 'central_registration_clerk' });
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('no_show');
+  });
+
+  test('completed is rejected for a role with no scheduling or clinical duty', async () => {
+    const apt = await createAppointment(validAppointment());
+    const result = await updateAppointmentStatus(apt._id, 'completed', { actorRole: 'cashier' });
+    expect(result).toBeNull();
+    const unchanged = await getAppointmentById(apt._id);
+    expect(unchanged!.status).toBe('scheduled');
+  });
+
+  test('completed succeeds for the clinician who carried the visit', async () => {
+    const apt = await createAppointment(validAppointment());
+    const result = await updateAppointmentStatus(apt._id, 'completed', { actorRole: 'doctor' });
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('completed');
+  });
+
+  test('completed succeeds for front-desk checkout of a walk-in', async () => {
+    const apt = await createAppointment(validAppointment({ appointmentType: 'walk_in' }));
+    const result = await updateAppointmentStatus(apt._id, 'completed', { actorRole: 'front_desk' });
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('completed');
+  });
+
+  test('status changes with no actorRole (system/service callers) are not blocked', async () => {
+    // check-in-service and telehealth-service call this without an actorRole —
+    // the assert only fires when one is supplied, so these keep working.
+    const apt = await createAppointment(validAppointment());
+    const result = await updateAppointmentStatus(apt._id, 'completed');
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('completed');
   });
 });

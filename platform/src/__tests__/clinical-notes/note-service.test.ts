@@ -15,9 +15,10 @@ import {
   saveNoteSection, addNoteSection, removeNoteSection, changeNoteType,
   clearNote, signClinicalNote, cosignClinicalNote, addNoteAddendum,
   copyNoteForward, recordPlanAction, listClinicalNotes, deleteClinicalNote,
-  hasContent, notePreview, isNoteLocked, NoteLockedError,
+  hasContent, notePreview, isNoteLocked, NoteLockedError, NoteSigningAuthorizationError,
 } from '@/lib/clinical-notes/note-service';
 import type { ClinicalNoteDoc } from '@/lib/clinical-notes/types';
+import type { DataScope } from '@/lib/services/data-scope';
 
 let store: Record<string, ClinicalNoteDoc> = {};
 
@@ -218,16 +219,103 @@ describe('signing', () => {
   });
 
   it('holds a trainee note for countersignature', async () => {
-    const note = await createClinicalNote(baseInput);
+    // The intern is the note's own author/assignee, so she may sign her own
+    // documented encounter even though `nurse` is not a provider role.
+    const note = await createClinicalNote({ ...baseInput, authorId: 'u-intern', authorName: 'Dr Intern' });
     await saveNoteSection(note._id, 'cc', { text: 'Headache.' });
     const signed = await signClinicalNote(note._id, {
-      signedBy: 'u-intern', signedByName: 'Dr Intern', awaitingCosign: true,
+      signedBy: 'u-intern', signedByName: 'Dr Intern', signerRole: 'nurse', awaitingCosign: true,
     });
     expect(signed!.status).toBe('awaiting_cosign');
 
-    const cosigned = await cosignClinicalNote(note._id, 'u-cons', 'Dr Consultant');
+    const cosigned = await cosignClinicalNote(note._id, 'u-cons', 'Dr Consultant', 'doctor');
     expect(cosigned!.status).toBe('signed');
     expect(cosigned!.cosignedByName).toBe('Dr Consultant');
+  });
+});
+
+describe('signing authorisation (KAN — anyone-can-sign-anyone\'s-note)', () => {
+  async function draftAuthoredByDoc() {
+    const note = await createClinicalNote(baseInput); // authorId: 'u-doc'
+    await saveNoteSection(note._id, 'cc', { text: 'Headache, two days.' });
+    return note._id;
+  }
+
+  it('refuses a signer who is neither the author nor the assignee and holds no provider role', async () => {
+    // The exact defect scenario: a rooming nurse opens a doctor's draft and
+    // presses Sign. She is not the author, not the assignee, and her role has
+    // no standing attestation authority.
+    const id = await draftAuthoredByDoc();
+    await expect(signClinicalNote(id, {
+      signedBy: 'u-rooming-nurse', signedByName: 'Nurse Akuc', signerRole: 'rooming_nurse',
+    })).rejects.toThrow(NoteSigningAuthorizationError);
+
+    // The note must not have locked — the attempt is rejected outright, not
+    // silently accepted.
+    const reloaded = await getClinicalNoteById(id);
+    expect(reloaded!.status).toBe('draft');
+    expect(reloaded!.signedBy).toBeUndefined();
+  });
+
+  it('refuses a signer with no identity/role information at all', async () => {
+    const id = await draftAuthoredByDoc();
+    await expect(signClinicalNote(id, { signedBy: '', signedByName: 'Unknown' }))
+      .rejects.toThrow(NoteSigningAuthorizationError);
+  });
+
+  it('allows the note\'s assignee to sign even when they are not its author', async () => {
+    const note = await createClinicalNote({
+      ...baseInput, authorId: 'u-doc', assignedToId: 'u-covering-doc', assignedToName: 'Dr Covering',
+    });
+    await saveNoteSection(note._id, 'cc', { text: 'Headache.' });
+    const signed = await signClinicalNote(note._id, {
+      signedBy: 'u-covering-doc', signedByName: 'Dr Covering',
+    });
+    expect(signed!.status).toBe('signed');
+  });
+
+  it('allows a provider role to sign a note that names neither them as author nor assignee', async () => {
+    // A supervising physician picking up an unassigned/legacy draft — the
+    // "explicit attest permission" carve-out.
+    const id = await draftAuthoredByDoc();
+    const signed = await signClinicalNote(id, {
+      signedBy: 'u-supervising-doc', signedByName: 'Dr Supervisor', signerRole: 'doctor',
+    });
+    expect(signed!.status).toBe('signed');
+  });
+
+  it('does not let a non-provider role sign someone else\'s note merely by claiming a clinical role name', async () => {
+    const id = await draftAuthoredByDoc();
+    await expect(signClinicalNote(id, {
+      signedBy: 'u-triage-nurse', signedByName: 'Nurse Nyibol', signerRole: 'triage_nurse',
+    })).rejects.toThrow(NoteSigningAuthorizationError);
+  });
+
+  it('refuses a co-signature from a non-supervisory role', async () => {
+    const note = await createClinicalNote({ ...baseInput, authorId: 'u-intern' });
+    await saveNoteSection(note._id, 'cc', { text: 'Headache.' });
+    await signClinicalNote(note._id, {
+      signedBy: 'u-intern', signedByName: 'Dr Intern', awaitingCosign: true,
+    });
+
+    await expect(cosignClinicalNote(note._id, 'u-rooming-nurse', 'Nurse Akuc', 'rooming_nurse'))
+      .rejects.toThrow(NoteSigningAuthorizationError);
+    await expect(cosignClinicalNote(note._id, 'u-someone', 'Someone'))
+      .rejects.toThrow(NoteSigningAuthorizationError);
+
+    const reloaded = await getClinicalNoteById(note._id);
+    expect(reloaded!.status).toBe('awaiting_cosign');
+  });
+
+  it('refuses a co-signature from the same person who signed', async () => {
+    const note = await createClinicalNote({ ...baseInput, authorId: 'u-intern' });
+    await saveNoteSection(note._id, 'cc', { text: 'Headache.' });
+    await signClinicalNote(note._id, {
+      signedBy: 'u-intern', signedByName: 'Dr Intern', signerRole: 'doctor', awaitingCosign: true,
+    });
+
+    await expect(cosignClinicalNote(note._id, 'u-intern', 'Dr Intern', 'doctor'))
+      .rejects.toThrow(NoteSigningAuthorizationError);
   });
 });
 
