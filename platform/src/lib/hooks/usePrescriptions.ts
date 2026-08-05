@@ -5,15 +5,17 @@ import type { PrescriptionDoc } from '../db-types';
 import { prescriptionsDB } from '../db';
 import { makeCoalescer } from './live-reload';
 import { useDataScope } from './useDataScope';
-import { useApp } from '../context';
+import { useAuth } from '../context';
 
 export function usePrescriptions(patientId?: string) {
   const [prescriptions, setPrescriptions] = useState<PrescriptionDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const scope = useDataScope();
-  // Only used to supply advance()'s actor id automatically below — see there.
-  const { currentUser } = useApp();
+  // Identity only (useAuth, not useApp) — only used to supply advance()'s
+  // actor id automatically below, so this must not re-render on every sync
+  // tick or global-search keystroke the way useApp()'s broader slice would.
+  const { currentUser } = useAuth();
 
   const loadPrescriptions = useCallback(async () => {
     try {

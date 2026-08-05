@@ -29,6 +29,34 @@ export const STAGE_LABELS: Record<QueueStage, string> = {
   awaiting_checkout: 'Awaiting Checkout',
 };
 
+/**
+ * The queue stage a visit is at, read from the front desk's ladder.
+ *
+ * `buildQueueFromTriage` can only speak for patients who already have a triage
+ * document, so a patient reception checked in five minutes ago — the ones the
+ * nursing station most needs to see — produced no queue entry at all, and any
+ * board falling back on "no entry" said whatever it had left (a department
+ * name, a dash). This maps the visit's own status onto the same vocabulary, so
+ * one patient reads the same on the ward board, the rooming queue and the front
+ * desk whether or not they have been assessed yet.
+ *
+ * Returns null when the visit is not in the building: still expected
+ * (scheduled/confirmed), or already finished.
+ */
+export function stageForAppointmentStatus(status: string | undefined): QueueStage | null {
+  switch (status) {
+    case 'arrived':
+    case 'checked_in':
+      return 'awaiting_triage';
+    case 'triaged':
+      return 'awaiting_rooming';
+    case 'in_progress':
+      return 'awaiting_consultation';
+    default:
+      return null;
+  }
+}
+
 /** Default target wait time in minutes per stage */
 const TARGET_WAIT: Record<QueueStage, number> = {
   awaiting_triage: 10,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useRooming } from '@/lib/hooks/useRooming';
@@ -19,6 +20,7 @@ import Modal from '@/components/Modal';
  */
 
 const STEP_LABEL: Record<RoomingWorklistEntry['step'], string> = {
+  awaiting_triage: 'Checked in · waiting for triage',
   awaiting_arrival: 'Not yet arrived',
   awaiting_rooming: 'Waiting for a room',
   being_roomed: 'In room',
@@ -58,6 +60,7 @@ const emptyVitals = (): RoomingVitals => ({
 });
 
 export default function RoomingWorkflow() {
+  const router = useRouter();
   const { currentUser } = useAuth();
   const toast = useToast();
   const { entries, loading, error, markArrived, assignRoom, transferClinic, markReady, recordVitals } = useRooming();
@@ -157,9 +160,9 @@ export default function RoomingWorkflow() {
       {entries.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <BedDouble className="w-6 h-6 mb-2" style={{ color: 'var(--text-muted)' }} />
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Nobody waiting to be roomed</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Nobody waiting</p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-            Patients appear here once triage routes them to your clinic.
+            Patients appear here the moment reception checks them in.
           </p>
         </div>
       ) : (
@@ -176,9 +179,18 @@ export default function RoomingWorkflow() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    {/* The name opens this patient's own triage page. Rooming is
+                        the queue everyone joins at check-in, so the first thing
+                        a nurse does from a row is assess the person in it. */}
+                    <button
+                      type="button"
+                      className="text-sm font-semibold truncate text-left"
+                      style={{ color: 'var(--accent-primary)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                      onClick={() => router.push(`/triage/${encounter.patientId}`)}
+                      title={`Triage ${encounter.patientName}`}
+                    >
                       {encounter.patientName}
-                    </span>
+                    </button>
                     {encounter.roomNumber && (
                       <span
                         className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
@@ -210,6 +222,19 @@ export default function RoomingWorkflow() {
                 </span>
 
                 <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Checked in and not yet assessed: the only thing to do is
+                      triage them, and it opens as its own page. */}
+                  {step === 'awaiting_triage' && (
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/triage/${encounter.patientId}`)}
+                      className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded"
+                      style={{ background: 'var(--accent-primary)', color: '#fff' }}
+                    >
+                      <Activity className="w-3.5 h-3.5" style={{ stroke: '#fff' }} /> Triage
+                    </button>
+                  )}
+
                   {step === 'awaiting_arrival' && (
                     <button
                       type="button"

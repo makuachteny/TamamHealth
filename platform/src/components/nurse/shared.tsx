@@ -6,10 +6,12 @@ import { useAuth, useUi } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useTriage } from '@/lib/hooks/useTriage';
+import { useWards } from '@/lib/hooks/useWards';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { priorityOrder } from '@/lib/clinical/triage-display';
 import type { MedicationAdministration, PrescriptionDoc } from '@/lib/db-types';
+import type { AdmissionDoc } from '@/lib/db-types-ward';
 
 // Re-export the shared vital-flagging helper so existing importers
 // (e.g. WardWorkflow) keep `import { getVitalFlags } from './shared'` working
@@ -416,14 +418,24 @@ export function useMarEntries() {
 }
 
 // ============================================================
-// Hook: Ward roster (real vs demo patients, search, urgency sort)
+// Hook: Ward roster (admitted patients, search, urgency sort)
 // ============================================================
+
+/** Acuity a ward admission implies when the patient has no triage on record. */
+export function severityAcuity(severity?: AdmissionDoc['severity']): 'RED' | 'YELLOW' | 'GREEN' | undefined {
+  if (severity === 'critical') return 'RED';
+  if (severity === 'severe') return 'YELLOW';
+  if (severity === 'moderate' || severity === 'mild') return 'GREEN';
+  return undefined;
+}
+
 export function useWardRoster(opts?: { search?: string; sortByUrgency?: boolean }) {
   const search = opts?.search ?? '';
   const sortByUrgency = opts?.sortByUrgency ?? true;
 
   const { patients, reload } = usePatients();
   const { triages: triageHistory } = useTriage();
+  const { activeAdmissions } = useWards();
   const { globalSearch } = useUi();
 
   // Map patient IDs to their most recent triage for sorting and display
@@ -435,12 +447,45 @@ export function useWardRoster(opts?: { search?: string; sortByUrgency?: boolean 
     return map;
   }, [triageHistory]);
 
-  // Ward patients with priority sorting using REAL triage data. When the
-  // facility has fewer than 10 seeded patients (demo mode), fall back to the
-  // demo roster so the ward board always shows a realistic, full list.
+  // patientId → their active admission (ward/bed, severity, admission date).
+  const admissionByPatient = useMemo(() => {
+    const map = new Map<string, AdmissionDoc>();
+    for (const a of activeAdmissions) {
+      if (!map.has(a.patientId)) map.set(a.patientId, a);
+    }
+    return map;
+  }, [activeAdmissions]);
+
+  // The ward roster IS the set of active admissions — "Review the ward roster:
+  // see admitted patients" (onboarding copy). This used to be
+  // `patients.slice(0, 12)`: the first twelve registry patients regardless of
+  // admission, which put never-admitted outpatients on the ward board with
+  // "—/Ward" rows and hid admitted patients that happened to sort past 12.
+  // Demo fallback only when the facility has no admissions at all, so a
+  // walkthrough still sees a populated board.
   const wardPatients = useMemo<WardRow[]>(() => {
-    const realRows: WardRow[] = patients.slice(0, 12);
-    const base: WardRow[] = (realRows.length >= 10 || !IS_DEMO) ? realRows : DEMO_WARD_PATIENTS;
+    const patientById = new Map(patients.map(p => [p._id, p]));
+    const admitted: WardRow[] = [];
+    for (const a of activeAdmissions) {
+      if (admitted.some(row => row._id === a.patientId)) continue; // one row per patient
+      const doc = patientById.get(a.patientId);
+      if (doc) {
+        admitted.push(doc as WardRow);
+        continue;
+      }
+      // Admission whose patient doc is outside the loaded registry — synthesize
+      // a row from the admission's own denormalized identity so the occupied
+      // bed is never invisible on the board.
+      const parts = (a.patientName || '').trim().split(/\s+/);
+      admitted.push({
+        _id: a.patientId,
+        firstName: parts[0] || 'Unknown',
+        surname: parts.slice(1).join(' '),
+        hospitalNumber: a.hospitalNumber || '',
+        gender: '',
+      });
+    }
+    const base: WardRow[] = (admitted.length > 0 || !IS_DEMO) ? admitted : DEMO_WARD_PATIENTS;
 
     const q = (search || globalSearch || '').toLowerCase();
     const filtered = base.filter(p =>
@@ -449,9 +494,12 @@ export function useWardRoster(opts?: { search?: string; sortByUrgency?: boolean 
 
     if (!sortByUrgency) return filtered;
 
-    const priorityOf = (p: WardRow) => patientTriageMap.get(p._id)?.priority ?? p._triage?.priority;
+    const priorityOf = (p: WardRow) =>
+      patientTriageMap.get(p._id)?.priority
+      ?? p._triage?.priority
+      ?? severityAcuity(admissionByPatient.get(p._id)?.severity);
     return [...filtered].sort((a, b) => priorityOrder(priorityOf(a)) - priorityOrder(priorityOf(b)));
-  }, [patients, globalSearch, search, sortByUrgency, patientTriageMap]);
+  }, [patients, activeAdmissions, globalSearch, search, sortByUrgency, patientTriageMap, admissionByPatient]);
 
-  return { patients, reload, triageHistory, wardPatients, patientTriageMap };
+  return { patients, reload, triageHistory, wardPatients, patientTriageMap, admissionByPatient };
 }

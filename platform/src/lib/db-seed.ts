@@ -7,7 +7,7 @@ import {
   organizationsDB,
   paymentsDB, insurancePoliciesDB, chargesDB, claimsDB,
   paymentPlansDB, ledgerDB, billingDB, feeScheduleDB,
-  appointmentsDB, wardDB, pharmacyInventoryDB, triageDB, availabilityDB,
+  appointmentsDB, wardDB, pharmacyInventoryDB, triageDB, availabilityDB, encountersDB,
   assetsDB, leaveRequestsDB, payrollEntriesDB,
   problemsDB, telehealthDB, patientNotesDB, orderSetsDB,
   phoneNotesDB, assessmentsDB, intakeFormsDB, bloodBankDB, patientDocumentsDB,
@@ -566,9 +566,51 @@ const mercyPatients: (Partial<PatientDoc> & Record<string, unknown>)[] = [
   { _id: 'pat-mercy-008', type: 'patient', firstName: 'Peter', middleName: 'Oyet', surname: 'Lomoro', gender: 'Male', dateOfBirth: '1975-08-08', age: 50, phone: '+211917700008', bloodType: 'B-', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Lomoro Santo', nokRelationship: 'Brother', nokPhone: '+211917700108', registrationHospital: 'hosp-mercy-001', registrationHospitalName: 'Mercy General Hospital', hospitalNumber: 'MGH-000008', state: 'Central Equatoria', county: 'Juba', payam: 'Munuki', boma: '', geocodeId: '', lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-mercy-001', lastConsultedAt: daysAgo(3), isActive: true, createdAt: daysAgo(45), updatedAt: daysAgo(3) },
 ];
 
+// ── Pool-identity normalization ────────────────────────────────────────────
+// The registry patients pat-00001..50 / pat-00087+ come from the deterministic
+// generator in `@/data/mock`, but hundreds of curated docs in this file carry
+// hand-written denormalized `patientName` strings that have drifted from what
+// the generator now produces (e.g. pat-00005 is generated as "Grace Mabior
+// Deng" while curated docs still said "Nyamal Koang Gatdet"; pat-00040 was
+// even two different names within this file). The UI joins by patientId and
+// shows the patient doc's name, so a drifted denormalized name makes lists
+// disagree with the chart. Rather than hand-maintaining every literal, the
+// write path below overwrites denormalized identity fields from the pool.
+let POOL_IDENTITY: Map<string, { name: string; phone: string }> | null = null;
+
+function buildPoolIdentity(
+  pool: Array<{ id: string; firstName: string; middleName?: string; surname: string; phone?: string }>,
+): Map<string, { name: string; phone: string }> {
+  const map = new Map<string, { name: string; phone: string }>();
+  for (const p of pool) {
+    const name = `${p.firstName} ${p.middleName ? p.middleName + ' ' : ''}${p.surname}`.replace(/\s+/g, ' ').trim();
+    map.set(p.id, { name, phone: p.phone || '' });
+  }
+  return map;
+}
+
+/** Overwrite denormalized patient identity fields from the generated pool.
+ *  Docs referencing hand-seeded patients (pat-00051+, Mercy, BSH…) are not in
+ *  the map and pass through untouched. */
+function normalizePoolIdentity(doc: Record<string, unknown>): void {
+  if (!POOL_IDENTITY) return;
+  const pool = POOL_IDENTITY;
+  const fix = (idKey: string, nameKey: string, phoneKey?: string) => {
+    const id = doc[idKey];
+    if (typeof id !== 'string') return;
+    const identity = pool.get(id);
+    if (!identity) return;
+    if (typeof doc[nameKey] === 'string') doc[nameKey] = identity.name;
+    if (phoneKey && typeof doc[phoneKey] === 'string' && identity.phone) doc[phoneKey] = identity.phone;
+  };
+  fix('patientId', 'patientName', 'patientPhone');
+  fix('currentPatientId', 'currentPatientName'); // beds
+}
+
 // Helper: put a doc, silently skip if it already exists (409 conflict)
 async function safePut(db: PouchDB.Database, doc: Record<string, unknown>): Promise<void> {
   try {
+    normalizePoolIdentity(doc);
     await db.put(doc);
   } catch (err: unknown) {
     const e = err as { status?: number };
@@ -833,15 +875,65 @@ export const seedLedgerEntries: Omit<LedgerEntryDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'led-013', type: 'ledger_entry', patientId: 'pat-00022', encounterId: 'enc-pay-005', entryType: 'payment', amount: -5000, runningBalance: 4000, description: 'Bank transfer — ECO-TRF-2026-03112', referenceId: 'pay-007', referenceType: 'payment', method: 'bank_transfer', currency: 'SSP', facilityId: 'hosp-001', createdAt: '2026-03-12T09:00:00Z', updatedAt: '2026-03-12T09:00:00Z' },
 ];
 
+// ═══ Visit encounters for today's checked-in patients ═════════════
+// The seed carried checked-in appointments but no encounter documents at all,
+// so the nursing station's Rooming queue — which reads encounters, not
+// appointments — was empty in a fresh demo even though reception had "checked
+// in" five people. One encounter per today's `checked_in` appointment, parked
+// at `awaiting_triage`: exactly where reception's own check-in leaves a patient
+// (createArrivalEncounter walks registered → arrived_at_facility →
+// awaiting_next_station → awaiting_triage), so the demo opens in the same state
+// a real morning produces.
+//
+// `stageKey` must agree with STATUS_STAGE in clinical-flow/encounter-journey —
+// 'awaiting_triage' belongs to the 'triage' stage.
+const CHECKED_IN_TODAY: Array<{
+  id: string; patientId: string; patientName: string; hospitalNumber: string;
+  hospitalId: string; hospitalName: string; appointmentId: string; time: string; orgId: string;
+}> = [
+  { id: 'enc-checkin-001', patientId: 'pat-00009', patientName: 'Registry patient 9', hospitalNumber: 'JTH-000009', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', appointmentId: 'appointment-13', time: '08:00', orgId: PUBLIC_ORG_ID },
+  { id: 'enc-checkin-002', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', hospitalNumber: 'WSH-000018', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', appointmentId: 'appointment-4', time: '08:45', orgId: PUBLIC_ORG_ID },
+  { id: 'enc-checkin-003', patientId: 'pat-00063', patientName: 'Santino Madut', hospitalNumber: 'WSH-000063', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', appointmentId: 'appointment-25', time: '08:15', orgId: PUBLIC_ORG_ID },
+  { id: 'enc-checkin-004', patientId: 'pat-mercy-008', patientName: 'Peter Oyet Lomoro', hospitalNumber: 'MGH-000008', hospitalId: 'hosp-mercy-001', hospitalName: 'Mercy General Hospital', appointmentId: 'appointment-mercy-t2', time: '09:15', orgId: PRIVATE_ORG_ID },
+];
+
+export const seedEncounters = CHECKED_IN_TODAY.map(entry => ({
+  _id: entry.id,
+  type: 'clinical_encounter' as const,
+  patientId: entry.patientId,
+  patientName: entry.patientName,
+  hospitalNumber: entry.hospitalNumber,
+  clinicianId: '',
+  clinicianName: '',
+  hospitalId: entry.hospitalId,
+  hospitalName: entry.hospitalName,
+  status: 'awaiting_triage' as const,
+  stageKey: 'triage' as const,
+  snapshot: {},
+  labOrderIds: [] as string[],
+  attendanceType: 'repeat' as const,
+  arrivalChannel: 'appointment' as const,
+  appointmentId: entry.appointmentId,
+  startedAt: `${dateAgo(0)}T${entry.time}:00.000Z`,
+  orgId: entry.orgId,
+  createdAt: `${dateAgo(0)}T${entry.time}:00.000Z`,
+  updatedAt: `${dateAgo(0)}T${entry.time}:00.000Z`,
+}));
+
 // ═══ Appointments seed data ═══════════════════════════════════════
 // Scheduled across recent + upcoming days, mixed statuses, linked to
 // seeded patients and providers (user-<username>).
 export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-1', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(1), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Malaria treatment follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
-  { _id: 'appointment-2', type: 'appointment', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(28), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Obstetrics & Gynecology', reason: 'Antenatal check-up', status: 'scheduled', reminderSent: false, isRecurring: true, recurrencePattern: 'monthly', bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
+  // Chronic-care review, not ANC: the registry generates pat-00005 as a
+  // 60-year-old, so her recurring visit is a monthly hypertension review.
+  { _id: 'appointment-2', type: 'appointment', patientId: 'pat-00005', patientName: 'Grace Mabior Deng', patientPhone: '', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(28), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Hypertension review', status: 'scheduled', reminderSent: false, isRecurring: true, recurrencePattern: 'monthly', bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
   { _id: 'appointment-3', type: 'appointment', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(7), appointmentTime: '11:00', endTime: '11:30', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Internal Medicine', reason: 'HIV / CD4 review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(4) },
   { _id: 'appointment-4', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '08:45', endTime: '09:15', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Diabetes management', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(6), updatedAt: daysAgo(0) },
-  { _id: 'appointment-5', type: 'appointment', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', patientPhone: '+211912555022', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '12:00', endTime: '12:45', duration: 45, appointmentType: 'general', priority: 'urgent', department: 'Internal Medicine', reason: 'Severe anaemia review', status: 'in_progress', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(7), updatedAt: daysAgo(0) },
+  // pat-00011, not pat-00022: Kuol is an admitted inpatient (admission-2,
+  // sickle-cell crisis) and cannot simultaneously be mid-consultation as an
+  // outpatient. Name/phone normalized from the registry at write time.
+  { _id: 'appointment-5', type: 'appointment', patientId: 'pat-00011', patientName: 'Registry patient 11', patientPhone: '', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '12:00', endTime: '12:45', duration: 45, appointmentType: 'general', priority: 'urgent', department: 'Internal Medicine', reason: 'Severe anaemia review', status: 'in_progress', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(7), updatedAt: daysAgo(0) },
   { _id: 'appointment-6', type: 'appointment', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', patientPhone: '+211912555030', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(2), appointmentTime: '09:30', endTime: '10:00', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Surgery', reason: 'Post-op wound check', status: 'completed', completedAt: daysAgo(2), reminderSent: true, reminderChannel: 'app', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(9), updatedAt: daysAgo(2) },
   { _id: 'appointment-7', type: 'appointment', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', patientPhone: '+211912555035', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(3), appointmentTime: '14:00', endTime: '14:30', duration: 30, appointmentType: 'lab', priority: 'routine', department: 'Laboratory', reason: 'Routine blood work', status: 'completed', completedAt: daysAgo(3), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(10), updatedAt: daysAgo(3) },
   { _id: 'appointment-8', type: 'appointment', patientId: 'pat-00040', patientName: 'Majok Chol Wol', patientPhone: '+211912555040', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(4), appointmentTime: '15:00', endTime: '15:30', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Abdominal pain', status: 'no_show', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(11), updatedAt: daysAgo(4) },
@@ -850,10 +942,15 @@ export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-11', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(14), appointmentTime: '08:00', endTime: '08:30', duration: 30, appointmentType: 'specialist', priority: 'routine', department: 'Endocrinology', reason: 'Diabetes specialist review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
   { _id: 'appointment-12', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(5), appointmentTime: '13:00', endTime: '13:30', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Cardiology', reason: 'Hypertension review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
   // ── Today's scheduled arrivals so the reception queue shows appointments. ──
-  { _id: 'appointment-13', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '08:00', endTime: '08:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Hypertension follow-up', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(0) },
+  // pat-00009, not pat-00001: Deng is an admitted inpatient (admission-1) and
+  // a same-day checked-in outpatient visit would re-queue him at reception
+  // while he occupies bed W1-B01. Name/phone normalized at write time.
+  { _id: 'appointment-13', type: 'appointment', patientId: 'pat-00009', patientName: 'Registry patient 9', patientPhone: '', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '08:00', endTime: '08:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Hypertension follow-up', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(0) },
   { _id: 'appointment-14', type: 'appointment', patientId: 'pat-00057', patientName: 'Achol Mayen Garang', patientPhone: '+211912555057', providerId: 'user-midwife.nyakong', providerName: 'Midwife Nyakong Gatkuoth', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '09:15', endTime: '09:45', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Maternity', reason: 'ANC visit', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
   { _id: 'appointment-15', type: 'appointment', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', patientPhone: '+211912555035', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '10:45', endTime: '11:15', duration: 30, appointmentType: 'general', priority: 'urgent', department: 'Outpatient', reason: 'Persistent fever', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
-  { _id: 'appointment-16', type: 'appointment', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '11:30', endTime: '12:00', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Obstetrics & Gynecology', reason: 'Antenatal check-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+  // Same patient as appointment-2 — today's visit is likewise a follow-up,
+  // not an antenatal check, for the 60-year-old the registry generates.
+  { _id: 'appointment-16', type: 'appointment', patientId: 'pat-00005', patientName: 'Grace Mabior Deng', patientPhone: '', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '11:30', endTime: '12:00', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Hypertension review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
   { _id: 'appointment-30', type: 'appointment', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', patientPhone: '+211912555008', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '13:00', endTime: '13:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Medication refill and BP review', status: 'scheduled', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-31', type: 'appointment', patientId: 'pat-00015', patientName: 'Tut Chuol Both', patientPhone: '+211912555015', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '13:45', endTime: '14:15', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Nephrology', reason: 'Renal follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-32', type: 'appointment', patientId: 'pat-00040', patientName: 'Majok Chol Wol', patientPhone: '+211912555040', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '14:30', endTime: '15:00', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Abdominal pain follow-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
@@ -1006,14 +1103,22 @@ const seedPharmacyInventory: Omit<PharmacyInventoryDoc, '_rev' | 'createdBy'>[] 
 const seedTriage: Omit<TriageDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'triage-1', type: 'triage', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', hospitalNumber: 'JTH-000030', airway: 'clear', breathing: 'distressed', circulation: 'impaired', consciousness: 'pain', priority: 'YELLOW', temperature: '38.6', pulse: '124', respiratoryRate: '28', systolic: '90', diastolic: '60', oxygenSaturation: '91', chiefComplaint: 'Burns and shortness of breath', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'admitted', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'triage-2', type: 'triage', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', hospitalNumber: 'JTH-000022', airway: 'clear', breathing: 'normal', circulation: 'impaired', consciousness: 'alert', priority: 'YELLOW', temperature: '37.2', pulse: '110', respiratoryRate: '22', systolic: '95', diastolic: '62', oxygenSaturation: '95', chiefComplaint: 'Severe bone pain, pallor', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'admitted', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
-  { _id: 'triage-3', type: 'triage', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'GREEN', temperature: '37.8', pulse: '88', respiratoryRate: '18', systolic: '120', diastolic: '78', oxygenSaturation: '98', chiefComplaint: 'Fever and headache', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(1), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'seen', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+  // The triage that led to admission-1 (severe malaria, 3 days ago). Status
+  // 'admitted' + a triagedAt matching the admission: he is an inpatient, and a
+  // later 'seen'/'pending' triage would put him back in the outpatient queue
+  // while occupying bed W1-B01.
+  { _id: 'triage-3', type: 'triage', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001', airway: 'clear', breathing: 'normal', circulation: 'impaired', consciousness: 'alert', priority: 'YELLOW', temperature: '38.9', pulse: '112', respiratoryRate: '22', systolic: '98', diastolic: '64', oxygenSaturation: '95', chiefComplaint: 'Fever and headache', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(3), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'admitted', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(3) },
   { _id: 'triage-4', type: 'triage', patientId: 'pat-00040', patientName: 'Majok Chol Wol', hospitalNumber: 'JTH-000040', airway: 'obstructed', breathing: 'absent', circulation: 'absent', consciousness: 'unresponsive', priority: 'RED', temperature: '36.0', pulse: '40', respiratoryRate: '6', systolic: '70', diastolic: '40', oxygenSaturation: '78', chiefComplaint: 'Collapsed, unresponsive', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'triage-5', type: 'triage', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', hospitalNumber: 'JTH-000018', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'GREEN', temperature: '37.0', pulse: '82', respiratoryRate: '17', systolic: '128', diastolic: '84', oxygenSaturation: '99', chiefComplaint: 'High blood sugar review', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(2), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'discharged', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
   { _id: 'triage-6', type: 'triage', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', hospitalNumber: 'JTH-000035', airway: 'clear', breathing: 'distressed', circulation: 'normal', consciousness: 'alert', priority: 'YELLOW', temperature: '38.0', pulse: '96', respiratoryRate: '26', systolic: '118', diastolic: '76', oxygenSaturation: '93', chiefComplaint: 'Cough and difficulty breathing', triagedBy: 'user-co.deng', triagedByName: 'CO Deng Mabior Kuol', triagedAt: daysAgo(3), facilityId: 'hosp-002', facilityName: 'Wau State Hospital', status: 'referred', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(3) },
   // ── Today's reception walk-ins (still WAITING / in consult) so the front-desk
   //    queue is populated on the seed day. ──
   { _id: 'triage-7', type: 'triage', patientId: 'pat-00004', patientName: 'Mary Nyandeng Lado', hospitalNumber: 'JTH-000004', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'YELLOW', temperature: '37.4', pulse: '92', respiratoryRate: '19', systolic: '142', diastolic: '90', oxygenSaturation: '97', chiefComplaint: 'High blood sugar and dizziness', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
-  { _id: 'triage-8', type: 'triage', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', hospitalNumber: 'JTH-000005', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'GREEN', temperature: '36.8', pulse: '80', respiratoryRate: '17', systolic: '116', diastolic: '74', oxygenSaturation: '99', chiefComplaint: 'Antenatal check-in', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+  // pat-00057 (Achol Mayen Garang, 24F — the mother in birth-001, with today's
+  // ANC appointment-14), not pat-00005: the registry generates pat-00005 as a
+  // 60-year-old, and an "Antenatal check-in" triage on her chart read as a
+  // data error on every board that joined the two.
+  { _id: 'triage-8', type: 'triage', patientId: 'pat-00057', patientName: 'Achol Mayen Garang', hospitalNumber: 'JTH-000057', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'GREEN', temperature: '36.8', pulse: '80', respiratoryRate: '17', systolic: '116', diastolic: '74', oxygenSaturation: '99', chiefComplaint: 'Antenatal check-in', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'triage-9', type: 'triage', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', hospitalNumber: 'JTH-000012', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'YELLOW', temperature: '37.1', pulse: '86', respiratoryRate: '18', systolic: '124', diastolic: '80', oxygenSaturation: '98', chiefComplaint: 'HIV review, fatigue', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'seen', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'triage-10', type: 'triage', patientId: 'pat-00015', patientName: 'Tut Chuol Both', hospitalNumber: 'JTH-000015', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'GREEN', temperature: '36.9', pulse: '84', respiratoryRate: '18', systolic: '122', diastolic: '78', oxygenSaturation: '98', chiefComplaint: 'Walk-in renal follow-up', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'triage-11', type: 'triage', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', hospitalNumber: 'JTH-000008', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'YELLOW', temperature: '37.6', pulse: '98', respiratoryRate: '20', systolic: '138', diastolic: '88', oxygenSaturation: '97', chiefComplaint: 'Walk-in refill request', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
@@ -1045,20 +1150,28 @@ function minutesAgo(n: number): string {
   return new Date(SEED_NOW - n * 60000).toISOString();
 }
 
+// Today's outpatient overflow queue. Names/phones are placeholders — safePut
+// normalizes them against the generated registry at write time, so only the
+// ids matter here. Deliberately EXCLUDES currently-admitted inpatients
+// (pat-00001, pat-00022, pat-00030, pat-00062 — admission-1..4): an occupied
+// ward bed and a same-day outpatient appointment for the same patient put one
+// person in two places at once on the boards. pat-00057 is also left out —
+// she carries today's curated antenatal triage (triage-8) and a second
+// overflow appointment would double-queue her.
 const overflowRoster = [
-  { id: 'pat-00001', name: 'Deng Mabior Garang', mrn: 'JTH-000001', phone: '+211912345678' },
+  { id: 'pat-00002', name: 'Registry patient 2', mrn: 'JTH-000002', phone: '' },
   { id: 'pat-00004', name: 'Mary Nyandeng Lado', mrn: 'JTH-000004', phone: '+211912555004' },
-  { id: 'pat-00005', name: 'Nyamal Koang Gatdet', mrn: 'JTH-000005', phone: '+211912555005' },
+  { id: 'pat-00005', name: 'Grace Mabior Deng', mrn: 'JTH-000005', phone: '' },
   { id: 'pat-00008', name: 'Ayen Dut Malual', mrn: 'JTH-000008', phone: '+211912555008' },
   { id: 'pat-00012', name: 'Gatluak Ruot Nyuon', mrn: 'JTH-000012', phone: '+211912555012' },
   { id: 'pat-00015', name: 'Tut Chuol Both', mrn: 'JTH-000015', phone: '+211912555015' },
   { id: 'pat-00018', name: 'Rose Tombura Gbudue', mrn: 'JTH-000018', phone: '+211912555018' },
-  { id: 'pat-00022', name: 'Kuol Akot Ajith', mrn: 'JTH-000022', phone: '+211912555022' },
-  { id: 'pat-00030', name: 'Achol Mayen Ring', mrn: 'JTH-000030', phone: '+211912555030' },
+  { id: 'pat-00003', name: 'Registry patient 3', mrn: 'JTH-000003', phone: '' },
+  { id: 'pat-00006', name: 'Registry patient 6', mrn: 'JTH-000006', phone: '' },
   { id: 'pat-00035', name: 'Ladu Tombe Keji', mrn: 'JTH-000035', phone: '+211912555035' },
   { id: 'pat-00040', name: 'Majok Chol Wol', mrn: 'JTH-000040', phone: '+211912555040' },
-  { id: 'pat-00057', name: 'Achol Mayen Garang', mrn: 'JTH-000057', phone: '+211912555057' },
-  { id: 'pat-00062', name: 'Nyandeng Chol Wol', mrn: 'JTH-000062', phone: '+211912555062' },
+  { id: 'pat-00007', name: 'Registry patient 7', mrn: 'JTH-000007', phone: '' },
+  { id: 'pat-00010', name: 'Registry patient 10', mrn: 'JTH-000010', phone: '' },
 ];
 
 const overflowProviders = [
@@ -1318,6 +1431,12 @@ async function migratePatientPhotos(): Promise<void> {
 async function migrateDemoAppointmentsAndWalkins(): Promise<void> {
   if (!IS_DEMO) return;
   try {
+    // This path runs against already-seeded DBs without the full-seed import
+    // above, so the identity map must be built here too before any safePut.
+    if (!POOL_IDENTITY) {
+      const { patients } = await import('@/data/mock');
+      POOL_IDENTITY = buildPoolIdentity(patients);
+    }
     const apptDB = appointmentsDB();
     const trDB = triageDB();
     const demoAppointments = seedAppointments.filter((a) =>
@@ -1500,6 +1619,9 @@ async function seedDatabaseExclusive(): Promise<void> {
   // production bundle never ships it.
   const { hospitals, patients, referrals, diseaseAlerts, generateMedicalRecords } =
     await import('@/data/mock');
+  // Every curated doc written from here on has its denormalized patient
+  // name/phone corrected against the generated registry (see safePut).
+  POOL_IDENTITY = buildPoolIdentity(patients);
   // Stale or missing seed — wipe all databases and re-seed fresh. But when a
   // seed at THIS version was interrupted (hard reload mid-seed), resume it
   // instead: every write below is a skip-if-exists put, so re-running only
@@ -2275,9 +2397,12 @@ async function seedDatabaseExclusive(): Promise<void> {
         _id: `triage-gen-${p.id}`, type: 'triage', patientId: p.id, patientName: name, hospitalNumber: p.hospitalNumber,
         airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert',
         priority: triagePri[i % triagePri.length], temperature: '37.0', pulse: '84', respiratoryRate: '18', systolic: '120', diastolic: '78', oxygenSaturation: '98',
-        chiefComplaint: `${tst.testName} workup`, triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(i % 5),
+        // 1–5 days back, never today: these are historical flow-through
+        // records, and a same-day triage here would collide with the
+        // one-visit-per-patient-per-day rule the VIS lanes below enforce.
+        chiefComplaint: `${tst.testName} workup`, triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo((i % 5) + 1),
         facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: triageStat[i % triageStat.length],
-        orgId: PUBLIC_ORG_ID, createdAt: daysAgo(i % 5), updatedAt: daysAgo(i % 5),
+        orgId: PUBLIC_ORG_ID, createdAt: daysAgo((i % 5) + 1), updatedAt: daysAgo((i % 5) + 1),
       } as unknown as Record<string, unknown>);
     }
   }
@@ -2430,6 +2555,30 @@ async function seedDatabaseExclusive(): Promise<void> {
       county: mp.county as string,
     }));
 
+    // Patients who currently occupy a ward bed (admission-1..4). Never drawn
+    // into today's outpatient lanes — one person cannot wait at reception and
+    // lie in bed W1-B01 at the same time.
+    const SEEDED_ADMITTED_IDS = new Set(['pat-00001', 'pat-00022', 'pat-00030', 'pat-00062']);
+
+    // Patients already holding a curated visit TODAY (static appointments, the
+    // overflow queue, or a curated same-day triage). The generated lanes draw
+    // around them, so no patient carries two contradictory visits at once —
+    // previously the lanes overlapped and produced rows like a scheduled
+    // appointment patient whose triage complaint asserted "Walk-in …".
+    const curatedTodayIds = new Set<string>();
+    for (const a of seedAppointments) {
+      if (a.appointmentDate === todayIso) curatedTodayIds.add(a.patientId);
+    }
+    for (const t of seedTriage) {
+      if ((t.triagedAt || '').slice(0, 10) === todayIso.slice(0, 10)) curatedTodayIds.add(t.patientId);
+    }
+
+    // Statuses that assert the patient has already arrived (or finished).
+    // Legal only for slots that have actually begun by seed time.
+    const ARRIVED_STATUSES = new Set(['checked_in', 'in_progress', 'completed']);
+    const seedNowDate = new Date(SEED_NOW);
+    const nowMins = seedNowDate.getHours() * 60 + seedNowDate.getMinutes();
+
     for (let f = 0; f < VIS_FACILITIES.length; f++) {
       const fac = VIS_FACILITIES[f];
       const facPatients = fac.org === PRIVATE_ORG_ID
@@ -2437,14 +2586,33 @@ async function seedDatabaseExclusive(): Promise<void> {
         : patients.filter((p) => p.registrationHospital === fac.fid);
       if (facPatients.length === 0) continue;
 
-      // Today's appointments (13 per public facility, fewer where the roster is thin).
-      const todayCount = Math.min(fac.org === PRIVATE_ORG_ID ? 4 : 13, facPatients.length);
+      // One visit per patient per day: each of today's lanes draws the next
+      // patient nobody else has used today, instead of every lane indexing the
+      // same roster and stacking 2–3 same-day visits onto one person.
+      const todayPool = facPatients.filter(
+        (p) => !SEEDED_ADMITTED_IDS.has(p.id) && !curatedTodayIds.has(p.id),
+      );
+      let todayCursor = 0;
+      const drawTodayPatient = () => (todayCursor < todayPool.length ? todayPool[todayCursor++] : null);
+
+      // Today's appointments (10 per public facility, fewer where the roster is thin).
+      const todayCount = fac.org === PRIVATE_ORG_ID ? 4 : 10;
       for (let i = 0; i < todayCount; i++) {
-        const p = facPatients[i % facPatients.length];
+        const p = drawTodayPatient();
+        if (!p) break; // roster exhausted for today
         const prov = fac.providers[i % fac.providers.length];
         const slot = takeTodaySlot(fac.fid, 30);
         if (!slot) break; // clinic day is fully booked
         const name = patName(p);
+        // Round-robin status, coerced to respect the slot's clock time: a
+        // visit cannot be checked in or completed before its slot has begun.
+        let status = VIS_APPT_STATUS[i % VIS_APPT_STATUS.length];
+        const slotStart = toMins(slot.t);
+        if (slotStart > nowMins && ARRIVED_STATUSES.has(status)) {
+          status = i % 2 === 0 ? 'confirmed' : 'scheduled';
+        } else if (status === 'completed' && toMins(slot.e) > nowMins) {
+          status = 'in_progress'; // began but cannot have finished yet
+        }
         await safePut(visApptDB, {
           _id: `appt-vis-${fac.fid}-${fac.org === PRIVATE_ORG_ID ? 'priv-' : ''}today-${i}`,
           type: 'appointment', patientId: p.id, patientName: name, patientPhone: p.phone || '',
@@ -2454,9 +2622,8 @@ async function seedDatabaseExclusive(): Promise<void> {
           appointmentType: VIS_VISITS[i % VIS_VISITS.length].vtype,
           priority: i % 4 === 0 ? 'urgent' : 'routine',
           department: VIS_VISITS[i % VIS_VISITS.length].dept, reason: VIS_VISITS[i % VIS_VISITS.length].reason,
-          status: VIS_APPT_STATUS[i % VIS_APPT_STATUS.length],
-          ...(VIS_APPT_STATUS[i % VIS_APPT_STATUS.length] === 'checked_in' || VIS_APPT_STATUS[i % VIS_APPT_STATUS.length] === 'in_progress'
-            ? { checkedInAt: daysAgo(0) } : {}),
+          status,
+          ...(status === 'checked_in' || status === 'in_progress' ? { checkedInAt: daysAgo(0) } : {}),
           reminderSent: true, reminderChannel: 'sms', isRecurring: false,
           bookedBy: fac.desk.id, bookedByName: fac.desk.name,
           state: p.state, county: p.county, orgId: fac.org,
@@ -2467,9 +2634,10 @@ async function seedDatabaseExclusive(): Promise<void> {
       // Telehealth visits today — a couple per facility so every clinician has
       // a video visit to Join from the dashboard (appointmentType 'telehealth'
       // drives the Join button + the telehealth visit room).
-      const thCount = Math.min(2, facPatients.length);
+      const thCount = 2;
       for (let i = 0; i < thCount; i++) {
-        const p = facPatients[(i + 2) % facPatients.length];
+        const p = drawTodayPatient();
+        if (!p) break;
         const prov = fac.providers[i % fac.providers.length];
         const slot = takeTodaySlot(fac.fid, 30);
         if (!slot) break;
@@ -2490,12 +2658,48 @@ async function seedDatabaseExclusive(): Promise<void> {
         } as unknown as Record<string, unknown>);
       }
 
-      // Extra "Scheduled" lane fill — 10 more scheduled arrivals for today per
-      // public facility so the Scheduled tab is well populated.
+      // Today's reception walk-ins (5 per public facility) so the triage queue
+      // is busy. Drawn BEFORE the scheduled-lane fill so a thin roster shorts
+      // the extra scheduled rows, never the walk-in queue — and from the same
+      // used-today pool, so a walk-in complaint never lands on a patient who
+      // also has a booked appointment today.
       if (fac.org !== PRIVATE_ORG_ID) {
-        const SCHED_COUNT = 10;
+        const walkCount = 5;
+        for (let i = 0; i < walkCount; i++) {
+          const p = drawTodayPatient();
+          if (!p) break;
+          const name = patName(p);
+          const pri = VIS_TRI_PRI[i % VIS_TRI_PRI.length];
+          await safePut(visTrDB, {
+            _id: `triage-vis-${fac.fid}-today-${i}`,
+            type: 'triage', patientId: p.id, patientName: name, hospitalNumber: p.hospitalNumber,
+            airway: 'clear',
+            breathing: pri === 'RED' ? 'distressed' : 'normal',
+            circulation: pri === 'RED' ? 'impaired' : 'normal',
+            consciousness: 'alert', priority: pri,
+            temperature: pri === 'RED' ? '39.0' : '37.2', pulse: pri === 'RED' ? '120' : '84',
+            respiratoryRate: pri === 'RED' ? '26' : '18',
+            systolic: pri === 'RED' ? '96' : '122', diastolic: pri === 'RED' ? '62' : '78',
+            oxygenSaturation: pri === 'RED' ? '92' : '98',
+            chiefComplaint: VIS_WALKIN[i % VIS_WALKIN.length],
+            // Staggered arrival times so the queue shows real, distinct waits
+            // instead of five patients who all arrived at the same instant.
+            triagedBy: fac.triager.id, triagedByName: fac.triager.name, triagedAt: minutesAgo(20 + i * 17),
+            facilityId: fac.fid, facilityName: fac.fname,
+            status: VIS_TRI_STATUS[i % VIS_TRI_STATUS.length],
+            orgId: fac.org, createdAt: minutesAgo(20 + i * 17), updatedAt: minutesAgo(20 + i * 17),
+          } as unknown as Record<string, unknown>);
+        }
+      }
+
+      // Extra "Scheduled" lane fill — more scheduled arrivals for today per
+      // public facility so the Scheduled tab is well populated. Takes whatever
+      // roster remains after the lanes above.
+      if (fac.org !== PRIVATE_ORG_ID) {
+        const SCHED_COUNT = 8;
         for (let i = 0; i < SCHED_COUNT; i++) {
-          const p = facPatients[(i + todayCount) % facPatients.length];
+          const p = drawTodayPatient();
+          if (!p) break;
           const prov = fac.providers[i % fac.providers.length];
           const slot = takeTodaySlot(fac.fid, 20);
           if (!slot) break;
@@ -2518,10 +2722,13 @@ async function seedDatabaseExclusive(): Promise<void> {
         }
       }
 
-      // Upcoming appointments (4 per facility) so calendars / carousels populate.
-      const upcomingCount = Math.min(4, facPatients.length);
+      // Upcoming appointments (4 per facility) so calendars / carousels
+      // populate. Future dates may legitimately reuse today's patients, but
+      // never a currently-admitted inpatient.
+      const futurePool = facPatients.filter((p) => !SEEDED_ADMITTED_IDS.has(p.id));
+      const upcomingCount = Math.min(4, futurePool.length);
       for (let i = 0; i < upcomingCount; i++) {
-        const p = facPatients[(i + 3) % facPatients.length];
+        const p = futurePool[(i + 3) % futurePool.length];
         const prov = fac.providers[i % fac.providers.length];
         // Afternoon slots — the static seedAppointments rows for the same
         // future dates all sit in the morning, so these never double-book.
@@ -2541,32 +2748,6 @@ async function seedDatabaseExclusive(): Promise<void> {
           bookedBy: fac.desk.id, bookedByName: fac.desk.name,
           state: p.state, county: p.county, orgId: fac.org,
           createdAt: daysAgo((i % 4) + 1), updatedAt: daysAgo(i % 3),
-        } as unknown as Record<string, unknown>);
-      }
-
-      // Today's reception walk-ins (5 per public facility) so the queue is busy.
-      if (fac.org === PRIVATE_ORG_ID) continue; // walk-ins tracked on the public facility record
-      const walkCount = Math.min(5, facPatients.length);
-      for (let i = 0; i < walkCount; i++) {
-        const p = facPatients[(i + 1) % facPatients.length];
-        const name = patName(p);
-        const pri = VIS_TRI_PRI[i % VIS_TRI_PRI.length];
-        await safePut(visTrDB, {
-          _id: `triage-vis-${fac.fid}-today-${i}`,
-          type: 'triage', patientId: p.id, patientName: name, hospitalNumber: p.hospitalNumber,
-          airway: 'clear',
-          breathing: pri === 'RED' ? 'distressed' : 'normal',
-          circulation: pri === 'RED' ? 'impaired' : 'normal',
-          consciousness: 'alert', priority: pri,
-          temperature: pri === 'RED' ? '39.0' : '37.2', pulse: pri === 'RED' ? '120' : '84',
-          respiratoryRate: pri === 'RED' ? '26' : '18',
-          systolic: pri === 'RED' ? '96' : '122', diastolic: pri === 'RED' ? '62' : '78',
-          oxygenSaturation: pri === 'RED' ? '92' : '98',
-          chiefComplaint: VIS_WALKIN[i % VIS_WALKIN.length],
-          triagedBy: fac.triager.id, triagedByName: fac.triager.name, triagedAt: daysAgo(0),
-          facilityId: fac.fid, facilityName: fac.fname,
-          status: VIS_TRI_STATUS[i % VIS_TRI_STATUS.length],
-          orgId: fac.org, createdAt: daysAgo(0), updatedAt: daysAgo(0),
         } as unknown as Record<string, unknown>);
       }
     }
@@ -3364,6 +3545,13 @@ async function seedDatabaseExclusive(): Promise<void> {
   const apptDB = appointmentsDB();
   for (const a of seedAppointments) {
     await safePut(apptDB, a as unknown as Record<string, unknown>);
+  }
+
+  // Seed the visit encounters those check-ins produce, so the nursing station's
+  // Rooming queue opens with the patients reception has already checked in.
+  const encDB = encountersDB();
+  for (const e of seedEncounters) {
+    await safePut(encDB, e as unknown as Record<string, unknown>);
   }
 
   // Seed wards, beds, and admissions (ward DB holds all three doc types)

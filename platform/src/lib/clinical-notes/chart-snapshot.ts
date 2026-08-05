@@ -62,9 +62,10 @@ export function formatMedications(prescriptions: PrescriptionDoc[]): string {
 }
 
 /**
- * Active allergies. Returns the explicit "no allergy history" sentence when the
- * list is empty, because "nothing documented" and "no known allergies" are
- * clinically different statements and the note must not blur them.
+ * Active allergies, one bullet per entry. Returns '' for an empty list — the
+ * caller (`snapshotForSection`) is the one that decides whether an empty list
+ * means "confirmed no known allergies" or "couldn't be determined"; this
+ * formatter only renders what it was given.
  */
 export function formatAllergies(allergies: AllergyEntry[]): string {
   const active = allergies.filter(a => a.status === 'active');
@@ -92,6 +93,16 @@ export interface ChartSnapshotInput {
   prescriptions?: PrescriptionDoc[];
   allergies?: AllergyEntry[];
   problems?: ProblemDoc[];
+  /**
+   * True when the allergy read itself threw (network/DB failure) rather than
+   * genuinely returning zero rows. `safely()` maps both cases to `[]`, which
+   * would otherwise make `snapshotForSection` write "No allergy history has
+   * been documented for this patient." into the note on a failed read — a
+   * fabricated negative clinical assertion indistinguishable from a real
+   * reconciled empty list. Only `loadChartSnapshot` sets this; a caller
+   * building `ChartSnapshotInput` by hand gets the pre-existing behaviour.
+   */
+  allergiesLoadFailed?: boolean;
 }
 
 /**
@@ -110,7 +121,13 @@ export function snapshotForSection(
       return formatMedications(input.prescriptions ?? []);
     case 'allergies': {
       const text = formatAllergies(input.allergies ?? []);
-      return text || 'No allergy history has been documented for this patient.';
+      if (text) return text;
+      // A failed read is not evidence of "no known allergies" — asserting
+      // that into a note would be a fabricated negative. Say nothing rather
+      // than say something false; the caller's own "not documented" wording
+      // (or a retry) takes it from here.
+      if (input.allergiesLoadFailed) return '';
+      return 'No allergy history has been documented for this patient.';
     }
     default:
       return '';
@@ -130,22 +147,28 @@ export function snapshotForSection(
  */
 export async function loadChartSnapshot(patientId: string, scope?: DataScope): Promise<ChartSnapshotInput> {
   const [prescriptions, allergies, problems, vitalsRecord] = await Promise.all([
-    safely(async () => {
+    safelyTagged(async () => {
       const { getPrescriptionsByPatient } = await import('../services/prescription-service');
       return getPrescriptionsByPatient(patientId, scope);
     }, [] as PrescriptionDoc[]),
-    safely(async () => {
+    safelyTagged(async () => {
       const { getActiveAllergies } = await import('../services/allergy-service');
       return getActiveAllergies(patientId);
     }, [] as AllergyEntry[]),
-    safely(async () => {
+    safelyTagged(async () => {
       const { getProblemsByPatient } = await import('../services/problem-service');
       return getProblemsByPatient(patientId);
     }, [] as ProblemDoc[]),
     newestVitals(patientId, scope),
   ]);
 
-  return { prescriptions, allergies, problems, vitalsRecord };
+  return {
+    prescriptions: prescriptions.value,
+    allergies: allergies.value,
+    problems: problems.value,
+    vitalsRecord,
+    allergiesLoadFailed: allergies.failed,
+  };
 }
 
 /**
@@ -199,5 +222,18 @@ async function safely<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
     return await fn();
   } catch {
     return fallback;
+  }
+}
+
+/**
+ * Same shape as {@link safely}, but tags whether the fallback was returned
+ * because the read genuinely failed — needed wherever an empty result and a
+ * failed read must be told apart (see `allergiesLoadFailed` above).
+ */
+async function safelyTagged<T>(fn: () => Promise<T>, fallback: T): Promise<{ value: T; failed: boolean }> {
+  try {
+    return { value: await fn(), failed: false };
+  } catch {
+    return { value: fallback, failed: true };
   }
 }

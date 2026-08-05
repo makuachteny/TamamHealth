@@ -15,7 +15,7 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClinicalNote, listClinicalNotes } from './note-service';
+import { createClinicalNote, listClinicalNotes, type CreateNoteInput } from './note-service';
 import { getNoteType, type NoteTypeId } from './note-catalog';
 import { useDataScope } from '../hooks/useDataScope';
 import type { ClinicalNoteDoc } from './types';
@@ -45,6 +45,65 @@ export interface CurrentUserLike {
   orgId?: string;
 }
 
+/**
+ * Reopen candidate: the existing draft against the same appointment, if any.
+ *
+ * Extracted from the hook body so the reopen-vs-fork decision is testable
+ * without mounting React — the same reasoning as `noteTypeMenuOrder` in
+ * `CreateNoteButton`. Pure: no I/O, just "given these notes, which (if any)
+ * do we reopen."
+ */
+export function findReusableDraft(
+  existingNotes: readonly ClinicalNoteDoc[],
+  appointmentId?: string,
+): ClinicalNoteDoc | undefined {
+  if (!appointmentId) return undefined;
+  return existingNotes.find(n => n.appointmentId === appointmentId && n.status === 'draft');
+}
+
+/**
+ * An explicit choice from the type dropdown always wins; the telehealth
+ * fallback only applies when the caller did not pick.
+ */
+export function resolveNoteTypeForCreate(
+  input: Pick<CreateNoteFromVisitInput, 'noteType' | 'telehealth'>,
+): NoteTypeId {
+  return input.noteType ?? (input.telehealth ? 'telehealth_soap' : 'soap');
+}
+
+/**
+ * Map a visit-context input plus the acting user into `note-service`'s create
+ * payload. Pure and exported for the same testability reason as the two
+ * helpers above — `now` is threaded in explicitly rather than read from
+ * `Date.now()` internally, so a test can pin it.
+ */
+export function buildCreateNoteInput(
+  input: CreateNoteFromVisitInput,
+  currentUser: CurrentUserLike | null,
+  now: Date,
+): CreateNoteInput {
+  const noteType = resolveNoteTypeForCreate(input);
+  return {
+    patientId: input.patientId,
+    patientName: input.patientName,
+    mrn: input.mrn,
+    patientDob: input.patientDob,
+    noteType,
+    serviceDate: input.serviceDate || now.toISOString().slice(0, 10),
+    serviceTime: input.serviceTime || now.toTimeString().slice(0, 5),
+    appointmentId: input.appointmentId,
+    encounterId: input.encounterId,
+    telehealth: input.telehealth ?? getNoteType(noteType).telehealth,
+    assignedToId: input.assignedToId ?? currentUser?._id,
+    assignedToName: input.assignedToName ?? currentUser?.name ?? currentUser?.username,
+    authorId: currentUser?._id,
+    authorName: currentUser?.name ?? currentUser?.username,
+    hospitalId: currentUser?.hospitalId,
+    hospitalName: currentUser?.hospitalName,
+    orgId: currentUser?.orgId,
+  };
+}
+
 export function useCreateNote(currentUser: CurrentUserLike | null) {
   const router = useRouter();
   const scope = useDataScope();
@@ -61,40 +120,14 @@ export function useCreateNote(currentUser: CurrentUserLike | null) {
       // the encounter across two records.
       if (input.appointmentId) {
         const existing = await listClinicalNotes({ patientId: input.patientId }, scope);
-        const draft = existing.find(
-          n => n.appointmentId === input.appointmentId && n.status === 'draft',
-        );
+        const draft = findReusableDraft(existing, input.appointmentId);
         if (draft) {
           if (navigate) router.push(`/notes/${draft._id}`);
           return draft;
         }
       }
 
-      const now = new Date();
-      // An explicit choice from the type dropdown always wins; the telehealth
-      // fallback only applies when the caller did not pick.
-      const noteType: NoteTypeId = input.noteType
-        ?? (input.telehealth ? 'telehealth_soap' : 'soap');
-
-      const note = await createClinicalNote({
-        patientId: input.patientId,
-        patientName: input.patientName,
-        mrn: input.mrn,
-        patientDob: input.patientDob,
-        noteType,
-        serviceDate: input.serviceDate || now.toISOString().slice(0, 10),
-        serviceTime: input.serviceTime || now.toTimeString().slice(0, 5),
-        appointmentId: input.appointmentId,
-        encounterId: input.encounterId,
-        telehealth: input.telehealth ?? getNoteType(noteType).telehealth,
-        assignedToId: input.assignedToId ?? currentUser?._id,
-        assignedToName: input.assignedToName ?? currentUser?.name ?? currentUser?.username,
-        authorId: currentUser?._id,
-        authorName: currentUser?.name ?? currentUser?.username,
-        hospitalId: currentUser?.hospitalId,
-        hospitalName: currentUser?.hospitalName,
-        orgId: currentUser?.orgId,
-      });
+      const note = await createClinicalNote(buildCreateNoteInput(input, currentUser, new Date()));
 
       if (navigate) router.push(`/notes/${note._id}`);
       return note;

@@ -328,7 +328,16 @@ export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 // several more read paths and rejects any doc with no orgId at all — the
 // alert docs had none, so every surveillance trend chart silently rendered
 // empty for every scoped (non-super_admin/government) user.
-export const SEED_VERSION = 62;
+// Bumped to 64: nurse-board data coherence. Curated docs' denormalized
+// patient names/phones are normalized against the generated registry at
+// write time (pat-00005 "Nyamal" had drifted to "Grace Mabior Deng", etc.);
+// admitted inpatients (admission-1..4) no longer hold same-day outpatient
+// appointments or pending triage; the antenatal triage moved off the
+// 60-year-old the registry generates for pat-00005; and the VIS visit
+// generator now books one visit per patient per day, never marks a
+// future-slot appointment checked-in/completed, and staggers walk-in
+// arrival times.
+export const SEED_VERSION = 64;
 
 export async function isSeeded(): Promise<boolean> {
   try {

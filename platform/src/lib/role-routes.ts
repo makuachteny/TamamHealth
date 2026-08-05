@@ -83,7 +83,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   doctor: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
+      '/dashboard', '/patients', '/triage', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/settings',
       '/appointments', '/telehealth', '/patient-intake',
@@ -97,7 +97,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // visits. Clinical scope only — payment processing belongs to
     // cashier/biller, not clinicians.
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
+      '/dashboard', '/patients', '/triage', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/settings',
       '/appointments', '/telehealth', '/patient-intake',
@@ -215,7 +215,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   medical_superintendent: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
+      '/dashboard', '/patients', '/triage', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/hospitals', '/settings',
       '/facility-settings',
@@ -329,7 +329,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   clinician: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
+      '/dashboard', '/patients', '/triage', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/appointments', '/telehealth', '/wards', '/alerts', '/settings',
       '/blood-bank', '/patient-intake',

@@ -1,13 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useCallback } from 'react';
-import { formatClockTime } from '@/lib/format-utils';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context';
-import EhrClinicalDashboard from '@/components/ehr/EhrClinicalDashboard';
+import EhrClinicalDashboard, {
+  type WorklistPatient,
+  type OutstandingItem,
+  type OutstandingEntry,
+} from '@/components/ehr/EhrClinicalDashboard';
 import { usePatients } from '@/lib/hooks/usePatients';
-import { useResumableEncounters } from '@/lib/hooks/useResumableEncounters';
+import { useResumableEncounters, type ResumableEncounter } from '@/lib/hooks/useResumableEncounters';
 import { useSigningInbox } from '@/lib/hooks/useSigningInbox';
+import { computeSignCount } from '@/lib/hooks/signing-inbox-math';
 import { usePhoneNotesInbox } from '@/lib/hooks/usePhoneNotesInbox';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useReferrals } from '@/lib/hooks/useReferrals';
@@ -18,6 +22,18 @@ import { getNoteType } from '@/lib/clinical-notes/note-catalog';
 import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
 import { useTransferQueue } from '@/lib/hooks/usePatientTransfers';
 import { describeAssignment, isTransferOverdue } from '@/lib/services/patient-transfer-service';
+import { formatClockTime } from '@/lib/format-utils';
+import type {
+  AppointmentDoc,
+  AssessmentDoc,
+  MedicalRecordDoc,
+  PatientDoc,
+  PatientTransferDoc,
+  PhoneNoteDoc,
+  ReferralDoc,
+  TriageDoc,
+} from '@/lib/db-types';
+import type { ClinicalNoteDoc } from '@/lib/clinical-notes/types';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
 
@@ -26,56 +42,76 @@ const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', '
 // real deploys and these collapse to blank.
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const { currentUser } = useAuth();
-  const { patients } = usePatients();
-  // Consultations this clinician paused while waiting on lab/imaging results.
-  const { encounters: resumableEncounters } = useResumableEncounters();
-  // Documents awaiting signature / co-signature — the "to sign" inbox.
-  const { unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes } = useSigningInbox();
-  // Open patient phone notes routed to me — callbacks worklist.
-  const { notes: phoneNotesInbox } = usePhoneNotesInbox();
-  // Referrals — drives the "My Referrals" / "Open referrals" outstanding item.
-  const { referrals } = useReferrals();
-  // Appointments — drives the schedule board + check-in action.
-  const { appointments, updateStatus: updateApptStatus } = useAppointments();
-  const { triages } = useTriage();
-  // Internal transfers waiting on THIS clinician to accept or reject. Surfaced
-  // here because a transfer request only ever shown on the patient's chart is
-  // invisible to the person who has to answer it — they have no reason to open
-  // a chart that isn't theirs yet.
-  const { incoming: incomingTransfers } = useTransferQueue();
+export interface DoctorWorklistInput {
+  patients: PatientDoc[];
+  triages: TriageDoc[];
+  currentUser: { _id: string; name?: string };
+  appointments: AppointmentDoc[];
+  unsignedDrafts: MedicalRecordDoc[];
+  awaitingCosign: MedicalRecordDoc[];
+  heldAssessments: AssessmentDoc[];
+  unsignedNotes: ClinicalNoteDoc[];
+  phoneNotesInbox: PhoneNoteDoc[];
+  referrals: ReferralDoc[];
+  resumableEncounters: ResumableEncounter[];
+  incomingTransfers: PatientTransferDoc[];
+  /** Injectable so callers (tests) get a deterministic "today" / cutoff instead
+   *  of the real wall clock. Defaults to `new Date()`. */
+  now?: Date;
+}
+
+export interface DoctorWorklistResult {
+  /** Assigned + unclaimed-but-triaged rows, combined — what EhrClinicalDashboard's `patients` prop expects. */
+  patients: WorklistPatient[];
+  /** This clinician's own appointments (closed ones included, for the Finished lane). */
+  appointments: AppointmentDoc[];
+  outstanding: OutstandingItem[];
+}
+
+/**
+ * Assembles the signed-in doctor/clinical-officer/clinician's worklist: their
+ * assigned patients, PLUS any active-triage walk-in nobody has claimed yet
+ * (previously invisible to every doctor at the facility — see
+ * `unclaimedTriaged` below), their schedule, and the "outstanding items" rail
+ * (documents to sign, phone notes, referrals, labs, telehealth, transfers).
+ *
+ * Pure: every input is already the resolved output of a scoped hook
+ * (`usePatients`, `useTriage`, … — tenancy is enforced there, by
+ * `filterByScope`), so this only has to combine what it's handed without
+ * doing any org/facility filtering of its own — and without ever pulling in
+ * a patient that isn't already in `input.patients`.
+ */
+export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorklistResult {
+  const {
+    patients, triages, currentUser, appointments,
+    unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes,
+    phoneNotesInbox, referrals, resumableEncounters, incomingTransfers,
+  } = input;
+  const now = input.now ?? new Date();
+  const nowMs = now.getTime();
+  const todayIso = now.toISOString().slice(0, 10);
 
   // Resolve a patient display name for the signing inbox from the loaded roster.
-  const signingPatientName = useCallback(
-    (patientId: string): string => {
-      const p = patients.find((pt) => pt._id === patientId);
-      return p ? patientFullName(p) : patientId;
-    },
-    [patients],
-  );
+  const signingPatientName = (patientId: string): string => {
+    const p = patients.find((pt) => pt._id === patientId);
+    return p ? patientFullName(p) : patientId;
+  };
 
   // Today's triage priority per patient, so the worklist can lead with acuity.
-  const triagePriorityByPatient = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const map: Record<string, 'RED' | 'YELLOW' | 'GREEN'> = {};
+  const triagePriorityByPatient: Record<string, 'RED' | 'YELLOW' | 'GREEN'> = {};
+  {
     const rank = { RED: 3, YELLOW: 2, GREEN: 1 } as const;
     for (const tr of triages) {
-      if (!(tr.triagedAt || '').startsWith(today)) continue;
-      const prev = map[tr.patientId];
-      if (!prev || rank[tr.priority] > rank[prev]) map[tr.patientId] = tr.priority;
+      if (!(tr.triagedAt || '').startsWith(todayIso)) continue;
+      const prev = triagePriorityByPatient[tr.patientId];
+      if (!prev || rank[tr.priority] > rank[prev]) triagePriorityByPatient[tr.patientId] = tr.priority;
     }
-    return map;
-  }, [triages]);
+  }
 
   // Patients a nurse has assigned to this clinician for care.
-  const myAssigned = useMemo(
-    () => patients
-      .filter(p => p.assignedDoctor && p.assignedDoctor === currentUser?._id)
-      .sort((a, b) => (b.assignedAt ?? '').localeCompare(a.assignedAt ?? '')),
-    [patients, currentUser?._id],
-  );
+  const myAssigned = patients
+    .filter(p => p.assignedDoctor && p.assignedDoctor === currentUser._id)
+    .sort((a, b) => (b.assignedAt ?? '').localeCompare(a.assignedAt ?? ''));
 
   // Active (pending/seen), unclaimed triage records at this clinician's own
   // facility. `myAssigned` above only ever surfaces patients a nurse (or a
@@ -85,45 +121,23 @@ export default function DashboardPage() {
   // scoped, so this stays inside the viewer's own facility/org. Windowed to
   // the last 24h to match EhrClinicalDashboard's own "active triage" cutoff —
   // a row seeded here should also resolve a live queue entry there.
-  const latestActiveTriageByPatient = useMemo(() => {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const map = new Map<string, typeof triages[number]>();
+  const latestActiveTriageByPatient = new Map<string, TriageDoc>();
+  {
+    const cutoff = nowMs - 24 * 60 * 60 * 1000;
     for (const tr of triages) {
       if (tr.status !== 'pending' && tr.status !== 'seen') continue;
       if (new Date(tr.triagedAt).getTime() < cutoff) continue;
       // triages is newest-first (getAllTriage sorts by triagedAt desc) — keep
       // only the first (latest) triage doc seen per patient.
-      if (!map.has(tr.patientId)) map.set(tr.patientId, tr);
+      if (!latestActiveTriageByPatient.has(tr.patientId)) latestActiveTriageByPatient.set(tr.patientId, tr);
     }
-    return map;
-  }, [triages]);
+  }
 
-  const unclaimedTriaged = useMemo(
-    () => patients.filter(p => latestActiveTriageByPatient.has(p._id) && !p.assignedDoctor),
-    [patients, latestActiveTriageByPatient],
-  );
-
-  // `/dashboard` is shared. Doctors / clinical officers / clinicians get the
-  // clinical view; the medical superintendent gets its own admin view (rendered
-  // below). Its defaultDashboard IS `/dashboard`, so it must be excluded from
-  // the redirect or it would bounce to itself. Every other role is sent home.
-  useEffect(() => {
-    if (
-      currentUser &&
-      currentUser.role !== 'doctor' &&
-      currentUser.role !== 'clinical_officer' &&
-      currentUser.role !== 'medical_superintendent' &&
-      currentUser.role !== 'clinician'
-    ) {
-      router.push(getDefaultDashboard(currentUser.role));
-    }
-  }, [currentUser, router]);
-
-  if (!currentUser) return null;
-  // Medical superintendent → admin-oriented hospital dashboard.
-  if (currentUser.role === 'medical_superintendent') return <SuperintendentDashboard />;
-  // Anyone who isn't a doctor / clinical officer / clinician is mid-redirect.
-  if (currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer' && currentUser.role !== 'clinician') return null;
+  // A patient with BOTH an assignedDoctor (any doctor, not just this viewer)
+  // AND an active triage only ever shows up via `myAssigned` above — the
+  // `!p.assignedDoctor` guard here is what keeps them from ALSO appearing as
+  // an unclaimed row, i.e. showing twice.
+  const unclaimedTriaged = patients.filter(p => latestActiveTriageByPatient.has(p._id) && !p.assignedDoctor);
 
   // Worklist rows: patients assigned to the signed-in clinician. Ward/division
   // are sampled in demo mode for visual richness and left blank in production.
@@ -139,7 +153,7 @@ export default function DashboardPage() {
     id: p.hospitalNumber,
     admittedAt: p.assignedAt || p.registeredAt || p.registrationDate,
     ward: IS_DEMO ? DEPARTMENTS[i % DEPARTMENTS.length] + '-' + (i + 1) : '',
-    doctor: currentUser?.name || '',
+    doctor: currentUser.name || '',
     assignedDoctor: p.assignedDoctor,
     assignedDoctorName: p.assignedDoctorName,
     nurse: p.assignedByName || '',
@@ -178,7 +192,7 @@ export default function DashboardPage() {
   });
 
   // Total documents awaiting the clinician's signature.
-  const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length + unsignedNotes.length;
+  const signCount = computeSignCount({ unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes });
 
   // All of this clinician's appointments, closed ones included, for the
   // schedule board — its Finished lane is fed by completed/cancelled/no-show
@@ -197,7 +211,7 @@ export default function DashboardPage() {
   const shortDate = (iso?: string) =>
     iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 
-  const documentEntries = [
+  const documentEntries: OutstandingEntry[] = [
     ...unsignedDrafts.map(r => ({
       id: r._id,
       title: signingPatientName(r.patientId),
@@ -254,7 +268,6 @@ export default function DashboardPage() {
   }));
 
   // Today's telehealth visits for this clinician — each row opens the visit room.
-  const todayIso = new Date().toISOString().slice(0, 10);
   const telehealthToday = myUpcomingAppts.filter(a => a.appointmentType === 'telehealth' && a.appointmentDate === todayIso);
   const telehealthEntries = telehealthToday.map(a => ({
     id: a._id,
@@ -277,7 +290,7 @@ export default function DashboardPage() {
   }));
 
   const transferEntries = incomingTransfers.map(t => {
-    const overdue = isTransferOverdue(t);
+    const overdue = isTransferOverdue(t, now);
     return {
       id: t._id,
       title: t.patientName || 'Patient',
@@ -290,11 +303,11 @@ export default function DashboardPage() {
     };
   });
 
-  const outstandingItems = [
+  const outstandingItems: OutstandingItem[] = [
     {
       label: 'Transfers to accept',
       count: incomingTransfers.length,
-      tone: incomingTransfers.some(t => isTransferOverdue(t))
+      tone: incomingTransfers.some(t => isTransferOverdue(t, now))
         ? ('danger' as const)
         : incomingTransfers.length > 0 ? ('warning' as const) : ('neutral' as const),
       href: '/patients',
@@ -307,14 +320,70 @@ export default function DashboardPage() {
     { label: 'Telehealth visits', count: telehealthToday.length, tone: telehealthToday.length > 0 ? 'warning' as const : 'neutral' as const, href: '/appointments', entries: telehealthEntries },
   ];
 
+  return {
+    patients: [...assignedRows, ...unassignedRows],
+    appointments: myAppts,
+    outstanding: outstandingItems,
+  };
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const { currentUser } = useAuth();
+  const { patients } = usePatients();
+  // Consultations this clinician paused while waiting on lab/imaging results.
+  const { encounters: resumableEncounters } = useResumableEncounters();
+  // Documents awaiting signature / co-signature — the "to sign" inbox.
+  const { unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes } = useSigningInbox();
+  // Open patient phone notes routed to me — callbacks worklist.
+  const { notes: phoneNotesInbox } = usePhoneNotesInbox();
+  // Referrals — drives the "My Referrals" / "Open referrals" outstanding item.
+  const { referrals } = useReferrals();
+  // Appointments — drives the schedule board + check-in action.
+  const { appointments, updateStatus: updateApptStatus } = useAppointments();
+  const { triages } = useTriage();
+  // Internal transfers waiting on THIS clinician to accept or reject. Surfaced
+  // here because a transfer request only ever shown on the patient's chart is
+  // invisible to the person who has to answer it — they have no reason to open
+  // a chart that isn't theirs yet.
+  const { incoming: incomingTransfers } = useTransferQueue();
+
+  // `/dashboard` is shared. Doctors / clinical officers / clinicians get the
+  // clinical view; the medical superintendent gets its own admin view (rendered
+  // below). Its defaultDashboard IS `/dashboard`, so it must be excluded from
+  // the redirect or it would bounce to itself. Every other role is sent home.
+  useEffect(() => {
+    if (
+      currentUser &&
+      currentUser.role !== 'doctor' &&
+      currentUser.role !== 'clinical_officer' &&
+      currentUser.role !== 'medical_superintendent' &&
+      currentUser.role !== 'clinician'
+    ) {
+      router.push(getDefaultDashboard(currentUser.role));
+    }
+  }, [currentUser, router]);
+
+  if (!currentUser) return null;
+  // Medical superintendent → admin-oriented hospital dashboard.
+  if (currentUser.role === 'medical_superintendent') return <SuperintendentDashboard />;
+  // Anyone who isn't a doctor / clinical officer / clinician is mid-redirect.
+  if (currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer' && currentUser.role !== 'clinician') return null;
+
+  const worklist = assembleDoctorWorklist({
+    patients, triages, currentUser, appointments,
+    unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes,
+    phoneNotesInbox, referrals, resumableEncounters, incomingTransfers,
+  });
+
   return (
     <main className="page-container page-enter">
       <EhrClinicalDashboard
         clinicianName={currentUser.name || 'clinician'}
         facilityName={currentUser.hospitalName}
-        patients={[...assignedRows, ...unassignedRows]}
-        appointments={myAppts}
-        outstanding={outstandingItems}
+        patients={worklist.patients}
+        appointments={worklist.appointments}
+        outstanding={worklist.outstanding}
         onUpdateAppointmentStatus={updateApptStatus}
       />
     </main>

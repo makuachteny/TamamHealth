@@ -56,13 +56,13 @@ import { encountersDB, labResultsDB } from '@/lib/db';
 import { makeCoalescer } from '@/lib/hooks/live-reload';
 import { tooltipStyle, axisTick } from '@/components/ChartCard';
 
-function appointmentTriage(priority: AppointmentDoc['priority']) {
+export function appointmentTriage(priority: AppointmentDoc['priority']) {
   if (priority === 'emergency') return 'RED';
   if (priority === 'urgent') return 'YELLOW';
   return 'GREEN';
 }
 
-type WorklistPatient = {
+export type WorklistPatient = {
   _id: string;
   /** Patient portrait; the avatar falls back to initials when absent. */
   photoUrl?: string;
@@ -81,7 +81,7 @@ type WorklistPatient = {
   assignmentNote?: string;
 };
 
-type UnifiedPatientRow = {
+export type UnifiedPatientRow = {
   id: string;
   photoUrl?: string;
   patient: WorklistPatient | null;
@@ -109,7 +109,7 @@ export type OutstandingEntry = {
   href?: string;
 };
 
-type OutstandingItem = {
+export type OutstandingItem = {
   label: string;
   count: number;
   tone?: 'neutral' | 'warning' | 'danger';
@@ -126,7 +126,7 @@ const statusOptions: AppointmentStatus[] = ['requested', ...APPOINTMENT_STATUS_O
 
 const statusLabel = appointmentStatusLabel;
 
-function typeLabel(value: string) {
+export function typeLabel(value: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
@@ -194,6 +194,258 @@ function departmentTone(value?: string) {
   if (department.includes('surgery')) return 'surgery';
   if (department.includes('lab')) return 'lab';
   return 'opd';
+}
+
+/**
+ * The worklist row list: every assigned/claimable patient (`patients` — see
+ * dashboard/page.tsx's assembleDoctorWorklist, which already folds in both a
+ * doctor's assigned patients AND unclaimed-but-triaged ones) merged with
+ * today's appointments, deduped so a patient who is both in `patients` and
+ * separately booked for today shows as one enriched row rather than two.
+ *
+ * Pure and exported so the assembly rules — dedup, and which name a row is
+ * labelled with — are directly testable without rendering the component:
+ *   - dedup: `assignedIds`/`assignedNames` below stop an appointment for a
+ *     patient already in `patients` from adding a second row.
+ *   - labelling: `provider` only borrows the viewing clinician's own name
+ *     once the patient actually carries an `assignedDoctor`. Falling back to
+ *     `clinicianName` unconditionally meant an explicitly unclaimed patient
+ *     (surfaced so ANY doctor at the facility could claim them) silently
+ *     showed up pre-labelled with whichever doctor happened to be looking —
+ *     hiding the exact "nobody has this patient yet" state the row exists to
+ *     show. An empty `provider` falls through to computeRowQueueColumns'
+ *     'Doctor unassigned'.
+ */
+export function buildUnifiedPatientRows({
+  patients,
+  selectedAppointmentsForDay,
+  photoByPatientId,
+  clinicianName,
+}: {
+  patients: WorklistPatient[];
+  selectedAppointmentsForDay: AppointmentDoc[];
+  photoByPatientId: Map<string, string>;
+  clinicianName: string;
+}): UnifiedPatientRow[] {
+  const appointmentByPatient = new Map<string, AppointmentDoc>();
+  const appointmentByName = new Map<string, AppointmentDoc>();
+  for (const appointment of selectedAppointmentsForDay) {
+    if (appointment.patientId && !appointmentByPatient.has(appointment.patientId)) appointmentByPatient.set(appointment.patientId, appointment);
+    if (appointment.patientName && !appointmentByName.has(appointment.patientName.toLowerCase())) appointmentByName.set(appointment.patientName.toLowerCase(), appointment);
+  }
+
+  const rows: UnifiedPatientRow[] = patients.map(patient => {
+    const appointment = appointmentByPatient.get(patient._id) || appointmentByName.get(patient.name.toLowerCase()) || null;
+    const status = appointment?.status || (patient.triagePriority === 'RED' ? 'checked_in' : 'scheduled');
+    const department = patient.division || patient.ward?.split('-')[0] || appointment?.department || 'OPD';
+    return {
+      id: patient._id,
+      photoUrl: patient.photoUrl,
+      patient,
+      appointment,
+      name: patient.name,
+      patientId: patient._id,
+      triagePriority: patient.triagePriority || (appointment ? appointmentTriage(appointment.priority) : 'GREEN'),
+      assignmentStatus: patient.assignmentStatus || (patient.assignedDoctor ? 'assigned' : undefined),
+      assignmentNote: patient.assignmentNote,
+      reason: appointment?.reason || patient.division || patient.ward || (patient.assignedDoctor ? 'Assigned patient' : 'Awaiting provider'),
+      timeLabel: appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime) : (patient.assignedDoctor ? 'Assigned' : 'Unclaimed'),
+      status: status as AppointmentStatus,
+      department,
+      // Only borrow the viewing clinician's own name once the patient
+      // actually carries an assignedDoctor. Falling back to `clinicianName`
+      // unconditionally meant an explicitly unclaimed patient (surfaced so
+      // ANY doctor at the facility could claim them) silently showed up
+      // pre-labelled with whichever doctor happened to be looking — hiding
+      // the exact "nobody has this patient yet" state the row exists to
+      // show. Falls through to careTeamPrimary's 'Doctor unassigned' below.
+      provider: patient.assignedDoctor
+        ? (patient.doctor || clinicianName || 'Not assigned')
+        : (appointment?.providerName || ''),
+      isAssigned: true,
+    };
+  });
+
+  const assignedIds = new Set(patients.map(patient => patient._id));
+  const assignedNames = new Set(patients.map(patient => patient.name.toLowerCase()));
+  for (const appointment of selectedAppointmentsForDay) {
+    if ((appointment.patientId && assignedIds.has(appointment.patientId)) || assignedNames.has(appointment.patientName.toLowerCase())) continue;
+    rows.push({
+      id: appointment._id,
+      photoUrl: appointment.patientId ? photoByPatientId.get(appointment.patientId) : undefined,
+      patient: null,
+      appointment,
+      name: appointment.patientName,
+      patientId: appointment.patientId,
+      triagePriority: appointmentTriage(appointment.priority),
+      reason: appointment.reason || typeLabel(appointment.appointmentType),
+      timeLabel: appointment.appointmentTime ? formatClockTime(appointment.appointmentTime) : 'Scheduled',
+      status: appointment.status,
+      department: appointment.department || appointment.appointmentType || 'OPD',
+      provider: appointment.providerName || clinicianName || 'Not assigned',
+      isAssigned: false,
+    });
+  }
+
+  return rows.sort((a, b) => {
+    if (a.isAssigned !== b.isAssigned) return a.isAssigned ? -1 : 1;
+    const aTime = a.appointment?.appointmentTime || '99:99';
+    const bTime = b.appointment?.appointmentTime || '99:99';
+    return aTime.localeCompare(bTime) || a.name.localeCompare(b.name);
+  });
+}
+
+/**
+ * The latest active (pending/seen) triage record per patient, windowed to the
+ * last 24h — older docs are unclosed visits, not a patient still waiting.
+ * `nowMs === null` (wall clock not sampled yet) returns an empty map rather
+ * than guessing, so the queue doesn't flash stale entries on first paint.
+ *
+ * A completed ETAT is still "active" here — `buildQueueFromTriage` (below)
+ * is what turns a 'seen' status into "Awaiting Rooming"/"Awaiting
+ * Consultation" rather than "Awaiting Triage", and drops terminal statuses
+ * ('lwbs', 'admitted', 'discharged', 'referred') from the queue entirely.
+ */
+export function buildActiveTriageByPatient(
+  triages: TriageDoc[],
+  nowMs: number | null,
+  windowMs = 24 * 60 * 60 * 1000,
+): Map<string, TriageDoc> {
+  const latest = new Map<string, TriageDoc>();
+  if (nowMs === null) return latest;
+  const cutoff = nowMs - windowMs;
+  for (const doc of triages) {
+    if (new Date(doc.triagedAt).getTime() < cutoff) continue;
+    const held = latest.get(doc.patientId);
+    if (!held || doc.triagedAt > held.triagedAt) latest.set(doc.patientId, doc);
+  }
+  return latest;
+}
+
+/** Live queue entry per patient, derived from the active-triage map above via
+ *  the shared acuity/time-aged queue builder (patient-queue-service). */
+export function buildQueueEntryByPatient(activeTriageByPatient: Map<string, TriageDoc>): Map<string, QueueEntry> {
+  const entries = buildQueueFromTriage([...activeTriageByPatient.values()]);
+  const map = new Map<string, QueueEntry>();
+  for (const entry of entries) map.set(entry.patientId, entry);
+  return map;
+}
+
+/** One worklist row's queue-derived display columns (Coming from / Care team
+ *  / Status / Queue / Wait), from its live queue entry when the patient has
+ *  arrived and from the appointment/assignment alone when they haven't. */
+export interface RowQueueColumns {
+  entry: QueueEntry | null;
+  triage: TriageDoc | null;
+  comingFrom: string;
+  careTeamPrimary: string;
+  careTeamSecondary: string;
+  statusText: string;
+  queueText: string;
+  waitText: string;
+  waitSubtext: string;
+  statusSubtext: string;
+  overTarget: boolean;
+  inService: boolean;
+}
+
+export function computeRowQueueColumns(
+  row: UnifiedPatientRow,
+  entry: QueueEntry | null,
+  triage: TriageDoc | null,
+  nowMs: number | null,
+): RowQueueColumns {
+  const inService = Boolean(entry?.assignedToId) || row.status === 'in_progress';
+  const appointmentAt = row.appointment?.appointmentTime
+    ? new Date(`${row.appointment.appointmentDate}T${row.appointment.appointmentTime}:00`)
+    : null;
+  const relativeNow = nowMs === null ? null : new Date(nowMs);
+  const appointmentRelative = appointmentAt && relativeNow && !Number.isNaN(appointmentAt.getTime())
+    ? formatAppointmentTimeUntil(appointmentAt, relativeNow)
+    : '';
+  const assignmentLabel = row.patient?.assignmentStatus === 'assigned'
+    ? 'Assigned'
+    : row.patient?.assignmentStatus === 'accepted'
+      ? 'Accepted'
+      : row.patient?.assignmentStatus === 'in_progress'
+        ? 'In service'
+        : row.patient?.assignmentStatus === 'completed'
+          ? 'Completed'
+          : null;
+  return {
+    entry: entry ?? null,
+    triage: triage ?? null,
+    comingFrom: entry
+      ? (entry.stage === 'awaiting_triage' ? 'Registration' : 'Triage')
+      : row.appointment ? 'Appointment' : 'Registry',
+    careTeamPrimary: row.provider || 'Doctor unassigned',
+    careTeamSecondary: row.patient?.nurse || entry?.assignedToName || 'Nurse unassigned',
+    statusText: inService
+      ? 'In service'
+      : entry ? 'Waiting' : assignmentLabel || statusLabel(row.status),
+    queueText: entry ? STAGE_LABELS[entry.stage] : typeLabel(row.department),
+    waitText: entry ? formatClockTime(entry.enteredStageAt) : row.appointment?.appointmentTime ? formatClockTime(row.appointment.appointmentTime) : '—',
+    waitSubtext: entry
+      ? waitLabel(entry.minutesWaiting)
+      : appointmentRelative || row.appointment?.appointmentDate || 'Assigned list',
+    statusSubtext: entry?.acuity === 'RED'
+      ? 'Critical'
+      : entry?.acuity === 'YELLOW'
+        ? 'Urgent'
+        : entry?.acuity === 'GREEN'
+          ? 'Routine'
+          : row.patient?.assignmentNote || PRIORITY_META[row.triagePriority].label,
+    overTarget: Boolean(entry?.flaggedForReassessment),
+    inService,
+  };
+}
+
+/** Which of the three worklist lanes (Scheduled / In Office / Finished) a row
+ *  belongs in. A live queue entry (or being actively in service) promotes an
+ *  otherwise-"scheduled" appointment status to In Office — a walk-in or
+ *  triaged patient is physically here even when no desk ever checked them in. */
+export function computeRowStatusGroup(status: AppointmentStatus, hasLiveQueueEntry: boolean): AppointmentStatusGroup {
+  const group = appointmentStatusGroup(status);
+  if (group !== 'scheduled') return group;
+  return hasLiveQueueEntry ? 'in_office' : 'scheduled';
+}
+
+/** Tally rows per lane — used for both the lane-tab counts and (filtered) the
+ *  rows actually rendered under each lane, so the two can never disagree. */
+export function tallyByStatusGroup<T>(
+  rows: T[],
+  groupOf: (row: T) => AppointmentStatusGroup,
+): Record<AppointmentStatusGroup, number> {
+  return rows.reduce(
+    (counts, row) => { counts[groupOf(row)] += 1; return counts; },
+    { scheduled: 0, in_office: 0, finished: 0 } as Record<AppointmentStatusGroup, number>,
+  );
+}
+
+/** The patient-record update a "claim" (Call patient) action writes: hands
+ *  ownership to whoever is claiming (falling back to the patient's existing
+ *  assignment only if there is somehow no signed-in user), never to the
+ *  patient's previously-displayed care team. */
+export function buildClaimUpdate(
+  patientAssignment: WorklistPatient | null | undefined,
+  currentUser: { _id?: string; name?: string } | null | undefined,
+  now: Date = new Date(),
+): {
+  assignedDoctor?: string;
+  assignedDoctorName?: string;
+  assignmentStatus: 'accepted';
+  assignmentAcceptedAt: string;
+  assignmentAcceptedBy?: string;
+  assignmentAcceptedByName?: string;
+} {
+  return {
+    assignedDoctor: currentUser?._id || patientAssignment?.assignedDoctor,
+    assignedDoctorName: currentUser?.name || patientAssignment?.assignedDoctorName,
+    assignmentStatus: 'accepted',
+    assignmentAcceptedAt: now.toISOString(),
+    assignmentAcceptedBy: currentUser?._id,
+    assignmentAcceptedByName: currentUser?.name,
+  };
 }
 
 export default function EhrClinicalDashboard({
@@ -443,74 +695,9 @@ export default function EhrClinicalDashboard({
   }, [filteredAppointments, selectedDate]);
 
   const appointmentQuery = appointmentSearch.trim().toLowerCase();
-  const unifiedPatientRows = useMemo<UnifiedPatientRow[]>(() => {
-    const appointmentByPatient = new Map<string, AppointmentDoc>();
-    const appointmentByName = new Map<string, AppointmentDoc>();
-    for (const appointment of selectedAppointmentsForDay) {
-      if (appointment.patientId && !appointmentByPatient.has(appointment.patientId)) appointmentByPatient.set(appointment.patientId, appointment);
-      if (appointment.patientName && !appointmentByName.has(appointment.patientName.toLowerCase())) appointmentByName.set(appointment.patientName.toLowerCase(), appointment);
-    }
-
-    const rows: UnifiedPatientRow[] = patients.map(patient => {
-      const appointment = appointmentByPatient.get(patient._id) || appointmentByName.get(patient.name.toLowerCase()) || null;
-      const status = appointment?.status || (patient.triagePriority === 'RED' ? 'checked_in' : 'scheduled');
-      const department = patient.division || patient.ward?.split('-')[0] || appointment?.department || 'OPD';
-      return {
-        id: patient._id,
-        photoUrl: patient.photoUrl,
-        patient,
-        appointment,
-        name: patient.name,
-        patientId: patient._id,
-        triagePriority: patient.triagePriority || (appointment ? appointmentTriage(appointment.priority) : 'GREEN'),
-        assignmentStatus: patient.assignmentStatus || (patient.assignedDoctor ? 'assigned' : undefined),
-        assignmentNote: patient.assignmentNote,
-        reason: appointment?.reason || patient.division || patient.ward || (patient.assignedDoctor ? 'Assigned patient' : 'Awaiting provider'),
-        timeLabel: appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime) : (patient.assignedDoctor ? 'Assigned' : 'Unclaimed'),
-        status: status as AppointmentStatus,
-        department,
-        // Only borrow the viewing clinician's own name once the patient
-        // actually carries an assignedDoctor. Falling back to `clinicianName`
-        // unconditionally meant an explicitly unclaimed patient (surfaced so
-        // ANY doctor at the facility could claim them) silently showed up
-        // pre-labelled with whichever doctor happened to be looking — hiding
-        // the exact "nobody has this patient yet" state the row exists to
-        // show. Falls through to careTeamPrimary's 'Doctor unassigned' below.
-        provider: patient.assignedDoctor
-          ? (patient.doctor || clinicianName || 'Not assigned')
-          : (appointment?.providerName || ''),
-        isAssigned: true,
-      };
-    });
-
-    const assignedIds = new Set(patients.map(patient => patient._id));
-    const assignedNames = new Set(patients.map(patient => patient.name.toLowerCase()));
-    for (const appointment of selectedAppointmentsForDay) {
-      if ((appointment.patientId && assignedIds.has(appointment.patientId)) || assignedNames.has(appointment.patientName.toLowerCase())) continue;
-      rows.push({
-        id: appointment._id,
-        photoUrl: appointment.patientId ? photoByPatientId.get(appointment.patientId) : undefined,
-        patient: null,
-        appointment,
-        name: appointment.patientName,
-        patientId: appointment.patientId,
-        triagePriority: appointmentTriage(appointment.priority),
-        reason: appointment.reason || typeLabel(appointment.appointmentType),
-        timeLabel: appointment.appointmentTime ? formatClockTime(appointment.appointmentTime) : 'Scheduled',
-        status: appointment.status,
-        department: appointment.department || appointment.appointmentType || 'OPD',
-        provider: appointment.providerName || clinicianName || 'Not assigned',
-        isAssigned: false,
-      });
-    }
-
-    return rows.sort((a, b) => {
-      if (a.isAssigned !== b.isAssigned) return a.isAssigned ? -1 : 1;
-      const aTime = a.appointment?.appointmentTime || '99:99';
-      const bTime = b.appointment?.appointmentTime || '99:99';
-      return aTime.localeCompare(bTime) || a.name.localeCompare(b.name);
-    });
-  }, [clinicianName, patients, photoByPatientId, selectedAppointmentsForDay]);
+  const unifiedPatientRows = useMemo<UnifiedPatientRow[]>(() => buildUnifiedPatientRows({
+    patients, selectedAppointmentsForDay, photoByPatientId, clinicianName,
+  }), [clinicianName, patients, photoByPatientId, selectedAppointmentsForDay]);
   const visiblePatientRows = unifiedPatientRows.filter(row => {
     // Assigned patients without a scheduled appointment belong to today's
     // worklist. Appointment-backed rows follow the selected calendar day.
@@ -637,73 +824,23 @@ export default function EhrClinicalDashboard({
     const timer = setInterval(() => setQueueNowMs(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, []);
-  const activeTriageByPatient = useMemo(() => {
-    const latest = new Map<string, TriageDoc>();
-    if (queueNowMs === null) return latest;
-    const cutoff = queueNowMs - 24 * 60 * 60 * 1000;
-    for (const doc of triages) {
-      if (new Date(doc.triagedAt).getTime() < cutoff) continue;
-      const held = latest.get(doc.patientId);
-      if (!held || doc.triagedAt > held.triagedAt) latest.set(doc.patientId, doc);
-    }
-    return latest;
-  }, [triages, queueNowMs]);
-  const queueEntryByPatient = useMemo(() => {
-    const entries = buildQueueFromTriage([...activeTriageByPatient.values()]);
-    const map = new Map<string, QueueEntry>();
-    for (const entry of entries) map.set(entry.patientId, entry);
-    return map;
-  }, [activeTriageByPatient]);
+  const activeTriageByPatient = useMemo(
+    () => buildActiveTriageByPatient(triages, queueNowMs),
+    [triages, queueNowMs],
+  );
+  const queueEntryByPatient = useMemo(
+    () => buildQueueEntryByPatient(activeTriageByPatient),
+    [activeTriageByPatient],
+  );
 
   // Worklist column values for one row, from its queue entry when the patient
   // has arrived and from the appointment alone when they haven't.
-  const rowQueueColumns = (row: UnifiedPatientRow) => {
-    const entry = row.patientId ? queueEntryByPatient.get(row.patientId) : undefined;
-    const triage = row.patientId ? activeTriageByPatient.get(row.patientId) : undefined;
-    const inService = Boolean(entry?.assignedToId) || row.status === 'in_progress';
-    const appointmentAt = row.appointment?.appointmentTime
-      ? new Date(`${row.appointment.appointmentDate}T${row.appointment.appointmentTime}:00`)
-      : null;
-    const relativeNow = queueNowMs === null ? null : new Date(queueNowMs);
-    const appointmentRelative = appointmentAt && relativeNow && !Number.isNaN(appointmentAt.getTime())
-      ? formatAppointmentTimeUntil(appointmentAt, relativeNow)
-      : '';
-    const assignmentLabel = row.patient?.assignmentStatus === 'assigned'
-      ? 'Assigned'
-      : row.patient?.assignmentStatus === 'accepted'
-        ? 'Accepted'
-        : row.patient?.assignmentStatus === 'in_progress'
-          ? 'In service'
-          : row.patient?.assignmentStatus === 'completed'
-            ? 'Completed'
-            : null;
-    return {
-      entry: entry ?? null,
-      triage: triage ?? null,
-      comingFrom: entry
-        ? (entry.stage === 'awaiting_triage' ? 'Registration' : 'Triage')
-        : row.appointment ? 'Appointment' : 'Registry',
-      careTeamPrimary: row.provider || 'Doctor unassigned',
-      careTeamSecondary: row.patient?.nurse || entry?.assignedToName || 'Nurse unassigned',
-      statusText: inService
-        ? 'In service'
-        : entry ? 'Waiting' : assignmentLabel || statusLabel(row.status),
-      queueText: entry ? STAGE_LABELS[entry.stage] : typeLabel(row.department),
-      waitText: entry ? formatClockTime(entry.enteredStageAt) : row.appointment?.appointmentTime ? formatClockTime(row.appointment.appointmentTime) : '—',
-      waitSubtext: entry
-        ? waitLabel(entry.minutesWaiting)
-        : appointmentRelative || row.appointment?.appointmentDate || 'Assigned list',
-      statusSubtext: entry?.acuity === 'RED'
-        ? 'Critical'
-        : entry?.acuity === 'YELLOW'
-          ? 'Urgent'
-          : entry?.acuity === 'GREEN'
-            ? 'Routine'
-            : row.patient?.assignmentNote || PRIORITY_META[row.triagePriority].label,
-      overTarget: Boolean(entry?.flaggedForReassessment),
-      inService,
-    };
-  };
+  const rowQueueColumns = (row: UnifiedPatientRow) => computeRowQueueColumns(
+    row,
+    row.patientId ? queueEntryByPatient.get(row.patientId) ?? null : null,
+    row.patientId ? activeTriageByPatient.get(row.patientId) ?? null : null,
+    queueNowMs,
+  );
 
   // Daybar filter pills — the shared three-lane vocabulary every role
   // dashboard uses: Scheduled (booked/assigned, patient not with us yet),
@@ -711,17 +848,12 @@ export default function EhrClinicalDashboard({
   // Finished (visit closed — checked out, cancelled, no-show, rescheduled).
   const [worklistFilter, setWorklistFilter] = useState<AppointmentStatusGroup>('scheduled');
   const rowStatusGroup = (row: UnifiedPatientRow): AppointmentStatusGroup => {
-    const group = appointmentStatusGroup(row.status);
-    if (group !== 'scheduled') return group;
     // A live queue entry means the patient is physically here even when the
     // appointment rung still says scheduled/arrived (walk-ins, triage).
     const columns = rowQueueColumns(row);
-    return columns.entry || columns.inService ? 'in_office' : 'scheduled';
+    return computeRowStatusGroup(row.status, Boolean(columns.entry) || columns.inService);
   };
-  const groupCounts = visiblePatientRows.reduce(
-    (counts, row) => { counts[rowStatusGroup(row)] += 1; return counts; },
-    { scheduled: 0, in_office: 0, finished: 0 } as Record<AppointmentStatusGroup, number>,
-  );
+  const groupCounts = tallyByStatusGroup(visiblePatientRows, rowStatusGroup);
   const filteredPatientRows = visiblePatientRows.filter(row => rowStatusGroup(row) === worklistFilter);
 
   // Row popup (visit info + actions) and the Move dialog it can open.
@@ -757,18 +889,10 @@ export default function EhrClinicalDashboard({
   // row flips to "In service" for every station) and open the consultation.
   const callPatient = async (row: UnifiedPatientRow) => {
     if (!row.patientId) return;
-    const now = new Date().toISOString();
     const patientAssignment = row.patient;
     try {
       const { updatePatient } = await import('@/lib/services/patient-service');
-      await updatePatient(row.patientId, {
-        assignedDoctor: currentUser?._id || patientAssignment?.assignedDoctor,
-        assignedDoctorName: currentUser?.name || patientAssignment?.assignedDoctorName,
-        assignmentStatus: 'accepted',
-        assignmentAcceptedAt: now,
-        assignmentAcceptedBy: currentUser?._id,
-        assignmentAcceptedByName: currentUser?.name,
-      });
+      await updatePatient(row.patientId, buildClaimUpdate(patientAssignment, currentUser));
     } catch {
       // The queue handoff and consultation can still proceed if the patient
       // cache is temporarily unavailable; the event is retried by sync.

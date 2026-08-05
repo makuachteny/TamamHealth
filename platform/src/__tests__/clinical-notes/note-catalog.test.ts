@@ -1,7 +1,7 @@
 import {
   NOTE_TYPES, NOTE_TYPE_ORDER, NOTE_SECTIONS,
   resolveSections, availableOptionalSections, getNoteType,
-  isNoteTypeId, isNoteSectionId, getSectionLabel,
+  isNoteTypeId, isNoteSectionId, getSectionLabel, getSectionDef,
   type NoteTypeId,
 } from '@/lib/clinical-notes/note-catalog';
 import { noteTypeMenuOrder } from '@/components/clinical-notes/CreateNoteButton';
@@ -151,6 +151,19 @@ describe('type guards', () => {
   test('getSectionLabel echoes an unknown id instead of throwing', () => {
     expect(getSectionLabel('cc')).toBe('CC');
     expect(getSectionLabel('mystery')).toBe('mystery');
+  });
+
+  test('getSectionDef returns the full definition for a known section', () => {
+    const def = getSectionDef('vitals');
+    expect(def).toMatchObject({ id: 'vitals', kind: 'derived', source: 'vitals' });
+  });
+
+  test('getSectionDef returns undefined for an unknown id, unlike getNoteType\'s SOAP fallback', () => {
+    // Deliberately asymmetric with getNoteType: a note must always resolve to
+    // some type (SOAP), but a section that no longer exists in the catalog
+    // has nothing safe to fall back to — the caller (resolveSections) is the
+    // one that decides to keep it anyway.
+    expect(getSectionDef('not_a_real_section')).toBeUndefined();
   });
 });
 

@@ -224,6 +224,7 @@ export default function PrescribeModal({
         effectiveOn: draft.effectiveOn,
         pharmacyInstructions: draft.pharmacyNote.trim() || undefined,
         hospitalId: currentUser?.hospitalId,
+        hospitalName: currentUser?.hospitalName,
         orgId: currentUser?.orgId,
       } as Omit<PrescriptionDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
 

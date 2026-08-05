@@ -83,12 +83,17 @@ async function patchHandler(
       } catch (err) {
         if (err instanceof DispenseError) {
           // 409 for "the shelf says no" (stock/clearance/ambiguity — state the
-          // caller must resolve before retrying), 400 for a bad request
-          // (missing or unverifiable witness, nonsense quantity, unconfirmed
-          // partial). The client shows the message either way, but the codes
-          // stay meaningful.
+          // caller must resolve before retrying), 403 for "you may not do
+          // this at all" (actor authorization — WRITE_ROLES above only gates
+          // the PATCH generally; NOT_AUTHORISED is dispenseMedication()'s own
+          // pharmacist-only check), 400 for everything else (missing or
+          // unverifiable witness, nonsense quantity, unconfirmed partial).
+          // The client shows the message either way, but the codes stay
+          // meaningful.
           const status = err.code === 'STOCK_OUT' || err.code === 'INSUFFICIENT_STOCK'
-            || err.code === 'NOT_CLEARED' || err.code === 'AMBIGUOUS_MEDICATION' ? 409 : 400;
+            || err.code === 'NOT_CLEARED' || err.code === 'AMBIGUOUS_MEDICATION' ? 409
+            : err.code === 'NOT_AUTHORISED' ? 403
+            : 400;
           return NextResponse.json(
             { error: err.message, code: err.code, available: err.available },
             { status },

@@ -14,7 +14,8 @@ import {
   createClinicalNote, getClinicalNoteById, updateClinicalNote,
   saveNoteSection, addNoteSection, removeNoteSection, changeNoteType,
   clearNote, signClinicalNote, cosignClinicalNote, addNoteAddendum,
-  copyNoteForward, recordPlanAction, listClinicalNotes, deleteClinicalNote,
+  copyNoteForward, recordPlanAction, listClinicalNotes, getNotesByPatient,
+  getUnsignedNotes, deleteClinicalNote,
   hasContent, notePreview, isNoteLocked, NoteLockedError, NoteSigningAuthorizationError,
 } from '@/lib/clinical-notes/note-service';
 import type { ClinicalNoteDoc } from '@/lib/clinical-notes/types';
@@ -51,10 +52,11 @@ jest.mock('@/lib/services/audit-service', () => ({
 
 jest.mock('@/lib/services/sync-event-service', () => ({ emitSyncEvent: jest.fn() }));
 
-jest.mock('@/lib/services/data-scope', () => ({
-  filterByScope: (rows: unknown[]) => rows,
-  buildScopeFromAuth: () => ({}),
-}));
+// The real scoping logic, not a passthrough stub — the tenancy tests below
+// (`describe('scope / tenancy')`) need actual org/hospital filtering, and
+// every other test in this file calls the service functions with no `scope`
+// argument at all, so filterByScope never runs for them either way.
+jest.mock('@/lib/services/data-scope', () => jest.requireActual('@/lib/services/data-scope'));
 
 const baseInput = {
   patientId: 'pat-1',
@@ -416,6 +418,64 @@ describe('plan actions', () => {
   });
 });
 
+/**
+ * Every mutator resolves an id against the DB before doing anything else. A
+ * caller racing a delete, or acting on a stale id from a closed tab, must get
+ * a clean `null` back rather than an exception that crashes the page — only
+ * the *locked* and *authorisation* refusals below are meant to throw.
+ */
+describe('operating on a note id that does not exist', () => {
+  const missing = 'note-does-not-exist';
+
+  it('getClinicalNoteById', async () => {
+    expect(await getClinicalNoteById(missing)).toBeNull();
+  });
+
+  it('updateClinicalNote', async () => {
+    expect(await updateClinicalNote(missing, { serviceDate: '2026-01-01' })).toBeNull();
+  });
+
+  it('saveNoteSection', async () => {
+    expect(await saveNoteSection(missing, 'cc', { text: 'x' })).toBeNull();
+  });
+
+  it('addNoteSection', async () => {
+    expect(await addNoteSection(missing, 'hpi')).toBeNull();
+  });
+
+  it('removeNoteSection', async () => {
+    expect(await removeNoteSection(missing, 'hpi')).toBeNull();
+  });
+
+  it('changeNoteType', async () => {
+    expect(await changeNoteType(missing, 'soap')).toBeNull();
+  });
+
+  it('clearNote', async () => {
+    expect(await clearNote(missing)).toBeNull();
+  });
+
+  it('recordPlanAction', async () => {
+    expect(await recordPlanAction(missing, { kind: 'lab', label: 'FBC' })).toBeNull();
+  });
+
+  it('signClinicalNote', async () => {
+    expect(await signClinicalNote(missing, { signedBy: 'u-doc', signedByName: 'Dr Achol' })).toBeNull();
+  });
+
+  it('cosignClinicalNote', async () => {
+    expect(await cosignClinicalNote(missing, 'u-cons', 'Dr Consultant', 'doctor')).toBeNull();
+  });
+
+  it('addNoteAddendum', async () => {
+    expect(await addNoteAddendum(missing, 'text', 'u-doc', 'Dr Achol')).toBeNull();
+  });
+
+  it('deleteClinicalNote resolves false rather than throwing', async () => {
+    expect(await deleteClinicalNote(missing)).toBe(false);
+  });
+});
+
 describe('listing and filters', () => {
   async function seed() {
     const a = await createClinicalNote({ ...baseInput, serviceDate: '2026-08-01' });
@@ -472,6 +532,127 @@ describe('listing and filters', () => {
     await seed();
     const rows = await listClinicalNotes({ userId: 'all' });
     expect(rows).toHaveLength(3);
+  });
+});
+
+/**
+ * Tenant isolation. `filterByScope` (the real implementation — see the
+ * `data-scope` mock above) drops any document whose `orgId` does not match
+ * the caller's `DataScope`, INCLUDING documents that carry no `orgId` at all.
+ * A scope fix that hides everything is exactly as broken as one that hides
+ * nothing, so every read here is asserted in both directions: the matching
+ * org's note comes back, and the other org's note does not.
+ */
+describe('scope / tenancy', () => {
+  const scopeOrgA: DataScope = { role: 'nurse', orgId: 'org-a' };
+  const scopeOrgB: DataScope = { role: 'nurse', orgId: 'org-b' };
+
+  async function seedTwoOrgs() {
+    const a = await createClinicalNote({ ...baseInput, orgId: 'org-a' });
+    await saveNoteSection(a._id, 'cc', { text: 'Org A visit.' });
+    const b = await createClinicalNote({ ...baseInput, orgId: 'org-b' });
+    await saveNoteSection(b._id, 'cc', { text: 'Org B visit.' });
+    return { a: a._id, b: b._id };
+  }
+
+  test('createClinicalNote stamps orgId onto the stored document', async () => {
+    // filterByScope drops any document with no orgId at all once a scope with
+    // an orgId is applied — if this stamping regressed, every note would
+    // silently vanish from every scoped list/get below despite belonging to
+    // a real, known organisation.
+    const note = await createClinicalNote({ ...baseInput, orgId: 'org-a' });
+    expect(note.orgId).toBe('org-a');
+    const reloaded = await getClinicalNoteById(note._id);
+    expect(reloaded!.orgId).toBe('org-a');
+  });
+
+  test('a note created with no orgId at all is invisible to every org-scoped read', async () => {
+    // This is `filterByScope`'s own documented behaviour (data isolation
+    // favours hiding over leaking), exercised here through the notes module
+    // so a regression in orgId-stamping is caught where it would actually
+    // bite: the chart's own notes list.
+    const orphan = await createClinicalNote({ ...baseInput, orgId: undefined });
+    expect(await getClinicalNoteById(orphan._id, scopeOrgA)).toBeNull();
+    const rows = await getNotesByPatient(orphan.patientId, scopeOrgA);
+    expect(rows.map(r => r._id)).not.toContain(orphan._id);
+  });
+
+  describe('getClinicalNoteById', () => {
+    test('returns the note when its orgId matches the scope', async () => {
+      const { a } = await seedTwoOrgs();
+      const found = await getClinicalNoteById(a, scopeOrgA);
+      expect(found).not.toBeNull();
+      expect(found!._id).toBe(a);
+    });
+
+    test('returns null for a note whose orgId does not match the scope', async () => {
+      const { b } = await seedTwoOrgs();
+      expect(await getClinicalNoteById(b, scopeOrgA)).toBeNull();
+    });
+  });
+
+  describe('getNotesByPatient', () => {
+    test('scopes to org A in both directions: keeps A\'s note, drops B\'s', async () => {
+      // Both notes are for the same patient — only the org boundary should
+      // decide what comes back.
+      const { a, b } = await seedTwoOrgs();
+      const rows = await getNotesByPatient(baseInput.patientId, scopeOrgA);
+      const ids = rows.map(r => r._id);
+      expect(ids).toContain(a);
+      expect(ids).not.toContain(b);
+    });
+
+    test('scopes to org B in both directions: a scope bug that hides everything is as broken as one that hides nothing', async () => {
+      const { a, b } = await seedTwoOrgs();
+      const rows = await getNotesByPatient(baseInput.patientId, scopeOrgB);
+      const ids = rows.map(r => r._id);
+      expect(ids).toContain(b);
+      expect(ids).not.toContain(a);
+    });
+  });
+
+  describe('listClinicalNotes', () => {
+    test('scopes the chart notes list by org in both directions', async () => {
+      const { a, b } = await seedTwoOrgs();
+      const rows = await listClinicalNotes({ patientId: baseInput.patientId }, scopeOrgA);
+      const ids = rows.map(r => r._id);
+      expect(ids).toContain(a);
+      expect(ids).not.toContain(b);
+    });
+
+    test('without a patient filter, still only ever returns the scoped org', async () => {
+      const { a, b } = await seedTwoOrgs();
+      const rows = await listClinicalNotes({}, scopeOrgA);
+      const ids = rows.map(r => r._id);
+      expect(ids).toContain(a);
+      expect(ids).not.toContain(b);
+    });
+  });
+
+  describe('getUnsignedNotes', () => {
+    test('a signing queue only ever shows the caller\'s own org', async () => {
+      const a = await createClinicalNote({ ...baseInput, orgId: 'org-a' });
+      await saveNoteSection(a._id, 'cc', { text: 'Needs a signature.' });
+      const b = await createClinicalNote({ ...baseInput, orgId: 'org-b' });
+      await saveNoteSection(b._id, 'cc', { text: 'Also needs a signature.' });
+
+      const rows = await getUnsignedNotes(undefined, scopeOrgA);
+      const ids = rows.map(r => r._id);
+      expect(ids).toContain(a._id);
+      expect(ids).not.toContain(b._id);
+    });
+
+    test('the other org\'s queue is not empty either — it just sees its own note', async () => {
+      const a = await createClinicalNote({ ...baseInput, orgId: 'org-a' });
+      await saveNoteSection(a._id, 'cc', { text: 'Needs a signature.' });
+      const b = await createClinicalNote({ ...baseInput, orgId: 'org-b' });
+      await saveNoteSection(b._id, 'cc', { text: 'Also needs a signature.' });
+
+      const rows = await getUnsignedNotes(undefined, scopeOrgB);
+      const ids = rows.map(r => r._id);
+      expect(ids).toContain(b._id);
+      expect(ids).not.toContain(a._id);
+    });
   });
 });
 

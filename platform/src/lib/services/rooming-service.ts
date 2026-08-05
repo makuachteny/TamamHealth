@@ -49,20 +49,44 @@ import { logAuditSafe } from './audit-service';
  * waiting to be acknowledged, and the queue would look permanently empty.
  */
 export const ROOMING_WORKLIST_STATUSES = [
+  // ── Everything from reception's check-in onward ──
+  // Reception's check-in creates the arrival encounter and walks it to
+  // `awaiting_triage`; the first status this list used to accept was
+  // `routed_to_clinic`, which is only reachable *after* a triage has been
+  // recorded and routed. So a patient reception had just checked in appeared on
+  // no nursing worklist at all — the rooming queue read empty while people sat
+  // in the waiting room, and the ward board's "Awaiting Rooming" context (which
+  // `buildQueueFromTriage` derives from triage docs) named patients this list
+  // had never heard of. Two surfaces, two answers, and a hole between them.
+  //
+  // Rooming is now the queue a patient joins the moment they are checked in,
+  // and triage is a step taken FROM it — click a row and the patient's triage
+  // page opens. The clinical order is unchanged (triage still precedes the
+  // room); what changed is that the waiting are visible from the first minute.
+  'awaiting_next_station',
+  'awaiting_triage',
+  'in_triage',
+  'triaged_awaiting_destination',
   'routed_to_clinic',
   'arrived_at_clinic_awaiting_rooming',
   'in_rooming',
 ] as const;
 
+/** The pre-triage statuses, kept in one place so the step map and the UI agree. */
+const PRE_TRIAGE_STATUSES: readonly string[] = [
+  'awaiting_next_station', 'awaiting_triage', 'in_triage', 'triaged_awaiting_destination',
+];
+
 export interface RoomingWorklistEntry {
   encounter: EncounterDoc;
-  /** Where in the rooming sequence this patient currently sits. */
-  step: 'awaiting_arrival' | 'awaiting_rooming' | 'being_roomed';
+  /** Where in the sequence this patient currently sits. */
+  step: 'awaiting_triage' | 'awaiting_arrival' | 'awaiting_rooming' | 'being_roomed';
   /** Minutes since the encounter started — the number that drives urgency. */
   waitingMinutes: number;
 }
 
 function stepFor(status: EncounterDoc['status']): RoomingWorklistEntry['step'] {
+  if (PRE_TRIAGE_STATUSES.includes(status)) return 'awaiting_triage';
   if (status === 'routed_to_clinic') return 'awaiting_arrival';
   if (status === 'in_rooming') return 'being_roomed';
   return 'awaiting_rooming';

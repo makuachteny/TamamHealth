@@ -2,11 +2,10 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWards } from '@/lib/hooks/useWards';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
 import { patientFullName, patientAgeLabel, initials, stateTint } from '@/lib/patient-utils';
-import { buildQueueFromTriage, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
+import { buildQueueFromTriage, stageForAppointmentStatus, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
 import { APPOINTMENT_STATUS_TONES, APPOINTMENT_STATUS_FLOW, APPOINTMENT_STATUS_EXITS, appointmentStatusLabel } from '@/lib/appointment-status';
@@ -21,8 +20,22 @@ const ACUITY_META: Record<'RED' | 'YELLOW' | 'GREEN', { label: string; tone: str
   YELLOW: { label: 'Watch', tone: 'yellow' },
   GREEN: { label: 'Stable', tone: 'green' },
 };
+
+// Tone → shared pill class, mirroring EhrCareDashboard's statusPillClass
+// mapping (the front desk's control) so a ward visit's status pill takes the
+// identical front-desk colour. Kept as its own map here rather than a
+// `status-${tone}` template — the tone names ('ready', 'active', 'danger'...)
+// are not themselves class names in globals.css, only these curated targets are.
+const STATUS_TONE_PILL_CLASS: Record<string, string> = {
+  done: 'status-completed',
+  active: 'status-checked-in',
+  ready: 'status-confirmed',
+  danger: 'status-no-show',
+  warning: 'status-attention',
+  scheduled: 'status-scheduled',
+};
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useWardRoster } from './shared';
+import { useWardRoster, severityAcuity } from './shared';
 /**
  * Ward patient board. Free-text search comes from OUTSIDE: the nurse-station
  * left rail passes `search` down; the standalone /dashboard/nurse/ward page
@@ -35,8 +48,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { wardPatients, patientTriageMap } = useWardRoster();
-  const { activeAdmissions } = useWards();
+  const { wardPatients, patientTriageMap, admissionByPatient } = useWardRoster();
   const { appointments, updateStatus } = useAppointments();
   const {
     canConfirmAppointments, canCheckInAppointments, canAdvanceAppointments, canManageAppointmentSchedule,
@@ -58,17 +70,6 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
     const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, []);
-
-  // patientId → their active admission (ward/bed, severity, admitting
-  // diagnosis, admission date). Only admitted patients appear here; the rest
-  // read as "Stable" / "—" in the row below.
-  const admissionByPatient = useMemo(() => {
-    const map = new Map<string, typeof activeAdmissions[number]>();
-    for (const a of activeAdmissions) {
-      if (!map.has(a.patientId)) map.set(a.patientId, a);
-    }
-    return map;
-  }, [activeAdmissions]);
 
   // Same queue derivation as the Clinical Officer worklist: the patient's
   // latest triage runs through the canonical stage machine, so the nurse
@@ -111,7 +112,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
     const triage = patientTriageMap.get(p._id) || p._triage;
     const appointment = appointmentByPatient.byPatient.get(p._id) || appointmentByPatient.byName.get(patientFullName(p).toLowerCase());
     const appointmentTime = appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime).toLowerCase() : '';
-    const priority = triage?.priority || '';
+    const priority = triage?.priority || severityAcuity(admissionByPatient.get(p._id)?.severity) || '';
     const complaint = (triage?.chiefComplaint || '').toLowerCase();
     if (q && !(
       patientFullName(p).toLowerCase().includes(q) ||
@@ -122,19 +123,22 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
     if (acuity === 'GREEN' && (priority === 'RED' || priority === 'YELLOW')) return false;
     if ((acuity === 'RED' || acuity === 'YELLOW') && priority !== acuity) return false;
     return true;
-  }), [wardPatients, patientTriageMap, appointmentByPatient, q, acuity]);
+  }), [wardPatients, patientTriageMap, admissionByPatient, appointmentByPatient, q, acuity]);
 
   // At-a-glance acuity counts across the whole roster (unfiltered), powering
   // the three chips. Stable = everything not RED/YELLOW (incl. not triaged).
   const summary = useMemo(() => {
     let critical = 0, urgent = 0;
     for (const p of wardPatients) {
-      const priority = (patientTriageMap.get(p._id) || p._triage)?.priority || '';
+      // Same acuity derivation as the rows below: triage first, then what the
+      // admission severity implies — so the chips agree with the board.
+      const priority = (patientTriageMap.get(p._id) || p._triage)?.priority
+        || severityAcuity(admissionByPatient.get(p._id)?.severity) || '';
       if (priority === 'RED') critical++;
       else if (priority === 'YELLOW') urgent++;
     }
     return { critical, urgent, stable: wardPatients.length - critical - urgent };
-  }, [wardPatients, patientTriageMap]);
+  }, [wardPatients, patientTriageMap, admissionByPatient]);
 
   const toggleAcuity = (v: 'RED' | 'YELLOW' | 'GREEN') => setAcuity(a => (a === v ? '' : v));
 
@@ -215,7 +219,11 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                     || appointmentByPatient.byName.get(patientFullName(patient).toLowerCase());
                   const admission = admissionByPatient.get(patient._id);
 
-                  const priority: 'RED' | 'YELLOW' | 'GREEN' = triage?.priority || 'GREEN';
+                  // Acuity: latest triage wins; an untriaged inpatient falls
+                  // back to what their admission severity implies rather than
+                  // reading "Stable" while in a sickle-cell crisis.
+                  const priority: 'RED' | 'YELLOW' | 'GREEN' =
+                    triage?.priority || severityAcuity(admission?.severity) || 'GREEN';
                   const inService = Boolean(entry?.assignedToId);
                   // The board speaks the front desk's vocabulary now — Checked
                   // In, Triaged, Roomed — rather than a private set ("Waiting",
@@ -226,11 +234,19 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                   // no visit (an inpatient on the roster), the queue stage stands
                   // in as a plain pill — there is no ladder to move.
                   const visitStatus: AppointmentStatus | null = appointment?.status ?? null;
-                  const fallbackStatusText = entry
+                  // Where this patient stands in the queue. The triage-derived
+                  // entry wins when there is one; otherwise the visit's own
+                  // status answers, so someone reception checked in but nobody
+                  // has assessed yet reads "Awaiting Triage" here instead of
+                  // falling through to a department name or a dash.
+                  const visitStage = stageForAppointmentStatus(visitStatus ?? undefined);
+                  const queueStageText = entry
                     ? STAGE_LABELS[entry.stage]
                     : demoTriage
                       ? (demoTriage.status === 'pending' ? STAGE_LABELS.awaiting_triage : STAGE_LABELS.awaiting_rooming)
-                      : admission ? 'Admitted' : '—';
+                      : visitStage ? STAGE_LABELS[visitStage]
+                      : null;
+                  const fallbackStatusText = queueStageText ?? (admission ? 'Admitted' : '—');
                   const statusSubtext = entry?.acuity === 'RED'
                     ? 'Critical'
                     : entry?.acuity === 'YELLOW'
@@ -242,33 +258,42 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                   // the queue stage / appointment department stands in.
                   const location = admission
                     ? `${admission.wardName}${admission.bedNumber ? ` · Bed ${admission.bedNumber}` : ''}`
-                    : entry
-                    ? STAGE_LABELS[entry.stage]
-                    : demoTriage
-                    ? (demoTriage.status === 'pending' ? STAGE_LABELS.awaiting_triage : STAGE_LABELS.awaiting_rooming)
-                    : appointment?.department || '—';
+                    : queueStageText ?? appointment?.department ?? '—';
                   // Wait column, exactly like the doctor worklist: queue/slot
-                  // time on top, elapsed/remaining hours-minutes below.
+                  // time on top, elapsed/remaining hours-minutes below. For an
+                  // inpatient with no queue entry or visit today, the admission
+                  // itself is the time fact — not a dash over today's date.
                   const appointmentAt = appointment?.appointmentTime
                     ? new Date(`${appointment.appointmentDate}T${appointment.appointmentTime}:00`)
                     : null;
+                  const admittedAt = admission ? new Date(admission.admissionDate) : null;
+                  const admittedDays = admittedAt && !Number.isNaN(admittedAt.getTime())
+                    ? Math.max(0, Math.floor((now.getTime() - admittedAt.getTime()) / 86_400_000))
+                    : null;
                   const waitText = entry
                     ? formatClockTime(entry.enteredStageAt)
-                    : appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime) : '—';
+                    : appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime)
+                    : admission && admittedAt && !Number.isNaN(admittedAt.getTime()) ? formatClockTime(admission.admissionDate)
+                    : '—';
                   const waitSubtext = entry
                     ? waitLabel(entry.minutesWaiting)
-                    : appointmentAt && !Number.isNaN(appointmentAt.getTime()) ? formatAppointmentTimeUntil(appointmentAt, now) : today;
+                    : appointmentAt && !Number.isNaN(appointmentAt.getTime()) ? formatAppointmentTimeUntil(appointmentAt, now)
+                    : admittedDays !== null ? (admittedDays === 0 ? 'Admitted today' : `Admitted ${admittedDays}d ago`)
+                    : today;
                   const overTarget = Boolean(entry?.flaggedForReassessment);
-                  const subtitle = `${triage?.chiefComplaint || patient.hospitalNumber || 'No ID'} · ${patientAgeLabel(patient)} · ${patient.gender || 'Not recorded'}`;
+                  const subtitle = `${triage?.chiefComplaint || admission?.admittingDiagnosis || patient.hospitalNumber || 'No ID'} · ${patientAgeLabel(patient)} · ${patient.gender || 'Not recorded'}`;
                   const activate = patient._demo ? undefined : () => router.push(`/patients/${patient._id}?tab=vitals`);
-                  const stageText = entry
-                    ? STAGE_LABELS[entry.stage]
-                    : demoTriage
-                    ? (demoTriage.status === 'pending' ? STAGE_LABELS.awaiting_triage : STAGE_LABELS.awaiting_rooming)
-                    : appointment?.department || '';
+                  const stageText = queueStageText ?? appointment?.department ?? '';
                   const careTeamDoctor = admission?.attendingPhysicianName || patient.assignedDoctorName || 'Doctor unassigned';
                   const careTeamNurse = admission?.nurseAssignedName || entry?.assignedToName || 'Nurse unassigned';
                   const statusPillClass = inService ? 'status-checked-in' : 'status-attention';
+                  // Same tone→class resolution as the front desk's picker: a
+                  // real visit status wins and is colored by its tone; a
+                  // roster-only row (no visit today) falls back to the queue
+                  // in-service/attention pill above.
+                  const visitPillClass = visitStatus
+                    ? STATUS_TONE_PILL_CLASS[APPOINTMENT_STATUS_TONES[visitStatus]]
+                    : statusPillClass;
                   return (
                     <div
                       key={patient._id}
@@ -318,17 +343,23 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                           onKeyDown={event => event.stopPropagation()}
                         >
                           {visitStatus && appointment && !patient._demo && canChangeVisitStatus ? (
-                            <AppointmentStatusSelect
-                              status={visitStatus}
-                              layout="bare"
-                              label={`Visit status for ${patientFullName(patient)}`}
-                              allowedStatuses={visitStatusOptions}
-                              onChange={status => updateStatus(appointment._id, status)}
-                            />
+                            // Same picker-on-a-pill structure as the front desk's
+                            // control (EhrCareDashboard): a compact pill span
+                            // carries the look, with the real <select> laid
+                            // transparently over it as the hit target — not a
+                            // bare native <select> rendered on its own.
+                            <span className={`appointment-status-pill appointment-status-pill--select ${visitPillClass}`.trim()}>
+                              {appointmentStatusLabel(visitStatus)}
+                              <AppointmentStatusSelect
+                                status={visitStatus}
+                                layout="bare"
+                                label={`Visit status for ${patientFullName(patient)}`}
+                                allowedStatuses={visitStatusOptions}
+                                onChange={status => updateStatus(appointment._id, status)}
+                              />
+                            </span>
                           ) : (
-                            <span
-                              className={`appointment-status-pill ${visitStatus ? `status-${APPOINTMENT_STATUS_TONES[visitStatus]}` : statusPillClass}`.trim()}
-                            >
+                            <span className={`appointment-status-pill ${visitPillClass}`.trim()}>
                               {visitStatus ? appointmentStatusLabel(visitStatus) : fallbackStatusText}
                             </span>
                           )}

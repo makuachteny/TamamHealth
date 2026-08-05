@@ -78,15 +78,16 @@ export default function NurseDashboard() {
 
   // The station is URL-addressable so notifications, redirects, bookmarks, and
   // the browser back button can return a nurse to the exact station they need.
-  // Null until the nurse explicitly picks a station, so the role-aware default
-  // below can resolve after currentUser hydrates: a rooming nurse's home
-  // station is Rooming (KAN-108 AC-1); everyone else starts on the ward board.
   const [fallbackStation, setFallbackStation] = useState<StationTab | null>(() => (
     isStationTab(searchParams.get('station')) ? searchParams.get('station') as StationTab : null
   ));
   const urlStation = searchParams.get('station');
   const initialTriagePatientId = searchParams.get('patient') ?? undefined;
-  const defaultStation: StationTab = currentUser?.role === 'rooming_nurse' ? 'rooming' : 'ward';
+  // Every nurse lands on the ward list, the way every other module opens on its
+  // worklist. Rooming nurses used to open on the Rooming board instead, which
+  // made the module the one place in the app where what you saw first depended
+  // on your role; Rooming is one click away, and triage arrives by deep link.
+  const defaultStation: StationTab = 'ward';
   const activeTab: StationTab = isStationTab(urlStation) ? urlStation : (fallbackStation ?? defaultStation);
 
   // Free-text search for the station lives in the LEFT RAIL (between the
@@ -113,10 +114,11 @@ export default function NurseDashboard() {
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
 
   // Tab counts must match what each station board actually displays. The ward
-  // board (shared.tsx `wardPatients`) swaps in the demo roster when the real
-  // roster is thin in demo mode — mirror that rule here so the tab never says
-  // "0" above a visibly populated board.
-  const wardBoardCount = (patients.length >= 10 || !IS_DEMO) ? patients.length : DEMO_WARD_PATIENTS.length;
+  // board (shared.tsx `wardPatients`) lists the active admissions, swapping in
+  // the demo roster only when there are none in demo mode — mirror that rule
+  // here so the tab never says "0" above a visibly populated board.
+  const wardAdmittedCount = new Set(activeAdmissions.map(a => a.patientId)).size;
+  const wardBoardCount = (wardAdmittedCount > 0 || !IS_DEMO) ? wardAdmittedCount : DEMO_WARD_PATIENTS.length;
   // The two boards a nurse works a shift from. Triage, rooming and handoff came
   // off this strip: each is a task you start and finish, not a place to sit, and
   // the three of them pushed the two standing boards to the far left of a

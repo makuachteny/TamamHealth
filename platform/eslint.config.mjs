@@ -42,6 +42,12 @@ const eslintConfig = [
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/ban-ts-comment': 'off',
+      // `jest.mock()` factories are hoisted above the imports, so they cannot
+      // close over one — `require()` inside the factory is the only way to
+      // reach a helper, and it is what every mock in this suite already does.
+      // The rule fired on .tsx tests only, which made the same line legal in
+      // an integration test and an error in a component test.
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 ];
