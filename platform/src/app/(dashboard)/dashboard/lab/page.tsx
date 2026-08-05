@@ -332,6 +332,10 @@ export default function LabDashboardPage() {
           searchValue={queueSearch}
           searchPlaceholder={t('topbar.searchPlaceholder')}
           onSearchChange={setQueueSearch}
+          // A pending order or a resulted-but-not-yet-reviewed test stays on
+          // the bench across days — the calendar's selected day must not hide
+          // it while the tab counts (which are not date-scoped) still show it.
+          filterRowsByDate={false}
           filters={[]}
           actions={[
             // Single results are entered in the chart's bench workflow. What is

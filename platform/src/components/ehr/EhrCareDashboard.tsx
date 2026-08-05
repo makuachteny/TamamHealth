@@ -4,12 +4,18 @@ import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from '
 import { useRouter } from 'next/navigation';
 import { ClipboardList, Search, Stethoscope, Video, X, type LucideIcon } from '@/components/icons/lucide';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
-import { useOwnsAttentionRail } from '@/lib/attention-rail';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
 import { initials, stateTint } from '@/lib/patient-utils';
 import { formatAppointmentTimeUntil } from '@/lib/format-utils';
+import { useAppointments } from '@/lib/hooks/useAppointments';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import {
+  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, appointmentStatusLabel,
+} from '@/lib/appointment-status';
+import { toIsoDate as visitIsoDate } from '@/components/ehr/EhrMiniCalendar';
+import type { AppointmentStatus } from '@/lib/db-types';
 
 export type EhrCareDashboardAction = {
   label: string;
@@ -77,6 +83,15 @@ export type EhrCareDashboardRow = {
   statusSecondary?: string;
   statusLabel?: string;
   statusTone?: 'scheduled' | 'ready' | 'active' | 'done' | 'warning' | 'danger';
+  /**
+   * Opts a row out of the shared visit ladder taking over its status pill.
+   * Radiology's Pending/In Progress/Complete and nutrition's SAM/MAM/At Risk
+   * are the station's whole reason for the screen — a same-day visit must not
+   * paint over them. A locked row keeps its own status/statusTone as the pill
+   * and gets the visit's status folded into the secondary line instead, so
+   * both readings stay visible.
+   */
+  lockStatus?: boolean;
   /**
    * Set these two together and the status pill becomes a picker: the row's own
    * state can be changed from the list without expanding it. Left unset, the
@@ -190,6 +205,7 @@ export default function EhrCareDashboard({
   metrics,
   metricsActions,
   showCalendar = true,
+  filterRowsByDate = true,
   railContent,
   chart,
   chartTitle = 'Day activity',
@@ -235,6 +251,16 @@ export default function EhrCareDashboard({
    *  just placed in the sidebar instead of the header/rail. */
   metricsActions?: EhrCareDashboardAction[];
   showCalendar?: boolean;
+  /**
+   * Whether the mini-calendar's selected day scopes the row list to that day.
+   * True by default — the front desk and other appointment-shaped dashboards
+   * are inherently a day's schedule. Stations whose work (a lab order, an
+   * imaging study, a screening) stays open across days set this to false, so
+   * a carried-over row doesn't vanish from the queue while its tab count
+   * still includes it — the calendar keeps highlighting dates but stops
+   * hiding rows.
+   */
+  filterRowsByDate?: boolean;
   /** Extra left-rail card(s) rendered between the day chart and the filter
    *  group — e.g. the nurse dashboard's ward-occupancy card. */
   railContent?: ReactNode;
@@ -273,9 +299,43 @@ export default function EhrCareDashboard({
   children?: ReactNode;
 }) {
   const router = useRouter();
-  // This dashboard renders its own right rail, so the shell suppresses the
-  // shared attention rail here rather than stacking two columns.
-  useOwnsAttentionRail();
+
+  // ── One status control for every station ────────────────────────────────
+  // Lab, pharmacy, radiology, nutrition and reception all render their rows
+  // through this component, and each used to show its own read-only pill. They
+  // now share the front desk's visit ladder, so a patient's status reads and
+  // sets the same way wherever they are seen.
+  //
+  // The ladder writes to the patient's APPOINTMENT — the visit — and never to
+  // the order in front of the station. A specimen or a prescription has its own
+  // lifecycle, and "No Show" is not a state a blood sample can be in; letting
+  // this dropdown touch those records would put clinically meaningless values
+  // into them. A row whose patient has no visit today keeps its own pill.
+  const { appointments, updateStatus: updateVisitStatus } = useAppointments();
+  // The front desk gates the identical control behind this same pair of
+  // flags (front-desk/page.tsx). A lab tech, pharmacist, radiographer or
+  // nutritionist passes neither, so the ladder they see here must be the same
+  // read-only pill everyone without the permission gets — the queue row is
+  // not a side door around the front desk's own gate.
+  const { canManageAppointmentSchedule, canCheckInAppointments } = usePermissions();
+  const canSetAppointmentStatus = canManageAppointmentSchedule || canCheckInAppointments;
+  const visitByPatient = useMemo(() => {
+    const today = visitIsoDate(new Date());
+    const map = new Map<string, { id: string; status: AppointmentStatus }>();
+    for (const appointment of appointments || []) {
+      if (appointment.appointmentDate !== today || !appointment.patientId) continue;
+      if (!map.has(appointment.patientId)) {
+        map.set(appointment.patientId, { id: appointment._id, status: appointment.status });
+      }
+    }
+    return map;
+  }, [appointments]);
+
+  const visitLadder = useMemo(
+    () => APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) })),
+    [],
+  );
+
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   // The calendar main-view toggle was removed — the dashboard is the only view
   // for all users. Typed as the union so the (now-inert) calendar branches below
@@ -310,12 +370,17 @@ export default function EhrCareDashboard({
   })), [rows]);
   const visibleRows = useMemo(() => {
     // The mini-calendar remains active in dashboard mode. Selecting a day
-    // must change the worklist itself, not only the calendar highlight.
-    const scopedRows = !showCalendar || rowEventDates.length === 0
+    // must change the worklist itself, not only the calendar highlight — but
+    // only for dashboards whose work is itself day-scoped (`filterRowsByDate`).
+    // A station's carried-over order or screening must stay in the queue no
+    // matter which day is selected; its tab/filter counts are never
+    // date-scoped, so filtering the rows here without it would silently
+    // disagree with them.
+    const scopedRows = !filterRowsByDate || !showCalendar || rowEventDates.length === 0
       ? rows
       : rows.filter(row => row.date === selectedDate);
     return scopedRows.slice().sort(compareDashboardRows);
-  }, [rowEventDates.length, rows, selectedDate, showCalendar]);
+  }, [filterRowsByDate, rowEventDates.length, rows, selectedDate, showCalendar]);
   // Live clock for the time column's countdown. Starts null so the
   // server-rendered markup and the first client render match, then ticks every
   // second so imminent meetings can show accurate seconds.
@@ -535,20 +600,59 @@ export default function EhrCareDashboard({
                       ? (countdown.usesDate ? (countdown.isPastDay ? '' : (row.time || '')) : countdown.label)
                       : row.timeSecondary || '';
                     // Status pill tone reuses the appointment pill classes.
-                    const statusPillClass = row.statusTone === 'done' ? 'status-completed'
-                      : row.statusTone === 'active' ? 'status-checked-in'
-                      : row.statusTone === 'ready' ? 'status-confirmed'
-                      : row.statusTone === 'danger' ? 'status-no-show'
-                      : row.statusTone === 'warning' ? 'status-attention'
+                    // The row's own control wins when a dashboard sets one
+                    // (reception drives the booking directly); otherwise the
+                    // patient's visit today supplies the same ladder — unless
+                    // the row locks its own status (radiology's Pending/In
+                    // Progress/Complete, nutrition's SAM/MAM/At Risk), in which
+                    // case the visit is surfaced below the pill instead of on it.
+                    const visit = row.patientId ? visitByPatient.get(row.patientId) : undefined;
+                    const ladderOwnsRow = !!visit && !row.lockStatus;
+                    const statusControl = row.statusOptions?.length && row.onStatusChange
+                      ? { options: row.statusOptions, value: row.statusValue, onChange: row.onStatusChange, text: '' }
+                      : ladderOwnsRow
+                        ? {
+                            // Only a role that could set this from the front
+                            // desk gets the picker here too — a lab tech,
+                            // pharmacist, radiographer or nutritionist has no
+                            // business writing to a visit from a queue row, so
+                            // they get the same status as everyone else, just
+                            // not as a control.
+                            options: canSetAppointmentStatus ? visitLadder : undefined,
+                            value: visit!.status as string,
+                            text: appointmentStatusLabel(visit!.status),
+                            onChange: canSetAppointmentStatus
+                              ? (value: string) => updateVisitStatus(visit!.id, value as AppointmentStatus)
+                              : undefined,
+                          }
+                        : { options: undefined, value: undefined, onChange: undefined, text: '' };
+                    // Pill colour follows whichever state owns the pill's text:
+                    // the visit's tone when the ladder owns it, the row's own
+                    // tone otherwise. The two used to be wired independently, so
+                    // a critical lab result could carry the ladder's "Checked
+                    // In" text in the order's own red danger colour.
+                    const effectiveStatusTone = ladderOwnsRow ? APPOINTMENT_STATUS_TONES[visit!.status] : row.statusTone;
+                    const statusPillClass = effectiveStatusTone === 'done' ? 'status-completed'
+                      : effectiveStatusTone === 'active' ? 'status-checked-in'
+                      : effectiveStatusTone === 'ready' ? 'status-confirmed'
+                      : effectiveStatusTone === 'danger' ? 'status-no-show'
+                      : effectiveStatusTone === 'warning' ? 'status-attention'
                       // 'scheduled' used to fall through to no class, so a booked
                       // row was the one pill in the list with no tint — the
                       // Scheduled tab's picker looked unlike every other tab's.
-                      : row.statusTone === 'scheduled' ? 'status-scheduled'
+                      : effectiveStatusTone === 'scheduled' ? 'status-scheduled'
                       : '';
                     // Under-pill cue: acuity when known, else the countdown.
                     const cue = priorityCode
                       ? PRIORITY_META[priorityCode].label
                       : countdown?.label || '';
+                    // A locked row keeps the station's own pill, so the visit —
+                    // real information, just not this pill's business — reads on
+                    // the line underneath instead of overwriting it.
+                    const lockedVisitSecondary = (row.lockStatus && visit) ? appointmentStatusLabel(visit.status) : undefined;
+                    const secondaryLine = lockedVisitSecondary
+                      ? (detailPair(row.statusSecondary, lockedVisitSecondary) || cue)
+                      : (row.statusSecondary || cue);
                     return (
                       <div key={row.id} className={isExpanded ? 'ehr-appointment-group is-expanded' : 'ehr-appointment-group'}>
                         <div
@@ -621,26 +725,26 @@ export default function EhrCareDashboard({
                                 derived rather than set (a walk-in's Waiting comes
                                 from triage, not the appointment ladder) keep a
                                 plain pill. */}
-                            {row.statusOptions?.length && row.onStatusChange ? (
+                            {statusControl.options && statusControl.onChange ? (
                               <span
                                 className={`appointment-status-pill appointment-status-pill--select ${statusPillClass}`.trim()}
                                 onClick={event => event.stopPropagation()}
                               >
-                                {statusText || '—'}
+                                {statusControl.text || statusText || '—'}
                                 <select
-                                  value={row.statusValue ?? ''}
+                                  value={statusControl.value ?? ''}
                                   aria-label="Appointment status"
-                                  onChange={event => row.onStatusChange?.(event.target.value)}
+                                  onChange={event => statusControl.onChange?.(event.target.value)}
                                 >
-                                  {row.statusOptions.map(option => (
+                                  {statusControl.options.map(option => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                   ))}
                                 </select>
                               </span>
                             ) : (
-                              <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusText || '—'}</span>
+                              <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusControl.text || statusText || '—'}</span>
                             )}
-                            <small>{row.statusSecondary || cue}</small>
+                            <small>{secondaryLine}</small>
                           </div>
                         </div>
                         {row.detail}
@@ -707,12 +811,6 @@ export default function EhrCareDashboard({
               </button>
             ))}
           </div>
-          {/* No "Needs your attention" card here: ProgressFeedCard below is
-              already this rail's version of it, built from the same triages,
-              labs and prescriptions, and the two side by side simply restated
-              each other. Stations get their feed role-tuned ("Patient flow");
-              modules with no rail of their own get the shell's shared card. */}
-
           {/* "Who moved where, just now" — the station equivalent of the
               clinician's "Awaiting review". Rendered here so every dashboard
               built on this shell gets it without wiring it seven times; the

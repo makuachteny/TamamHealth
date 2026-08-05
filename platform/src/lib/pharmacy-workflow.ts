@@ -2,9 +2,13 @@ import type { PrescriptionStatus } from './clinical-flow/order-lifecycles';
 import type { PrescriptionDoc } from './db-types';
 
 export function pharmacyStage(rx: Pick<PrescriptionDoc, 'orderStatus' | 'status'>): PrescriptionStatus {
+  // Mirrors effectivePrescriptionStatus in prescription-service.ts: `status`
+  // must be checked before `orderStatus` so a discontinue that lands on top
+  // of a stale 'cleared_for_dispensing' orderStatus can't still read as
+  // dispensable.
+  if (rx.status === 'discontinued') return 'held_awaiting_clarification';
   if (rx.orderStatus) return rx.orderStatus;
   if (rx.status === 'dispensed') return 'dispensed';
-  if (rx.status === 'discontinued') return 'held_awaiting_clarification';
   return 'received_in_pharmacy_queue';
 }
 

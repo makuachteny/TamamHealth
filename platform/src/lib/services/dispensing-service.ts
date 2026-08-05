@@ -413,6 +413,17 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
       'NOT_CLEARED',
     );
   }
+  // Belt-and-suspenders on top of the stage check above: a discontinued order
+  // must never be dispensable, independent of whatever effectivePrescriptionStatus
+  // resolves `orderStatus` to. Checked explicitly rather than trusted to the
+  // stage function alone, since a stopped drug reaching a patient is the
+  // failure this gate exists to prevent.
+  if (rx.status === 'discontinued') {
+    throw new DispenseError(
+      'This medication was discontinued and can no longer be dispensed.',
+      'NOT_CLEARED',
+    );
+  }
   if (!Number.isFinite(quantity) || quantity <= 0) {
     throw new DispenseError('Dispense quantity must be greater than zero.', 'BAD_QUANTITY');
   }

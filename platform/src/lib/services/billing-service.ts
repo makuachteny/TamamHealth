@@ -242,6 +242,51 @@ export async function createBill(data: CreateBillInput): Promise<BillingDoc> {
   return doc;
 }
 
+/**
+ * Apply a payment to a bill in memory (payments[], amountPaid, balanceDue,
+ * status) — the math shared by `recordPayment` (single bill, posts its own
+ * ledger entry) and `settleOpenBillsWithPayment` (a patient-level payment
+ * spread across several bills, ledger entry posted once by the caller).
+ * Does not persist or touch the ledger; callers do both.
+ */
+function applyPaymentToBill(
+  bill: BillingDoc,
+  amount: number,
+  method: PaymentMethod,
+  receivedBy: string,
+  receivedByName: string,
+  now: string,
+  reference?: string,
+  notes?: string,
+): PaymentRecord {
+  const payment: PaymentRecord = {
+    id: uuidv4().slice(0, 8),
+    amount,
+    method,
+    reference,
+    receivedBy,
+    receivedByName,
+    receivedAt: now,
+    notes,
+  };
+
+  bill.payments.push(payment);
+  bill.amountPaid = Math.round((bill.amountPaid + amount) * 100) / 100;
+  bill.balanceDue = Math.round((bill.totalAmount - bill.amountPaid) * 100) / 100;
+
+  // Update status
+  /* istanbul ignore next -- payment status: all paths tested but istanbul counts extra branches */
+  if (bill.balanceDue <= 0) {
+    bill.status = 'paid';
+    bill.balanceDue = 0;
+  } else if (bill.amountPaid > 0) {
+    bill.status = 'partial';
+  }
+
+  bill.updatedAt = now;
+  return payment;
+}
+
 export async function recordPayment(
   billId: string,
   amount: number,
@@ -256,31 +301,8 @@ export async function recordPayment(
     const bill = await db.get(billId) as BillingDoc;
     const now = new Date().toISOString();
 
-    const payment: PaymentRecord = {
-      id: uuidv4().slice(0, 8),
-      amount,
-      method,
-      reference,
-      receivedBy,
-      receivedByName,
-      receivedAt: now,
-      notes,
-    };
+    const payment = applyPaymentToBill(bill, amount, method, receivedBy, receivedByName, now, reference, notes);
 
-    bill.payments.push(payment);
-    bill.amountPaid = Math.round((bill.amountPaid + amount) * 100) / 100;
-    bill.balanceDue = Math.round((bill.totalAmount - bill.amountPaid) * 100) / 100;
-
-    // Update status
-    /* istanbul ignore next -- payment status: all paths tested but istanbul counts extra branches */
-    if (bill.balanceDue <= 0) {
-      bill.status = 'paid';
-      bill.balanceDue = 0;
-    } else if (bill.amountPaid > 0) {
-      bill.status = 'partial';
-    }
-
-    bill.updatedAt = now;
     const resp = await db.put(bill);
     bill._rev = resp.rev;
 
@@ -323,6 +345,79 @@ export async function recordPayment(
   } catch {
     return null;
   }
+}
+
+/**
+ * Settle a patient-level payment (e.g. from PaymentPanel's `collectPayment`,
+ * which collects against the patient's aggregate ledger balance rather than
+ * one specific bill) against that patient's open bills, oldest first.
+ *
+ * Without this, a payment collected through the ledger never touches the
+ * BillingDoc(s) it was actually paying down: the ledger balance reads paid
+ * while the bill stays 'pending'/'partial' forever, and the two permanently
+ * disagree. Partial payments settle proportionally (a bill only moves to
+ * 'paid' once its own balance is fully covered; otherwise it becomes/stays
+ * 'partial') exactly like `recordPayment`, just spread across bills instead
+ * of applied to one.
+ *
+ * Deliberately does NOT post a ledger entry — the caller already posted one
+ * for the full payment amount, and a second one here would double-credit the
+ * patient's balance for the same real-world payment. Only bills whose
+ * currency matches the payment are touched, so a payment in one currency
+ * can't be applied to a bill denominated in another.
+ *
+ * Best-effort by callers, same as the ledger mirrors elsewhere in this file:
+ * bills are already-persisted records of what was billed, so a failure here
+ * must not unwind a payment that already succeeded.
+ */
+export async function settleOpenBillsWithPayment(
+  patientId: string,
+  amount: number,
+  currency: string,
+  method: PaymentMethod,
+  receivedBy: string,
+  receivedByName: string,
+  reference?: string,
+  notes?: string,
+): Promise<{ settledBills: BillingDoc[]; unapplied: number }> {
+  if (!(amount > 0)) return { settledBills: [], unapplied: amount };
+
+  const db = billingDB();
+  const openBills = (await getBillsByPatient(patientId))
+    .filter(b => (b.status === 'pending' || b.status === 'partial') && b.currency === currency)
+    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
+  let remaining = Math.round(amount * 100) / 100;
+  const settledBills: BillingDoc[] = [];
+  const now = new Date().toISOString();
+
+  for (const bill of openBills) {
+    if (remaining <= 0) break;
+    const portion = Math.round(Math.min(remaining, bill.balanceDue) * 100) / 100;
+    if (portion <= 0) continue;
+
+    applyPaymentToBill(bill, portion, method, receivedBy, receivedByName, now, reference, notes);
+    const resp = await db.put(bill);
+    bill._rev = resp.rev;
+    settledBills.push(bill);
+    remaining = Math.round((remaining - portion) * 100) / 100;
+
+    await logAuditSafe(
+      'PAYMENT_RECORDED', receivedBy, receivedByName,
+      `Payment ${portion} ${bill.currency} applied to ${bill.invoiceNumber} from a patient-balance payment`
+    );
+
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
+  }
+
+  return { settledBills, unapplied: Math.max(0, remaining) };
 }
 
 /**

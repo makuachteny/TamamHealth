@@ -400,7 +400,10 @@ export default function AppointmentsPage() {
     try {
       await create({
         patientId: patient._id, patientName: `${patient.firstName} ${patient.surname}`,
-        patientPhone: patient.phone || undefined, providerId: currentUser?._id || '',
+        // The form only captures a provider NAME (free text below), not a real
+        // clinician id — stamping the acting clerk's own id here put every
+        // desk-booked appointment on the clerk's own schedule.
+        patientPhone: patient.phone || undefined, providerId: '',
         providerName: formProvider || currentUser?.name || '', facilityId: currentUser?.hospitalId || '',
         facilityName: currentUser?.hospitalName || '', facilityLevel: 'payam' as FacilityLevel,
         appointmentDate: formDate, appointmentTime: formTime, duration: formDuration,
@@ -409,6 +412,7 @@ export default function AppointmentsPage() {
         reminderSent: false, isRecurring: formRecurring,
         recurrencePattern: formRecurring ? formRecurrencePattern : undefined,
         bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
+        orgId: currentUser?.orgId,
       });
       showToast(t('appointments.toastBooked'), 'success'); setShowNewForm(false); resetForm();
     } catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedBook'), 'error'); }
@@ -423,14 +427,17 @@ export default function AppointmentsPage() {
     try {
       await create({
         patientId: patient._id, patientName: `${patient.firstName} ${patient.surname}`,
-        patientPhone: patient.phone || undefined, providerId: currentUser?._id || '',
-        providerName: currentUser?.name || '', facilityId: currentUser?.hospitalId || '',
+        // The desk registering a walk-in is not their clinician; the queue
+        // assigns one. `bookedBy` below already records who took them in.
+        patientPhone: patient.phone || undefined, providerId: '',
+        providerName: '', facilityId: currentUser?.hospitalId || '',
         facilityName: currentUser?.hospitalName || '', facilityLevel: 'payam' as FacilityLevel,
         appointmentDate: today, appointmentTime: jubaTime(),
         duration: 30, appointmentType: 'walk_in', priority: wiPriority,
         department: wiDepartment, reason: wiReason, notes: wiNotes || undefined,
         status: 'checked_in', reminderSent: false, isRecurring: false,
         bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
+        orgId: currentUser?.orgId,
       });
       showToast(t('appointments.toastWalkInRegistered'), 'success'); setShowWalkIn(false);
       setWiPatient(''); setWiReason(''); setWiNotes(''); setWiDepartment('Outpatient'); setWiPriority('routine');

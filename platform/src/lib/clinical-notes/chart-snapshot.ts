@@ -13,11 +13,12 @@
  */
 
 import type { AllergyEntry } from '../types/patient-clinical';
-import type { PrescriptionDoc, ProblemDoc, MedicalRecordDoc } from '../db-types';
+import type { PrescriptionDoc, ProblemDoc, MedicalRecordDoc, TriageDoc } from '../db-types';
 import type { NoteSectionId } from './note-catalog';
+import { filterByScope, type DataScope } from '../services/data-scope';
 
 /** "38.1 °C · 150/90 · HR 92" — the line a clinician scans, not a table. */
-export function formatVitals(record: Pick<MedicalRecordDoc, 'vitalSigns' | 'triageVitals'> | null): string {
+export function formatVitals(record: Partial<Pick<MedicalRecordDoc, 'vitalSigns' | 'triageVitals'>> | null): string {
   if (!record) return '';
   const v = record.vitalSigns;
   const t = record.triageVitals;
@@ -87,7 +88,7 @@ export function formatProblems(problems: ProblemDoc[]): string {
 }
 
 export interface ChartSnapshotInput {
-  vitalsRecord?: Pick<MedicalRecordDoc, 'vitalSigns' | 'triageVitals'> | null;
+  vitalsRecord?: Partial<Pick<MedicalRecordDoc, 'vitalSigns' | 'triageVitals'>> | null;
   prescriptions?: PrescriptionDoc[];
   allergies?: AllergyEntry[];
   problems?: ProblemDoc[];
@@ -121,12 +122,17 @@ export function snapshotForSection(
  *
  * Each source is independently guarded: a chart with no problem list must still
  * produce vitals, and one failing read should not blank the whole note.
+ *
+ * `scope` is threaded into the tenant-boundary-sensitive reads (prescriptions,
+ * vitals) the same way the chart itself scopes them — a note's derived
+ * sections must not surface another facility's or org's data that the chart
+ * would hide, especially once that text is frozen into a signed note.
  */
-export async function loadChartSnapshot(patientId: string): Promise<ChartSnapshotInput> {
+export async function loadChartSnapshot(patientId: string, scope?: DataScope): Promise<ChartSnapshotInput> {
   const [prescriptions, allergies, problems, vitalsRecord] = await Promise.all([
     safely(async () => {
       const { getPrescriptionsByPatient } = await import('../services/prescription-service');
-      return getPrescriptionsByPatient(patientId);
+      return getPrescriptionsByPatient(patientId, scope);
     }, [] as PrescriptionDoc[]),
     safely(async () => {
       const { getActiveAllergies } = await import('../services/allergy-service');
@@ -136,15 +142,56 @@ export async function loadChartSnapshot(patientId: string): Promise<ChartSnapsho
       const { getProblemsByPatient } = await import('../services/problem-service');
       return getProblemsByPatient(patientId);
     }, [] as ProblemDoc[]),
-    safely(async () => {
-      const { getRecordsByPatient } = await import('../services/medical-record-service');
-      const rows = await getRecordsByPatient(patientId);
-      // Newest record that actually carries observations.
-      return rows.find(r => r.vitalSigns || r.triageVitals) ?? null;
-    }, null as MedicalRecordDoc | null),
+    newestVitals(patientId, scope),
   ]);
 
   return { prescriptions, allergies, problems, vitalsRecord };
+}
+
+/**
+ * The patient's most recent vitals, from whichever source actually has them.
+ *
+ * TriageWorkflow writes vitals onto the TriageDoc itself, never onto a
+ * medical_record's `triageVitals` — nothing in the app writes that field. A
+ * note opened right after triage and before any consult record exists must
+ * still pick up what triage just took, so this compares the newest
+ * vitals-bearing medical record against the newest vitals-bearing triage stop
+ * and returns whichever is more recent, rather than only ever looking at
+ * medical records and showing stale (or no) vitals.
+ */
+async function newestVitals(
+  patientId: string,
+  scope?: DataScope,
+): Promise<Partial<Pick<MedicalRecordDoc, 'vitalSigns' | 'triageVitals'>> | null> {
+  const [fromRecord, fromTriage] = await Promise.all([
+    safely(async () => {
+      const { getRecordsByPatient } = await import('../services/medical-record-service');
+      const rows = await getRecordsByPatient(patientId, scope);
+      // Newest record that actually carries observations.
+      const record = rows.find(r => r.vitalSigns || r.triageVitals) ?? null;
+      return record ? { at: record.consultedAt || record.visitDate || record.createdAt || '', record } : null;
+    }, null as { at: string; record: MedicalRecordDoc } | null),
+    safely(async () => {
+      const { getTriageByPatient } = await import('../services/triage-service');
+      const rows = scope ? filterByScope(await getTriageByPatient(patientId), scope) : await getTriageByPatient(patientId);
+      const withVitals = rows
+        .filter(t => t.temperature || t.pulse || t.respiratoryRate || t.systolic || t.diastolic || t.oxygenSaturation || t.weight)
+        .sort((a, b) => (b.triagedAt || '').localeCompare(a.triagedAt || ''));
+      return withVitals[0] ? { at: withVitals[0].triagedAt || '', triage: withVitals[0] } : null;
+    }, null as { at: string; triage: TriageDoc } | null),
+  ]);
+
+  if (fromTriage && (!fromRecord || fromTriage.at.localeCompare(fromRecord.at) > 0)) {
+    const t = fromTriage.triage;
+    return {
+      triageVitals: {
+        temperature: t.temperature, systolic: t.systolic, diastolic: t.diastolic,
+        pulse: t.pulse, respiratoryRate: t.respiratoryRate, oxygenSaturation: t.oxygenSaturation,
+        weight: t.weight, muac: t.muac, bloodGlucose: t.bloodGlucose, capturedAt: t.triagedAt,
+      },
+    };
+  }
+  return fromRecord?.record ?? null;
 }
 
 async function safely<T>(fn: () => Promise<T>, fallback: T): Promise<T> {

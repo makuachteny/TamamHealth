@@ -85,7 +85,11 @@ describe('Check-in creates the visit encounter (EMR-FIELD-AUDIT §3)', () => {
     const res = await checkInPatient({ ...base, chiefComplaint: 'Fever' });
     expect(res.encounter.status).toBe('awaiting_triage');
     expect(res.encounter.arrivalChannel).toBe('walk_in');
-    expect(res.encounter.appointmentId).toBeUndefined();
+    // The walk-in's own auto-created booking (see walkInAppointmentCreated)
+    // is threaded onto the encounter rather than left orphaned.
+    expect(res.walkInAppointmentCreated).toBe(true);
+    expect(res.appointmentId).toBeDefined();
+    expect(res.encounter.appointmentId).toBe(res.appointmentId);
     expect(res.attendanceType).toBe('new');
     expect(res.encounter.attendanceType).toBe('new');
     expect(res.triage.encounterId).toBe(res.encounter._id);
@@ -129,6 +133,11 @@ describe('Check-in creates the visit encounter (EMR-FIELD-AUDIT §3)', () => {
     // in-flight consultation — it is rejected with a front-desk message.
     await expect(checkInPatient({ ...base, patientId: 'patient-midvisit', patientName: 'Mid Visit' }))
       .rejects.toThrow(/visit in progress/);
+    // The rejected attempt must not leave a stray second walk-in booking on
+    // today's schedule — only the first check-in's own appointment exists.
+    const appts = await getAppointmentsByPatient('patient-midvisit');
+    expect(appts).toHaveLength(1);
+    expect(appts[0]._id).toBe(first.appointmentId);
   });
 
   test('deriveAttendanceType: new with no history, repeat once an encounter has closed', async () => {

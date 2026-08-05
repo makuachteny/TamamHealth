@@ -24,7 +24,6 @@ import {
 import type { PatientDoc } from '@/lib/db-types';
 import ClinicalNoteEditor from '@/components/clinical-notes/ClinicalNoteEditor';
 import { useUsers } from '@/lib/hooks/useUsers';
-import { useOwnsAttentionRail } from '@/lib/attention-rail';
 import OrderBasketPanel from './panels/OrderBasketPanel';
 import VisitNotePanel from './panels/VisitNotePanel';
 import TaskListPanel from './panels/TaskListPanel';
@@ -106,13 +105,6 @@ export default function OpenmrsChartShell({
   onOpenPrescribeModal, onOpenOrderLabModal, onNoteSaved,
   panelRequest, onPanelRequestHandled,
 }: OpenmrsChartShellProps) {
-  // The chart builds its own right rail (the workspace icon rail and its
-  // drawer), so it takes ownership of the rail slot and the shell's shared
-  // "Needs your attention" panel stays off. That feed is a dashboard view of
-  // everyone waiting on you; inside one patient's chart it is about other
-  // patients, and it sat where this chart's own rail belongs. Claiming is
-  // scoped to this mount, so leaving the chart hands the rail straight back.
-  useOwnsAttentionRail();
 
   const [openPanel, setOpenPanel] = useState<string | null>(null);
   // Note being edited by the clinical-note panel, set by an id-carrying request.

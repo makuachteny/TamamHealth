@@ -21,6 +21,8 @@ import { Info, Plus, X } from '@/components/icons/lucide';
 import PrescribeModal from './prescribe/PrescribeModal';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { useDataScope } from '@/lib/hooks/useDataScope';
+import { filterByScope } from '@/lib/services/data-scope';
 import { pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 import type { PatientDoc, PrescriptionDoc } from '@/lib/db-types';
@@ -67,6 +69,7 @@ export default function MedicationsModal({
   patientId, patientName, currentUser, onClose,
 }: MedicationsModalProps) {
   const { showToast } = useToast();
+  const scope = useDataScope();
   const [showPrescribe, setShowPrescribe] = useState(false);
   const userName = currentUser?.name || currentUser?.username || 'Unknown user';
 
@@ -86,27 +89,38 @@ export default function MedicationsModal({
   const load = useCallback(async () => {
     const { getPrescriptionsByPatient } = await import('@/lib/services/prescription-service');
     const { getPatientById } = await import('@/lib/services/patient-service');
+    // Org-scoped only, not facility-scoped: the right-hand panel is a
+    // deliberate cross-facility view (see file header) so it must stop at the
+    // tenant boundary but must not be narrowed to one facility.
+    const orgScope = scope ? { ...scope, hospitalId: undefined } : undefined;
     const [rx, pt] = await Promise.all([
-      getPrescriptionsByPatient(patientId),
+      getPrescriptionsByPatient(patientId, orgScope),
       getPatientById(patientId),
     ]);
     rx.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     setPrescriptions(rx);
     setPatient(pt);
     setLoading(false);
-  }, [patientId]);
+  }, [patientId, scope]);
 
   useEffect(() => { void load(); }, [load]);
 
+  // The working med list (left) is this facility's own record, same as the
+  // chart's Medications tab — narrower than the org-wide network history (right).
+  const facilityRx = useMemo(
+    () => (scope ? filterByScope(prescriptions, scope) : prescriptions),
+    [prescriptions, scope],
+  );
+
   const counts = useMemo(() => {
     const c: Record<MedTab, number> = { active: 0, discontinued: 0, not_administered: 0 };
-    for (const rx of prescriptions) c[bucketOf(rx)] += 1;
+    for (const rx of facilityRx) c[bucketOf(rx)] += 1;
     return c;
-  }, [prescriptions]);
+  }, [facilityRx]);
 
   const rows = useMemo(
-    () => prescriptions.filter(rx => bucketOf(rx) === tab),
-    [prescriptions, tab],
+    () => facilityRx.filter(rx => bucketOf(rx) === tab),
+    [facilityRx, tab],
   );
   const selected = rows.find(rx => rx._id === selectedId) || null;
 

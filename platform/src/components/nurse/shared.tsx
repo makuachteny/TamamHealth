@@ -9,7 +9,8 @@ import { useTriage } from '@/lib/hooks/useTriage';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { priorityOrder } from '@/lib/clinical/triage-display';
-import type { MedicationAdministration } from '@/lib/db-types';
+import { durationToDays } from '@/lib/clinical-flow/dispense-quantity';
+import type { MedicationAdministration, PrescriptionDoc } from '@/lib/db-types';
 
 // Re-export the shared vital-flagging helper so existing importers
 // (e.g. WardWorkflow) keep `import { getVitalFlags } from './shared'` working
@@ -190,6 +191,25 @@ function scheduledForISO(day: string, time: string): string {
   return new Date(`${day}T${time}:00`).toISOString();
 }
 
+/**
+ * The point past which a prescription must stop producing new scheduled-dose
+ * rows — either the moment it was stopped, or its prescribed course running
+ * out. Without this, a discontinued or long-finished order keeps expanding
+ * into "due"/"overdue" rows every day indefinitely. Returns null when neither
+ * applies (still an open, unstopped course).
+ */
+export function doseExpansionCutoff(rx: Pick<PrescriptionDoc, 'stoppedAt' | 'createdAt' | 'duration'>): number | null {
+  if (rx.stoppedAt) {
+    const stoppedMs = new Date(rx.stoppedAt).getTime();
+    if (Number.isFinite(stoppedMs)) return stoppedMs;
+  }
+  if (rx.createdAt && rx.duration) {
+    const startMs = new Date(rx.createdAt).getTime();
+    if (Number.isFinite(startMs)) return startMs + durationToDays(rx.duration) * 24 * 60 * 60 * 1000;
+  }
+  return null;
+}
+
 // ============================================================
 // Hook: MAR entries sourced from REAL prescriptions + administration persistence
 // ============================================================
@@ -217,12 +237,21 @@ export function useMarEntries() {
       const times = scheduleForFrequency(rx.frequency);
       if (times.length === 0) continue;
 
+      // A discontinued order, or one whose prescribed course has already run
+      // out, must not keep producing new due/overdue/upcoming rows forever —
+      // but a dose already given before the stop stays visible below, so the
+      // skip is per-slot, not a blanket `continue` on the prescription.
+      const stopped = rx.status === 'discontinued';
+      const cutoff = doseExpansionCutoff(rx);
+
       for (const time of times) {
         const scheduledFor = scheduledForISO(day, time);
         // Only a non-voided administration satisfies a scheduled dose. A voided
         // entry stays in the append-only history but the slot reverts to
         // due/overdue, so a dose marked given by mistake can be re-recorded.
         const adm = (rx.administrations || []).find(a => a.scheduledFor === scheduledFor && !a.voided);
+
+        if (!adm && (stopped || (cutoff !== null && new Date(scheduledFor).getTime() >= cutoff))) continue;
 
         let status: MAREntry['status'];
         if (adm) {

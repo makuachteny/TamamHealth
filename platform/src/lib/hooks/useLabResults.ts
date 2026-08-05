@@ -20,7 +20,7 @@ export function useLabResults(patientId?: string) {
     try {
       setError(null);
       const { getAllLabResults, getLabResultsByPatient } = await import('../services/lab-service');
-      const data = patientId ? await getLabResultsByPatient(patientId) : await getAllLabResults(scope);
+      const data = patientId ? await getLabResultsByPatient(patientId, scope) : await getAllLabResults(scope);
       setResults(data);
     } catch (err) {
       console.error(err);

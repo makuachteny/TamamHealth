@@ -67,7 +67,7 @@ export async function advanceLabOrder(
   const now = new Date().toISOString();
   const status = coarseFromOrderStatus(to);
   const completedAt = (to === 'resulted' && !existing.completedAt)
-    ? new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    ? new Date().toISOString()
     : existing.completedAt;
   return updateLabResult(id, { ...extra, orderStatus: to, status, completedAt, updatedAt: now } as Partial<LabResultDoc>);
 }
@@ -91,9 +91,10 @@ export async function getAllLabResults(scope?: DataScope): Promise<LabResultDoc[
   return scope ? filterByScope(all, scope) : all;
 }
 
-export async function getLabResultsByPatient(patientId: string): Promise<LabResultDoc[]> {
-  return (await findByType<LabResultDoc>(labResultsDB(), 'lab_result', { patientId }, { indexFields: ['type', 'patientId'] }))
+export async function getLabResultsByPatient(patientId: string, scope?: DataScope): Promise<LabResultDoc[]> {
+  const rows = (await findByType<LabResultDoc>(labResultsDB(), 'lab_result', { patientId }, { indexFields: ['type', 'patientId'] }))
     .map(decryptLabResult);
+  return scope ? filterByScope(rows, scope) : rows;
 }
 
 export async function createLabResult(

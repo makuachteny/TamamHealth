@@ -3,8 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { makeCoalescer } from './live-reload';
 import type { MedicalRecordDoc, AssessmentDoc } from '../db-types';
-import { medicalRecordsDB, assessmentsDB } from '../db';
+import { medicalRecordsDB, assessmentsDB, getDB } from '../db';
 import { useDataScope } from './useDataScope';
+import type { ClinicalNoteDoc } from '../clinical-notes/types';
+
+// Same db name `note-service.ts`'s `clinicalNotesDB()` resolves to. Read
+// directly via `getDB` (already statically imported here, like
+// `medicalRecordsDB`/`assessmentsDB`) rather than statically importing the
+// whole notes service module into every screen this hook loads on.
+const clinicalNotesDB = () => getDB('tamamhealth_clinical_notes');
 
 export interface SigningInboxState {
   /** Draft/legacy consult notes that have not yet been signed. */
@@ -13,6 +20,13 @@ export interface SigningInboxState {
   awaitingCosign: MedicalRecordDoc[];
   /** Outcome-measure assessments entered by the front desk, awaiting review/signature. */
   heldAssessments: AssessmentDoc[];
+  /**
+   * Unsigned clinical notes. Now that the consultation wizard is retired, the
+   * clinical note IS the encounter record, so it belongs in the same "to
+   * sign" inbox as legacy medical-record drafts — otherwise a signed-less
+   * note is invisible and never gets attested.
+   */
+  unsignedNotes: ClinicalNoteDoc[];
   loading: boolean;
   reload: () => void;
 }
@@ -28,18 +42,23 @@ export function useSigningInbox(): SigningInboxState {
   const [unsignedDrafts, setUnsignedDrafts] = useState<MedicalRecordDoc[]>([]);
   const [awaitingCosign, setAwaitingCosign] = useState<MedicalRecordDoc[]>([]);
   const [heldAssessments, setHeldAssessments] = useState<AssessmentDoc[]>([]);
+  const [unsignedNotes, setUnsignedNotes] = useState<ClinicalNoteDoc[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [{ getSigningInbox }, { getHeldAssessments }] = await Promise.all([
+      const [{ getSigningInbox }, { getHeldAssessments }, { getUnsignedNotes }] = await Promise.all([
         import('../services/medical-record-service'),
         import('../services/assessment-service'),
+        import('../clinical-notes/note-service'),
       ]);
-      const [inbox, held] = await Promise.all([getSigningInbox(scope), getHeldAssessments(scope)]);
+      const [inbox, held, notes] = await Promise.all([
+        getSigningInbox(scope), getHeldAssessments(scope), getUnsignedNotes(undefined, scope),
+      ]);
       setUnsignedDrafts(inbox.unsignedDrafts);
       setAwaitingCosign(inbox.awaitingCosign);
       setHeldAssessments(held);
+      setUnsignedNotes(notes);
     } catch (err) {
       console.error('Failed to load signing inbox', err);
     } finally {
@@ -56,13 +75,16 @@ export function useSigningInbox(): SigningInboxState {
       .on('change', () => reload.trigger()).on('error', () => { /* noop */ });
     const asmtChanges = assessmentsDB().changes({ since: 'now', live: true, include_docs: false })
       .on('change', () => reload.trigger()).on('error', () => { /* noop */ });
+    const noteChanges = clinicalNotesDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger()).on('error', () => { /* noop */ });
     return () => {
       cancelled = true;
       reload.cancel();
       try { recChanges.cancel(); } catch { /* noop */ }
       try { asmtChanges.cancel(); } catch { /* noop */ }
+      try { noteChanges.cancel(); } catch { /* noop */ }
     };
   }, [load]);
 
-  return { unsignedDrafts, awaitingCosign, heldAssessments, loading, reload: load };
+  return { unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes, loading, reload: load };
 }

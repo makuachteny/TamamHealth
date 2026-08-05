@@ -10,7 +10,7 @@
 import type { AppointmentDoc, TriageDoc, TriagePriority, EncounterDoc } from '../db-types';
 import { createTriage } from './triage-service';
 import { createAppointment, getAppointmentsByPatient, updateAppointmentStatus } from './appointment-service';
-import { jubaDate } from '../time-juba';
+import { jubaDate, jubaTime } from '../time-juba';
 import { APPOINTMENT_PENDING_STATUSES } from '../appointment-status';
 import { createArrivalEncounter, findOpenEncounterForPatient, hasClosedEncounterForPatient, PRE_CLINICIAN_STATUSES } from './encounter-service';
 import { getRecordsByPatient } from './medical-record-service';
@@ -89,7 +89,10 @@ export interface CheckInResult {
   encounter: EncounterDoc;
   /** True when a scheduled appointment for today was also marked checked_in. */
   appointmentCheckedIn: boolean;
+  /** The appointment now linked to this visit — matched-existing or the walk-in's own new one. */
   appointmentId?: string;
+  /** True when this check-in wrote a brand-new walk-in booking (no scheduled appointment matched). */
+  walkInAppointmentCreated: boolean;
   attendanceType: AttendanceType;
 }
 
@@ -127,6 +130,21 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
       ? 'referral'
       : 'walk_in';
 
+  // Join the patient's already-open visit (e.g. re-checked-in after a lapse)
+  // instead of spawning a duplicate encounter for the same episode of care —
+  // scoped to THIS facility, so another facility's open encounter in the
+  // shared org DB is never absorbed. Checked BEFORE the walk-in booking below
+  // is written: a rejected check-in must not leave a stray appointment on
+  // today's schedule.
+  let encounter = await findOpenEncounterForPatient(input.patientId, input.facilityId || '');
+  if (encounter && !PRE_CLINICIAN_STATUSES.includes(encounter.status)) {
+    // The visit is already with a clinician (or in a downstream loop such as
+    // labs/checkout). A duplicate check-in here would attach a fresh pending
+    // triage to a mid-flight encounter and re-queue a patient who is already
+    // being seen — reject it with a message the front-desk toast can show.
+    throw new Error('This patient already has a visit in progress — no new check-in was recorded.');
+  }
+
   // A walk-in gets a booking of its own, created at the moment they are
   // checked in. Without one, half the patients in the building had no
   // appointment record, so every surface that reasons about a visit — the
@@ -137,7 +155,6 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
   let walkInAppointmentId: string | undefined;
   if (!appointmentId) {
     try {
-      const now = new Date();
       const created = await createAppointment({
         patientId: input.patientId,
         patientName: input.patientName,
@@ -149,7 +166,10 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
         facilityName: input.facilityName ?? '',
         facilityLevel: 'county',
         appointmentDate: jubaDate(),
-        appointmentTime: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+        // Same clock as the date above — reading the hour off the browser's
+        // own timezone paired a Juba calendar date with a non-Juba wall-clock
+        // time for anyone outside Africa/Juba.
+        appointmentTime: jubaTime(),
         duration: 15,
         // Recorded as what it is. The status is already `checked_in`: the
         // patient is at the desk, not expected later.
@@ -168,20 +188,13 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
     }
   }
 
+  // The appointment now linked to this visit: the matched scheduled booking,
+  // or the walk-in's own new one. The two branches above are mutually
+  // exclusive, so this never merges two different bookings.
+  const linkedAppointmentId = appointmentId ?? walkInAppointmentId;
+
   const attendanceType = input.attendanceType ?? await deriveAttendanceType(input.patientId);
 
-  // Join the patient's already-open visit (e.g. re-checked-in after a lapse)
-  // instead of spawning a duplicate encounter for the same episode of care —
-  // scoped to THIS facility, so another facility's open encounter in the
-  // shared org DB is never absorbed.
-  let encounter = await findOpenEncounterForPatient(input.patientId, input.facilityId || '');
-  if (encounter && !PRE_CLINICIAN_STATUSES.includes(encounter.status)) {
-    // The visit is already with a clinician (or in a downstream loop such as
-    // labs/checkout). A duplicate check-in here would attach a fresh pending
-    // triage to a mid-flight encounter and re-queue a patient who is already
-    // being seen — reject it with a message the front-desk toast can show.
-    throw new Error('This patient already has a visit in progress — no new check-in was recorded.');
-  }
   if (!encounter) {
     encounter = await createArrivalEncounter({
       patientId: input.patientId,
@@ -191,7 +204,7 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
       hospitalName: input.facilityName,
       orgId: input.orgId,
       arrivalChannel,
-      appointmentId,
+      appointmentId: linkedAppointmentId,
       attendanceType,
       actorId: input.checkedInById,
     });
@@ -234,7 +247,11 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
     encounterId: encounter._id,
   } as Omit<TriageDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
 
-  // Mark the matched appointment checked_in — non-fatal.
+  // Mark the matched EXISTING appointment checked_in — non-fatal. A
+  // newly-created walk-in booking is already written with status
+  // 'checked_in' above, so this only ever fires for the matched-appointment
+  // branch: `appointmentCheckedIn` means "an existing scheduled appointment
+  // was marked checked_in", not "this visit now has an appointment".
   let appointmentCheckedIn = false;
   if (appointmentId) {
     try {
@@ -245,5 +262,12 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
     }
   }
 
-  return { triage, encounter, appointmentCheckedIn, appointmentId, attendanceType };
+  return {
+    triage,
+    encounter,
+    appointmentCheckedIn,
+    appointmentId: linkedAppointmentId,
+    walkInAppointmentCreated: Boolean(walkInAppointmentId),
+    attendanceType,
+  };
 }

@@ -30,13 +30,8 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { ArrowLeft, FileText } from '@/components/icons/lucide';
 import TriageWorkflow from '@/components/nurse/TriageWorkflow';
 import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
-import { useOwnsAttentionRail } from '@/lib/attention-rail';
 
 export default function PatientTriagePage() {
-  // A page about one patient does not carry a feed about everyone else — the
-  // ETAT form and this patient's history use the full width instead. Same call
-  // the chart makes.
-  useOwnsAttentionRail();
 
   const params = useParams();
   const router = useRouter();

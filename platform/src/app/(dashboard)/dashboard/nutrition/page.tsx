@@ -14,6 +14,13 @@ import {
 } from '@/components/icons/lucide';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
+// The same patient lookup the lab order flow uses — generic over PatientDoc,
+// not lab-specific — so a screening can link to a real chart instead of
+// nowhere. Its `labord-*` styles are scoped and additive, matching how the
+// lab order screens already pull this file in.
+import LabOrderPatientPicker from '@/components/lab/order/LabOrderPatientPicker';
+import '@/components/lab/order/lab-order.css';
+import { patientFullName } from '@/lib/patient-utils';
 
 // Use the platform accent token so this dashboard matches the reference
 // Clinical Officer design instead of a one-off hardcoded hex.
@@ -92,7 +99,7 @@ const matchesTab = (status: string, tab: string): boolean => {
 export default function NutritionDashboard() {
   const { currentUser } = useAuth();
   const { t } = useTranslation();
-  usePatients();
+  const { patients } = usePatients();
 
   // Real screenings persist to the synced nutrition_screenings store; demo
   // rows fill in behind them in demo mode only.
@@ -104,6 +111,11 @@ export default function NutritionDashboard() {
   const togglePanel = (key: 'classification' | 'supplies') =>
     setCenterPanel(prev => (prev === key ? null : key));
   const [form, setForm] = useState(EMPTY_FORM);
+  // Which registered patient (if any) this screening is for. Screenings can
+  // legitimately precede registration, so this stays optional — but when a
+  // match exists, linking it is what lets a SAM/MAM classification reach the
+  // chart and raise an order or referral instead of going nowhere.
+  const [screeningPatientId, setScreeningPatientId] = useState('');
   const [formError, setFormError] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [queueSearch, setQueueSearch] = useState('');
@@ -195,6 +207,7 @@ export default function NutritionDashboard() {
     if (!Number.isFinite(muac) || muac <= 0 || muac > 40) { setFormError(t('nutrition.formErrorMuac')); return; }
     try {
       await addScreening({
+        patientId: screeningPatientId || undefined,
         patientName: form.name.trim(),
         age: form.isAnc && !form.age.toUpperCase().includes('ANC') ? `${form.age.trim()} ANC` : form.age.trim(),
         sex: form.isAnc ? 'F' : form.sex,
@@ -209,6 +222,7 @@ export default function NutritionDashboard() {
         orgId: currentUser?.orgId,
       });
       setForm(EMPTY_FORM);
+      setScreeningPatientId('');
       setFormError('');
       setShowForm(false);
     } catch (err) {
@@ -286,6 +300,10 @@ export default function NutritionDashboard() {
         searchValue={queueSearch}
         searchPlaceholder={t('topbar.searchPlaceholder')}
         onSearchChange={setQueueSearch}
+        // A screening stays on the worklist regardless of which calendar day
+        // is selected — a carried-over SAM/MAM case must not disappear while
+        // the filter chip counts (which are not date-scoped) still show it.
+        filterRowsByDate={false}
         filters={[
           { label: t('nutrition.kpiScreenings'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
           { label: t('nutrition.kpiSamCases'), value: stats.sam, active: filterStatus === 'sam', onClick: () => setFilterStatus(filterStatus === 'sam' ? 'all' : 'sam') },
@@ -329,6 +347,11 @@ export default function NutritionDashboard() {
               : s.status === 'MAM' ? 'warning'
               : (s.status === 'At Risk' || s.status === 'Underweight') ? 'warning'
               : 'done',
+            // SAM/MAM/At Risk IS this screen's whole point — a same-day visit
+            // must not paint over the classification with the appointment
+            // ladder. The shared shell still surfaces the visit status on the
+            // line under the pill when one exists.
+            lockStatus: true,
             popupDetail: renderScreeningDetail(s),
           };
         })}
@@ -344,6 +367,25 @@ export default function NutritionDashboard() {
           {/* ── New screening entry form ── */}
           {showForm && (
             <div className="p-4 rounded-lg dash-card" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+              <div className="mb-3">
+                {/* Optional — a screening can still be recorded for someone not
+                    yet registered. Linking a match here is what lets a SAM/MAM
+                    classification reach that patient's chart. */}
+                <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>
+                  Patient chart (optional)
+                </label>
+                <LabOrderPatientPicker
+                  patients={patients}
+                  selectedId={screeningPatientId}
+                  onSelect={(patientId) => {
+                    setScreeningPatientId(patientId);
+                    const patient = patients.find(p => p._id === patientId);
+                    if (patient) {
+                      setForm(f => ({ ...f, name: patientFullName(patient), sex: patient.gender === 'Male' ? 'M' : 'F' }));
+                    }
+                  }}
+                />
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formName')}</label>

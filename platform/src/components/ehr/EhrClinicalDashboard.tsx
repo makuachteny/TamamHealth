@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  ClipboardCheck,
   ClipboardList,
   MoreVertical,
   Pill,
@@ -24,10 +23,6 @@ import {
   X,
 } from '@/components/icons/lucide';
 import { initials, stateTint, AVATAR_TINT_NEUTRAL } from '@/lib/patient-utils';
-// One palette for "what is this and how urgent" across the bell and the rail.
-import { NOTIFICATION_META, SEVERITY_META } from '@/lib/notification-meta';
-import { useOwnsAttentionRail } from '@/lib/attention-rail';
-import type { NotificationSeverity, NotificationType } from '@/lib/hooks/useNotifications';
 import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
 import {
   APPOINTMENT_STATUS_OPTIONS, appointmentStatusLabel,
@@ -102,26 +97,6 @@ type UnifiedPatientRow = {
   isAssigned: boolean;
 };
 
-/**
- * One row of the rail's "Needs your attention" feed. `type` picks the icon and
- * hue (shared with the notification bell via NOTIFICATION_META) and answers
- * "what kind of thing is this"; `severity` picks the tint and answers "how
- * hard is it pushing". They are deliberately separate: a lab result is purple
- * whether it is critical or routine.
- */
-type RailAction = {
-  key: string;
-  type: Extract<NotificationType, 'lab' | 'triage' | 'appointment'>;
-  severity: NotificationSeverity;
-  title: string;
-  meta: string;
-  /** Ties broken inside a severity band — bigger is more urgent (minutes
-   *  waiting, hours overdue). */
-  weight: number;
-  onOpen: () => void;
-};
-
-const SEVERITY_RANK: Record<NotificationSeverity, number> = { critical: 0, warning: 1, info: 2 };
 
 /** One row inside an outstanding-item worklist (a document to sign, an open
  *  referral, a paused encounter, …) rendered inline in the centre panel. */
@@ -267,11 +242,6 @@ export default function EhrClinicalDashboard({
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   const [view, setView] = useState<'dashboard' | 'calendar'>('dashboard');
   const [railOpen, setRailOpen] = useState(false);
-  // This dashboard builds its own right rail (Outstanding items + the
-  // attention feed), so the shell must not stack a second one beside it. Only
-  // the dashboard view renders that rail — the chart/worklist views get the
-  // shared one like every other module.
-  useOwnsAttentionRail(view === 'dashboard');
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [openAppointment, setOpenAppointment] = useState<AppointmentDoc | null>(null);
   // Which action dropdown (if any) is open in the appointment detail popup.
@@ -492,11 +462,20 @@ export default function EhrClinicalDashboard({
         triagePriority: patient.triagePriority || (appointment ? appointmentTriage(appointment.priority) : 'GREEN'),
         assignmentStatus: patient.assignmentStatus || (patient.assignedDoctor ? 'assigned' : undefined),
         assignmentNote: patient.assignmentNote,
-        reason: appointment?.reason || patient.division || patient.ward || 'Assigned patient',
-        timeLabel: appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime) : 'Assigned',
+        reason: appointment?.reason || patient.division || patient.ward || (patient.assignedDoctor ? 'Assigned patient' : 'Awaiting provider'),
+        timeLabel: appointment?.appointmentTime ? formatClockTime(appointment.appointmentTime) : (patient.assignedDoctor ? 'Assigned' : 'Unclaimed'),
         status: status as AppointmentStatus,
         department,
-        provider: patient.doctor || clinicianName || appointment?.providerName || 'Not assigned',
+        // Only borrow the viewing clinician's own name once the patient
+        // actually carries an assignedDoctor. Falling back to `clinicianName`
+        // unconditionally meant an explicitly unclaimed patient (surfaced so
+        // ANY doctor at the facility could claim them) silently showed up
+        // pre-labelled with whichever doctor happened to be looking — hiding
+        // the exact "nobody has this patient yet" state the row exists to
+        // show. Falls through to careTeamPrimary's 'Doctor unassigned' below.
+        provider: patient.assignedDoctor
+          ? (patient.doctor || clinicianName || 'Not assigned')
+          : (appointment?.providerName || ''),
         isAssigned: true,
       };
     });
@@ -745,64 +724,6 @@ export default function EhrClinicalDashboard({
   // Row popup (visit info + actions) and the Move dialog it can open.
   const [visitRow, setVisitRow] = useState<UnifiedPatientRow | null>(null);
 
-  // ── "Needs your attention" rail feed ────────────────────────────────────
-  // One row per thing that actually wants this clinician: a result past its
-  // review SLA, a triaged patient still waiting, a patient checked in. Each
-  // row is typed and colour-coded, because a flat monochrome list makes a RED
-  // triage look exactly like a routine check-in. Icon + hue come from the
-  // notification palette so the rail and the bell say the same thing about the
-  // same item; the tint on the row comes from severity, not from the source.
-  const railActions = useMemo<RailAction[]>(() => {
-    const rows: RailAction[] = [];
-
-    for (const lab of overdueLabRows) {
-      rows.push({
-        key: `lab-${lab._id}`,
-        type: 'lab',
-        severity: lab.critical ? 'critical' : 'warning',
-        title: lab.testName,
-        // Hours until it reads oddly, then days.
-        meta: `${lab.patientName} · ${lab.hoursOverdue >= 48
-          ? `${Math.floor(lab.hoursOverdue / 24)}d overdue`
-          : `${lab.hoursOverdue}h overdue`}`,
-        weight: lab.hoursOverdue,
-        onOpen: () => router.push(`/patients/${lab.patientId}?tab=labs&focus=${encodeURIComponent(lab._id)}`),
-      });
-    }
-
-    for (const row of visiblePatientRows) {
-      // Same "arrived, not yet in service" test the worklist's Waiting pill
-      // uses — inlined off queueEntryByPatient so this stays memoisable.
-      const entry = row.patientId ? queueEntryByPatient.get(row.patientId) : undefined;
-      const inService = Boolean(entry?.assignedToId) || row.status === 'in_progress';
-      if (inService) continue;
-      if (entry) {
-        rows.push({
-          key: `triage-${row.id}`,
-          type: 'triage',
-          // ETAT acuity is the whole point of triage — it drives the tint.
-          severity: entry.acuity === 'RED' ? 'critical' : entry.acuity === 'YELLOW' ? 'warning' : 'info',
-          title: row.name,
-          meta: `${STAGE_LABELS[entry.stage]} · ${waitLabel(entry.minutesWaiting)}`,
-          weight: entry.minutesWaiting,
-          onOpen: () => setVisitRow(row),
-        });
-      } else if (row.status === 'checked_in') {
-        rows.push({
-          key: `checkin-${row.id}`,
-          type: 'appointment',
-          severity: 'info',
-          title: row.name,
-          meta: `Checked in · ${row.timeLabel || 'waiting to be seen'}`,
-          weight: 0,
-          onOpen: () => setVisitRow(row),
-        });
-      }
-    }
-
-    // Urgency first, then the oldest wait/breach inside each band.
-    return rows.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.weight - a.weight);
-  }, [overdueLabRows, visiblePatientRows, queueEntryByPatient, router]);
 
   // A visit opened from the alert rail may belong to a lane the worklist is
   // filtered away from — the panel would then expand a row nobody can see. So
@@ -1624,67 +1545,6 @@ export default function EhrClinicalDashboard({
                 </button>
               ))}
             </div>
-          </section>
-          {/* Everything that wants this clinician, typed and colour-coded
-              (KAN-75 started this as an unreviewed-results card). Placed BELOW
-              "Outstanding items" at the user's direction. Note the trade-off
-              this accepts: a breached critical result now sits under routine
-              outstanding work rather than leading the rail. The card stays
-              mounted when the feed is empty — at the user's direction — so the
-              rail keeps a stable shape and "nothing to act on" is stated
-              rather than inferred from a missing card. */}
-          <section className="ehr-side-card ehr-action-feed-card">
-            <div className="ehr-side-card-head">
-              <ClipboardCheck className="w-5 h-5" />
-              <h2>Needs your attention</h2>
-            </div>
-            {railActions.length === 0 ? (
-              <p className="ehr-action-empty">All caught up — nothing needs your attention right now.</p>
-            ) : (
-              <>
-                {/* Three rows tall, the rest on a scroll: the card is a glance
-                    surface in a fixed-height rail, so a clinician with hundreds
-                    of open items gets a bounded card rather than one that runs
-                    off the rail. Capped at 25 rows here; the full queue lives on
-                    /notifications. */}
-                <ul className="ehr-action-feed is-scrollable">
-                  {railActions.slice(0, 25).map(action => {
-                    const meta = NOTIFICATION_META[action.type];
-                    const severity = SEVERITY_META[action.severity];
-                    const Icon = meta.icon;
-                    return (
-                      <li key={action.key}>
-                        <button
-                          type="button"
-                          className={`ehr-action-row is-${action.severity}`}
-                          onClick={action.onOpen}
-                          title={`${meta.label} · ${severity.label}`}
-                        >
-                          {/* Bare icon, no tinted chip: globals.css strips the
-                              background off any `span:has(> svg:only-child)` —
-                              the flat-clinical direction — so the glyph carries
-                              the source colour on its own. */}
-                          <span className="ehr-action-icon">
-                            {/* The icon set hardcodes a stroke attribute, so the
-                                colour must be forced via the stroke property. */}
-                            <Icon className="w-3.5 h-3.5" style={{ stroke: meta.color, color: meta.color }} />
-                          </span>
-                          <span className="ehr-action-text">
-                            <span className="ehr-action-title">{action.title}</span>
-                            <span className="ehr-action-meta">{action.meta}</span>
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {/* These rows ARE notifications — the same items the bell raises
-                    — so "view all" opens the notifications feed. */}
-                <button type="button" className="ehr-action-more" onClick={() => router.push('/notifications')}>
-                  {`View all ${railActions.length} in notifications`}
-                </button>
-              </>
-            )}
           </section>
         </aside>
         )}

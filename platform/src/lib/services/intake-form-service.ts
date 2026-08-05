@@ -85,41 +85,42 @@ export async function rejectIntakeForm(id: string, rejectedBy: string): Promise<
  * object built by the reviewer from the form's fields (kept loosely typed
  * here to avoid a circular import on PatientDoc from a service that's
  * primarily about the intake form lifecycle).
+ *
+ * Failures are NOT swallowed: a failed `updatePatient` or `db.put` reaches
+ * the caller as a rejected promise, not a silent `null`, so the
+ * front-desk/patient-intake UI can show a real error instead of telling the
+ * clerk the form was merged when the chart was never touched.
  */
 export async function mergeIntakeFormToChart(
   id: string,
   patientUpdates: Record<string, unknown>,
   mergedBy: string
-): Promise<PatientIntakeFormDoc | null> {
+): Promise<PatientIntakeFormDoc> {
   const db = intakeFormsDB();
-  try {
-    const existing = await db.get(id) as PatientIntakeFormDoc;
-    if (existing.patientId && Object.keys(patientUpdates).length > 0) {
-      const { updatePatient } = await import('./patient-service');
-      await updatePatient(existing.patientId, patientUpdates);
-    }
-    const updated: PatientIntakeFormDoc = {
-      ...existing,
-      status: 'merged',
-      mergedAt: new Date().toISOString(),
-      mergedBy,
-      updatedAt: new Date().toISOString(),
-    };
-    const resp = await db.put(updated);
-    updated._rev = resp.rev;
-    await logAuditSafe('MERGE_INTAKE_FORM', existing.patientId, mergedBy, `Intake form ${id} merged into patient chart`);
-    emitSyncEvent({
-      resourceType: 'patient_intake_form',
-      resourceId: updated._id,
-      operation: 'update',
-      resourceVersion: updated._rev,
-      orgId: updated.orgId,
-      hospitalId: updated.hospitalId,
-    });
-    return updated;
-  } catch {
-    return null;
+  const existing = await db.get(id) as PatientIntakeFormDoc;
+  if (existing.patientId && Object.keys(patientUpdates).length > 0) {
+    const { updatePatient } = await import('./patient-service');
+    await updatePatient(existing.patientId, patientUpdates);
   }
+  const updated: PatientIntakeFormDoc = {
+    ...existing,
+    status: 'merged',
+    mergedAt: new Date().toISOString(),
+    mergedBy,
+    updatedAt: new Date().toISOString(),
+  };
+  const resp = await db.put(updated);
+  updated._rev = resp.rev;
+  await logAuditSafe('MERGE_INTAKE_FORM', existing.patientId, mergedBy, `Intake form ${id} merged into patient chart`);
+  emitSyncEvent({
+    resourceType: 'patient_intake_form',
+    resourceId: updated._id,
+    operation: 'update',
+    resourceVersion: updated._rev,
+    orgId: updated.orgId,
+    hospitalId: updated.hospitalId,
+  });
+  return updated;
 }
 
 export async function sendIntakeFormRequest(

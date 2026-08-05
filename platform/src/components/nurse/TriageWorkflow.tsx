@@ -198,7 +198,14 @@ export default function TriageWorkflow({
     label: string,
   ) => {
     try {
-      await updateTriageRecord(ti._id, { status });
+      // updateTriage never throws on an illegal/failed transition — it
+      // swallows the error and resolves null. Without this check a rejected
+      // status change still showed the success toast below.
+      const updated = await updateTriageRecord(ti._id, { status });
+      if (!updated) {
+        showToast(t('nurse.triageStatusFailed'), 'error');
+        return;
+      }
       showToast(t('nurse.triageStatusUpdated', { name: ti.patientName, status: label }), 'success');
     } catch {
       showToast(t('nurse.triageStatusFailed'), 'error');
@@ -213,7 +220,14 @@ export default function TriageWorkflow({
     try {
       const { recordLeftWithoutBeingSeen } = await import('@/lib/services/encounter-service');
       await recordLeftWithoutBeingSeen(ti.encounterId!, { actorId: currentUser?._id });
-      await updateTriageRecord(ti._id, { status: 'lwbs' });
+      // updateTriage never throws on an illegal/failed transition — it
+      // swallows the error and resolves null, which previously still hit the
+      // success toast below while the triage record stayed 'pending' forever.
+      const updated = await updateTriageRecord(ti._id, { status: 'lwbs' });
+      if (!updated) {
+        showToast(t('nurse.triageStatusFailed'), 'error');
+        return;
+      }
       showToast(t('nurse.triageStatusUpdated', { name: ti.patientName, status: t('nurse.triageActionLwbs') }), 'success');
     } catch {
       showToast(t('nurse.triageStatusFailed'), 'error');
@@ -317,8 +331,23 @@ export default function TriageWorkflow({
       };
       if (editingTriageId) {
         // Correct an already-saved record in place — keeps the same id so the
-        // patient chart history points at one record, not a duplicate.
-        await updateTriageRecord(editingTriageId, payload);
+        // patient chart history points at one record, not a duplicate. A
+        // record still sitting at 'pending' (e.g. a clerical check-in,
+        // KAN-100, that this save is now giving its first real ETAT) advances
+        // past it here too — otherwise it joins the same "finished assessment
+        // stuck at Awaiting Triage forever" bug fixed below for new records.
+        const existingTriage = triageHistory.find(h => h._id === editingTriageId);
+        const updated = await updateTriageRecord(
+          editingTriageId,
+          existingTriage?.status === 'pending' ? { ...payload, status: 'seen' } : payload,
+        );
+        if (!updated) {
+          // updateTriage never throws on an illegal/failed transition — it
+          // swallows the error and resolves null. Without this check the
+          // correction silently didn't save while the toast still read success.
+          showToast(t('nurse.triageSaveFailed'), 'error');
+          return;
+        }
       } else {
         await createTriageRecord({
           patientId: selectedTriagePatient._id,
@@ -331,7 +360,12 @@ export default function TriageWorkflow({
           facilityId: currentUser?.hospitalId,
           facilityName: currentUser?.hospitalName,
           orgId: currentUser?.orgId,
-          status: 'pending',
+          // A completed ETAT (the submit guard above requires every ABCC
+          // dimension) is past triage, not still awaiting it. 'pending' here
+          // meant buildQueueFromTriage classified every nurse-assessed
+          // patient as `awaiting_triage` and no doctor's worklist ever
+          // picked them up — the worst break in the triage → doctor handoff.
+          status: 'seen',
         });
       }
       // Triaged, and now waiting on a room — the nurse's next move.

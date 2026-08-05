@@ -17,6 +17,7 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClinicalNote, listClinicalNotes } from './note-service';
 import { getNoteType, type NoteTypeId } from './note-catalog';
+import { useDataScope } from '../hooks/useDataScope';
 import type { ClinicalNoteDoc } from './types';
 
 export interface CreateNoteFromVisitInput {
@@ -46,6 +47,7 @@ export interface CurrentUserLike {
 
 export function useCreateNote(currentUser: CurrentUserLike | null) {
   const router = useRouter();
+  const scope = useDataScope();
   const [creating, setCreating] = useState(false);
 
   const createNote = useCallback(async (
@@ -58,7 +60,7 @@ export function useCreateNote(currentUser: CurrentUserLike | null) {
       // Reopen rather than fork: a second draft against one appointment splits
       // the encounter across two records.
       if (input.appointmentId) {
-        const existing = await listClinicalNotes({ patientId: input.patientId });
+        const existing = await listClinicalNotes({ patientId: input.patientId }, scope);
         const draft = existing.find(
           n => n.appointmentId === input.appointmentId && n.status === 'draft',
         );
@@ -99,7 +101,7 @@ export function useCreateNote(currentUser: CurrentUserLike | null) {
     } finally {
       setCreating(false);
     }
-  }, [currentUser, router]);
+  }, [currentUser, router, scope]);
 
   return { createNote, creating };
 }

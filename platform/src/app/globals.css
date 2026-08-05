@@ -5796,28 +5796,6 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   overflow: hidden;
 }
 
-/* The shell's own attention rail — shown on every module that does not build a
-   right-hand column of its own, so "what needs me" sits in the same place
-   whether the clinician is in Pharmacy, Wards or their dashboard. Matches the
-   dashboards' rail width so the column does not shift as you move between
-   modules. */
-.ehr-global-rail {
-  flex: 0 0 300px;
-  width: 300px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-  padding: 16px 16px 16px 0;
-  overflow-y: auto;
-}
-
-/* Below this the module body needs the full width more than the rail needs to
-   be permanent; the bell and /notifications still carry the same feed. */
-@media (max-width: 1279px) {
-  .ehr-global-rail { display: none; }
-}
-
 .ehr-side-card {
   flex: 0 0 auto;
   padding: 14px;
@@ -5855,130 +5833,6 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   height: 17px;
   margin: 0;
   color: var(--accent-primary);
-}
-
-/* ── "Needs your attention" rail feed (KAN-75, widened) ───────────────────
-   Started life as an unreviewed-results list; now carries every item that
-   wants this clinician — breached results, triaged patients still waiting,
-   patients checked in.
-
-   Source stays on the icon tile (the hue shared with the bell), so a lab
-   result reads as lab whether it is critical or routine. Severity no longer
-   gets a left rail — removed at the user's direction; `is-critical` keeps its
-   body tint, which is the channel that has to survive peripheral vision.
-
-   Rows run the full width of the card: the list cancels the side-card's 14px
-   padding so a row's tint reaches both edges instead of floating in a gutter. */
-.ehr-action-feed {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0 -14px;
-  padding: 0;
-  list-style: none;
-}
-
-/* Three rows, then scroll (measured: 54.7px row + 4px gap → 3 rows = 172px,
-   plus 8px so the top of the fourth row peeks in as the scroll cue). Keeps the
-   card a fixed size no matter how deep the backlog is, so the cards below stay
-   reachable in the rail. Cut from five at the user's direction: three rows is
-   the glance, the scroll and the "view all" footer carry the depth. */
-.ehr-action-feed.is-scrollable {
-  max-height: 180px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  /* Overlay scrollbar: with the rows now edge-to-edge there is no gutter to
-     reserve, so the thumb floats over the row's right margin instead. */
-  scrollbar-width: thin;
-  scrollbar-gutter: stable;
-}
-
-.ehr-action-feed.is-scrollable::-webkit-scrollbar { width: 6px; }
-.ehr-action-feed.is-scrollable::-webkit-scrollbar-thumb {
-  background: var(--border-medium, rgba(148, 163, 184, 0.45));
-  border-radius: 999px;
-}
-.ehr-action-feed.is-scrollable::-webkit-scrollbar-track { background: transparent; }
-
-/* Empty state: the card stays mounted when there is nothing to act on, so the
-   rail keeps its shape and the quiet is stated, not inferred from a missing
-   card. Muted ink — "all caught up" is the one row that should not compete. */
-.ehr-action-empty {
-  margin: 0;
-  padding: 14px 2px 8px;
-  color: var(--ehr-text-muted, var(--text-secondary));
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.ehr-action-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  text-align: left;
-  background: var(--ehr-surface-2, rgba(148, 163, 184, 0.08));
-  border: 1px solid transparent;
-  border-left: 0;
-  border-right: 0;
-  /* Square: the row spans the card edge to edge, so rounded ends would leave
-     four notches of card background against the card's own border. */
-  border-radius: 0;
-  cursor: pointer;
-  transition: background .12s, border-color .12s;
-}
-
-.ehr-action-row:hover {
-  background: var(--ehr-surface-3, rgba(148, 163, 184, 0.16));
-}
-
-/* Critical also tints the row body — a breached critical result has to be
-   findable in peripheral vision, not just on inspection. */
-.ehr-action-row.is-critical {
-  background: rgba(225, 29, 72, 0.08);
-  border-color: rgba(225, 29, 72, 0.28);
-}
-
-.ehr-action-row.is-critical:hover {
-  background: rgba(225, 29, 72, 0.14);
-}
-
-.ehr-action-icon {
-  /* Fixed slot so titles line up down the column. No fill: the flat-clinical
-     rule near the top of this file strips backgrounds off icon-only spans, so
-     the glyph carries the source hue by itself. */
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ehr-action-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.ehr-action-title {
-  color: var(--ehr-text);
-  font-size: 13px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ehr-action-meta {
-  color: var(--ehr-text-muted, var(--text-secondary));
-  font-size: 12px;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ── Progress feed ────────────────────────────────────────────────────────
@@ -6055,48 +5909,6 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* "View all N in notifications" — the card's centred footer link, not a metric
-   row. The selector carries the parent because `.ehr-side-card > button`
-   (class + element) outranks a lone class and was winning: it dragged this
-   into the metric-row look — 13px, dark ink, left-aligned, space-between.
-   Full-bleed like the rows above it, with a hairline divider so the card ends
-   on a deliberate edge rather than a stray link floating in padding; the bed
-   stays untinted, per the flat-clinical direction. */
-.ehr-side-card > .ehr-action-more {
-  /* A `<button>` sizes to fit-content even at display:flex, so the width has
-     to be stated: card content width plus the 14px padding cancelled on each
-     side. The card's own `overflow: hidden` clips the bleed to its radius. */
-  width: calc(100% + 28px);
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  /* Cancel the card's 14px padding on three sides so the divider meets the
-     card border; 10px above keeps the link off the last row. */
-  margin: 10px -14px -14px;
-  padding: 10px 14px;
-  background: transparent;
-  border: 0;
-  border-top: 1px solid var(--ehr-border);
-  /* Matches .ehr-side-card's 12px, less the border it sits inside. */
-  border-radius: 0 0 11px 11px;
-  color: var(--accent-primary);
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
-  cursor: pointer;
-  transition: background .12s, color .12s;
-}
-
-.ehr-side-card > .ehr-action-more:hover {
-  /* Same hover bed as the rail's metric rows, so the footer reads as part of
-     the same control family. */
-  background: rgba(33, 145, 208, 0.07);
-  color: var(--tb-blue-800, #015697);
-  text-decoration: none;
 }
 
 .ehr-side-card p {
@@ -16291,12 +16103,9 @@ textarea.ehr-handoff-input {
 /* One row language for every right-rail card, on every role's dashboard: the
    clinical "Outstanding items" rows and the care-team metric rows (Clinic
    today, Reception today, Today's triage, …) are the same control.
-
-   `.ehr-action-more` opts out: it is the "Needs your attention" card's footer
-   link, not a metric row, and this block was stretching it into a 48px
-   dark-ink left-aligned row. */
+ */
 .ehr-right-rail .ehr-outstanding-chips button,
-.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):not(.ehr-action-more) {
+.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row) {
   min-height: 48px;
   padding: 0;
   border: 0;
@@ -16308,22 +16117,16 @@ textarea.ehr-handoff-input {
 }
 
 .ehr-right-rail .ehr-outstanding-chips button:last-child,
-.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):not(.ehr-action-more):last-child {
+.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):last-child {
   border-bottom: 0;
 }
 
 .ehr-right-rail .ehr-outstanding-chips button:hover,
-.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):not(.ehr-action-more):hover {
+.ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):hover {
   padding-inline: 10px;
   border-radius: 8px;
   background: rgba(33, 145, 208, 0.07);
   color: var(--tb-blue-800, #015697);
-}
-
-/* Footer bleed measured against the rail card's own padding (22px 14px 24px
-   just above), not the generic 14px side card. */
-.ehr-right-rail .ehr-side-card > .ehr-action-more {
-  margin: 12px -14px -24px;
 }
 
 .ehr-right-rail .ehr-outstanding-chips button.is-open,

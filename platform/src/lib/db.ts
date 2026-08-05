@@ -323,7 +323,12 @@ export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 // Bumped to 61: chart documents (pdoc-seed-001..010) — reports, referral
 // letters, education handouts and a consent form, as real one-page PDFs — so
 // all three views of the chart's Documents section open with content.
-export const SEED_VERSION = 61;
+// Bumped to 62: generated disease-alert weekly buckets (introduced at v53)
+// now carry orgId: PUBLIC_ORG_ID. filterByScope was recently threaded into
+// several more read paths and rejects any doc with no orgId at all — the
+// alert docs had none, so every surveillance trend chart silently rendered
+// empty for every scoped (non-super_admin/government) user.
+export const SEED_VERSION = 62;
 
 export async function isSeeded(): Promise<boolean> {
   try {

@@ -15,6 +15,7 @@ import {
   getBillsByPatient,
   getUnpaidBills,
   recordPayment,
+  settleOpenBillsWithPayment,
   waiveBill,
   getBillingSummary,
 } from '@/lib/services/billing-service';
@@ -131,6 +132,70 @@ describe('billing-service', () => {
     );
     expect(updated!.status).toBe('paid');
     expect(updated!.balanceDue).toBe(0);
+  });
+
+  test('settleOpenBillsWithPayment marks a fully-covered bill paid without a second ledger entry', async () => {
+    const bill = await createBill(makeBillData());
+    const { settledBills, unapplied } = await settleOpenBillsWithPayment(
+      'pat-001', 7000, 'SSP', 'cash', 'user-001', 'Desk Amira', 'REC-100'
+    );
+    expect(unapplied).toBe(0);
+    expect(settledBills).toHaveLength(1);
+    expect(settledBills[0]._id).toBe(bill._id);
+    expect(settledBills[0].status).toBe('paid');
+    expect(settledBills[0].balanceDue).toBe(0);
+    expect(settledBills[0].amountPaid).toBe(7000);
+
+    const fresh = await getBillById(bill._id);
+    expect(fresh!.status).toBe('paid');
+  });
+
+  test('settleOpenBillsWithPayment settles proportionally across multiple open bills, oldest first', async () => {
+    const bill1 = await createBill(makeBillData());
+    const bill2 = await createBill(makeBillData());
+    // 7000 due on each; pay 10000 total — bill1 (created first) is fully
+    // covered, bill2 only gets the 3000 remainder and stays partial.
+    const { settledBills, unapplied } = await settleOpenBillsWithPayment(
+      'pat-001', 10000, 'SSP', 'cash', 'user-001', 'Desk Amira'
+    );
+    expect(unapplied).toBe(0);
+    expect(settledBills.map(b => b._id)).toEqual([bill1._id, bill2._id]);
+
+    const first = await getBillById(bill1._id);
+    const second = await getBillById(bill2._id);
+    expect(first!.status).toBe('paid');
+    expect(first!.balanceDue).toBe(0);
+    expect(second!.status).toBe('partial');
+    expect(second!.amountPaid).toBe(3000);
+    expect(second!.balanceDue).toBe(4000);
+  });
+
+  test('settleOpenBillsWithPayment reports the unapplied remainder when it exceeds every open bill', async () => {
+    await createBill(makeBillData());
+    const { unapplied } = await settleOpenBillsWithPayment(
+      'pat-001', 10000, 'SSP', 'cash', 'user-001', 'Desk Amira'
+    );
+    expect(unapplied).toBe(3000);
+  });
+
+  test('settleOpenBillsWithPayment ignores bills in a different currency', async () => {
+    await createBill(makeBillData({ currency: 'USD' }));
+    const { settledBills, unapplied } = await settleOpenBillsWithPayment(
+      'pat-001', 7000, 'SSP', 'cash', 'user-001', 'Desk Amira'
+    );
+    expect(settledBills).toHaveLength(0);
+    expect(unapplied).toBe(7000);
+  });
+
+  test('settleOpenBillsWithPayment leaves paid/waived/cancelled bills untouched', async () => {
+    const bill = await createBill(makeBillData());
+    await recordPayment(bill._id, bill.totalAmount, 'cash', 'user-001', 'Admin');
+
+    const { settledBills, unapplied } = await settleOpenBillsWithPayment(
+      'pat-001', 500, 'SSP', 'cash', 'user-001', 'Desk Amira'
+    );
+    expect(settledBills).toHaveLength(0);
+    expect(unapplied).toBe(500);
   });
 
   test('waiveBill sets status to waived', async () => {
@@ -403,7 +468,7 @@ describe('billing-service', () => {
 });
 
 describe('billing-service ↔ ledger reconciliation', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const { getPatientBalance } = require('@/lib/services/ledger-service');
 
   test('createBill debits the ledger so the patient balance reflects it', async () => {

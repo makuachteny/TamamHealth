@@ -131,6 +131,11 @@ export function usePrescriptions(patientId?: string) {
     const { updatePrescription } = await import('../services/prescription-service');
     const result = await updatePrescription(id, {
       status: 'discontinued',
+      // Clear any stale lifecycle stage (e.g. 'cleared_for_dispensing') so it
+      // can't disagree with `status` — effectivePrescriptionStatus/pharmacyStage
+      // fall back to `status` when this is unset, but a leftover value must not
+      // be left around to be trusted by some other reader.
+      orderStatus: undefined,
       stoppedAt: new Date().toISOString(),
       stoppedReason: reason,
       stoppedSource: source,

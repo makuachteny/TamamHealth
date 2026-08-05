@@ -72,12 +72,14 @@ const updatePrescription = jest.fn(
 jest.mock('@/lib/services/prescription-service', () => ({
   updatePrescription: (...args: unknown[]) =>
     (updatePrescription as unknown as (...a: unknown[]) => unknown)(...args),
-  // Mirrors the real helper: a legacy doc with no `orderStatus` falls back to
-  // the coarse status and defaults to "in the queue" — i.e. not yet cleared.
+  // Mirrors the real helper: `status === 'discontinued'` wins over a stale
+  // `orderStatus` (e.g. 'cleared_for_dispensing' from before the prescriber
+  // stopped it), and a legacy doc with no `orderStatus` falls back to the
+  // coarse status, defaulting to "in the queue" — i.e. not yet cleared.
   effectivePrescriptionStatus: (doc: { orderStatus?: string; status?: string }) => {
+    if (doc.status === 'discontinued') return 'held_awaiting_clarification';
     if (doc.orderStatus) return doc.orderStatus;
     if (doc.status === 'dispensed') return 'dispensed';
-    if (doc.status === 'discontinued') return 'held_awaiting_clarification';
     return 'received_in_pharmacy_queue';
   },
 }));
@@ -589,5 +591,22 @@ describe('clearance gate', () => {
     store['inv-amox'] = batch({ _id: 'inv-amox', medicationName: 'Amoxicillin 500mg', stockLevel: 100 });
     const found = await getDispensableBatches('Amoxicillin', 'hosp-001');
     expect(found.map(f => f._id)).toEqual(['inv-amox']);
+  });
+
+  // Regression: a prescription cleared for dispensing and THEN discontinued
+  // by the prescriber kept resolving to 'cleared_for_dispensing' because the
+  // gate trusted the stale `orderStatus` over the newer `status` — so a
+  // stopped drug was still dispensable. `status: 'discontinued'` must win
+  // regardless of what `orderStatus` was left at.
+  it('refuses a prescription discontinued after it was cleared for dispensing', async () => {
+    store['inv-1'] = batch({ _id: 'inv-1', stockLevel: 100 });
+    const stopped = {
+      ...rx, orderStatus: 'cleared_for_dispensing', status: 'discontinued',
+    } as PrescriptionDoc;
+
+    await expect(dispenseMedication({ ...input, prescription: stopped, quantity: 21 }))
+      .rejects.toMatchObject({ code: 'NOT_CLEARED' });
+
+    expect(store['inv-1'].stockLevel).toBe(100);
   });
 });

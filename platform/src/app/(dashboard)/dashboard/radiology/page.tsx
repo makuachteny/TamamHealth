@@ -207,8 +207,8 @@ export default function RadiologyDashboard() {
 
   const handleSubmitReport = async (studyId: string) => {
     if (!findings.trim()) return;
-    const isReal = realStudies.some(s => s.id === studyId);
-    if (isReal) {
+    const study = realStudies.find(s => s.id === studyId);
+    if (study) {
       // Persist to the actual order doc so the findings reach the ordering
       // clinician's consultation view and the HMIS reports.
       await updateLabResult(studyId, {
@@ -216,6 +216,29 @@ export default function RadiologyDashboard() {
         status: 'completed',
         completedAt: new Date().toISOString(),
       });
+      // Mirrors the lab bench's notifyClinician: a report otherwise only
+      // surfaces if someone happens to reopen the chart, so page the ordering
+      // clinician directly. Best-effort — the report is already durably
+      // saved, so a notification failure must not undo that.
+      try {
+        const { createMessage } = await import('@/lib/services/message-service');
+        await createMessage({
+          recipientType: 'staff',
+          patientId: study.patientId,
+          patientName: study.patientName,
+          patientPhone: '',
+          fromDoctorId: currentUser?._id || 'radiology',
+          fromDoctorName: currentUser?.name || 'Radiology',
+          fromHospitalName: currentUser?.hospitalName || '',
+          subject: `Imaging report ready: ${study.modality} — ${study.bodyPart} for ${study.patientName}`,
+          body: `${study.modality} — ${study.bodyPart} for ${study.patientName} has been reported: ${findings.trim()}`,
+          channel: 'app',
+          sentAt: new Date().toISOString(),
+          orgId: currentUser?.orgId,
+        });
+      } catch (err) {
+        console.error('[radiology] clinician notification failed; report was saved', err);
+      }
     } else {
       setSubmittedFindings(prev => ({ ...prev, [studyId]: findings.trim() }));
     }
@@ -452,6 +475,10 @@ export default function RadiologyDashboard() {
         searchValue={queueSearch}
         searchPlaceholder={t('radiology.imagingWorklist')}
         onSearchChange={setQueueSearch}
+        // A study stays on the worklist until it's reported, regardless of
+        // which calendar day is selected — an un-reported scan from
+        // yesterday must not disappear while the tab counts still include it.
+        filterRowsByDate={false}
         filters={[
           { label: t('radiology.filter_all'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
           { label: 'Scheduled', value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
@@ -496,6 +523,11 @@ export default function RadiologyDashboard() {
             // study.priority is a real urgency, not free text — emergency/urgent
             // studies get the same RED/YELLOW acuity pill used everywhere else.
             priority: study.priority === 'emergency' ? 'RED' : study.priority === 'urgent' ? 'YELLOW' : undefined,
+            // Pending/In Progress/Complete IS the imaging worklist — a same-day
+            // visit must not paint over it with the appointment ladder. The
+            // shared shell still surfaces the visit status on the line under
+            // the pill when one exists.
+            lockStatus: true,
             popupDetail: renderRadiologyWorkflowPopup(study),
           };
         })}

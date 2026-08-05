@@ -15,9 +15,13 @@ import { withPendingOfflineSync } from '../sync/offline-metadata';
 export function effectivePrescriptionStatus(
   doc: Pick<PrescriptionDoc, 'orderStatus' | 'status'>,
 ): PrescriptionStatus {
+  // A discontinue can land on a prescription that already carries a stale
+  // `orderStatus` (e.g. 'cleared_for_dispensing' from before the prescriber
+  // stopped it) — `status` is the more recent write and must win, or the
+  // stopped drug keeps resolving to a dispensable/administrable stage.
+  if (doc.status === 'discontinued') return 'held_awaiting_clarification';
   if (doc.orderStatus) return doc.orderStatus;
   if (doc.status === 'dispensed') return 'dispensed';
-  if (doc.status === 'discontinued') return 'held_awaiting_clarification';
   return 'received_in_pharmacy_queue';
 }
 

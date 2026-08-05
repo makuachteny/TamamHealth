@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X } from '@/components/icons/lucide';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { useDataScope } from '@/lib/hooks/useDataScope';
 import CollapsibleSection from './CollapsibleSection';
 import DrugInfoSection from './DrugInfoSection';
 import PharmacyInfoSection from './PharmacyInfoSection';
@@ -49,6 +50,7 @@ export default function PrescribeModal({
   patientId, patientName, currentUser, onClose, onPrescribed,
 }: PrescribeModalProps) {
   const { showToast } = useToast();
+  const scope = useDataScope();
   const userName = currentUser?.name || currentUser?.username || 'Unknown user';
   const facility = currentUser?.hospitalName || 'This facility';
   const pharmacyName = `${facility} Pharmacy`;
@@ -93,7 +95,7 @@ export default function PrescribeModal({
       } catch { /* Reason For Rx offers nothing to cite */ }
       try {
         const { getPrescriptionsByPatient } = await import('@/lib/services/prescription-service');
-        const rx = await getPrescriptionsByPatient(patientId);
+        const rx = await getPrescriptionsByPatient(patientId, scope);
         if (!cancelled) setActiveRx(rx.filter(r => r.status !== 'discontinued'));
       } catch { /* the save-time interaction check still runs */ }
       try {
@@ -108,7 +110,7 @@ export default function PrescribeModal({
       } catch { if (!cancelled) setBalance(0); }
       try {
         const { loadChartSnapshot } = await import('@/lib/clinical-notes/chart-snapshot');
-        const snap = await loadChartSnapshot(patientId);
+        const snap = await loadChartSnapshot(patientId, scope);
         const vitals = snap.vitalsRecord?.vitalSigns as { weight?: number } | undefined;
         const triage = snap.vitalsRecord?.triageVitals as { weight?: string | number } | undefined;
         const weight = vitals?.weight ?? (triage?.weight ? Number(triage.weight) : undefined);
@@ -116,7 +118,7 @@ export default function PrescribeModal({
       } catch { /* "No patient observations available." */ }
     })();
     return () => { cancelled = true; };
-  }, [patientId]);
+  }, [patientId, scope]);
 
   // ── Live safety check for the picked drug ──
   useEffect(() => {

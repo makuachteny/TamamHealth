@@ -24,7 +24,7 @@ export function useTriage(patientId?: string) {
       setError(null);
       const svc = await import('../services/triage-service');
       if (patientId) {
-        const data = await svc.getTriageByPatient(patientId);
+        const data = await svc.getTriageByPatient(patientId, scope);
         setTriages(data);
       } else {
         const data = await svc.getAllTriage(scope);

@@ -76,6 +76,31 @@ export default function DashboardPage() {
     [patients, currentUser?._id],
   );
 
+  // Active (pending/seen), unclaimed triage records at this clinician's own
+  // facility. `myAssigned` above only ever surfaces patients a nurse (or a
+  // prior claim) already stamped with THIS doctor's id — a triaged walk-in
+  // nobody has assigned yet gets no `assignedDoctor` at all, so it existed on
+  // no doctor's worklist. `triages` (useTriage()) is already org/hospital-
+  // scoped, so this stays inside the viewer's own facility/org. Windowed to
+  // the last 24h to match EhrClinicalDashboard's own "active triage" cutoff —
+  // a row seeded here should also resolve a live queue entry there.
+  const latestActiveTriageByPatient = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const map = new Map<string, typeof triages[number]>();
+    for (const tr of triages) {
+      if (tr.status !== 'pending' && tr.status !== 'seen') continue;
+      if (new Date(tr.triagedAt).getTime() < cutoff) continue;
+      // triages is newest-first (getAllTriage sorts by triagedAt desc) — keep
+      // only the first (latest) triage doc seen per patient.
+      if (!map.has(tr.patientId)) map.set(tr.patientId, tr);
+    }
+    return map;
+  }, [triages]);
+
+  const unclaimedTriaged = useMemo(
+    () => patients.filter(p => latestActiveTriageByPatient.has(p._id) && !p.assignedDoctor),
+    [patients, latestActiveTriageByPatient],
+  );
 
   // `/dashboard` is shared. Doctors / clinical officers / clinicians get the
   // clinical view; the medical superintendent gets its own admin view (rendered
@@ -114,11 +139,42 @@ export default function DashboardPage() {
     admittedAt: p.assignedAt || p.registeredAt || p.registrationDate,
     ward: IS_DEMO ? DEPARTMENTS[i % DEPARTMENTS.length] + '-' + (i + 1) : '',
     doctor: currentUser?.name || '',
+    assignedDoctor: p.assignedDoctor,
+    assignedDoctorName: p.assignedDoctorName,
     nurse: p.assignedByName || '',
     division: IS_DEMO ? DEPARTMENTS[i % DEPARTMENTS.length] : '',
     critical: false,
     triagePriority: triagePriorityByPatient[p._id],
   }));
+
+  // Same row shape as `assignedRows`, but for a triaged patient nobody has
+  // claimed yet: no `doctor`/`assignedDoctor`. EhrClinicalDashboard already
+  // renders a patient-sourced row with no assignedDoctor as "Doctor
+  // unassigned" — its existing vocabulary for this, not a new one — and its
+  // worklist row's claim action already stamps `assignedDoctor` on whichever
+  // clinician opens it, so surfacing the row here is enough to make it both
+  // visible and claimable.
+  const unassignedRows = unclaimedTriaged.map((p, i) => {
+    const tr = latestActiveTriageByPatient.get(p._id);
+    return {
+      _id: p._id,
+      firstName: p.firstName,
+      surname: p.surname,
+      photoUrl: p.photoUrl,
+      payorInfo: p.payorInfo,
+      name: patientFullName(p),
+      age: patientAge(p) ?? (25 + i * 3),
+      gender: p.gender?.[0] || (IS_DEMO ? (i % 2 === 0 ? 'M' : 'F') : ''),
+      id: p.hospitalNumber,
+      admittedAt: tr?.triagedAt || p.registeredAt || p.registrationDate,
+      ward: IS_DEMO ? DEPARTMENTS[i % DEPARTMENTS.length] + '-' + (i + 1) : '',
+      doctor: '',
+      nurse: tr?.triagedByName || '',
+      division: IS_DEMO ? DEPARTMENTS[i % DEPARTMENTS.length] : '',
+      critical: false,
+      triagePriority: triagePriorityByPatient[p._id] || tr?.priority,
+    };
+  });
 
   // Total documents awaiting the clinician's signature.
   const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length;
@@ -247,7 +303,7 @@ export default function DashboardPage() {
       <EhrClinicalDashboard
         clinicianName={currentUser.name || 'clinician'}
         facilityName={currentUser.hospitalName}
-        patients={assignedRows}
+        patients={[...assignedRows, ...unassignedRows]}
         appointments={myAppts}
         outstanding={outstandingItems}
         onUpdateAppointmentStatus={updateApptStatus}

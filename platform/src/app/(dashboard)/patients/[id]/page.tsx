@@ -42,6 +42,7 @@ import { isScreeningOverdue } from '@/lib/services/screening-service';
 import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
+import { useDataScope } from '@/lib/hooks/useDataScope';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatientPayments } from '@/lib/hooks/usePayments';
@@ -247,6 +248,7 @@ export default function PatientDetailPage() {
 
   const { t } = useTranslation();
   const { currentUser } = useAuth();
+  const scope = useDataScope();
   const { patients, loading, update: updatePatient } = usePatients();
   const { hospitals } = useHospitals();
 
@@ -336,12 +338,12 @@ export default function PatientDetailPage() {
     let cancelled = false;
     if (!patientIdForNotes) { setClinicalNotes([]); return; }
     import('@/lib/clinical-notes/note-service')
-      .then(m => m.getNotesByPatient(patientIdForNotes))
+      .then(m => m.getNotesByPatient(patientIdForNotes, scope))
       .then(rows => { if (!cancelled) setClinicalNotes(rows); })
       .catch(() => { /* the timeline simply omits notes */ });
     return () => { cancelled = true; };
     // notesRefreshToken re-reads after a note is created, saved or signed.
-  }, [patientIdForNotes, notesRefreshToken]);
+  }, [patientIdForNotes, notesRefreshToken, scope]);
 
   // ── "+ Note" → the clinical-notes module, edited in the chart's drawer. ──
   // Reopen today's unsigned draft when one exists (a second click must not
@@ -354,7 +356,7 @@ export default function PatientDetailPage() {
     try {
       const { listClinicalNotes } = await import('@/lib/clinical-notes/note-service');
       const today = toIsoDate(new Date());
-      const drafts = await listClinicalNotes({ patientId: patient._id, display: 'unsigned' });
+      const drafts = await listClinicalNotes({ patientId: patient._id, display: 'unsigned' }, scope);
       const note = drafts.find(n => n.serviceDate === today)
         ?? await createClinicalNoteDraft({
           patientId: patient._id,
@@ -368,7 +370,7 @@ export default function PatientDetailPage() {
       // still goes somewhere useful.
       setActiveTab('notes');
     }
-  }, [patient, createClinicalNoteDraft]);
+  }, [patient, createClinicalNoteDraft, scope]);
 
   // Outstanding balance for the most recent encounter — surfaced as a chip on
   // the "Most Recent Record" hero so clinicians see if the visit is settled.

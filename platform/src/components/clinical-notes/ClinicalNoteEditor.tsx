@@ -24,8 +24,10 @@ import Modal from '@/components/Modal';
 import NoteSectionCard from './NoteSectionCard';
 import AssignPicker from './AssignPicker';
 import PrescribeModal from './prescribe/PrescribeModal';
+import LabOrderModal from '@/components/lab/order/LabOrderModal';
 import type { NoteSectionActionId } from '@/lib/clinical-notes/section-actions';
 import MedicationsModal from './MedicationsModal';
+import { useDataScope } from '@/lib/hooks/useDataScope';
 import IncludeProblemsModal from './assessment/IncludeProblemsModal';
 import AllergiesModal from './AllergiesModal';
 import CareCoordinationModal, {
@@ -47,7 +49,7 @@ import type { PatientDoc, PatientDocumentDoc } from '@/lib/db-types';
 import { loadChartSnapshot, snapshotForSection, formatProblems } from '@/lib/clinical-notes/chart-snapshot';
 import { stripTemplateMarkers } from '@/lib/clinical-notes/section-templates';
 import type {
-  ClinicalNoteDoc, NoteSectionContent, NoteDiagnosis, NotePlanAction,
+  ClinicalNoteDoc, NoteSectionContent, NoteDiagnosis,
 } from '@/lib/clinical-notes/types';
 import './clinical-notes.css';
 
@@ -87,6 +89,7 @@ export default function ClinicalNoteEditor({
 }: ClinicalNoteEditorProps) {
   const router = useRouter();
   const { showToast } = useToast();
+  const scope = useDataScope();
 
   const [note, setNote] = useState<ClinicalNoteDoc | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,6 +105,7 @@ export default function ClinicalNoteEditor({
   const [showProblems, setShowProblems] = useState(false);
   const [showAllergies, setShowAllergies] = useState(false);
   const [showPrescribe, setShowPrescribe] = useState(false);
+  const [showLabOrder, setShowLabOrder] = useState(false);
   const [problems, setProblems] = useState<SummaryProblem[]>([]);
   const [socialHistory, setSocialHistory] = useState<SummarySocialHistory[]>([]);
 
@@ -114,6 +118,11 @@ export default function ClinicalNoteEditor({
   const [docLabel, setDocLabel] = useState<string>('all');
 
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Patches not yet written to the DB, merged as they arrive rather than
+  // replaced — so a second edit to the same section before the debounce fires
+  // (e.g. Include Problems landing mid-keystroke) cannot silently discard the
+  // first one's pending text.
+  const pendingSaves = useRef<Record<string, Partial<NoteSectionContent>>>({});
   const userName = currentUser?.name || currentUser?.username || 'Unknown user';
 
   // ── Load ────────────────────────────────────────────────────────────────
@@ -161,7 +170,7 @@ export default function ClinicalNoteEditor({
         if (!cancelled) setPatient(doc);
       } catch { /* identity card renders from the note's own fields */ }
       try {
-        const rows = await listClinicalNotes({ patientId });
+        const rows = await listClinicalNotes({ patientId }, scope);
         if (!cancelled) setSiblingNotes(rows.filter(n => n._id !== noteId).slice(0, 8));
       } catch { /* Patient Notes card shows its empty state */ }
       try {
@@ -185,14 +194,22 @@ export default function ClinicalNoteEditor({
       } catch { if (!cancelled) setDocuments([]); }
     })();
     return () => { cancelled = true; };
-  }, [note?.patientId, noteId]);
+  }, [note?.patientId, noteId, scope]);
 
-  // Flush any pending autosave when the editor unmounts, so navigating away
-  // mid-keystroke does not drop the last edit.
+  // Flush any pending autosave when the editor unmounts (or switches to a
+  // different note), so navigating away mid-keystroke does not drop the last
+  // edit — clearing the timer alone discarded up to AUTOSAVE_MS of typing.
   useEffect(() => {
-    const pending = timers.current;
-    return () => { for (const t of Object.values(pending)) clearTimeout(t); };
-  }, []);
+    return () => {
+      for (const sectionId of Object.keys(timers.current)) {
+        clearTimeout(timers.current[sectionId]);
+        const toSave = pendingSaves.current[sectionId];
+        if (toSave) void saveNoteSection(noteId, sectionId as NoteSectionId, toSave).catch(() => undefined);
+      }
+      timers.current = {};
+      pendingSaves.current = {};
+    };
+  }, [noteId]);
 
   const locked = note ? isNoteLocked(note) : false;
   const typeDef = note ? getNoteType(note.noteType) : null;
@@ -230,22 +247,26 @@ export default function ClinicalNoteEditor({
       return { ...prev, sections };
     });
 
+    pendingSaves.current[sectionId] = { ...pendingSaves.current[sectionId], ...patch };
     clearTimeout(timers.current[sectionId]);
     timers.current[sectionId] = setTimeout(() => {
-      void persist(() => saveNoteSection(noteId, sectionId, patch));
+      const toSave = pendingSaves.current[sectionId];
+      delete pendingSaves.current[sectionId];
+      delete timers.current[sectionId];
+      if (toSave) void persist(() => saveNoteSection(noteId, sectionId, toSave));
     }, AUTOSAVE_MS);
   }, [noteId, persist]);
 
   const refreshDerived = useCallback(async (sectionId: NoteSectionId) => {
     if (!note) return;
-    const snapshot = await loadChartSnapshot(note.patientId);
+    const snapshot = await loadChartSnapshot(note.patientId, scope);
     const text = snapshotForSection(sectionId, snapshot);
     await persist(() => saveNoteSection(noteId, sectionId, {
       snapshot: text,
       snapshotAt: new Date().toISOString(),
     }));
     showToast(`${getSectionLabel(sectionId)} refreshed from the chart.`, 'success');
-  }, [note, noteId, persist, showToast]);
+  }, [note, noteId, persist, showToast, scope]);
 
   // Fill any empty derived section on first open, so a new note opens with
   // today's observations already in it.
@@ -258,7 +279,7 @@ export default function ClinicalNoteEditor({
 
     let cancelled = false;
     (async () => {
-      const snapshot = await loadChartSnapshot(note.patientId);
+      const snapshot = await loadChartSnapshot(note.patientId, scope);
       if (cancelled) return;
       for (const section of empty) {
         const text = snapshotForSection(section.sectionId, snapshot);
@@ -287,31 +308,13 @@ export default function ClinicalNoteEditor({
   };
 
   // ── Section actions ─────────────────────────────────────────────────────
-  // Actions that open a popup do so here; actions that hand the work to
-  // another module are recorded on the note first (so the note itself shows
-  // what was raised from it) and then navigate.
-  const ROUTED_ACTIONS: Partial<Record<NoteSectionActionId, {
-    kind: NotePlanAction['kind']; label: string; href: (patientId: string) => string;
-  }>> = useMemo(() => ({
-    order_lab: {
-      kind: 'lab', label: 'Lab/study ordered from the note',
-      href: id => `/lab?patientId=${id}&action=order`,
-    },
-    order_vaccine: {
-      kind: 'vaccine', label: 'Vaccine ordered from the note',
-      href: id => `/immunizations?patientId=${id}`,
-    },
-    patient_education: {
-      kind: 'patient_education', label: 'Patient education sent from the note',
-      href: id => `/messages?patientId=${id}&kind=education`,
-    },
-    refer: {
-      kind: 'referral', label: 'Referral raised from the note',
-      href: id => `/referrals?patientId=${id}`,
-    },
-  }), []);
-
-  const handleSectionAction = useCallback(async (actionId: NoteSectionActionId) => {
+  // Actions that open a popup, or the real order flow, do so in place; the
+  // note is only stamped with "ordered from the note" once that order really
+  // exists (see the `onPlaced`/`onSend` callbacks below) — clicking a button
+  // must never by itself attest that an order was raised. Two targets
+  // (`/immunizations`, `/messages`) have no in-place flow here, so those just
+  // hand the clinician off without recording anything until it's real.
+  const handleSectionAction = useCallback((actionId: NoteSectionActionId) => {
     if (!note) return;
     switch (actionId) {
       case 'include_problems': setShowProblems(true); return;
@@ -324,17 +327,29 @@ export default function ClinicalNoteEditor({
       case 'schedule_followup':
         router.push(`/appointments?patientId=${note.patientId}`);
         return;
-      default: break;
+      case 'order_lab':
+        setShowLabOrder(true);
+        return;
+      // Care Coordination already creates the referral and records the plan
+      // action itself, only on success (see handleCoordination) — reuse it
+      // instead of navigating to a list page that does not read patientId.
+      case 'refer':
+        setShowCoordination(true);
+        return;
+      // `/immunizations?patientId=` does read and act on this param (it opens
+      // the add-immunization form prefilled), but the order is not placed
+      // until the clinician submits it there, so nothing is recorded yet.
+      case 'order_vaccine':
+        router.push(`/immunizations?patientId=${note.patientId}`);
+        return;
+      // `/messages` does not read either param — this is a hand-off, not a
+      // completed send, so the plan is not stamped.
+      case 'patient_education':
+        router.push(`/messages?patientId=${note.patientId}&kind=education`);
+        return;
+      default: return;
     }
-    const routed = ROUTED_ACTIONS[actionId];
-    if (!routed) return;
-    await persist(() => recordPlanAction(noteId, {
-      kind: routed.kind,
-      label: routed.label,
-      createdBy: currentUser?._id,
-    }));
-    router.push(routed.href(note.patientId));
-  }, [note, noteId, persist, router, currentUser?._id, ROUTED_ACTIONS]);
+  }, [note, router]);
 
   // ── Assessment: problems checked in the Include Problems popup become
   //    diagnosis lines on the note, deduped against what is already there ──
@@ -344,6 +359,8 @@ export default function ClinicalNoteEditor({
     const have = new Set(existing.map(d => d.problemId || d.icd11Code || d.name.toLowerCase()));
     const fresh = lines.filter(d => !have.has(d.problemId || d.icd11Code || d.name.toLowerCase()));
     if (fresh.length === 0) return;
+    // Routed through handleSectionChange, whose pending-patch merge keeps this
+    // from clobbering an assessment edit still waiting on its own debounce.
     handleSectionChange('assessment', { diagnoses: [...existing, ...fresh] });
   }, [note, handleSectionChange]);
 
@@ -932,6 +949,22 @@ export default function ClinicalNoteEditor({
           socialHistory={socialHistory}
           onSend={handleCoordination}
           onClose={() => setShowCoordination(false)}
+        />
+      )}
+
+      {showLabOrder && (
+        <LabOrderModal
+          presetPatientId={note.patientId}
+          onClose={() => setShowLabOrder(false)}
+          onPlaced={() => {
+            // Fires only once submit() has actually written the order(s) —
+            // this is the point the note may honestly say a lab was ordered.
+            void persist(() => recordPlanAction(noteId, {
+              kind: 'lab',
+              label: 'Lab/study ordered from the note',
+              createdBy: currentUser?._id,
+            }));
+          }}
         />
       )}
     </div>

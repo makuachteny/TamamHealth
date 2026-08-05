@@ -33,7 +33,7 @@ import type {
   PatientFinancialSummary,
 } from '../db-types-payments';
 import type { BaseDoc } from '../db-types';
-import type { BillingDoc } from '../db-types-billing';
+import type { BillingDoc, PaymentMethod as BillingPaymentMethod } from '../db-types-billing';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
@@ -66,6 +66,34 @@ const billingDB = () => getDB('tamamhealth_billing');
 // ═══════════════════════════════════════════════════════════════════
 // PAYMENTS
 // ═══════════════════════════════════════════════════════════════════
+
+/**
+ * `collectPayment`'s tender/provider is more granular than the BillingDoc
+ * `PaymentRecord.method` union (predates mobile-money providers and card).
+ * Map onto the closest billing category so a settled bill's payment history
+ * stays readable — the exact tender is still on the authoritative PaymentDoc
+ * this collectPayment call creates.
+ */
+function toBillingPaymentMethod(method: PaymentMethodType): BillingPaymentMethod {
+  switch (method) {
+    case 'cash': return 'cash';
+    case 'bank_transfer': return 'bank_transfer';
+    case 'insurance': return 'insurance';
+    case 'waiver': return 'waiver';
+    case 'mpesa':
+    case 'airtel':
+    case 'mtn_momo':
+    case 'm_gurush':
+      return 'mobile_money';
+    // No card/payment-plan category on the bill side — an electronic
+    // bank-rail settlement is the closest existing bucket.
+    case 'card':
+    case 'payment_plan':
+      return 'bank_transfer';
+    default:
+      return 'cash';
+  }
+}
 
 export interface CollectPaymentInput {
   patientId: string;
@@ -139,6 +167,28 @@ export async function collectPayment(input: CollectPaymentInput): Promise<Paymen
     orgId: input.orgId,
     createdBy: input.processedBy,
   });
+
+  // Settle the patient's open BillingDoc(s) with this payment. collectPayment
+  // isn't earmarked for one bill — it pays down the patient's aggregate
+  // ledger balance — so without this, the ledger reads paid while the
+  // invoice(s) it was actually paying stay 'pending'/'partial' forever and
+  // the two permanently disagree. Best-effort: the ledger entry above is the
+  // record of the money received and must stand even if this mirror fails.
+  try {
+    const { settleOpenBillsWithPayment } = await import('./billing-service');
+    await settleOpenBillsWithPayment(
+      input.patientId,
+      input.amount,
+      doc.currency,
+      toBillingPaymentMethod(input.method),
+      input.processedBy,
+      input.processedByName,
+      doc.reference,
+      input.notes,
+    );
+  } catch (err) {
+    console.warn('[payment] could not settle open bills for', input.patientId, err);
+  }
 
   await logAuditSafe(
     'PAYMENT_COLLECTED', input.processedBy, input.processedByName,
@@ -234,6 +284,27 @@ export async function updatePaymentStatus(
       orgId: pmt.orgId,
       createdBy: pmt.processedBy,
     });
+
+    // Same bill-settlement mirror as collectPayment, for the same reason:
+    // this is a patient-balance payment, not one earmarked to a bill, and
+    // without it a webhook-confirmed payment credits the ledger but leaves
+    // the BillingDoc(s) it paid down stuck 'pending'/'partial'. Best-effort —
+    // the ledger entry above is the record of the money received.
+    try {
+      const { settleOpenBillsWithPayment } = await import('./billing-service');
+      await settleOpenBillsWithPayment(
+        pmt.patientId,
+        pmt.amount,
+        pmt.currency,
+        toBillingPaymentMethod(pmt.method),
+        pmt.processedBy,
+        pmt.processedByName,
+        pmt.reference,
+        pmt.notes,
+      );
+    } catch (err) {
+      console.warn('[payment] could not settle open bills for', pmt.patientId, err);
+    }
   }
 
   await logAuditSafe('PAYMENT_STATUS_UPDATED', pmt.processedBy, pmt.processedByName,

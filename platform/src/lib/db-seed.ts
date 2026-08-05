@@ -2130,6 +2130,14 @@ async function seedDatabaseExclusive(): Promise<void> {
         cases,
         deaths,
         reportDate: dateAgo(offset),
+        // `a` (from @/data/mock's diseaseAlerts) carries no orgId; without it
+        // filterByScope rejects every generated weekly bucket for every scoped
+        // user — same class of bug as the ledger-entry fix above (see the
+        // seedLedgerEntries comment below), and the surveillance dashboard's
+        // disease trend charts render empty. Disease surveillance is a
+        // public-org-only feature (Mercy's featureFlags.epidemicIntelligence
+        // is false), so PUBLIC_ORG_ID is correct for all of them.
+        orgId: PUBLIC_ORG_ID,
         createdAt: daysAgo(offset),
         updatedAt: daysAgo(offset),
       } as DiseaseAlertDoc;

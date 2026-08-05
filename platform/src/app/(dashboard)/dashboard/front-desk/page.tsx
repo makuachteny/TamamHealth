@@ -916,6 +916,19 @@ export default function FrontDeskDashboardPage() {
       // dashboard row renders hours/minutes underneath from `timeAt`.
       const waitTime = entry.time || entry.date || undefined;
 
+      // Whatever this row is really about: a booking, or a walk-in's triage
+      // record. Both carry the same ladder, so the desk sets status the same
+      // way for every patient in the building. Computed up front (not just
+      // inside the ladder-status block below) so checkout below can complete
+      // the SAME linked appointment for a triage-sourced row, not only rows
+      // whose queue entry happened to originate as 'appt-'.
+      const queueAppointment = entry.id.startsWith('appt-')
+        ? todaysAppointments.find(a => a._id === entry.sourceId)
+        // A triage-sourced row still belongs to a booking when the patient has
+        // one today — check-in now creates one for every walk-in, so the row
+        // gets the same ladder and the same panel as anyone else.
+        : todaysAppointments.find(a => a.patientId === entry.patientId);
+
       // Icon actions for the row's inline panel. "Open chart" is always
       // offered; the primary desk action (Checkout/Assign) and the secondary
       // one (Undo/Start consultation) mirror the same state machine the old
@@ -934,7 +947,10 @@ export default function FrontDeskDashboardPage() {
             patientName: entry.patientName,
             hospitalNumber: patient?.hospitalNumber,
             encounterId: entry.encounterId,
-            appointmentId: entry.id.startsWith('appt-') ? entry.sourceId : undefined,
+            // Every walk-in now has its own booking (check-in-service), so a
+            // triage-sourced row must complete it too — otherwise the queue
+            // row reads DONE while its appointment sits at checked_in forever.
+            appointmentId: queueAppointment?._id,
             triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
           }),
         });
@@ -959,15 +975,6 @@ export default function FrontDeskDashboardPage() {
       }
       const hasAllergies = Boolean(patient?.allergies?.length) && patient?.allergies[0] !== 'None known';
 
-      // Whatever this row is really about: a booking, or a walk-in's triage
-      // record. Both carry the same ladder, so the desk sets status the same
-      // way for every patient in the building.
-      const queueAppointment = entry.id.startsWith('appt-')
-        ? todaysAppointments.find(a => a._id === entry.sourceId)
-        // A triage-sourced row still belongs to a booking when the patient has
-        // one today — check-in now creates one for every walk-in, so the row
-        // gets the same ladder and the same panel as anyone else.
-        : todaysAppointments.find(a => a.patientId === entry.patientId);
       const queueTriage = entry.id.startsWith('triage-')
         ? triages.find(tr => tr._id === entry.sourceId)
         : undefined;
@@ -1023,9 +1030,13 @@ export default function FrontDeskDashboardPage() {
         patientId: entry.patientId,
         // The same panel a Scheduled row opens — tabs for the appointment,
         // provider & staff, and status & billing — so a patient's row looks
-        // and behaves the same wherever they are in the day. A walk-in has no
-        // booking behind it, so it keeps the facts panel.
-        popupDetail: queueAppointment ? (
+        // and behaves the same wherever they are in the day. Decided by the
+        // row's OWN kind, not by whether an appointment matched: every walk-in
+        // now has its own booking (check-in-service), so `queueAppointment`
+        // alone would swap a triage/queue row over to this panel too and hide
+        // the exam-room / doctor / nurse assignment controls below, which are
+        // built for exactly those patients.
+        popupDetail: entry.id.startsWith('appt-') && queueAppointment ? (
           <AppointmentEditModal
             inline
             appointment={queueAppointment}

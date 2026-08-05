@@ -129,6 +129,7 @@ export default function BookAppointmentModal({
         bookedBy: currentUser?._id || '',
         bookedByName: currentUser?.name || '',
         state: '',
+        orgId: currentUser?.orgId,
       });
       showToast(t('appointments.toastBooked'), 'success');
       onBooked?.();

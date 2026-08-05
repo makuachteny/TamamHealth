@@ -82,16 +82,24 @@ export async function createAppointment(
   const db = appointmentsDB();
   const now = new Date().toISOString();
 
-  // Check for scheduling conflicts
-  const existing = await getAppointmentsByProvider(data.providerId);
-  const conflict = existing.find(a =>
-    a.appointmentDate === data.appointmentDate &&
-    a.status !== 'cancelled' &&
-    a.status !== 'no_show' &&
-    isTimeOverlap(a.appointmentTime, a.duration, data.appointmentTime, data.duration)
-  );
-  if (conflict) {
-    throw new Error(`Scheduling conflict: ${data.providerName} already has an appointment at ${conflict.appointmentTime} on ${conflict.appointmentDate}`);
+  // Check for scheduling conflicts. An empty providerId (walk-ins — see
+  // check-in-service, which books them with no clinician chosen yet) is not a
+  // real provider to collide on: every walk-in checked in within the same
+  // window would otherwise "conflict" with every other. Scoped to this
+  // booking's own org so one tenant's schedule can never block another's —
+  // getAppointmentsByProvider() is unscoped and would match every org.
+  if (data.providerId) {
+    const existing = (await getAppointmentsByProvider(data.providerId))
+      .filter(a => a.orgId === data.orgId);
+    const conflict = existing.find(a =>
+      a.appointmentDate === data.appointmentDate &&
+      a.status !== 'cancelled' &&
+      a.status !== 'no_show' &&
+      isTimeOverlap(a.appointmentTime, a.duration, data.appointmentTime, data.duration)
+    );
+    if (conflict) {
+      throw new Error(`Scheduling conflict: ${data.providerName} already has an appointment at ${conflict.appointmentTime} on ${conflict.appointmentDate}`);
+    }
   }
 
   const doc: AppointmentDoc = withPendingOfflineSync({

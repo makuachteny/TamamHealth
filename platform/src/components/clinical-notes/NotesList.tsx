@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { FileText, Trash2 } from '@/components/icons/lucide';
 import CreateNoteButton from './CreateNoteButton';
 import { useToast } from '@/components/Toast';
+import { useDataScope } from '@/lib/hooks/useDataScope';
 import {
   listClinicalNotes, notePreview, deleteClinicalNote, createClinicalNote,
 } from '@/lib/clinical-notes/note-service';
@@ -55,6 +56,7 @@ export default function NotesList({
 }: NotesListProps) {
   const router = useRouter();
   const { showToast } = useToast();
+  const scope = useDataScope();
 
   const [notes, setNotes] = useState<ClinicalNoteDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,12 +76,12 @@ export default function NotesList({
         display,
         sortBy,
         noteType: isNoteTypeId(noteType) ? noteType : undefined,
-      });
+      }, scope);
       setNotes(rows);
     } finally {
       setLoading(false);
     }
-  }, [patientId, userId, display, sortBy, noteType]);
+  }, [patientId, userId, display, sortBy, noteType, scope]);
 
   useEffect(() => { void load(); }, [load, refreshToken]);
 

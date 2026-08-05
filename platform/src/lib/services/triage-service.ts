@@ -39,11 +39,17 @@ export function calculatePriority(data: {
 
 // Valid triage status transitions (state machine)
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending: ['seen', 'admitted', 'discharged', 'referred'],
-  seen: ['admitted', 'discharged', 'referred'],
+  // 'lwbs' (left without being seen, KAN-100) is reachable from either wait
+  // state — a patient can walk out before triage starts or after it's done
+  // but before a room/provider is free. It was missing here, so calling
+  // updateTriage(id, {status:'lwbs'}) always threw an "invalid transition"
+  // caught below and silently returned null.
+  pending: ['seen', 'admitted', 'discharged', 'referred', 'lwbs'],
+  seen: ['admitted', 'discharged', 'referred', 'lwbs'],
   admitted: ['discharged', 'referred'],
   discharged: [],
   referred: ['discharged'],
+  lwbs: [],
 };
 
 export async function getAllTriage(scope?: DataScope): Promise<TriageDoc[]> {
@@ -55,8 +61,8 @@ export async function getAllTriage(scope?: DataScope): Promise<TriageDoc[]> {
 }
 
 /** Triages for a specific patient, newest first. */
-export async function getTriageByPatient(patientId: string): Promise<TriageDoc[]> {
-  const all = await getAllTriage();
+export async function getTriageByPatient(patientId: string, scope?: DataScope): Promise<TriageDoc[]> {
+  const all = await getAllTriage(scope);
   return all.filter(t => t.patientId === patientId);
 }
 
