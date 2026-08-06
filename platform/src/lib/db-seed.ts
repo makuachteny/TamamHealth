@@ -1242,6 +1242,89 @@ const overflowAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = overf
 });
 seedAppointments.push(...overflowAppointments);
 
+
+const overflowTriage: Omit<TriageDoc, '_rev' | 'createdBy'>[] = overflowRoster.map((p, i) => {
+  const priorities = ['GREEN', 'YELLOW', 'GREEN', 'YELLOW', 'RED'] as const;
+  const priority = priorities[i % priorities.length];
+  const status = (i % 3 === 2 ? 'seen' : 'pending') as 'seen' | 'pending';
+  const at = minutesAgo(15 + i * 14);
+  return {
+    _id: `triage-ovf-${i + 1}`,
+    type: 'triage' as const,
+    patientId: p.id, patientName: p.name, hospitalNumber: p.mrn,
+    airway: 'clear' as const,
+    breathing: (priority === 'RED' ? 'distressed' : 'normal') as 'distressed' | 'normal',
+    circulation: (priority === 'RED' ? 'impaired' : 'normal') as 'impaired' | 'normal',
+    consciousness: 'alert' as const,
+    priority,
+    temperature: '37.4', pulse: '92', respiratoryRate: '19',
+    systolic: '120', diastolic: '78', oxygenSaturation: '97',
+    chiefComplaint: overflowVisits[(i + 3) % overflowVisits.length].reason,
+    modeOfArrival: 'walk-in',
+    triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi',
+    triagedAt: at,
+    facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital',
+    status, orgId: PUBLIC_ORG_ID, createdAt: at, updatedAt: at,
+  };
+});
+seedTriage.push(...overflowTriage);
+
+/**
+ * A booking for every walk-in still in today's queue.
+ *
+ * Check-in creates one for every walk-in now (check-in-service), but the seeded
+ * triage records predate that, so those patients sat in the queue with no
+ * appointment document at all. The front desk decides a row's panel by whether
+ * it HAS a booking — with none, the row fell back to the legacy facts-and-assign
+ * panel while everyone else got the appointment editor, and the same day showed
+ * two different drop-downs for no reason a user could see.
+ *
+ * The visit these represent is real — the patient walked in and was triaged —
+ * so the missing document is the bug, not the row. Only open triage records get
+ * one; an admitted or discharged patient's visit is over.
+ */
+const WALK_IN_OPEN_STATUSES = new Set(['pending', 'seen']);
+const walkInAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = seedTriage
+  .filter(triage => (triage.triagedAt || '').startsWith(dateAgo(0)))
+  .filter(triage => WALK_IN_OPEN_STATUSES.has(triage.status || ''))
+  .filter(triage => !seedAppointments.some(a =>
+    a.patientId === triage.patientId && a.appointmentDate === dateAgo(0)))
+  .map((triage, i) => {
+    const time = (triage.triagedAt || '').slice(11, 16) || '08:00';
+    return {
+      _id: `appointment-walkin-${i + 1}`,
+      type: 'appointment' as const,
+      patientId: triage.patientId,
+      patientName: triage.patientName,
+      hospitalNumber: triage.hospitalNumber,
+      providerId: '',
+      providerName: '',
+      facilityId: triage.facilityId || 'hosp-001',
+      facilityName: triage.facilityName || 'Juba Teaching Hospital',
+      facilityLevel: 'national' as const,
+      appointmentDate: dateAgo(0),
+      appointmentTime: time,
+      duration: 30,
+      appointmentType: 'walk_in' as const,
+      priority: (triage.priority === 'RED' ? 'emergency' : triage.priority === 'YELLOW' ? 'urgent' : 'routine') as AppointmentDoc['priority'],
+      department: 'Outpatient',
+      reason: triage.chiefComplaint || 'Walk-in visit',
+      // The patient is in the building and triaged; `checked_in` is the rung
+      // reception's own walk-in check-in leaves them on.
+      status: 'checked_in' as const,
+      checkedInAt: triage.triagedAt,
+      reminderSent: false,
+      isRecurring: false,
+      bookedBy: triage.triagedBy || '',
+      bookedByName: triage.triagedByName || '',
+      state: '',
+      orgId: triage.orgId,
+      createdAt: triage.triagedAt,
+      updatedAt: triage.triagedAt,
+    };
+  });
+seedAppointments.push(...walkInAppointments);
+
 /**
  * One appointment per slot, per facility — the same rule the booking service
  * enforces (`assertNoBookingConflicts`), applied to the seed.
@@ -1279,32 +1362,6 @@ seedAppointments.push(...overflowAppointments);
     taken.add(key);
   }
 })();
-
-const overflowTriage: Omit<TriageDoc, '_rev' | 'createdBy'>[] = overflowRoster.map((p, i) => {
-  const priorities = ['GREEN', 'YELLOW', 'GREEN', 'YELLOW', 'RED'] as const;
-  const priority = priorities[i % priorities.length];
-  const status = (i % 3 === 2 ? 'seen' : 'pending') as 'seen' | 'pending';
-  const at = minutesAgo(15 + i * 14);
-  return {
-    _id: `triage-ovf-${i + 1}`,
-    type: 'triage' as const,
-    patientId: p.id, patientName: p.name, hospitalNumber: p.mrn,
-    airway: 'clear' as const,
-    breathing: (priority === 'RED' ? 'distressed' : 'normal') as 'distressed' | 'normal',
-    circulation: (priority === 'RED' ? 'impaired' : 'normal') as 'impaired' | 'normal',
-    consciousness: 'alert' as const,
-    priority,
-    temperature: '37.4', pulse: '92', respiratoryRate: '19',
-    systolic: '120', diastolic: '78', oxygenSaturation: '97',
-    chiefComplaint: overflowVisits[(i + 3) % overflowVisits.length].reason,
-    modeOfArrival: 'walk-in',
-    triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi',
-    triagedAt: at,
-    facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital',
-    status, orgId: PUBLIC_ORG_ID, createdAt: at, updatedAt: at,
-  };
-});
-seedTriage.push(...overflowTriage);
 
 // ═══ Asset / equipment seed data ══════════════════════════════════
 const seedAssets: Omit<AssetDoc, '_rev' | 'createdBy'>[] = [

@@ -1235,7 +1235,14 @@ export default function FrontDeskDashboardPage() {
         // alone would swap a triage/queue row over to this panel too and hide
         // the exam-room / doctor / nurse assignment controls below, which are
         // built for exactly those patients.
-        popupDetail: entry.id.startsWith('appt-') && queueAppointment ? (
+        // Having a booking is what decides the panel — not what kind of row it
+        // came from. The old test (`entry.id.startsWith('appt-')`) meant a
+        // patient who arrived as a walk-in kept the legacy facts-and-assign
+        // panel even after check-in gave them a real appointment, so the same
+        // booking looked different depending on which door it came through.
+        // Rows with no booking at all still get the legacy panel: there is
+        // nothing for the editor to edit.
+        popupDetail: queueAppointment ? (
           <AppointmentEditModal
             inline
             appointment={queueAppointment}

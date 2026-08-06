@@ -4,13 +4,13 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { formatClockTime } from '@/lib/format-utils';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
 import AppointmentDetailFields, { type AppointmentDetailFieldValues } from '@/components/appointments/AppointmentDetailFields';
+import AppointmentEditModal from '@/components/appointments/AppointmentEditModal';
 import {
   APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_I18N_KEYS,
   APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_PENDING_STATUSES, APPOINTMENT_STATUS_FLOW,
-  APPOINTMENT_STATUS_EXITS, priorAppointmentStatus, canonicalAppointmentStatus,
+  APPOINTMENT_STATUS_EXITS, canonicalAppointmentStatus,
 } from '@/lib/appointment-status';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import AvailabilityModal from '@/components/AvailabilityModal';
 import {
   Calendar, Plus, CheckCircle2, User,
@@ -37,7 +37,7 @@ import type { AppointmentType, AppointmentPriority, AppointmentStatus, FacilityL
 import dynamic from 'next/dynamic';
 import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
-import { jubaDate, jubaNow, jubaTime } from '@/lib/time-juba';
+import { jubaDate, jubaTime } from '@/lib/time-juba';
 import PageInstructionCard from '@/components/PageInstructionCard';
 
 // react-big-calendar (and its CSS) is a heavy client-only library. Split it out
@@ -138,28 +138,10 @@ export default function AppointmentsPage() {
   const {
     canBookAppointments,
     canConfirmAppointments,
-    canDoTelehealth,
     canManageAppointmentSchedule,
     canCheckInAppointments,
-    canAdvanceAppointments,
     canExportAppointments,
   } = usePermissions();
-  // Anyone who can move a booking along the ladder gets the pill-as-picker;
-  // read-only roles keep a plain pill.
-  const canChangeAppointmentStatus = canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments;
-  // The picker's own option list, independent of whether it renders at all:
-  // forward progression (arrived/checked in/roomed/in progress/completed…) is
-  // open to anyone above, but the exits are not — dropping a patient with
-  // Cancelled, No Show or Rescheduled belongs to reception/scheduling, same as
-  // the dedicated Reschedule and (former) Cancel actions beside it always
-  // required. `cancelled` is excluded even for schedule-management roles: it
-  // needs a reason, and only the dedicated Cancel button below (which still
-  // opens the reason dialog) collects one — the picker never writes it
-  // directly.
-  const statusPickerOptions = useMemo(() => [
-    ...APPOINTMENT_STATUS_FLOW,
-    ...(canManageAppointmentSchedule ? APPOINTMENT_STATUS_EXITS.filter(s => s !== 'cancelled') : []),
-  ], [canManageAppointmentSchedule]);
   const { showToast } = useToast();
   const { t } = useTranslation();
   const { departments: facilityDepartments } = useSettings();
@@ -185,7 +167,6 @@ export default function AppointmentsPage() {
   // appointment can be badged Insured / Not insured.
   const insuredIds = useInsuredPatientIds();
 
-  const router = useRouter();
   const [calView, setCalView] = useState<'month' | 'week' | 'day'>('month');
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list');
   const [listSearch, setListSearch] = useState('');
@@ -656,69 +637,25 @@ export default function AppointmentsPage() {
    * `onDone` closes whichever container it is in, so an action that navigates
    * away or opens another dialog doesn't leave this hanging open behind it.
    */
+  /**
+   * One appointment drop-down, everywhere.
+   *
+   * This used to be a bespoke facts grid over a strip of a dozen status
+   * buttons — a second way to read and change a booking that drifted from the
+   * editor the front desk uses. `AppointmentEditModal` is that editor: Details,
+   * Provider & staff, Status & billing, saving status through
+   * `updateAppointmentStatus` so the timestamps and history are stamped rather
+   * than written past. Rendering it `inline` gives the row the same panel the
+   * dialog shows, so a booking looks and behaves the same wherever it is opened.
+   */
   const renderAppointmentDetail = (apt: typeof appointments[0], onDone: () => void) => (
-    <>
-      <div className="ehr-row-detail__body">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, gridColumn: '1 / -1', marginBottom: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: statusConfig[apt.status].color, background: statusConfig[apt.status].bg }}>
-            {t(statusLabelKey[apt.status])}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: priorityConfig[apt.priority].color, background: `${priorityConfig[apt.priority].color}14` }}>
-            {t(priorityLabelKey[apt.priority])}
-          </span>
-          <InsuranceBadge insured={insuredIds.has(apt.patientId)} pill />
-        </div>
-        <div className="appointment-detail-row"><dt>Date</dt><dd>{new Date(apt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</dd></div>
-        <div className="appointment-detail-row"><dt>Time</dt><dd>{formatClockTime(apt.appointmentTime)} · {apt.duration}m</dd></div>
-        <div className="appointment-detail-row"><dt>Type</dt><dd>{appointmentTypes.find(x => x.value === apt.appointmentType)?.label || apt.appointmentType}</dd></div>
-        <div className="appointment-detail-row"><dt>Provider</dt><dd>{apt.providerName || 'Unassigned'}</dd></div>
-        <div className="appointment-detail-row"><dt>Department</dt><dd>{apt.department || '—'}</dd></div>
-        {apt.reason && <div className="appointment-detail-row"><dt>Reason</dt><dd>{apt.reason}</dd></div>}
-      </div>
-
-      <div className="ehr-row-detail__actions">
-        {/* No status control here: the row's own editor (Status & billing)
-            is where a booking changes. */}
-        {canDoTelehealth && apt.appointmentType === 'telehealth' && apt.status !== 'cancelled' && apt.status !== 'completed' && (
-          <button onClick={() => { onDone(); router.push(`/telehealth/visit/${encodeURIComponent(apt._id)}`); }} className="btn btn-primary btn-sm" style={{ gap: 6, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
-            <Video size={14} /> Join session
-          </button>
-        )}
-        <button onClick={() => { onDone(); router.push(`/patients/${apt.patientId}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
-          <User size={14} /> Open patient record
-        </button>
-        {canConfirmAppointments && (apt.status === 'requested' || apt.status === 'scheduled' || apt.status === 'reminder_sent') && (
-          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'confirmed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionApprove')}</button>
-        )}
-        {canCheckInAppointments && (apt.status === 'requested' || APPOINTMENT_PENDING_STATUSES.includes(apt.status)) && (
-          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'checked_in'); }} className="btn btn-secondary btn-sm">{t('appointments.actionCheckIn')}</button>
-        )}
-        {canAdvanceAppointments && apt.status === 'checked_in' && (
-          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'in_progress'); }} className="btn btn-secondary btn-sm">{t('appointments.actionStart')}</button>
-        )}
-        {canAdvanceAppointments && (apt.status === 'checked_in' || apt.status === 'in_progress') && (
-          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'completed'); }} className="btn btn-secondary btn-sm">{t('appointments.actionComplete')}</button>
-        )}
-        {canManageAppointmentSchedule && (
-          <button onClick={() => { loadEditForm(apt); setEditingApt(apt._id); onDone(); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
-        )}
-        {canManageAppointmentSchedule && (
-          <button onClick={() => { setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); onDone(); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
-        )}
-        {(canManageAppointmentSchedule || canCheckInAppointments || canAdvanceAppointments)
-          && !APPOINTMENT_CLOSED_STATUSES.includes(apt.status) && priorAppointmentStatus(apt.status) && (
-          <button onClick={() => { onDone(); handleStatusChange(apt._id, priorAppointmentStatus(apt.status)!); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
-        )}
-        {/* Reopen covers every closed status — completed, cancelled, no-show,
-            and now rescheduled — none of which has a rung to step back to. */}
-        {canManageAppointmentSchedule && APPOINTMENT_CLOSED_STATUSES.includes(apt.status) && (
-          <button onClick={() => { onDone(); handleStatusChange(apt._id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
-        )}
-        {canManageAppointmentSchedule && apt.status !== 'cancelled' && apt.status !== 'completed' && (
-          <button onClick={() => { setCancelId(apt._id); onDone(); }} className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger)' }}>{t('appointments.actionCancel')}</button>
-        )}
-      </div>
-    </>
+    <AppointmentEditModal
+      inline
+      appointment={apt}
+      appointments={appointments}
+      patient={patientById.get(apt.patientId)}
+      onClose={onDone}
+    />
   );
 
   return (

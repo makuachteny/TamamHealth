@@ -337,7 +337,7 @@ export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 // generator now books one visit per patient per day, never marks a
 // future-slot appointment checked-in/completed, and staggers walk-in
 // arrival times.
-export const SEED_VERSION = 66;
+export const SEED_VERSION = 67;
 
 export async function isSeeded(): Promise<boolean> {
   try {
