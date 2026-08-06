@@ -420,6 +420,10 @@ export default function DataEntryDashboard() {
         tabs={[
           { key: 'all', label: t('dataEntry.previousReports', { count: filteredReports.length }) },
         ]}
+        // "Previous reports" spans many days; the rows carry their report date,
+        // so the default day-scoping hid every report not filed on the selected
+        // day while the tab kept counting them all.
+        filterRowsByDate={false}
         activeTab="all"
         onTabChange={() => {}}
         searchValue={reportSearch}

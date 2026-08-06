@@ -12,7 +12,9 @@ import { formatAppointmentTimeUntil } from '@/lib/format-utils';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import {
-  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_STATUS_DESCRIPTIONS, appointmentStatusLabel, canonicalAppointmentStatus,
+  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_STATUS_DESCRIPTIONS,
+  APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_GROUPS, appointmentStatusGroup,
+  appointmentStatusLabel, canonicalAppointmentStatus, type AppointmentStatusGroup,
 } from '@/lib/appointment-status';
 import { toIsoDate as visitIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import type { AppointmentStatus } from '@/lib/db-types';
@@ -398,6 +400,44 @@ export default function EhrCareDashboard({
       : rows.filter(row => row.date === selectedDate);
     return scopedRows.slice().sort(compareDashboardRows);
   }, [filterRowsByDate, rowEventDates.length, rows, selectedDate, showCalendar]);
+
+  // A row must sit in the lane its own status pill names. The front desk filed
+  // by "does a triage record exist" instead of the visit's rung, so bookings
+  // still on Scheduled were listed — and counted — under In Office. Any
+  // dashboard whose tabs are keyed by AppointmentStatusGroup gets the check.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    if (!APPOINTMENT_STATUS_GROUPS.includes(activeTab as AppointmentStatusGroup)) return;
+    const misfiled = visibleRows.filter(row => {
+      const status = row.status as AppointmentStatus | undefined;
+      if (!status || !(status in APPOINTMENT_STATUS_LABELS)) return false;
+      return appointmentStatusGroup(status) !== activeTab;
+    });
+    if (misfiled.length > 0) {
+      console.warn(
+        `[EhrCareDashboard] ${misfiled.length} row(s) in the "${activeTab}" lane carry a status belonging to another lane ` +
+        `(e.g. ${misfiled[0].title}: "${misfiled[0].status}"). File rows with appointmentStatusGroup() so the pill and the lane agree.`,
+      );
+    }
+  }, [activeTab, visibleRows]);
+
+  // A lane tab must never advertise more work than the list beneath it shows.
+  // Day-scoping here silently dropped rows the page had already counted (the
+  // front desk read "In Office · 25" over three rows), so the mismatch is
+  // called out in development rather than shipped. A page whose list is not a
+  // single day's work should pass `filterRowsByDate={false}`; one that is
+  // should count from the same day-scoped set it builds rows from.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    const active = tabs.find(tab => tab.key === activeTab);
+    if (!active || typeof active.count !== 'number') return;
+    if (active.count > visibleRows.length && rows.length > visibleRows.length) {
+      console.warn(
+        `[EhrCareDashboard] "${active.label}" counts ${active.count} but only ${visibleRows.length} of ${rows.length} rows render on ${selectedDate}. ` +
+        'Count from the same date-scoped set as the rows, or set filterRowsByDate={false}.',
+      );
+    }
+  }, [tabs, activeTab, visibleRows.length, rows.length, selectedDate]);
   // Live clock for the time column's countdown. Starts null so the
   // server-rendered markup and the first client render match, then ticks every
   // second so imminent meetings can show accurate seconds.
@@ -695,27 +735,34 @@ export default function EhrCareDashboard({
                                 : initials(row.title)}
                             </div>
                             <div className="ehr-appointment-main appointment-card-patient">
-                              {/* The name is the way into the chart; the rest of
-                                  the row expands the details underneath. */}
-                              <button
-                                type="button"
-                                className={row.patientId ? 'print-visible ehr-row-name-link' : 'print-visible'}
-                                title={row.patientId ? `Open ${row.title}'s chart` : undefined}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (row.patientId) router.push(`/patients/${row.patientId}`);
-                                  else activate();
-                                }}
-                              >
-                                {row.title}
-                              </button>
-                              {/* Marks a remote visit where the name is read,
-                                  so the desk can see it without opening a row. */}
-                              {row.telehealth && (
-                                <span className="ehr-row-telehealth" title="Telehealth visit" aria-label="Telehealth visit">
-                                  <Video className="w-3.5 h-3.5" aria-hidden />
-                                </span>
-                              )}
+                              {/* Name and its telehealth mark share one line, so
+                                  the icon reads as a property of the patient.
+                                  Loose in the grid it auto-placed into the
+                                  second column and drifted to the row's far
+                                  right, where it looked like an action. */}
+                              <span className="ehr-row-name">
+                                {/* The name is the way into the chart; the rest of
+                                    the row expands the details underneath. */}
+                                <button
+                                  type="button"
+                                  className={row.patientId ? 'print-visible ehr-row-name-link' : 'print-visible'}
+                                  title={row.patientId ? `Open ${row.title}'s chart` : undefined}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (row.patientId) router.push(`/patients/${row.patientId}`);
+                                    else activate();
+                                  }}
+                                >
+                                  {row.title}
+                                </button>
+                                {/* Marks a remote visit where the name is read,
+                                    so the desk can see it without opening a row. */}
+                                {row.telehealth && (
+                                  <span className="ehr-row-telehealth" title="Telehealth visit" aria-label="Telehealth visit">
+                                    <Video className="w-3.5 h-3.5" aria-hidden />
+                                  </span>
+                                )}
+                              </span>
                               <p>{row.subtitle}</p>
                             </div>
                           </div>

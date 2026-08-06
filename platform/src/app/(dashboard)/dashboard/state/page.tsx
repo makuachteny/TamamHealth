@@ -332,6 +332,10 @@ export default function StateDashboardPage() {
           tabs={[
             { key: 'all', label: t('state.countiesIn', { state: stateName || '—' }), count: counties.length },
           ]}
+          // Counties are a roster, not a day's schedule — their row date is
+          // "last reported", so day-scoping left the list empty on most days
+          // while the tab counted the whole state.
+          filterRowsByDate={false}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           searchValue={search}

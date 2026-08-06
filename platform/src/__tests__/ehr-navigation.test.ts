@@ -37,6 +37,23 @@ describe('header navigation shortcuts', () => {
     // And a real destination is preferred over it.
     expect(hrefs[0].startsWith('/dashboard')).toBe(false);
   });
+
+  it('keeps the dashboard out of the row when the role has enough destinations', () => {
+    // The module trigger beside this row carries the dashboard glyph and opens
+    // a menu led by Dashboard, so a shortcut to it put the same destination in
+    // two adjacent buttons. It may still backfill a short menu — hence the
+    // length check rather than a blanket ban.
+    for (const [role, config] of Object.entries(ROLE_PERMISSIONS) as [UserRole, (typeof ROLE_PERMISSIONS)[UserRole]][]) {
+      const items = uniqueAllowedNavItems(config.navItems, config.allowedRoutes);
+      const nonDashboard = items.filter(i => !i.href.startsWith('/dashboard'));
+      const shortcuts = getPrimaryShortcutItems(items, role, 4);
+      if (nonDashboard.length >= 4) {
+        expect(shortcuts.some(i => i.href.startsWith('/dashboard'))).toBe(false);
+      }
+      // Whatever the menu size, the row is still filled.
+      expect(shortcuts).toHaveLength(4);
+    }
+  });
 });
 
 describe('activeNavItem — which module the user is in', () => {

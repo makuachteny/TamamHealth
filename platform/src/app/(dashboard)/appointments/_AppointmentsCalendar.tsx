@@ -22,6 +22,44 @@ const calendarLocalizer = dateFnsLocalizer({
 export type CalEvent = { id: string; title: string; start: Date; end: Date; resource: AppointmentDoc };
 
 /**
+ * Every appointment full width, one under the other.
+ *
+ * Both built-in algorithms divide the column between concurrent appointments:
+ * `overlap` cascades them on top of each other and `no-overlap` splits the
+ * width, which is what produced the ragged half/third/full mix — a day where
+ * some names were readable and others were a truncated sliver, and the eye had
+ * to work out which column belonged to which time. The schedule now forbids two
+ * appointments in the same slot (see `assertNoBookingConflicts`), so there is
+ * nothing to divide the width between: each one takes the whole column at its
+ * own time, and the day reads as a single stack.
+ *
+ * Signature is react-big-calendar's `dayLayoutAlgorithm` contract — it hands us
+ * the events plus the `slotMetrics` that convert a time range into the column's
+ * top/height percentages, and expects styled events back.
+ */
+type SlotMetrics = {
+  getRange: (start: Date, end: Date) => { top: number; height: number };
+};
+
+export function stackedDayLayout({
+  events, slotMetrics, accessors,
+}: {
+  events: CalEvent[];
+  slotMetrics: SlotMetrics;
+  accessors: { start: (e: CalEvent) => Date; end: (e: CalEvent) => Date };
+}) {
+  return [...events]
+    .sort((a, b) => +accessors.start(a) - +accessors.start(b))
+    .map(event => {
+      const { top, height } = slotMetrics.getRange(accessors.start(event), accessors.end(event));
+      return {
+        event,
+        style: { top, height, width: 100, xOffset: 0 },
+      };
+    });
+}
+
+/**
  * "4pm", "11am", "1:30pm" — Google Calendar's month-view clock.
  *
  * Lowercase meridiem, no leading zero, and `:00` dropped entirely, because in a
@@ -254,11 +292,9 @@ export default function AppointmentsCalendar({
       popup
       style={{ height: '100%' }}
       scrollToTime={new Date(1970, 0, 1, 7, 0, 0)}
-      // Side-by-side columns for concurrent appointments. The default
-      // "overlap" algorithm stretches every event to the right edge and
-      // cascades overlapping ones on top of each other, hiding all but the
-      // topmost — unusable on a busy clinic day.
-      dayLayoutAlgorithm="no-overlap"
+      // One stack, full width — see `stackedDayLayout`. Neither built-in
+      // algorithm does this: both divide the column between concurrent events.
+      dayLayoutAlgorithm={stackedDayLayout as never}
       // The label is now a single ellipsised line, so the tooltip carries what
       // the block had to cut. (It was blanked while events wrapped and showed
       // their text in full — then it only repeated what was already on screen.)

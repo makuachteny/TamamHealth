@@ -12,7 +12,7 @@ import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, AppointmentStatus, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
 import {
   APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
-  APPOINTMENT_PENDING_STATUSES, appointmentStatusLabel,
+  APPOINTMENT_PENDING_STATUSES, appointmentStatusLabel, appointmentStatusGroup,
   APPOINTMENT_STATUS_GROUP_LABELS, type AppointmentStatusGroup,
 } from '@/lib/appointment-status';
 import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
@@ -296,6 +296,15 @@ export default function FrontDeskDashboardPage() {
      *  rescheduled / no-show). The row files under Finished wearing this
      *  status's own pill, and never offers Checkout. */
     closedStatus?: AppointmentStatus;
+    /**
+     * The visit's rung on the shared appointment ladder — the SINGLE fact that
+     * decides both which lane this row files into (`appointmentStatusGroup`)
+     * and which pill it wears. Previously the lane came from the coarse
+     * WAITING/IN CONSULT/DONE field below while the pill came from the linked
+     * appointment, so a booking still on "Scheduled" showed a Scheduled pill
+     * inside the In Office lane.
+     */
+    visitStatus: AppointmentStatus;
     waitMinutes?: number;
     overTarget?: boolean;
     /** Ordering weight — the service's acuity+wait score for triage-sourced
@@ -347,17 +356,22 @@ export default function FrontDeskDashboardPage() {
       }
     }
 
-    // Active triage per patient, driving the stage-based live queue — same
-    // 24h cutoff + newest-per-patient dedupe as the clinical dashboard's
-    // queue (older triage docs are unclosed visits, not still-waiting
-    // patients). The live queue only exists for TODAY: another board day has
+    // Active triage per patient, driving the stage-based live queue, newest
+    // per patient. The live queue only exists for TODAY: another board day has
     // no one physically in the building, so its lanes come from that day's
     // appointments alone (the loop below).
+    //
+    // Scoped to the board DAY, not a rolling 24h window. The window counted
+    // yesterday's never-closed triages as "in office" today — 25 on the tab
+    // against 3 actually listed, because those rows carry yesterday's date and
+    // the shared dashboard only renders the selected day. A visit left open
+    // overnight is stale data, not someone standing in reception; encounters
+    // that never close are the root cause (see
+    // docs/PATIENT-JOURNEY-GAP-AUDIT-2026-08.md §A5).
     const activeTriageByPatient = new Map<string, TriageDoc>();
     if (viewingToday) {
-      const triageCutoff = queueNowMs - 24 * 60 * 60 * 1000;
       for (const doc of triages) {
-        if (new Date(doc.triagedAt).getTime() < triageCutoff) continue;
+        if (isoDateKey(doc.triagedAt) !== boardDate) continue;
         const held = activeTriageByPatient.get(doc.patientId);
         if (!held || doc.triagedAt > held.triagedAt) activeTriageByPatient.set(doc.patientId, doc);
       }
@@ -377,8 +391,20 @@ export default function FrontDeskDashboardPage() {
       // signal the doctor/nurse boards derive from this engine, so reception
       // can tell who is actually with a clinician vs still queued.
       const inConsult = Boolean(entry.assignedToId) || triageDoc?.status === 'seen';
+      // The booking this walk-in's visit is threaded onto (check-in creates one
+      // for every arrival). Its rung is the authority on where the patient
+      // actually is; the triage record only proves an assessment exists, which
+      // is why "has a triage" was the wrong test for "is in the building".
+      const linkedAppointment = todaysAppointments.find(a => a.patientId === entry.patientId);
+      const triageVisitStatus: AppointmentStatus =
+        linkedAppointment?.status
+        ?? triageDoc?.visitStatus
+        // A walk-in with no booking at all: the triage record IS the proof of
+        // presence, so it files as checked in (or further along).
+        ?? (isCheckout ? 'completed' : inConsult ? 'in_progress' : 'checked_in');
       items.push({
         id: `triage-${entry.triageId}`,
+        visitStatus: triageVisitStatus,
         patientId: entry.patientId,
         patientName: entry.patientName,
         type: 'walk-in',
@@ -428,6 +454,7 @@ export default function FrontDeskDashboardPage() {
                      a.status === 'in_progress' ? 'IN CONSULT' : 'WAITING';
       items.push({
         id: `appt-${a._id}`,
+        visitStatus: a.status,
         patientId: a.patientId,
         patientName: a.patientName,
         type: 'appointment',
@@ -459,6 +486,10 @@ export default function FrontDeskDashboardPage() {
       const patient = patientById.get(enc.patientId);
       items.push({
         id: `encounter-${enc._id}`,
+        // Clinical work is done but the desk has not closed them out, so the
+        // patient is still in the building — In Office, carrying the Checkout
+        // action. Finished means checked out, which is what that action does.
+        visitStatus: 'in_progress',
         patientId: enc.patientId,
         patientName: enc.patientName || (patient ? patientFullName(patient) : 'Patient'),
         type: 'walk-in',
@@ -487,15 +518,47 @@ export default function FrontDeskDashboardPage() {
     items.sort((a, b) => (b.score - a.score) || (a.time || '').localeCompare(b.time || ''));
 
     return items;
-  }, [currentUser?.hospitalName, encounters, patients, queueNowMs, today, todaysAppointments, triages, viewingToday]);
+    // `queueNowMs` ticks every minute purely to recompute the wait labels
+    // (buildQueueFromTriage reads the clock) — it is a dependency, not a value
+    // read directly in the body above.
+  }, [boardDate, currentUser?.hospitalName, encounters, patients, queueNowMs, today, todaysAppointments, triages, viewingToday]);
+
+  /**
+   * The queue as it applies to the board's day. Every builder above already
+   * scopes to `boardDate`, so this is an enforced invariant rather than a
+   * filter that does work: the lane COUNTS and the lane ROWS must come from
+   * one list, or the tab says 25 while the table shows 3.
+   */
+  const boardQueue = useMemo(
+    () => queue.filter(item => item.calendarDate === boardDate),
+    [queue, boardDate],
+  );
+
+  /**
+   * The queue split into the three lanes, by the SHARED rule
+   * (`appointmentStatusGroup`) every role dashboard files a visit under —
+   * never by the coarse WAITING/DONE field, which put a booking still on
+   * "Scheduled" into In Office because a triage record happened to exist.
+   *
+   * In Office therefore means exactly what the pill says: checked in, triaged,
+   * or with the clinician. A patient the desk has not opened a visit for is
+   * still expected, and belongs in Scheduled.
+   */
+  const queueByLane = useMemo(() => {
+    const lanes: Record<AppointmentStatusGroup, QueueItem[]> = {
+      scheduled: [], in_office: [], finished: [],
+    };
+    for (const item of boardQueue) lanes[appointmentStatusGroup(item.visitStatus)].push(item);
+    return lanes;
+  }, [boardQueue]);
 
   const filteredQueue = useMemo(() => {
     // The Live queue tile shows the whole in-building queue regardless of the
     // active lane tab; the tabs themselves split it DONE vs not-DONE (Finished
     // vs In Office). Scheduled is served by pendingAppointments, not this list.
-    let items = panelView === 'queue' ? queue :
-      queueFilter === 'scheduled' ? [] :
-      queue.filter(q => (q.status === 'DONE') === (queueFilter === 'finished'));
+    // The lane's own members — the Live queue tile still shows the whole
+    // in-building queue regardless of the active tab.
+    let items = panelView === 'queue' ? boardQueue : queueByLane[queueFilter];
 
     const q = queueSearch.trim().toLowerCase();
     if (q) {
@@ -523,7 +586,7 @@ export default function FrontDeskDashboardPage() {
     }
 
     return items;
-  }, [panelView, patients, queue, queueFilter, queueSearch, queueSort]);
+  }, [panelView, patients, boardQueue, queueByLane, queueFilter, queueSearch, queueSort]);
 
   const filteredRegisteredPatients = useMemo(() => {
     const sorted = [...patients].sort((a, b) =>
@@ -902,11 +965,16 @@ export default function FrontDeskDashboardPage() {
       .format(new Date(`${boardDate}T12:00:00`))
   ), [boardDate]);
 
+  // Counts come from the very lists the lanes render — same day scope, same
+  // status-group filing — so a tab can never advertise work it does not show.
+  // Scheduled adds the bookings that have no queue row at all (nobody has
+  // checked them in or triaged them yet) to any queue row still on a
+  // Scheduled rung.
   const tabs = useMemo(() => ([
-    { key: 'scheduled', label: APPOINTMENT_STATUS_GROUP_LABELS.scheduled, count: pendingAppointments.length },
-    { key: 'in_office', label: APPOINTMENT_STATUS_GROUP_LABELS.in_office, count: queue.filter(q => q.status !== 'DONE').length },
-    { key: 'finished', label: APPOINTMENT_STATUS_GROUP_LABELS.finished, count: queue.filter(q => q.status === 'DONE').length },
-  ]), [queue, pendingAppointments.length]);
+    { key: 'scheduled', label: APPOINTMENT_STATUS_GROUP_LABELS.scheduled, count: pendingAppointments.length + queueByLane.scheduled.length },
+    { key: 'in_office', label: APPOINTMENT_STATUS_GROUP_LABELS.in_office, count: queueByLane.in_office.length },
+    { key: 'finished', label: APPOINTMENT_STATUS_GROUP_LABELS.finished, count: queueByLane.finished.length },
+  ]), [queueByLane, pendingAppointments.length]);
 
   const handleTabChange = useCallback((tab: string) => {
     setQueueFilter(tab as AppointmentStatusGroup);
@@ -1137,15 +1205,10 @@ export default function FrontDeskDashboardPage() {
       const queueTriage = entry.id.startsWith('triage-')
         ? triages.find(tr => tr._id === entry.sourceId)
         : undefined;
-      // Until a clerk sets it explicitly, read the walk-in's rung off the
-      // stage the queue already computed, so the pill never starts blank.
-      const walkInStatus: AppointmentStatus | undefined = queueTriage
-        ? queueTriage.visitStatus
-          ?? (entry.status === 'DONE' ? 'completed'
-            : entry.status === 'IN CONSULT' ? 'in_progress'
-            : 'checked_in')
-        : undefined;
-      const ladderStatus = queueAppointment?.status ?? walkInStatus;
+      // The pill reads the SAME field the lane was filed by, so a row can
+      // never show "Scheduled" while sitting under In Office. Resolved once,
+      // when the queue item was built.
+      const ladderStatus = entry.visitStatus;
       return {
         id: entry.id,
         photoUrl: (patient as { photoUrl?: string } | undefined)?.photoUrl,

@@ -280,7 +280,16 @@ export default function AppointmentsPage() {
   // Date the react-big-calendar view is centered on (Google-Calendar-style nav).
   // Defaults to "today" in Africa/Juba so the initial focus matches the facility
   // timezone rather than whatever timezone the viewer's browser is set to.
-  const [calDate, setCalDate] = useState<Date>(() => jubaNow());
+  /**
+   * One day for both views. `listDate` is the module's date — the header's
+   * picker sets it, the table is scoped to it, and the calendar opens on it.
+   * They used to be separate pieces of state, so moving the calendar to next
+   * Tuesday and switching back to the table showed today, and vice versa.
+   */
+  const calDate = useMemo(() => new Date(`${listDate}T12:00:00`), [listDate]);
+  const setCalDate = useCallback((d: Date) => {
+    setListDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  }, []);
 
   // Form state
   const [formPatient, setFormPatient] = useState('');
@@ -329,14 +338,26 @@ export default function AppointmentsPage() {
 
   // Appointments → react-big-calendar events. Each event keeps the full
   // appointment on `resource` so clicking can open the existing detail/edit flow.
+  /**
+   * The calendar shows the same appointments the table does.
+   *
+   * These were two independent views of one dataset: the table filtered by its
+   * own `listStatus`/`listSearch`, the calendar by a separate `filterStatus`/
+   * `search` pair, and each kept its own date. Switching from the table to the
+   * calendar could therefore land on a different day showing a different subset
+   * — the same Thursday reading 31 appointments in one view and fewer in the
+   * other, with no way to tell which was right. One filter, one search, one
+   * date; the calendar only widens the *range* (a week or a month instead of a
+   * day), never the contents.
+   */
   const calendarEvents = useMemo(() => {
     let list = appointments;
     if (filterStatus === 'pending_approval') {
       list = list.filter(a => a.status === 'scheduled' && a.appointmentDate >= today);
-    } else if (filterStatus !== 'all') {
-      list = list.filter(a => canonicalAppointmentStatus(a.status) === filterStatus);
+    } else if (listStatus !== 'all') {
+      list = list.filter(a => canonicalAppointmentStatus(a.status) === listStatus);
     }
-    const q = `${search} ${globalSearch}`.toLowerCase().trim();
+    const q = `${listSearch} ${globalSearch}`.toLowerCase().trim();
     if (q) list = list.filter(a =>
       a.patientName.toLowerCase().includes(q) ||
       a.providerName.toLowerCase().includes(q) ||
@@ -354,7 +375,7 @@ export default function AppointmentsPage() {
         resource: a,
       };
     });
-  }, [appointments, filterStatus, search, globalSearch, today]);
+  }, [appointments, filterStatus, listStatus, listSearch, globalSearch, today]);
 
   // Same scope as the calendar (date + search) but WITHOUT the status filter, so the
   // status tab badges show how many appointments each status holds in the current view.

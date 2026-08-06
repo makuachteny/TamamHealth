@@ -5534,6 +5534,58 @@ html:has(.ehr-top-rail) {
   font-weight: 700;
 }
 
+/* The name and any mark that belongs to it, on one line.
+   `.ehr-appointment-main span` above turns every span in this cell into a
+   right-aligned pill in the second column — written for the status badge, but
+   it also caught the telehealth icon, which is why the icon sat at the far
+   right of the row looking like a button rather than beside the patient. These
+   two rules take the name group and the mark back out of that treatment; two
+   classes outrank the class+element selector above, so no !important. */
+.ehr-appointment-main .ehr-row-name {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  /* The pill rule also carries `justify-self: end`, which pushed the whole
+     name group to the right edge of its column and left the names ragged
+     against the subtitles below them. The name starts where the subtitle
+     starts. */
+  justify-self: start;
+  text-align: left;
+  /* Inherits `width: fit-content` from the pill rule; capping it at the column
+     keeps a long name truncating instead of widening the cell. */
+  max-width: 100%;
+  /* The button inside owns the truncation — clipping here would cut the icon. */
+  overflow: visible;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.ehr-appointment-main .ehr-row-name button {
+  grid-column: auto;
+  grid-row: auto;
+  min-width: 0;
+}
+
+.ehr-appointment-main .ehr-row-name .ehr-row-telehealth {
+  grid-column: auto;
+  grid-row: auto;
+  flex: 0 0 auto;
+  justify-self: auto;
+  align-self: center;
+  width: auto;
+  margin-left: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ehr-blue, var(--accent-primary));
+}
+
 .ehr-appointment-main .ehr-row-meta {
   display: none;
 }
@@ -12934,7 +12986,23 @@ span:has(> svg:only-child) {
 }
 
 /* Time slot rows */
-.rbc-tamam .rbc-time-view .rbc-timeslot-group { min-height: 56px; }
+/* Hour rows, sized so an appointment can breathe.
+   Events are one full-width row each (see `stackedDayLayout`), so a 30-minute
+   visit gets half an hour row: at the old 56px that left a ~28px sliver with
+   the name clipped against the block's own padding. 96px gives the half-hour
+   ~48px — a comfortable line of text plus its border — and the grid scrolls
+   rather than compressing, the way Google Calendar keeps a constant hour height
+   and moves the day under the viewport. */
+.rbc-tamam .rbc-time-view .rbc-timeslot-group { min-height: 96px; }
+
+/* The scroll lives on the time grid, so the day/week headers stay put while the
+   hours move under them. `.rbc-time-view` clips (`overflow: hidden` above) —
+   without this the grid simply grew past the card and the later hours were
+   unreachable. */
+.rbc-tamam .rbc-time-content {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
 .rbc-tamam .rbc-time-view .rbc-time-gutter .rbc-timeslot-group { font-size: 10px; }
 .rbc-tamam .rbc-timeslot-group { border-bottom: 1px solid var(--glass-border); }
 .rbc-tamam .rbc-time-slot { border-top: none; }
@@ -13002,7 +13070,24 @@ span:has(> svg:only-child) {
   white-space: nowrap;
 }
 
-/* ── Column header: weekday over a date badge ── */
+/* ── Column header: weekday over a date badge ──
+   react-big-calendar ships `.rbc-header { overflow: hidden; min-height: 0 }`,
+   written for a single line of text. This header stacks two — the weekday over
+   a 30px date circle — so the row sized itself to the weekday and clipped the
+   date in half; the week view showed "SUN" above the top of a "2". The header
+   has to be tall enough for what it contains and must not crop it. */
+.rbc-tamam .rbc-header {
+  min-height: 64px;
+  overflow: visible;
+}
+
+/* The flex row the headers sit in inherits its height from them, and the
+   all-day row below must not eat into it. */
+.rbc-tamam .rbc-time-header-content > .rbc-row:first-child,
+.rbc-tamam .rbc-month-view .rbc-row:first-child {
+  min-height: 64px;
+}
+
 .rbc-tamam .rbc-header .gcal-colhead {
   display: flex;
   flex-direction: column;

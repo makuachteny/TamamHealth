@@ -226,10 +226,13 @@ export default function EhrTopRail() {
           title="Open module menu"
           data-track="nav.module_menu"
         >
-          {/* A hamburger, not the current module's icon: the trigger is the
-              menu of ALL modules, and a changing glyph read as a mystery
-              button. The open panel attaches directly below this button. */}
-          <Menu className="w-5 h-5" />
+          {/* The dashboard glyph, fixed — not a hamburger and not the current
+              module's icon. It stays constant so the trigger is always the same
+              button in the same place (a changing glyph read as a mystery
+              button), and because the module list leads with Dashboard this
+              also stands in for the shortcut that used to sit in the row. The
+              open panel attaches directly below. */}
+          <LayoutDashboard className="w-5 h-5" />
         </button>
 
         {moduleOpen && (

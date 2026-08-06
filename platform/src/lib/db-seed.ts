@@ -954,8 +954,6 @@ export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-30', type: 'appointment', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', patientPhone: '+211912555008', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '13:00', endTime: '13:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Medication refill and BP review', status: 'scheduled', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-31', type: 'appointment', patientId: 'pat-00015', patientName: 'Tut Chuol Both', patientPhone: '+211912555015', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '13:45', endTime: '14:15', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Nephrology', reason: 'Renal follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-32', type: 'appointment', patientId: 'pat-00040', patientName: 'Majok Chol Wol', patientPhone: '+211912555040', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '14:30', endTime: '15:00', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Abdominal pain follow-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
-  { _id: 'appointment-33', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '15:15', endTime: '15:45', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Endocrinology', reason: 'Diabetes review', status: 'confirmed', reminderSent: true, reminderChannel: 'app', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
-  { _id: 'appointment-34', type: 'appointment', patientId: 'pat-00063', patientName: 'Santino Madut', patientPhone: '+211915200063', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '09:15', endTime: '09:45', duration: 30, appointmentType: 'follow_up', priority: 'urgent', department: 'Outpatient', reason: 'Chest pain reassessment', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-35', type: 'appointment', patientId: 'pat-00064', patientName: 'Aluel Garang', patientPhone: '+211915200064', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '10:15', endTime: '10:45', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Fever follow-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   // ── Extra upcoming appointments for carousel demo ──
   { _id: 'appointment-17', type: 'appointment', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', patientPhone: '+211912555022', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(1), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'follow_up', priority: 'urgent', department: 'Outpatient', reason: 'Anaemia review', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(1) },
@@ -1023,8 +1021,8 @@ const seedAdmissions: Omit<AdmissionDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'admission-3', type: 'admission', patientId: 'pat-00062', patientName: 'Nyandeng Chol Wol', hospitalNumber: 'JTH-000062', admissionDate: daysAgo(1), admittingDiagnosis: 'Labour at term', icd11Code: 'JB40', severity: 'moderate', admittedBy: 'user-midwife.nyakong', admittedByName: 'Midwife Nyakong Gatkuoth', wardId: 'ward-3', wardName: 'Maternity Ward', bedId: 'bed-5', bedNumber: 'W3-B01', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', attendingPhysician: 'user-dr.achol', attendingPhysicianName: 'Dr. Achol Mayen Deng', nurseAssigned: 'user-midwife.nyakong', nurseAssignedName: 'Midwife Nyakong Gatkuoth', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
   { _id: 'admission-4', type: 'admission', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', hospitalNumber: 'JTH-000030', admissionDate: daysAgo(2), admittingDiagnosis: 'Severe burns >30% TBSA', icd11Code: 'NE00', severity: 'critical', admittedBy: 'user-dr.wani', admittedByName: 'Dr. James Wani Igga', wardId: 'ward-5', wardName: 'ICU', bedId: 'bed-7', bedNumber: 'ICU-B01', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', attendingPhysician: 'user-dr.wani', attendingPhysicianName: 'Dr. James Wani Igga', isolationRequired: true, isolationReason: 'Burn wound infection control', status: 'admitted', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
   { _id: 'admission-5', type: 'admission', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', hospitalNumber: 'JTH-000035', admissionDate: daysAgo(9), admittingDiagnosis: 'Pneumonia', icd11Code: 'CA40', severity: 'moderate', admittedBy: 'user-co.deng', admittedByName: 'CO Deng Mabior Kuol', wardId: 'ward-6', wardName: 'General Ward', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', attendingPhysician: 'user-co.deng', attendingPhysicianName: 'CO Deng Mabior Kuol', isolationRequired: false, status: 'discharged', dischargeDate: daysAgo(4), dischargeType: 'normal', dischargeDiagnosis: 'Resolved pneumonia', dischargedBy: 'user-co.deng', dischargedByName: 'CO Deng Mabior Kuol', followUpRequired: true, followUpDate: dateFromNow(3), lengthOfStay: 5, state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(9), updatedAt: daysAgo(4) },
-  // Active inpatient at Wau State Hospital — pat-00063 already has same-day
-  // outpatient follow-ups with CO Deng (appointment-25/appointment-34), so
+  // Active inpatient at Wau State Hospital — pat-00063 already has a same-day
+  // outpatient follow-up with CO Deng (appointment-25), so
   // this also exercises the inpatient-vs-outpatient split on the day-activity
   // chart (previously 0 inpatient at hosp-002, since admission-5 above is
   // discharged and every other admission is at hosp-001).
@@ -1193,7 +1191,27 @@ const overflowVisits: Array<{ reason: string; providerIdx: 0 | 1 | 2 }> = [
   { reason: 'Routine check-up',       providerIdx: 1 },  // Outpatient
 ];
 
-const overflowAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = overflowRoster.map((p, i) => {
+/**
+ * Patients who already hold a live visit today in the curated list above.
+ *
+ * The roster's own exclusions (admitted inpatients, the antenatal triage
+ * patient) were maintained by hand against one hazard — the same person in two
+ * places on the boards — but nothing stopped an overflow row landing on a
+ * patient who already had a curated appointment today. Eight did, which is why
+ * the calendar drew the same name twice in a single day column. Deriving the
+ * exclusion from the appointments themselves keeps it true as the curated list
+ * changes, instead of relying on someone remembering to edit two places.
+ */
+const overflowExcludedToday = new Set(
+  seedAppointments
+    .filter(a => a.appointmentDate === dateAgo(0)
+      && !['completed', 'cancelled', 'no_show', 'rescheduled'].includes(a.status))
+    .map(a => a.patientId),
+);
+
+const overflowAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = overflowRoster
+  .filter(p => !overflowExcludedToday.has(p.id))
+  .map((p, i) => {
   const visit = overflowVisits[i % overflowVisits.length];
   const provider = overflowProviders[visit.providerIdx];
   const hour = 8 + Math.floor(i / 2);
@@ -1223,6 +1241,44 @@ const overflowAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = overf
   };
 });
 seedAppointments.push(...overflowAppointments);
+
+/**
+ * One appointment per slot, per facility — the same rule the booking service
+ * enforces (`assertNoBookingConflicts`), applied to the seed.
+ *
+ * Seed rows are written straight to the database and never pass through that
+ * guard, so the curated list and the generated blocks between them could put
+ * two appointments in one slot. The calendar draws a day as a single stack, one
+ * row per time, which leaves a collision nowhere to go: the two either overlap
+ * or split the column into slivers.
+ *
+ * Colliding rows are pushed to the next free half-hour rather than dropped —
+ * the demo keeps its volume, and a nudged appointment is a truthful one, where
+ * a deleted appointment silently changes the day's counts.
+ */
+(() => {
+  const CLOSED = new Set(['completed', 'cancelled', 'no_show', 'rescheduled']);
+  const taken = new Set<string>();
+  const slotKey = (a: { facilityId?: string; appointmentDate: string; appointmentTime: string }) =>
+    `${a.facilityId || ''}|${a.appointmentDate}|${a.appointmentTime}`;
+  const addMinutes = (time: string, minutes: number) => {
+    const [h, m] = time.split(':').map(Number);
+    const total = (h * 60 + m + minutes) % (24 * 60);
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  };
+
+  for (const appointment of seedAppointments) {
+    if (CLOSED.has(appointment.status)) continue;
+    let key = slotKey(appointment);
+    // 48 half-hours covers a whole day; the guard stops a pathological loop.
+    for (let attempt = 0; taken.has(key) && attempt < 48; attempt++) {
+      appointment.appointmentTime = addMinutes(appointment.appointmentTime, 30);
+      appointment.endTime = addMinutes(appointment.appointmentTime, appointment.duration || 30);
+      key = slotKey(appointment);
+    }
+    taken.add(key);
+  }
+})();
 
 const overflowTriage: Omit<TriageDoc, '_rev' | 'createdBy'>[] = overflowRoster.map((p, i) => {
   const priorities = ['GREEN', 'YELLOW', 'GREEN', 'YELLOW', 'RED'] as const;
@@ -1440,7 +1496,7 @@ async function migrateDemoAppointmentsAndWalkins(): Promise<void> {
     const apptDB = appointmentsDB();
     const trDB = triageDB();
     const demoAppointments = seedAppointments.filter((a) =>
-      ['appointment-30', 'appointment-31', 'appointment-32', 'appointment-33', 'appointment-34', 'appointment-35'].includes(a._id)
+      ['appointment-30', 'appointment-31', 'appointment-32', 'appointment-35'].includes(a._id)
     );
     const demoWalkIns = seedTriage.filter((t) =>
       ['triage-10', 'triage-11', 'triage-12', 'triage-13', 'triage-w5'].includes(t._id)

@@ -129,10 +129,14 @@ function sortByShortcutPriority(list: NavItem[]): NavItem[] {
  * Tiers, in fill order:
  *   1. Primary destinations — not the home dashboard, messages, or a route the
  *      role's own dashboard body already duplicates.
- *   2. Messages, then the role dashboard — preferred before reusing a route
- *      already represented by the dashboard.
- *   3. Dashboard-duplicate destinations — used only when still needed to
- *      reach the requested header size.
+ *   2. Messages.
+ *   3. Dashboard-duplicate destinations — used when still needed to reach the
+ *      requested header size.
+ *   4. The role's own dashboard, last. The module trigger beside this row now
+ *      carries the dashboard glyph and its menu leads with Dashboard, so a
+ *      shortcut to it was the same destination twice in adjacent buttons. It
+ *      stays as the final fallback rather than being dropped outright, so a
+ *      specialist role with a short menu still fills the row.
  */
 export function getPrimaryShortcutItems(items: NavItem[], role?: UserRole, maxItems = 5) {
   const duplicateRoutes = role ? HEADER_SHORTCUT_DUPLICATE_ROUTES[role] : undefined;
@@ -149,7 +153,7 @@ export function getPrimaryShortcutItems(items: NavItem[], role?: UserRole, maxIt
 
   // De-duplicate by href across tiers (defensive; nav items are already unique).
   const seen = new Set<string>();
-  const ordered = [...tier1, ...messagesFallback, ...dashboardFallback, ...duplicateFallbacks].filter(item => {
+  const ordered = [...tier1, ...messagesFallback, ...duplicateFallbacks, ...dashboardFallback].filter(item => {
     if (seen.has(item.href)) return false;
     seen.add(item.href);
     return true;

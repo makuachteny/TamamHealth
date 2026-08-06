@@ -9,6 +9,7 @@
  * - Cross-references between seed data arrays are valid
  */
 import { patients, hospitals, referrals, diseaseAlerts } from '@/data/mock';
+import { seedAppointments } from '@/lib/db-seed';
 
 describe('Seed Data Integrity', () => {
 
@@ -184,6 +185,68 @@ describe('Seed Data Integrity', () => {
       messagePatientIds.forEach((id) => {
         expect(patientIds.has(id)).toBe(true);
       });
+    });
+  });
+
+  describe('Appointments', () => {
+    /**
+     * One open visit per patient per day.
+     *
+     * The seed carried two same-day pairs — one patient booked at 08:15 and
+     * again at 09:15, both checked in — which drew the same person twice in a
+     * single calendar column and made the day's counts disagree with the
+     * number of people in the building. `assertNoBookingConflicts` now refuses
+     * a second open same-day visit at the service; this keeps the seed itself
+     * honest, since seed rows are written straight to the database and never
+     * pass through that check.
+     */
+    test('no patient holds two open appointments on the same day', () => {
+      const CLOSED = new Set(['completed', 'cancelled', 'no_show', 'rescheduled']);
+      const seen = new Map<string, { _id: string; appointmentTime: string }>();
+      const collisions: string[] = [];
+
+      for (const appointment of seedAppointments) {
+        if (CLOSED.has(appointment.status)) continue;
+        const key = `${appointment.patientId}|${appointment.appointmentDate}`;
+        const first = seen.get(key);
+        if (first) {
+          collisions.push(
+            `${appointment.patientName} on ${appointment.appointmentDate}: ` +
+            `${first._id} @ ${first.appointmentTime} and ${appointment._id} @ ${appointment.appointmentTime}`,
+          );
+          continue;
+        }
+        seen.set(key, appointment);
+      }
+
+      expect(collisions).toEqual([]);
+    });
+
+    test('appointment IDs are unique', () => {
+      const ids = seedAppointments.map(a => a._id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    /**
+     * A slot holds one appointment. The calendar draws a day as a single stack
+     * — one row per time — so two bookings in the same slot have nowhere to go.
+     * The service refuses them; this keeps the seed to the same rule, since
+     * seed rows are written straight to the database.
+     */
+    test('no two open appointments share a slot at one facility', () => {
+      const CLOSED = new Set(['completed', 'cancelled', 'no_show', 'rescheduled']);
+      const seen = new Map<string, string>();
+      const collisions: string[] = [];
+
+      for (const a of seedAppointments) {
+        if (CLOSED.has(a.status)) continue;
+        const key = `${a.facilityId}|${a.appointmentDate}|${a.appointmentTime}`;
+        const first = seen.get(key);
+        if (first) collisions.push(`${key}: ${first} and ${a._id}`);
+        else seen.set(key, a._id);
+      }
+
+      expect(collisions).toEqual([]);
     });
   });
 });

@@ -214,6 +214,10 @@ export default function HRDashboardPage() {
         tabs={[
           { key: 'pending', label: t('hr.kpiPendingDecisions'), count: pendingLeave.length },
         ]}
+        // A leave request stays pending across days; its row carries the date
+        // it was REQUESTED, so day-scoping showed only requests filed today
+        // while the tab counted every open one.
+        filterRowsByDate={false}
         activeTab={leaveTab}
         onTabChange={setLeaveTab}
         searchValue={staffSearch}

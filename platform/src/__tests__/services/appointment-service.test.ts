@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
+ 
 /**
  * Tests for appointment-service.ts
  * Covers scheduling, conflict detection, status transitions, and statistics.
@@ -402,6 +402,10 @@ describe('Appointment Service', () => {
       appointmentType: 'follow_up',
       department: 'Surgery',
       providerId: 'dr-004',
+      // A slot holds one appointment facility-wide, so the second booking in
+      // this fixture needs its own time — the grouping under test is by type
+      // and department, not by clock.
+      appointmentTime: '11:00',
     }));
 
     const stats = await getAppointmentStats();

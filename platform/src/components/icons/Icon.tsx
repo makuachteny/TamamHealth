@@ -113,7 +113,9 @@ const ICON_COMPONENTS: Record<string, keyof typeof Lucide> = {
   mapPin: 'MapPin',
   maximize: 'Maximize2',
   mch: 'HeartPulse',
-  menu: 'PanelLeft',
+  // Lucide's real hamburger (three lines). This was 'PanelLeft', which drew a
+  // sidebar glyph on the top rail's module-menu trigger.
+  menu: 'Menu',
   message: 'MessageSquare',
   mic: 'Mic',
   micOff: 'MicOff',

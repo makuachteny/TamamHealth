@@ -108,6 +108,8 @@ interface BookingSlot {
   patientId?: string;
   patientName?: string;
   orgId?: string;
+  /** Scopes the one-appointment-per-slot rule to a single facility. */
+  facilityId?: string;
   appointmentDate: string;
   appointmentTime: string;
   duration: number;
@@ -155,6 +157,25 @@ export async function assertNoBookingConflicts(
     holdsSlot(a) &&
     isTimeOverlap(a.appointmentTime, a.duration, data.appointmentTime, data.duration);
 
+  // ── One appointment per slot, facility-wide ──
+  // Not just per provider: the calendar draws a day as a single stack, one
+  // appointment per row at its own time, so two bookings in the same slot have
+  // nowhere to go — they either overlap or split the column into unreadable
+  // slivers. Making the slot exclusive is what lets the day read straight down.
+  // Scoped to the facility (and org), so two clinics in different buildings do
+  // not block each other.
+  if (data.facilityId) {
+    const sameDay = (await getAppointmentsByDate(data.appointmentDate))
+      .filter(a => a.orgId === data.orgId && a.facilityId === data.facilityId);
+    const taken = sameDay.find(overlaps);
+    if (taken) {
+      throw new BookingConflictError(
+        `Scheduling conflict: that slot is taken — ${taken.patientName} at ${taken.appointmentTime} on ${taken.appointmentDate}` +
+        `${taken.providerName ? ` with ${taken.providerName}` : ''}. Pick another time.`,
+      );
+    }
+  }
+
   if (data.providerId) {
     const existing = (await getAppointmentsByProvider(data.providerId))
       .filter(a => a.orgId === data.orgId);
@@ -170,6 +191,30 @@ export async function assertNoBookingConflicts(
     const duplicate = existing.find(overlaps);
     if (duplicate) {
       throw new BookingConflictError(`Duplicate booking: ${data.patientName || 'this patient'} already has an appointment at ${duplicate.appointmentTime} on ${duplicate.appointmentDate}${duplicate.providerName ? ` with ${duplicate.providerName}` : ''}`);
+    }
+
+    // One open visit per patient per day.
+    //
+    // The check above only catches an overlapping *slot*, so the same patient
+    // could be booked at 08:15 and again at 09:15 on the same day and both
+    // bookings were legal — which is how the calendar filled with the same
+    // person twice in one column, once even checked in twice over. A visit is
+    // a day, not a half-hour: while one is still open the patient is already
+    // in the building's flow, and a second row is a duplicate rather than a
+    // second visit.
+    //
+    // Deliberately keyed on OPEN visits (`holdsSlot`): once the first is
+    // checked out, cancelled, or a no-show, a genuine second same-day visit —
+    // the patient who comes back that afternoon — books without argument.
+    const sameDayOpen = existing.find(a =>
+      a._id !== excludeAppointmentId &&
+      a.appointmentDate === data.appointmentDate &&
+      holdsSlot(a));
+    if (sameDayOpen) {
+      throw new BookingConflictError(
+        `${data.patientName || 'This patient'} already has an open visit on ${sameDayOpen.appointmentDate} at ${sameDayOpen.appointmentTime}` +
+        `${sameDayOpen.providerName ? ` with ${sameDayOpen.providerName}` : ''}. Use that visit, or close it before booking another.`,
+      );
     }
   }
 }

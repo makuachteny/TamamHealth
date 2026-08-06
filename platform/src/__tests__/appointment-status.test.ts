@@ -150,6 +150,44 @@ describe('appointmentStatusGroup', () => {
     expect(APPOINTMENT_STATUS_GROUPS.map(g => APPOINTMENT_STATUS_GROUP_LABELS[g]))
       .toEqual(['Scheduled', 'In Office', 'Finished']);
   });
+
+  /**
+   * The lane invariant every station board relies on. The front desk used to
+   * file rows by "does this patient have a triage record" rather than by the
+   * visit's rung, so bookings still on Scheduled were listed AND counted under
+   * In Office. These pin the rule the boards must file by.
+   */
+  it('admits only checked-in visits to the In Office lane', () => {
+    const inOffice = ALL_STATUSES.filter(s => appointmentStatusGroup(s) === 'in_office');
+    // Exactly the rungs where the desk has opened the visit and the patient is
+    // in the building — nothing that is merely booked, and nothing closed.
+    expect([...inOffice].sort()).toEqual(['checked_in', 'in_progress', 'triaged']);
+  });
+
+  it('keeps every not-yet-checked-in booking in the Scheduled lane', () => {
+    // `arrived` included on purpose: standing in the waiting room is not the
+    // same as the desk having opened the visit.
+    const scheduled = ALL_STATUSES.filter(s => appointmentStatusGroup(s) === 'scheduled');
+    expect([...scheduled].sort()).toEqual(['arrived', 'confirmed', 'reminder_sent', 'requested', 'scheduled']);
+    for (const status of scheduled) {
+      expect(APPOINTMENT_CHECKED_IN_STATUSES).not.toContain(status);
+    }
+  });
+
+  it('files each status into one lane only, so no row can be counted twice', () => {
+    const lanes = { scheduled: 0, in_office: 0, finished: 0 };
+    for (const status of ALL_STATUSES) lanes[appointmentStatusGroup(status)] += 1;
+    expect(lanes.scheduled + lanes.in_office + lanes.finished).toBe(ALL_STATUSES.length);
+  });
+
+  it('agrees with APPOINTMENT_CHECKED_IN_STATUSES on who is in the building', () => {
+    // The two must not drift: the queue admits rows by the set, the lanes file
+    // them by the function. `completed` is checked-in-derived but closed out.
+    for (const status of APPOINTMENT_CHECKED_IN_STATUSES) {
+      const lane = appointmentStatusGroup(status);
+      expect(status === 'completed' ? 'finished' : 'in_office').toBe(lane);
+    }
+  });
 });
 
 describe('priorAppointmentStatus', () => {
