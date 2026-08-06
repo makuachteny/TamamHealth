@@ -13,9 +13,10 @@
  * otherwise each have to wire three hooks and a memo, and they would drift —
  * the card is the same thing everywhere, so it owns its own feed.
  *
- * Renders nothing when the role has no configured feed, or when there is
- * nothing to show. An empty "Patient progress" card in a fixed-height rail
- * costs the space that the metrics below it need.
+ * Renders nothing only when the role has no configured feed. A quiet window
+ * shows the card with an explicit empty line instead of vanishing — a card
+ * that appears and disappears reads as broken, and "no movement" is itself
+ * information a station wants.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -62,7 +63,7 @@ export default function ProgressFeedCard() {
     ).filter(e => allowed.has(e.kind));
   }, [config, nowMs, triages, results, prescriptions]);
 
-  if (!config || events.length === 0) return null;
+  if (!config) return null;
 
   return (
     <section className="ehr-side-card ehr-progress-card">
@@ -70,6 +71,12 @@ export default function ProgressFeedCard() {
         <Activity className="w-5 h-5" />
         <h2>{config.title}</h2>
       </div>
+      {events.length === 0 && (
+        // The feed's window is 12h (buildProgressFeed default) — say so, so a
+        // quiet card reads as "nothing happened", not "nothing loaded".
+        <p className="ehr-progress-empty">No patient movement in the last 12 hours.</p>
+      )}
+      {events.length > 0 && (
       <ul className="ehr-progress-list is-scrollable">
         {events.slice(0, VISIBLE_CAP).map(ev => (
           <li key={ev.id}>
@@ -92,6 +99,7 @@ export default function ProgressFeedCard() {
           </li>
         ))}
       </ul>
+      )}
     </section>
   );
 }

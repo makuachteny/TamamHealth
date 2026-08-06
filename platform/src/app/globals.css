@@ -1945,6 +1945,51 @@ small,
   background: color-mix(in srgb, var(--color-danger) 20%, transparent);
 }
 
+/* ── Confirmation dialog ─────────────────────────────────────────────────────
+   The shared "are you sure?" panel behind useConfirm(). Deliberately small and
+   quiet: it interrupts an action the user has already decided on, so it asks
+   its question and gets out of the way. */
+.confirm-dialog {
+  padding: 22px 24px 18px;
+}
+
+.confirm-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.confirm-dialog-head h2 {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.confirm-dialog-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--color-danger);
+}
+
+.confirm-dialog-body {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* Confirm sits right of Cancel, which is where the eye finishes — and Cancel
+   is the one holding focus, so keyboard-clearing a dialog is always harmless. */
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
 /* Filter toggle — turns clearly accent-colored when its dropdown is open
    (aria-expanded/aria-pressed="true") or when filters are applied (.is-active).
    Add `btn-filter` to any "Filters" button to get this behavior consistently. */
@@ -5849,6 +5894,14 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Quiet-window line — the card stays mounted instead of vanishing. */
+.ehr-progress-empty {
+  margin: 0;
+  padding: 2px 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .ehr-progress-list.is-scrollable {
@@ -14593,7 +14646,11 @@ span:has(> svg:only-child) {
   color: var(--ehr-blue, var(--accent-primary));
 }
 
-.ehr-care-row:hover .ehr-appointment-main button {
+/* The name is its own target: clicking it opens the patient's chart, while
+   clicking anywhere else in the row opens the row's own panel. Underlining on
+   row hover advertised the wrong one — the pointer has to be on the name
+   itself before it reads as a link. */
+.ehr-care-row .ehr-appointment-main button:hover {
   text-decoration: underline;
 }
 
@@ -18396,6 +18453,15 @@ textarea.ehr-handoff-input {
 
 .appointment-card-row .ehr-appointment-identity {
   min-width: 0;
+}
+
+/* Closed slots (cancelled / rescheduled / no-show / checked out) stay in the
+   day table, muted: the status pill keeps its full colour as the indicator,
+   everything else recedes so live rows read first. */
+.appointment-card-row.is-closed .ehr-appointment-identity,
+.appointment-card-row.is-closed .ehr-appointment-time,
+.appointment-card-row.is-closed .appointment-card-provider {
+  opacity: 0.55;
 }
 
 .appointment-card-patient.ehr-appointment-main {
@@ -24891,6 +24957,25 @@ table.patient-data-table.patient-data-table {
    every other row panel keeps its own inset. */
 .ehr-row-detail:has(.appt-edit-shell) {
   padding-left: 10px;
+}
+
+/* Keep the caret on every select in the appointment form.
+   The global `select` rule draws the chevron as a background-image, but the
+   rules above set `background` — the shorthand — to change only the fill, which
+   silently resets that image to none. Visit type, Room and Recurrence were left
+   looking like plain bold text with no sign they open a menu. Re-declared here
+   (after those rules, at matching specificity) for the resting, hover and focus
+   states, since each one re-sets the shorthand. */
+.appt-edit-shell select,
+.appt-edit-shell.is-inline select,
+.appt-edit-shell select:hover,
+.appt-edit-shell.is-inline select:hover,
+.appt-edit-shell select:focus,
+.appt-edit-shell.is-inline select:focus {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
 }
 
 /* Billing rows stack, one pair per line. An earlier block in this file makes the

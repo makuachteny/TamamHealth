@@ -8,7 +8,7 @@ import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
 import { withPendingOfflineSync } from '../sync/offline-metadata';
-import { APPOINTMENT_PENDING_STATUSES } from '../appointment-status';
+import { APPOINTMENT_PENDING_STATUSES, APPOINTMENT_SLOT_RELEASED_STATUSES } from '../appointment-status';
 import { isTimeOverlap } from '../appointment-time';
 
 export type AppointmentStatusUpdateExtra = {
@@ -101,31 +101,86 @@ export async function getTodaysAppointments(scope?: DataScope): Promise<Appointm
   return getAppointmentsByDate(today, scope);
 }
 
+/** The fields a booking must expose for the conflict guard to judge it. */
+interface BookingSlot {
+  providerId?: string;
+  providerName?: string;
+  patientId?: string;
+  patientName?: string;
+  orgId?: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  duration: number;
+}
+
+/** A booking whose status released its slot never counts as a clash. */
+function holdsSlot(a: AppointmentDoc): boolean {
+  return !APPOINTMENT_SLOT_RELEASED_STATUSES.includes(a.status);
+}
+
+/**
+ * Thrown by the conflict guard. Its own class so the update/reschedule paths —
+ * which swallow infrastructure failures into a null return — can rethrow the
+ * one error the desk must actually read.
+ */
+export class BookingConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BookingConflictError';
+  }
+}
+
+/**
+ * The single conflict rule every write path runs through — create, reschedule,
+ * field edits that move the slot, and approving a portal request. Throws with
+ * a human-readable message the booking surfaces show as-is.
+ *
+ * Two checks:
+ *  - PROVIDER: the doctor cannot be in two visits at once. An empty
+ *    providerId (walk-ins booked with no clinician chosen yet) is not a real
+ *    provider to collide on. Scoped to the booking's own org so one tenant's
+ *    schedule can never block another's — getAppointmentsByProvider() is
+ *    unscoped and would match every org.
+ *  - PATIENT: the same patient cannot hold two overlapping live bookings —
+ *    this is where duplicate appointments were slipping in. Non-overlapping
+ *    same-day bookings (a morning lab, an afternoon review) stay legal.
+ */
+export async function assertNoBookingConflicts(
+  data: BookingSlot,
+  excludeAppointmentId?: string,
+): Promise<void> {
+  const overlaps = (a: AppointmentDoc) =>
+    a._id !== excludeAppointmentId &&
+    a.appointmentDate === data.appointmentDate &&
+    holdsSlot(a) &&
+    isTimeOverlap(a.appointmentTime, a.duration, data.appointmentTime, data.duration);
+
+  if (data.providerId) {
+    const existing = (await getAppointmentsByProvider(data.providerId))
+      .filter(a => a.orgId === data.orgId);
+    const conflict = existing.find(overlaps);
+    if (conflict) {
+      throw new BookingConflictError(`Scheduling conflict: ${data.providerName || 'this provider'} already has ${conflict.patientName} at ${conflict.appointmentTime} on ${conflict.appointmentDate}`);
+    }
+  }
+
+  if (data.patientId) {
+    const existing = (await getAppointmentsByPatient(data.patientId))
+      .filter(a => a.orgId === data.orgId);
+    const duplicate = existing.find(overlaps);
+    if (duplicate) {
+      throw new BookingConflictError(`Duplicate booking: ${data.patientName || 'this patient'} already has an appointment at ${duplicate.appointmentTime} on ${duplicate.appointmentDate}${duplicate.providerName ? ` with ${duplicate.providerName}` : ''}`);
+    }
+  }
+}
+
 export async function createAppointment(
   data: Omit<AppointmentDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>
 ): Promise<AppointmentDoc> {
   const db = appointmentsDB();
   const now = new Date().toISOString();
 
-  // Check for scheduling conflicts. An empty providerId (walk-ins — see
-  // check-in-service, which books them with no clinician chosen yet) is not a
-  // real provider to collide on: every walk-in checked in within the same
-  // window would otherwise "conflict" with every other. Scoped to this
-  // booking's own org so one tenant's schedule can never block another's —
-  // getAppointmentsByProvider() is unscoped and would match every org.
-  if (data.providerId) {
-    const existing = (await getAppointmentsByProvider(data.providerId))
-      .filter(a => a.orgId === data.orgId);
-    const conflict = existing.find(a =>
-      a.appointmentDate === data.appointmentDate &&
-      a.status !== 'cancelled' &&
-      a.status !== 'no_show' &&
-      isTimeOverlap(a.appointmentTime, a.duration, data.appointmentTime, data.duration)
-    );
-    if (conflict) {
-      throw new Error(`Scheduling conflict: ${data.providerName} already has an appointment at ${conflict.appointmentTime} on ${conflict.appointmentDate}`);
-    }
-  }
+  await assertNoBookingConflicts(data);
 
   const doc: AppointmentDoc = withPendingOfflineSync({
     _id: `apt-${uuidv4().slice(0, 8)}`,
@@ -193,6 +248,13 @@ export async function updateAppointmentStatus(
     }
     if (status === 'completed' && extra?.actorRole && !APPOINTMENT_COMPLETE_ROLES.includes(extra.actorRole)) {
       throw new Error('Only reception or the clinical care team can complete an appointment');
+    }
+    // Approving a portal request turns it into a live booking — and the portal
+    // write path deliberately skips the conflict guard (a patient can ask for
+    // any slot). The check therefore runs HERE, at the moment reception makes
+    // it real, so a request over an occupied slot cannot be waved through.
+    if (existing.status === 'requested' && (status === 'scheduled' || status === 'confirmed')) {
+      await assertNoBookingConflicts(existing, id);
     }
     const actorPatch = {
       ...(actorId ? { by: actorId } : {}),
@@ -285,7 +347,8 @@ export async function updateAppointmentStatus(
       hospitalId: updated.facilityId,
     });
     return updated;
-  } catch {
+  } catch (err) {
+    if (err instanceof BookingConflictError) throw err;
     return null;
   }
 }
@@ -297,6 +360,14 @@ export async function updateAppointment(
   const db = appointmentsDB();
   try {
     const existing = await db.get(id) as AppointmentDoc;
+    // An edit that moves the slot or changes whose it is re-runs the same
+    // guard a fresh booking gets — the edit modal was the open back door
+    // through which a doctor could be double-booked.
+    const movesSlot = ['appointmentDate', 'appointmentTime', 'duration', 'providerId', 'providerName']
+      .some(key => key in updates && updates[key as keyof AppointmentDoc] !== existing[key as keyof AppointmentDoc]);
+    if (movesSlot) {
+      await assertNoBookingConflicts({ ...existing, ...updates }, id);
+    }
     const updated = withPendingOfflineSync({ ...existing, ...updates, updatedAt: new Date().toISOString() });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
@@ -310,7 +381,8 @@ export async function updateAppointment(
       hospitalId: updated.facilityId,
     });
     return updated;
-  } catch {
+  } catch (err) {
+    if (err instanceof BookingConflictError) throw err;
     return null;
   }
 }
@@ -323,6 +395,12 @@ export async function rescheduleAppointment(
   const db = appointmentsDB();
   try {
     const existing = await db.get(id) as AppointmentDoc;
+    // Moving a booking must clear the same bar as making one — the target
+    // slot may already hold this doctor or this patient.
+    await assertNoBookingConflicts(
+      { ...existing, appointmentDate: newDate, appointmentTime: newTime },
+      id,
+    );
     const updated = withPendingOfflineSync({
       ...existing,
       appointmentDate: newDate,
@@ -344,7 +422,8 @@ export async function rescheduleAppointment(
       hospitalId: updated.facilityId,
     });
     return updated;
-  } catch {
+  } catch (err) {
+    if (err instanceof BookingConflictError) throw err;
     return null;
   }
 }

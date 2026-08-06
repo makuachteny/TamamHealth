@@ -5,14 +5,21 @@ import { CheckCircle2, AlertTriangle, X } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { DANGER, DANGER_STRONG, SUCCESS, SUCCESS_STRONG, WHITE } from '@/lib/theme-colors';
 
+/** An inline action rendered as a button in the toast — e.g. Undo. */
+export interface ToastAction {
+  label: string;
+  onClick: () => void | Promise<void>;
+}
+
 interface Toast {
   id: number;
   message: string;
   type: 'success' | 'error';
+  action?: ToastAction;
 }
 
 interface ToastContextType {
-  showToast: (message: string, type: 'success' | 'error') => void;
+  showToast: (message: string, type: 'success' | 'error', opts?: { action?: ToastAction; durationMs?: number }) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -23,12 +30,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error', opts?: { action?: ToastAction; durationMs?: number }) => {
     const id = ++toastId;
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => [...prev, { id, message, type, action: opts?.action }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
+      // A toast carrying an action (Undo) stays up twice as long — it is the
+      // recovery window, not just a receipt.
+    }, opts?.durationMs ?? (opts?.action ? 8000 : 4000));
   }, []);
 
   const removeToast = (id: number) => {
@@ -65,6 +74,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <AlertTriangle className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
             )}
             <p className="text-sm font-medium flex-1">{toast.message}</p>
+            {toast.action && (
+              <button
+                onClick={() => { void toast.action!.onClick(); removeToast(toast.id); }}
+                className="px-3 py-1.5 rounded font-semibold text-sm flex-shrink-0 transition-colors"
+                style={{ background: 'rgba(255,255,255,0.22)', color: WHITE, border: '1px solid rgba(255,255,255,0.45)' }}
+              >
+                {toast.action.label}
+              </button>
+            )}
             <button
               onClick={() => removeToast(toast.id)}
               aria-label={t('common.dismissNotification')}

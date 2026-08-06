@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import { ClipboardList, Plus, Check, X, Clock } from '@/components/icons/lucide';
 import CodedSearchField from '@/components/CodedSearchField';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -21,6 +22,7 @@ const COMMON_SCREENINGS = ['Blood pressure', 'HIV test', 'Cervical cancer (VIA)'
 const screeningOptions = COMMON_SCREENINGS.map(s => ({ code: '', name: s }));
 
 export default function ScreeningsPanel({ patient }: { patient: PatientDoc }) {
+  const confirm = useConfirm();
   const { currentUser } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +107,15 @@ export default function ScreeningsPanel({ patient }: { patient: PatientDoc }) {
                   <Check className="w-3 h-3" /> Done
                 </button>
                 <button className="btn btn-xs btn-secondary flex-shrink-0" disabled={busy} onClick={() => run(() => doDecline(s.id))} title="Patient declined">Decline</button>
-                <button className="p-1 rounded flex-shrink-0" disabled={busy} onClick={() => run(() => doRemove(s.id))} title="Remove" style={{ color: 'var(--text-muted)' }}>
+                <button className="p-1 rounded flex-shrink-0" disabled={busy} onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Remove this screening?',
+                    message: `${s.type} will be deleted from this patient's chart.`,
+                    confirmLabel: 'Remove',
+                    tone: 'danger',
+                  });
+                  if (ok) run(() => doRemove(s.id));
+                }} title="Remove" style={{ color: 'var(--text-muted)' }}>
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>

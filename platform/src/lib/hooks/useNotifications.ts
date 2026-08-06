@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useApp } from '../context';
 import { makeCoalescer } from './live-reload';
 import { referralsDB, appointmentsDB, labResultsDB, prescriptionsDB, intakeFormsDB, consultationProgressDB, patientTransfersDB, triageDB } from '../db';
+import { isForViewer } from '../notification-scope';
 import {
   NOTIFICATION_READS_EVENT,
   getReadNotificationIds,
@@ -234,6 +235,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     // waiting is a different class of thing from a care-progress update, and
     // the acuity is what makes it actionable. `seen` triages are excluded —
     // someone already picked the patient up.
+    //
+    // Deliberately NOT narrowed to the viewer, unlike appointments and routine
+    // results: a triage record names no provider, because the waiting room is
+    // the shared pool clinicians pull the next patient from. Filtering it by
+    // ownership would empty the queue for everyone — there is no owner yet.
     try {
       const { getActiveTriage } = await import('../services/triage-service');
       const triages = await getActiveTriage(scope);
@@ -313,6 +319,9 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       }
       const readyLabs = labs
         .filter(x => !x.critical && x.status === 'completed' && !overdueIds.has(x._id))
+        // Routine results go to the clinician who ordered them. (The critical
+        // loop above is deliberately left unfiltered — see notification-scope.)
+        .filter(x => isForViewer({ ownerName: x.orderedBy }, currentUser))
         .filter(x => {
           const ms = Date.parse(x.completedAt || x.updatedAt || x.createdAt || '');
           return Number.isNaN(ms) || nowMsLocal - ms <= RECENT_MS;
@@ -331,13 +340,21 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       // still need confirmation.
       const pending = appts
         .filter(a => a.status === 'requested' || (a.status === 'scheduled' && a.appointmentDate >= todayIso))
+        // A clinician is shown the slots booked with THEM. Unfiltered, this one
+        // source alone put every future appointment in the hospital on every
+        // doctor's bell — the bulk of a ~500-row feed.
+        .filter(a => isForViewer({ ownerId: a.providerId, ownerName: a.providerName }, currentUser))
         .sort((a, b) => (a.appointmentDate + (a.appointmentTime || '')).localeCompare(b.appointmentDate + (b.appointmentTime || '')))
         .slice(0, perSourceLimit);
       for (const a of pending) {
         out.push({ id: `appt-appr-${a._id}`, type: 'appointment', severity: 'info', title: `Appointment to confirm · ${a.patientName}`, subtitle: `${a.appointmentDate}${a.appointmentTime ? ` ${a.appointmentTime}` : ''} · ${a.providerName || a.department || 'awaiting approval'}`, time: a.updatedAt || a.createdAt || a.appointmentDate, href: '/appointments' });
       }
       // Checked in today, waiting to be seen.
-      for (const a of appts.filter(a => a.status === 'checked_in' && a.appointmentDate === todayIso).slice(0, perSourceLimit)) {
+      const checkedIn = appts
+        .filter(a => a.status === 'checked_in' && a.appointmentDate === todayIso)
+        .filter(a => isForViewer({ ownerId: a.providerId, ownerName: a.providerName }, currentUser))
+        .slice(0, perSourceLimit);
+      for (const a of checkedIn) {
         out.push({ id: `appt-ci-${a._id}`, type: 'appointment', severity: 'warning', title: `Checked in · ${a.patientName}`, subtitle: `${a.appointmentTime ? `${a.appointmentTime} · ` : ''}${a.department || a.reason || 'waiting to be seen'}`, time: a.checkedInAt || a.updatedAt || a.appointmentDate, href: '/appointments' });
       }
     } catch { /* offline */ }

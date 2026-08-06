@@ -398,6 +398,65 @@ export async function advanceEncounterToClinician(
   return enc;
 }
 
+/**
+ * Walk a checked-in encounter through triage and stop at the clinic door.
+ *
+ * Saving a triage used to write the triage document (and, since the visit
+ * ladder gained its Triaged rung, the appointment status) and touch the
+ * encounter not at all. The encounter therefore sat at `awaiting_triage`
+ * forever: the rooming station — whose actions all require `routed_to_clinic`
+ * or later — could never offer a room for a patient who had just been
+ * assessed, while the ward board, reading the appointment, already said
+ * "Triaged · Awaiting Rooming". Two machines, one patient, two answers.
+ *
+ * This closes that gap without overshooting it. `advanceEncounterToClinician`
+ * exists but runs all the way to `with_clinician`, walking straight through
+ * the rooming states without a human ever assigning a room — the very bypass
+ * the rooming service's own header calls out. Triage hands the patient to the
+ * clinic; rooming is a person's job, so the walk stops at `routed_to_clinic`
+ * and the rooming station takes it from there.
+ *
+ * Every hop goes through `transitionEncounter`, so the audit trail records
+ * `in_triage` → `triaged_awaiting_destination` → `routed_to_clinic` exactly as
+ * a station-by-station walk would. An encounter already past this point (or
+ * diverted — escalated, admitted, LWBS) is returned untouched.
+ */
+const TRIAGE_TO_CLINIC_CHAIN: EncounterStatus[] = [
+  'awaiting_next_station',
+  'awaiting_triage',
+  'in_triage',
+  'triaged_awaiting_destination',
+  'routed_to_clinic',
+];
+
+export async function advanceEncounterAfterTriage(
+  id: string,
+  opts: { triageId?: string; destinationClinic?: string; actorId?: string } = {},
+): Promise<EncounterDoc> {
+  let enc = await getEncounter(id);
+  if (!enc) throw new Error(`Encounter not found: ${id}`);
+
+  // Link the triage to the visit thread even when the encounter is already
+  // past this stretch — the record of which assessment fed this visit is
+  // useful regardless of where the patient has since got to.
+  if (opts.triageId != null || opts.destinationClinic != null) {
+    enc = await updateEncounter(id, {
+      triageId: opts.triageId ?? enc.triageId,
+      destinationClinic: opts.destinationClinic ?? enc.destinationClinic,
+    }) ?? enc;
+  }
+
+  const startIdx = TRIAGE_TO_CLINIC_CHAIN.indexOf(enc.status);
+  // Not on this stretch: either already routed/roomed/with a clinician, or
+  // diverted off the chain entirely. Either way there is nothing to walk.
+  if (startIdx === -1) return enc;
+
+  for (let i = startIdx + 1; i < TRIAGE_TO_CLINIC_CHAIN.length; i++) {
+    enc = await transitionEncounter(id, TRIAGE_TO_CLINIC_CHAIN[i], { actorId: opts.actorId });
+  }
+  return enc;
+}
+
 export interface CreateDirectConsultationEncounterInput {
   patientId: string;
   patientName: string;

@@ -6,7 +6,8 @@ import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useAppointments } from '@/lib/hooks/useAppointments';
-import { APPOINTMENT_STATUS_FLOW, APPOINTMENT_CLOSED_STATUSES } from '@/lib/appointment-status';
+import { APPOINTMENT_STATUS_FLOW, APPOINTMENT_CLOSED_STATUSES, canonicalAppointmentStatus } from '@/lib/appointment-status';
+import type { AppointmentStatus } from '@/lib/db-types';
 import { jubaDate } from '@/lib/time-juba';
 import { useToast } from '@/components/Toast';
 import { patientFullName, patientGenderAge, initials } from '@/lib/patient-utils';
@@ -83,8 +84,12 @@ export default function TriageWorkflow({
       appointment.appointmentDate === today &&
       !APPOINTMENT_CLOSED_STATUSES.includes(appointment.status));
     if (!visit) return;
-    const rung = (status: string) => APPOINTMENT_STATUS_FLOW.indexOf(status as typeof APPOINTMENT_STATUS_FLOW[number]);
-    if (rung(visit.status) >= rung('triaged')) return;
+    // `triaged` folds into the In Progress rung on the simplified ladder, so
+    // the "already there or past it" check compares canonical rungs — a visit
+    // still at Checked In (or the finer arrived) gets the hop, one already in
+    // the clinical workflow doesn't get downgraded.
+    const rung = (status: AppointmentStatus) => APPOINTMENT_STATUS_FLOW.indexOf(canonicalAppointmentStatus(status));
+    if (rung(visit.status) >= rung('in_progress')) return;
     try {
       await updateAppointmentStatus(visit._id, 'triaged');
     } catch {
@@ -247,6 +252,32 @@ export default function TriageWorkflow({
   // Empty the form. On the per-patient page the patient survives the clear —
   // the nurse is there to triage that one person, and dropping the selection
   // would leave a form with no subject on a page that is about them.
+  /**
+   * Hand the assessed patient to the clinic.
+   *
+   * The boards read the appointment; the rooming station reads the encounter.
+   * Marking the visit Triaged without moving the encounter left the patient
+   * sitting in Rooming as "waiting for triage" with no way to be given a room —
+   * the rooming actions all require `routed_to_clinic` or later. This walks the
+   * encounter the rest of the way to the clinic door and stops there, because
+   * assigning the room is a person's job, not an automatic hop.
+   */
+  const routeTriagedEncounter = async (patientId: string, triageId?: string) => {
+    try {
+      const { findOpenEncounterForPatient, advanceEncounterAfterTriage } =
+        await import('@/lib/services/encounter-service');
+      const encounter = await findOpenEncounterForPatient(patientId, currentUser?.hospitalId || '');
+      if (!encounter) return;
+      await advanceEncounterAfterTriage(encounter._id, {
+        triageId,
+        actorId: currentUser?._id,
+      });
+    } catch {
+      // The assessment itself is saved; a failed hand-off must not read as a
+      // failed triage. The rooming station can still pick the patient up.
+    }
+  };
+
   const clearForm = () => {
     setEditingTriageId(null);
     setTriageData({ airway: '', breathing: '', circulation: '', consciousness: '', priority: '' });
@@ -329,6 +360,9 @@ export default function TriageWorkflow({
         chiefComplaint: triageComplaint || undefined,
         notes: triageNotes || undefined,
       };
+      // The saved record's id, so the encounter can point back at the
+      // assessment that routed it.
+      let created: Awaited<ReturnType<typeof createTriageRecord>> | null = null;
       if (editingTriageId) {
         // Correct an already-saved record in place — keeps the same id so the
         // patient chart history points at one record, not a duplicate. A
@@ -349,7 +383,7 @@ export default function TriageWorkflow({
           return;
         }
       } else {
-        await createTriageRecord({
+        created = await createTriageRecord({
           patientId: selectedTriagePatient._id,
           patientName: patientFullName(selectedTriagePatient),
           hospitalNumber: selectedTriagePatient.hospitalNumber,
@@ -368,8 +402,11 @@ export default function TriageWorkflow({
           status: 'seen',
         });
       }
-      // Triaged, and now waiting on a room — the nurse's next move.
+      // Triaged, and now waiting on a room — the nurse's next move. Both
+      // machines have to hear about it: the visit ladder the boards read, and
+      // the encounter the rooming station works from.
       await markVisitTriaged(selectedTriagePatient._id);
+      await routeTriagedEncounter(selectedTriagePatient._id, editingTriageId ?? created?._id);
       void import('@/lib/services/consultation-progress-service').then(({ syncConsultationProgressStage }) =>
         syncConsultationProgressStage({
           patientId: selectedTriagePatient._id,

@@ -1,6 +1,6 @@
 'use client';
 
-import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Children, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClipboardList, Search, Stethoscope, Video, X, type LucideIcon } from '@/components/icons/lucide';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
@@ -12,7 +12,7 @@ import { formatAppointmentTimeUntil } from '@/lib/format-utils';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import {
-  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, appointmentStatusLabel,
+  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_STATUS_DESCRIPTIONS, appointmentStatusLabel, canonicalAppointmentStatus,
 } from '@/lib/appointment-status';
 import { toIsoDate as visitIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import type { AppointmentStatus } from '@/lib/db-types';
@@ -206,6 +206,8 @@ export default function EhrCareDashboard({
   metricsActions,
   showCalendar = true,
   filterRowsByDate = true,
+  selectedDate: controlledSelectedDate,
+  onSelectedDateChange,
   railContent,
   chart,
   chartTitle = 'Day activity',
@@ -251,6 +253,14 @@ export default function EhrCareDashboard({
    *  just placed in the sidebar instead of the header/rail. */
   metricsActions?: EhrCareDashboardAction[];
   showCalendar?: boolean;
+  /**
+   * Controlled calendar selection. When provided (with `onSelectedDateChange`),
+   * the page owns the selected day — it can rebuild rows, tab counts and the
+   * header copy for that date — and the mini-calendar/week-chart selections
+   * report through the callback. Omit both for the internal-state behaviour.
+   */
+  selectedDate?: string;
+  onSelectedDateChange?: (iso: string) => void;
   /**
    * Whether the mini-calendar's selected day scopes the row list to that day.
    * True by default — the front desk and other appointment-shaped dashboards
@@ -341,7 +351,14 @@ export default function EhrCareDashboard({
   // for all users. Typed as the union so the (now-inert) calendar branches below
   // still compile; the mini-calendar sidebar (showCalendar) is unaffected.
   const effectiveView = 'dashboard' as 'dashboard' | 'calendar';
-  const [selectedDate, setSelectedDate] = useState(todayIso);
+  // Selected day: controlled by the page when it passes `selectedDate` (so it
+  // can rebuild its data for that day), internal state otherwise.
+  const [internalSelectedDate, setInternalSelectedDate] = useState(todayIso);
+  const selectedDate = controlledSelectedDate ?? internalSelectedDate;
+  const selectDate = useCallback((iso: string) => {
+    onSelectedDateChange?.(iso);
+    if (controlledSelectedDate === undefined) setInternalSelectedDate(iso);
+  }, [controlledSelectedDate, onSelectedDateChange]);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   // Clicking a row opens a right-side detail slider where the actions live,
   // keeping the row itself clean (avatar · time · name).
@@ -460,7 +477,7 @@ export default function EhrCareDashboard({
               today={todayIso}
               eventDates={eventDates}
               onMonthChange={setCalendarMonth}
-              onDateSelect={setSelectedDate}
+              onDateSelect={selectDate}
             />
           )}
           {/* Same markup and classes as the Clinical Officer rail search, so
@@ -495,7 +512,7 @@ export default function EhrCareDashboard({
               todayIso={todayIso}
               title={chartTitle}
               onSelectDate={iso => {
-                setSelectedDate(iso);
+                selectDate(iso);
                 setCalendarMonth(startOfMonth(parseIsoDate(iso)));
               }}
             />
@@ -732,12 +749,27 @@ export default function EhrCareDashboard({
                               >
                                 {statusControl.text || statusText || '—'}
                                 <select
-                                  value={statusControl.value ?? ''}
+                                  // Fine-grained stored statuses (confirmed,
+                                  // arrived, triaged…) display as the rung they
+                                  // fold into — the options list only offers
+                                  // the simplified ladder. Non-appointment
+                                  // ladders pass through unchanged.
+                                  value={statusControl.value ? canonicalAppointmentStatus(statusControl.value as AppointmentStatus) : ''}
                                   aria-label="Appointment status"
+                                  // Status definitions as tooltips (booked vs
+                                  // patient-confirmed). Non-appointment ladders
+                                  // (SAM/MAM etc.) have no entry — no title.
+                                  title={APPOINTMENT_STATUS_DESCRIPTIONS[statusControl.value as AppointmentStatus] || undefined}
                                   onChange={event => statusControl.onChange?.(event.target.value)}
                                 >
                                   {statusControl.options.map(option => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                    <option
+                                      key={option.value}
+                                      value={option.value}
+                                      title={APPOINTMENT_STATUS_DESCRIPTIONS[option.value as AppointmentStatus] || undefined}
+                                    >
+                                      {option.label}
+                                    </option>
                                   ))}
                                 </select>
                               </span>

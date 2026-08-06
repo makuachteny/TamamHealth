@@ -17,29 +17,51 @@
 import type { AppointmentStatus } from './db-types';
 
 /**
- * The forward ladder, in the order reception moves a visit through it:
- * booked → reminded → patient confirms → patient shows up → checked in at the
- * desk → placed in a room → finished and checked out.
+ * The forward ladder OFFERED to users, in the order reception moves a visit
+ * through it: booked → present and checked in → in the clinical workflow →
+ * visit finished.
  *
- * `arrived` and `checked_in` are deliberately distinct: a patient can be
- * standing in the waiting room (arrived) before the desk has taken payment,
- * verified insurance and opened the visit (checked in).
- *
- * `triaged` is the nurse's rung between them and the room: the ETAT assessment
- * is recorded and the patient is waiting to be roomed. Saving a triage sets it,
- * so the board shows assessed-and-waiting apart from not-yet-seen, and the next
- * option in this same dropdown is the one the nurse takes next — Roomed.
+ * Simplified (2026-08) from the eight-rung ladder staff found ambiguous
+ * ("what's the difference between Scheduled and Confirmed?"). The four
+ * fine-grained statuses that came off the ladder are STILL VALID STORED
+ * VALUES — system events keep writing them (the reminder service writes
+ * `reminder_sent`, the portal/Approve writes `confirmed`, arrival marking
+ * writes `arrived`, saving a triage writes `triaged`) — they just display and
+ * behave as the rung they fold into, per `APPOINTMENT_STATUS_CANONICAL`.
+ * Nothing in the database changes: the label is what moved, not the data.
  */
 export const APPOINTMENT_STATUS_FLOW: AppointmentStatus[] = [
   'scheduled',
-  'reminder_sent',
-  'confirmed',
-  'arrived',
   'checked_in',
-  'triaged',
   'in_progress',
   'completed',
 ];
+
+/**
+ * Where each fine-grained, system-written status folds into the simplified
+ * ladder. Reading UIs canonicalise before comparing against the ladder;
+ * writing UIs only offer the four canonical rungs.
+ *
+ *  - reminder_sent → scheduled: a reminder is a communication event, not a
+ *    different kind of booking (the `reminderSent` flag carries the fact).
+ *  - confirmed → scheduled: confirmation is a fact about the booking (kept in
+ *    the status history and the tooltip), not a separate rung.
+ *  - arrived → checked_in: the waiting-room gap between the two is real but
+ *    operational sets (APPOINTMENT_CHECKED_IN_STATUSES etc.) still tell them
+ *    apart; the user-facing vocabulary no longer does.
+ *  - triaged → in_progress: both mean "moving through the clinical workflow".
+ */
+export const APPOINTMENT_STATUS_CANONICAL: Partial<Record<AppointmentStatus, AppointmentStatus>> = {
+  reminder_sent: 'scheduled',
+  confirmed: 'scheduled',
+  arrived: 'checked_in',
+  triaged: 'in_progress',
+};
+
+/** The simplified rung a stored status displays and files as. */
+export function canonicalAppointmentStatus(status: AppointmentStatus): AppointmentStatus {
+  return APPOINTMENT_STATUS_CANONICAL[status] ?? status;
+}
 
 /** Ways a visit leaves the ladder without being seen. */
 export const APPOINTMENT_STATUS_EXITS: AppointmentStatus[] = ['no_show', 'rescheduled', 'cancelled'];
@@ -55,19 +77,45 @@ export const APPOINTMENT_STATUS_OPTIONS: AppointmentStatus[] = [
   ...APPOINTMENT_STATUS_EXITS,
 ];
 
+/**
+ * Fine-grained statuses wear their canonical rung's label. `confirmed` reads
+ * as plain Scheduled too — the confirmation fact stays in the status history
+ * and the tooltip, not on the pill.
+ */
 export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   requested: 'Requested',
   scheduled: 'Scheduled',
-  reminder_sent: 'Reminder Sent',
-  confirmed: 'Confirmed',
-  arrived: 'Arrived',
+  reminder_sent: 'Scheduled',
+  confirmed: 'Scheduled',
+  arrived: 'Checked In',
   checked_in: 'Checked In',
-  triaged: 'Triaged',
-  in_progress: 'Roomed',
-  completed: 'Checked Out',
+  triaged: 'In Progress',
+  in_progress: 'In Progress',
+  completed: 'Completed',
   no_show: 'No Show',
   rescheduled: 'Rescheduled',
   cancelled: 'Cancelled',
+};
+
+/**
+ * One-line definition per status, shown as tooltips wherever a status can be
+ * picked. Written to settle the questions staff actually ask — above all
+ * "Scheduled vs Confirmed": Scheduled means the DESK booked the slot;
+ * Confirmed means the PATIENT has said they are coming.
+ */
+export const APPOINTMENT_STATUS_DESCRIPTIONS: Record<AppointmentStatus, string> = {
+  requested: 'Asked for by the patient through the portal — not yet booked by the desk.',
+  scheduled: 'Booked by the desk.',
+  reminder_sent: 'Booked, and a reminder has gone out — still awaiting the patient.',
+  confirmed: 'Booked, and the patient has confirmed they will attend.',
+  arrived: 'The patient is at the facility and their visit is being opened.',
+  checked_in: 'The patient is at the facility and their visit is open at the desk.',
+  triaged: 'Moving through the clinical workflow — nurse assessment recorded.',
+  in_progress: 'Moving through the clinical workflow — with (or waiting for) the clinician.',
+  completed: 'The visit has ended and is closed out.',
+  no_show: 'The patient never arrived and the slot has lapsed.',
+  rescheduled: 'Not happening at this time — to be rebooked for a new slot.',
+  cancelled: 'Called off. The slot is released; the booking stays on record.',
 };
 
 /** Locale keys, for the surfaces that translate their status pills. */
@@ -136,6 +184,16 @@ export const APPOINTMENT_CHECKED_IN_STATUSES: AppointmentStatus[] = ['checked_in
 export const APPOINTMENT_CLOSED_STATUSES: AppointmentStatus[] = ['completed', 'cancelled', 'no_show', 'rescheduled'];
 
 /**
+ * Statuses that RELEASE the slot for conflict purposes: a cancelled, no-show
+ * or rescheduled booking no longer holds its provider or patient at that
+ * time, so rebooking over it must not report a clash. (`completed` is absent
+ * deliberately — a finished visit really did occupy its slot.) One list, used
+ * by the service's conflict guard and every availability picker, so "free"
+ * means the same thing at booking time and in the dropdowns.
+ */
+export const APPOINTMENT_SLOT_RELEASED_STATUSES: AppointmentStatus[] = ['cancelled', 'no_show', 'rescheduled'];
+
+/**
  * Still awaiting the patient: reception can remind, confirm, or check them in.
  * `requested` is excluded — it is not a booking yet.
  */
@@ -173,11 +231,13 @@ export function appointmentStatusLabel(status: AppointmentStatus): string {
 }
 
 /**
- * The rung below `status`, for undoing a step. Exits reopen to `scheduled`
- * (their own rung is gone), and `scheduled` has nowhere to fall back to.
+ * The rung below `status`, for undoing a step. Fine-grained statuses step
+ * from their canonical rung (undoing a `triaged` visit lands on Checked In).
+ * Exits reopen to `scheduled` (their own rung is gone), and `scheduled` has
+ * nowhere to fall back to.
  */
 export function priorAppointmentStatus(status: AppointmentStatus): AppointmentStatus | undefined {
-  const rung = APPOINTMENT_STATUS_FLOW.indexOf(status);
+  const rung = APPOINTMENT_STATUS_FLOW.indexOf(canonicalAppointmentStatus(status));
   if (rung > 0) return APPOINTMENT_STATUS_FLOW[rung - 1];
   if (APPOINTMENT_STATUS_EXITS.includes(status)) return 'scheduled';
   return undefined;

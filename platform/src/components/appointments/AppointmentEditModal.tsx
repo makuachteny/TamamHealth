@@ -90,6 +90,10 @@ export default function AppointmentEditModal({
   const [priority, setPriority] = useState<AppointmentPriority>(appointment.priority);
   const [status, setStatus] = useState<AppointmentStatus>(appointment.status);
   const [department, setDepartment] = useState(appointment.department);
+  // Provider carried as id + name. Name-only saves left providerId pointing
+  // at the OLD doctor after a change — conflict checks and provider filters
+  // then tested the wrong person's diary.
+  const [providerId, setProviderId] = useState(appointment.providerId || '');
   const [provider, setProvider] = useState(appointment.providerName);
   const [reason, setReason] = useState(appointment.reason);
   const [notes, setNotes] = useState(appointment.notes || '');
@@ -117,7 +121,7 @@ export default function AppointmentEditModal({
       await updateAppointment(appointment._id, {
         appointmentDate: date, appointmentTime: time, duration,
         appointmentType: type, priority, department,
-        providerName: provider, reason, notes,
+        providerId, providerName: provider, reason, notes,
         appointmentMode: detail.mode,
         staffId: detail.staffId || undefined,
         staffName: detail.staffName || undefined,
@@ -146,7 +150,8 @@ export default function AppointmentEditModal({
     patient,
     appointment,
     appointments,
-    providerId: appointment.providerId,
+    // The SELECTED provider, so the clash warning follows a changed pick.
+    providerId: providerId || appointment.providerId,
     providerName: provider || appointment.providerName,
     date,
     time,
@@ -165,7 +170,7 @@ export default function AppointmentEditModal({
       )}
       {inline && (
         <div className="ehr-visit-pop-tabs" role="tablist">
-          {([['appointment', 'Appointment'], ['care', 'Provider & staff'], ['billing', 'Status & billing']] as const).map(([key, label]) => (
+          {([['appointment', 'Details'], ['care', 'Provider & staff'], ['billing', 'Status & billing']] as const).map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -232,21 +237,28 @@ export default function AppointmentEditModal({
           <div>
             <label>Provider</label>
             <span className="appt-assign-field">
-              <select value={provider} onChange={e => setProvider(e.target.value)}>
-                <option value="">Unassigned</option>
-                {provider && !providerOptions.some(p => (p.name || p.username) === provider) && (
-                  <option value={provider}>{provider}</option>
+              <select
+                value={providerId}
+                onChange={e => {
+                  const person = providerOptions.find(p => p._id === e.target.value);
+                  setProviderId(e.target.value);
+                  setProvider(person ? (person.name || person.username || '') : '');
+                }}
+              >
+                <option value="">{!providerId && provider ? `${provider} (not on staff list)` : 'Unassigned'}</option>
+                {providerId && !providerOptions.some(p => p._id === providerId) && (
+                  <option value={providerId}>{provider || 'Current provider'}</option>
                 )}
                 {/* Specialty/department, free-or-busy at this slot, and the
                     day's load — so a clash is visible before the pick, not
                     after saving. */}
                 {providerOptions.map(person => (
-                  <option key={person._id} value={person.name || person.username || ''}>
+                  <option key={person._id} value={person._id}>
                     {staffOptionLabel(person, providerSlotContext)}
                   </option>
                 ))}
               </select>
-              <button type="button" className="appt-assign-btn" onClick={save} disabled={saving || provider === appointment.providerName}>
+              <button type="button" className="appt-assign-btn" onClick={save} disabled={saving || (providerId === (appointment.providerId || '') && provider === appointment.providerName)}>
                 {saving ? '…' : 'Assign'}
               </button>
             </span>

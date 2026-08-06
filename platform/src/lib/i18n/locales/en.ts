@@ -401,20 +401,22 @@ const en: TranslationMap = {
   'appointments.statPendingApproval': 'Pending Approval',
   'appointments.statTodaysAppointments': 'Today\'s Appointments',
   'appointments.statWalkInsToday': 'Walk-Ins Today',
-  'appointments.statusArrived': 'Arrived',
+  // Simplified vocabulary (2026-08): the fine-grained stored statuses wear
+  // their merged rung's wording — reminder_sent/confirmed read as Scheduled,
+  // arrived as Checked In, triaged as In Progress — matching
+  // APPOINTMENT_STATUS_LABELS, which a test enforces.
+  'appointments.statusArrived': 'Checked In',
   'appointments.statusCancelled': 'Cancelled',
   'appointments.statusCheckedIn': 'Checked In',
-  // `completed` and `in_progress` are the stored names; the front desk calls
-  // these rungs Checked Out and Roomed, which is what staff say out loud.
-  'appointments.statusCompleted': 'Checked Out',
-  'appointments.statusConfirmed': 'Confirmed',
-  'appointments.statusInProgress': 'Roomed',
+  'appointments.statusCompleted': 'Completed',
+  'appointments.statusConfirmed': 'Scheduled',
+  'appointments.statusInProgress': 'In Progress',
   'appointments.statusNoShow': 'No Show',
-  'appointments.statusReminderSent': 'Reminder Sent',
+  'appointments.statusReminderSent': 'Scheduled',
   'appointments.statusRequested': 'Requested',
   'appointments.statusRescheduled': 'Rescheduled',
   'appointments.statusScheduled': 'Scheduled',
-  'appointments.statusTriaged': 'Triaged',
+  'appointments.statusTriaged': 'In Progress',
   'appointments.subtitle': 'Schedule, approve, and manage patient appointments',
   'appointments.title': 'Appointments',
   'appointments.toastBooked': 'Appointment booked',

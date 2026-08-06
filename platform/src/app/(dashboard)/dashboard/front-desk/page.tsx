@@ -30,6 +30,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { getRoleConfig } from '@/lib/permissions';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMetric, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import {
   Calendar, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList,
@@ -181,6 +182,12 @@ export default function FrontDeskDashboardPage() {
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [reschedSaving, setReschedSaving] = useState(false);
   const [noShowTarget, setNoShowTarget] = useState<AppointmentDoc | null>(null);
+  // Cancelling is confirmed first, exactly like no-show: it takes the row off
+  // the live board, so an accidental pick from the status dropdown must not
+  // land silently. `triage` rides along for walk-in rows whose visit rung is
+  // mirrored onto the triage record.
+  const [cancelTarget, setCancelTarget] = useState<{ appt: AppointmentDoc; triage?: TriageDoc } | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [encounters, setEncounters] = useState<EncounterDoc[]>([]);
@@ -191,7 +198,18 @@ export default function FrontDeskDashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  // LOCAL calendar day, same helper the mini-calendar's "today" ring uses.
+  // This was a UTC slice (`toISOString().slice(0, 10)`), which rolls to
+  // tomorrow during the evening (Juba is UTC+2) — so the board's "today"
+  // disagreed with the calendar's, clicking back onto today never matched,
+  // and the live queue vanished after ~21:00.
+  const today = toIsoDate(new Date());
+  // The day the board is showing. The mini-calendar drives it; today by
+  // default. The LIVE parts of the board (triage queue, checkout encounters,
+  // walk-ins physically in the building) only exist for today — another day
+  // shows that day's appointments alone, split into the same three lanes.
+  const [boardDate, setBoardDate] = useState<string>(today);
+  const viewingToday = boardDate === today;
 
   useEffect(() => {
     if (!currentUser) return;
@@ -223,13 +241,17 @@ export default function FrontDeskDashboardPage() {
     };
   }, [currentUser, currentUser?.hospital?._id, currentUser?.hospitalId, currentUser?.orgId, currentUser?.role]);
 
-  // ── Real today's appointments ──
+  // ── The board day's appointments (today unless the calendar picked another
+  //    day). Cancelled ones are KEPT: they surface in the Finished lane with
+  //    their red pill rather than vanishing from the board, so the desk can
+  //    find and reopen one cancelled by mistake. Lists that must not show them
+  //    (pending arrivals, the live queue) filter by status themselves. ──
   const todaysAppointments = useMemo(() =>
     appointments
-      .filter(a => a.appointmentDate === today && a.status !== 'cancelled')
+      .filter(a => a.appointmentDate === boardDate)
       // appointmentTime can be missing on seeded/synced rows — guard before sort
       .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || '')),
-    [appointments, today]
+    [appointments, boardDate]
   );
 
   // ── Real today's triages (pending/seen = still in queue) ──
@@ -267,6 +289,10 @@ export default function FrontDeskDashboardPage() {
     stage?: QueueStage;
     /** Stage-based label from patient-queue-service (triage-sourced entries only). */
     stageLabel?: string;
+    /** Set when the slot closed WITHOUT the patient being seen (cancelled /
+     *  rescheduled / no-show). The row files under Finished wearing this
+     *  status's own pill, and never offers Checkout. */
+    closedStatus?: AppointmentStatus;
     waitMinutes?: number;
     overTarget?: boolean;
     /** Ordering weight — the service's acuity+wait score for triage-sourced
@@ -302,27 +328,36 @@ export default function FrontDeskDashboardPage() {
       'awaiting_facility_checkout',
       'in_facility_checkout',
     ]);
+    // Live checkout encounters belong to today's building, not to whichever
+    // day the calendar is showing — an empty map on other days keeps them out
+    // of both the encounter rows below and the appointment rows' checkout state.
     const checkoutEncounterByPatient = new Map<string, EncounterDoc>();
-    for (const enc of encounters) {
-      if (!checkoutStatuses.has(enc.status)) continue;
-      const dateKey = isoDateKey(enc.updatedAt || enc.closedAt || enc.startedAt || enc.createdAt);
-      if (dateKey !== today) continue;
-      const current = checkoutEncounterByPatient.get(enc.patientId);
-      if (!current || (enc.updatedAt || enc.createdAt || '').localeCompare(current.updatedAt || current.createdAt || '') > 0) {
-        checkoutEncounterByPatient.set(enc.patientId, enc);
+    if (viewingToday) {
+      for (const enc of encounters) {
+        if (!checkoutStatuses.has(enc.status)) continue;
+        const dateKey = isoDateKey(enc.updatedAt || enc.closedAt || enc.startedAt || enc.createdAt);
+        if (dateKey !== today) continue;
+        const current = checkoutEncounterByPatient.get(enc.patientId);
+        if (!current || (enc.updatedAt || enc.createdAt || '').localeCompare(current.updatedAt || current.createdAt || '') > 0) {
+          checkoutEncounterByPatient.set(enc.patientId, enc);
+        }
       }
     }
 
     // Active triage per patient, driving the stage-based live queue — same
     // 24h cutoff + newest-per-patient dedupe as the clinical dashboard's
     // queue (older triage docs are unclosed visits, not still-waiting
-    // patients).
+    // patients). The live queue only exists for TODAY: another board day has
+    // no one physically in the building, so its lanes come from that day's
+    // appointments alone (the loop below).
     const activeTriageByPatient = new Map<string, TriageDoc>();
-    const triageCutoff = queueNowMs - 24 * 60 * 60 * 1000;
-    for (const doc of triages) {
-      if (new Date(doc.triagedAt).getTime() < triageCutoff) continue;
-      const held = activeTriageByPatient.get(doc.patientId);
-      if (!held || doc.triagedAt > held.triagedAt) activeTriageByPatient.set(doc.patientId, doc);
+    if (viewingToday) {
+      const triageCutoff = queueNowMs - 24 * 60 * 60 * 1000;
+      for (const doc of triages) {
+        if (new Date(doc.triagedAt).getTime() < triageCutoff) continue;
+        const held = activeTriageByPatient.get(doc.patientId);
+        if (!held || doc.triagedAt > held.triagedAt) activeTriageByPatient.set(doc.patientId, doc);
+      }
     }
 
     // Add triaged patients (walk-ins and triaged appointments) via the
@@ -373,13 +408,19 @@ export default function FrontDeskDashboardPage() {
     // opened the visit — stay in the Today's Appointments card until the
     // receptionist checks them in via the check-in popup.
     const ARRIVED = new Set<AppointmentDoc['status']>(APPOINTMENT_CHECKED_IN_STATUSES);
+    // Slots closed without the patient being seen. They file into the Finished
+    // lane (as DONE rows wearing their own red/muted pill) instead of being
+    // dropped from the board — a cancellation the desk can still see is one it
+    // can still reverse.
+    const CLOSED_UNSEEN = new Set<AppointmentDoc['status']>(['cancelled', 'rescheduled', 'no_show']);
     const triagedPatientIds = new Set(activeTriageByPatient.keys());
     const APPT_SCORE: Record<string, number> = { emergency: 3, urgent: 2 };
     for (const a of todaysAppointments) {
       if (triagedPatientIds.has(a.patientId)) continue;
-      if (!ARRIVED.has(a.status)) continue; // not checked in yet → not in the queue
+      if (!ARRIVED.has(a.status) && !CLOSED_UNSEEN.has(a.status)) continue; // not checked in yet → not in the queue
       const checkoutEncounter = checkoutEncounterByPatient.get(a.patientId);
-      const status = checkoutEncounter ? 'DONE' :
+      const status = CLOSED_UNSEEN.has(a.status) ? 'DONE' :
+                     checkoutEncounter ? 'DONE' :
                      a.status === 'completed' ? 'DONE' :
                      a.status === 'in_progress' ? 'IN CONSULT' : 'WAITING';
       items.push({
@@ -397,6 +438,9 @@ export default function FrontDeskDashboardPage() {
         timeAt: appointmentMoment(a.appointmentDate, a.appointmentTime),
         calendarDate: isoDateKey(a.appointmentDate),
         status,
+        ...(CLOSED_UNSEEN.has(a.status)
+          ? { closedStatus: a.status, stageLabel: appointmentStatusLabel(a.status) }
+          : {}),
         score: APPT_SCORE[a.priority ?? ''] ?? 1,
         sourceId: a._id,
         encounterId: checkoutEncounter?._id,
@@ -440,7 +484,7 @@ export default function FrontDeskDashboardPage() {
     items.sort((a, b) => (b.score - a.score) || (a.time || '').localeCompare(b.time || ''));
 
     return items;
-  }, [currentUser?.hospitalName, encounters, patients, queueNowMs, today, todaysAppointments, triages]);
+  }, [currentUser?.hospitalName, encounters, patients, queueNowMs, today, todaysAppointments, triages, viewingToday]);
 
   const filteredQueue = useMemo(() => {
     // The Live queue tile shows the whole in-building queue regardless of the
@@ -452,11 +496,18 @@ export default function FrontDeskDashboardPage() {
 
     const q = queueSearch.trim().toLowerCase();
     if (q) {
-      items = items.filter(it =>
-        it.patientName.toLowerCase().includes(q) ||
-        it.complaint.toLowerCase().includes(q) ||
-        it.department.toLowerCase().includes(q)
-      );
+      // Same fields the registered-patients view searches: name, complaint,
+      // department, plus the patient's hospital number and phone — so the one
+      // rail search behaves identically on every lane tab.
+      const patientById = new Map(patients.map(p => [p._id, p]));
+      items = items.filter(it => {
+        const patient = patientById.get(it.patientId);
+        return it.patientName.toLowerCase().includes(q) ||
+          it.complaint.toLowerCase().includes(q) ||
+          it.department.toLowerCase().includes(q) ||
+          (patient?.hospitalNumber || '').toLowerCase().includes(q) ||
+          (patient?.phone || '').toLowerCase().includes(q);
+      });
     }
 
     if (queueSort !== 'priority') {
@@ -469,7 +520,7 @@ export default function FrontDeskDashboardPage() {
     }
 
     return items;
-  }, [panelView, queue, queueFilter, queueSearch, queueSort]);
+  }, [panelView, patients, queue, queueFilter, queueSearch, queueSort]);
 
   const filteredRegisteredPatients = useMemo(() => {
     const sorted = [...patients].sort((a, b) =>
@@ -657,29 +708,6 @@ export default function FrontDeskDashboardPage() {
     }
   }, [updateAppointmentStatus, showToast]);
 
-  // ── Set any rung on the ladder straight from the row's status dropdown.
-  //    Checking in and no-show keep their own buttons: those two do more than
-  //    move a status (open the visit thread; confirm before hiding the patient
-  //    from arrivals), so the dropdown routes to them rather than writing the
-  //    status behind their backs. ──
-  const handleAppointmentStatusChange = useCallback(async (appt: AppointmentDoc, status: AppointmentStatus) => {
-    if (status === 'checked_in') { setCheckInTarget(appt); return; }
-    if (status === 'no_show') { setNoShowTarget(appt); return; }
-    // 'rescheduled' is set directly, and means "not happening at this time, to
-    // be rebooked" — the Reschedule action beside it moves a booking to a known
-    // new slot in place, which leaves it scheduled, not rescheduled.
-    try {
-      await updateAppointmentStatus(appt._id, status, {
-        actorId: currentUser?._id,
-        actorName: currentUser?.name || currentUser?.username,
-        actorRole: currentUser?.role,
-      });
-      showToast(`${appt.patientName} — ${appointmentStatusLabel(status).toLowerCase()}`, 'success');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not update the appointment status', 'error');
-    }
-  }, [updateAppointmentStatus, showToast, currentUser]);
-
   // ── A walk-in has no booking, so its rung lives on the triage record. The
   //    desk sets it from the same dropdown a booked patient uses; triage's own
   //    clinical `status` is only touched when the visit actually closes, which
@@ -697,6 +725,106 @@ export default function FrontDeskDashboardPage() {
     }
   }, [updateTriage, showToast]);
 
+  // ── Set any rung on the ladder straight from the row's status dropdown.
+  //    Checking in, no-show and cancelling keep their own dialogs: those do
+  //    more than move a status (open the visit thread; confirm before hiding
+  //    the patient from the board), so the dropdown routes to them rather than
+  //    writing the status behind their backs.
+  //    `mirrorTriage` is the walk-in row's triage record, when there is one —
+  //    written in the same action so the two records never disagree, and
+  //    restored together by Undo. ──
+  const handleAppointmentStatusChange = useCallback(async (
+    appt: AppointmentDoc,
+    status: AppointmentStatus,
+    mirrorTriage?: TriageDoc,
+  ) => {
+    if (status === 'checked_in') { setCheckInTarget(appt); return; }
+    if (status === 'no_show') { setNoShowTarget(appt); return; }
+    if (status === 'cancelled') { setCancelReason(''); setCancelTarget({ appt, triage: mirrorTriage }); return; }
+    // 'rescheduled' is set directly, and means "not happening at this time, to
+    // be rebooked" — the Reschedule action beside it moves a booking to a known
+    // new slot in place, which leaves it scheduled, not rescheduled.
+    const prevStatus = appt.status;
+    const prevVisitStatus = mirrorTriage?.visitStatus;
+    try {
+      await updateAppointmentStatus(appt._id, status, {
+        actorId: currentUser?._id,
+        actorName: currentUser?.name || currentUser?.username,
+        actorRole: currentUser?.role,
+      });
+      if (mirrorTriage) await handleWalkInStatusChange(mirrorTriage, status, true);
+      if (status === 'rescheduled') {
+        // One accidental click away from dropping off the live board — the
+        // toast itself is the recovery path, restoring both records.
+        showToast(`${appt.patientName} — marked rescheduled`, 'success', {
+          action: {
+            label: t('action.undo'),
+            onClick: async () => {
+              try {
+                await updateAppointmentStatus(appt._id, prevStatus, {
+                  actorId: currentUser?._id,
+                  actorName: currentUser?.name || currentUser?.username,
+                  actorRole: currentUser?.role,
+                });
+                if (mirrorTriage) await updateTriage(mirrorTriage._id, { visitStatus: prevVisitStatus });
+                showToast(`${appt.patientName} — restored to ${appointmentStatusLabel(prevStatus).toLowerCase()}`, 'success');
+              } catch {
+                showToast('Could not restore the appointment', 'error');
+              }
+            },
+          },
+        });
+      } else {
+        showToast(`${appt.patientName} — ${appointmentStatusLabel(status).toLowerCase()}`, 'success');
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not update the appointment status', 'error');
+    }
+  }, [updateAppointmentStatus, updateTriage, handleWalkInStatusChange, showToast, currentUser, t]);
+
+  // ── Cancel, after the dialog confirms it. Mirrors handleNoShow, and leaves
+  //    an Undo on the toast that restores the pre-cancel rung (the cancel
+  //    reason stays in the status history for the audit trail). ──
+  const handleCancelAppointment = useCallback(async () => {
+    if (!cancelTarget) return;
+    const { appt, triage } = cancelTarget;
+    const prevStatus = appt.status;
+    const prevVisitStatus = triage?.visitStatus;
+    try {
+      await updateAppointmentStatus(appt._id, 'cancelled', {
+        cancelledReason: cancelReason.trim() || undefined,
+        cancelledByName: currentUser?.name || currentUser?.username,
+        actorId: currentUser?._id,
+        actorName: currentUser?.name || currentUser?.username,
+        actorRole: currentUser?.role,
+      });
+      if (triage) await handleWalkInStatusChange(triage, 'cancelled', true);
+      showToast(`${appt.patientName} — appointment cancelled`, 'success', {
+        action: {
+          label: t('action.undo'),
+          onClick: async () => {
+            try {
+              await updateAppointmentStatus(appt._id, prevStatus, {
+                actorId: currentUser?._id,
+                actorName: currentUser?.name || currentUser?.username,
+                actorRole: currentUser?.role,
+              });
+              if (triage) await updateTriage(triage._id, { visitStatus: prevVisitStatus });
+              showToast(`${appt.patientName} — restored to ${appointmentStatusLabel(prevStatus).toLowerCase()}`, 'success');
+            } catch {
+              showToast('Could not restore the appointment', 'error');
+            }
+          },
+        },
+      });
+    } catch {
+      showToast('Failed to cancel the appointment', 'error');
+    } finally {
+      setCancelTarget(null);
+      setCancelReason('');
+    }
+  }, [cancelTarget, cancelReason, updateAppointmentStatus, updateTriage, handleWalkInStatusChange, showToast, currentUser, t]);
+
   // ── Move an appointment to a new date/time without leaving the desk. ──
   const openReschedule = useCallback((appt: AppointmentDoc) => {
     setRescheduleDate(isoDateKey(appt.appointmentDate));
@@ -711,8 +839,9 @@ export default function FrontDeskDashboardPage() {
       await rescheduleAppointment(rescheduleTarget._id, rescheduleDate, rescheduleTime);
       showToast(`${rescheduleTarget.patientName} moved to ${formatDayMonthYear(rescheduleDate)} ${formatClockTime(rescheduleTime)}`, 'success');
       setRescheduleTarget(null);
-    } catch {
-      showToast('Failed to reschedule appointment', 'error');
+    } catch (err) {
+      // A booking conflict names the clash — show it rather than a shrug.
+      showToast(err instanceof Error ? err.message : 'Failed to reschedule appointment', 'error');
     } finally {
       setReschedSaving(false);
     }
@@ -757,13 +886,18 @@ export default function FrontDeskDashboardPage() {
     // reminding or marking someone arrived dropped their row off this list.
     // `requested` joins them: a portal ask is reception's to answer.
     const pendingStatuses = new Set<AppointmentDoc['status']>(['requested', ...APPOINTMENT_PENDING_STATUSES]);
-    const triagedPatientIds = new Set(todaysTriages.map(item => item.patientId));
+    // Only today's triages pull a booking out of the Scheduled lane — a
+    // patient triaged today must not vanish from tomorrow's schedule.
+    const triagedPatientIds = new Set(viewingToday ? todaysTriages.map(item => item.patientId) : []);
     return todaysAppointments.filter(appointment => pendingStatuses.has(appointment.status) && !triagedPatientIds.has(appointment.patientId));
-  }, [todaysAppointments, todaysTriages]);
+  }, [todaysAppointments, todaysTriages, viewingToday]);
 
+  // The board day's header label — follows the mini-calendar, not the wall
+  // clock, so picking a day changes the card title with the data.
   const dateLabel = useMemo(() => (
-    new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date())
-  ), []);
+    new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' })
+      .format(new Date(`${boardDate}T12:00:00`))
+  ), [boardDate]);
 
   const tabs = useMemo(() => ([
     { key: 'scheduled', label: APPOINTMENT_STATUS_GROUP_LABELS.scheduled, count: pendingAppointments.length },
@@ -788,15 +922,21 @@ export default function FrontDeskDashboardPage() {
     // must stay populated for them regardless of the active lane tab.
     if (queueFilter !== 'scheduled' && panelView !== 'appointments' && panelView !== 'pending') return [];
     const q = queueSearch.trim().toLowerCase();
+    // Same field set as the queue lanes: name, reason, department, hospital
+    // number and phone — one search, identical behaviour on every tab.
+    const patientById = new Map(patients.map(p => [p._id, p]));
     const items = q
-      ? pendingAppointments.filter(appointment =>
-          appointment.patientName.toLowerCase().includes(q) ||
-          (appointment.reason || '').toLowerCase().includes(q) ||
-          (appointment.department || '').toLowerCase().includes(q)
-        )
+      ? pendingAppointments.filter(appointment => {
+          const patient = patientById.get(appointment.patientId);
+          return appointment.patientName.toLowerCase().includes(q) ||
+            (appointment.reason || '').toLowerCase().includes(q) ||
+            (appointment.department || '').toLowerCase().includes(q) ||
+            (patient?.hospitalNumber || '').toLowerCase().includes(q) ||
+            (patient?.phone || appointment.patientPhone || '').toLowerCase().includes(q);
+        })
       : pendingAppointments;
     return items.sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
-  }, [panelView, pendingAppointments, queueFilter, queueSearch]);
+  }, [panelView, patients, pendingAppointments, queueFilter, queueSearch]);
 
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
     ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: LogIn, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
@@ -878,8 +1018,12 @@ export default function FrontDeskDashboardPage() {
     const queueRows = filteredQueue.map(entry => {
       const patient = patients.find(pp => pp._id === entry.patientId);
       const activeForCare = entry.status === 'WAITING' || entry.status === 'IN CONSULT';
-      const checkoutReady = entry.status === 'DONE';
-      const statusTone: EhrCareDashboardRow['statusTone'] = entry.status === 'DONE'
+      // A slot closed without the patient being seen is finished, but there is
+      // no visit to check out — it gets its own pill, never the Checkout action.
+      const checkoutReady = entry.status === 'DONE' && !entry.closedStatus;
+      const statusTone: EhrCareDashboardRow['statusTone'] = entry.closedStatus
+        ? APPOINTMENT_STATUS_TONES[entry.closedStatus]
+        : entry.status === 'DONE'
         ? 'done'
         : entry.status === 'IN CONSULT'
           ? 'active'
@@ -1020,11 +1164,13 @@ export default function FrontDeskDashboardPage() {
         onStatusChange: canSetAppointmentStatus
           ? async (value: string) => {
               const next = value as AppointmentStatus;
-              // A walk-in has both records. Advance the appointment and mirror
-              // the rung onto its triage row, so a patient moved to a terminal
-              // status stops being rebuilt into the queues from triage.
-              if (queueAppointment) await handleAppointmentStatusChange(queueAppointment, next);
-              if (queueTriage) await handleWalkInStatusChange(queueTriage, next, !!queueAppointment);
+              // A walk-in has both records. The appointment handler writes the
+              // rung AND mirrors it onto the triage row in one action — so a
+              // status that routes to a dialog (check-in, no-show, cancel)
+              // defers BOTH writes until the clerk confirms, and Undo restores
+              // both together.
+              if (queueAppointment) await handleAppointmentStatusChange(queueAppointment, next, queueTriage);
+              else if (queueTriage) await handleWalkInStatusChange(queueTriage, next);
             }
           : undefined,
         priority: acuity,
@@ -1275,7 +1421,13 @@ export default function FrontDeskDashboardPage() {
           rows={frontDeskRows}
           metrics={metrics}
           calendarEventDates={appointments.map(appointment => appointment.appointmentDate)}
-          metricsTitle="Reception today"
+          // The page owns the calendar's selected day: picking a date rebuilds
+          // every lane, count and header for that day's schedule.
+          selectedDate={boardDate}
+          onSelectedDateChange={setBoardDate}
+          // Static title: the card's counts follow the selected day already; a
+          // date in the title just restated the header and wrapped badly.
+          metricsTitle="Reception"
           centerTitle={centerCopy.title}
           centerSubtitle={centerCopy.subtitle}
           missionTitle="Keep the desk moving"
@@ -1434,6 +1586,35 @@ export default function FrontDeskDashboardPage() {
               <div className="flex justify-end gap-2 mt-5">
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setNoShowTarget(null)}>{t('action.cancel')}</button>
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => handleNoShow(noShowTarget)}>Mark no-show</button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {cancelTarget && (
+          <Modal onClose={() => setCancelTarget(null)} width={420} labelledBy="cancel-dialog-title">
+            <div className="card-elevated" style={{ padding: 24, borderRadius: 16, background: 'var(--bg-card)' }}>
+              <h2 id="cancel-dialog-title" className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>Cancel this appointment?</h2>
+              <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
+                {cancelTarget.appt.patientName} — {formatClockTime(cancelTarget.appt.appointmentTime)}.
+                The booking stays on record under Finished; you can undo from the notification or reopen it later.
+              </p>
+              <label className="block text-xs font-semibold mt-4 mb-1" style={{ color: 'var(--text-secondary)' }} htmlFor="front-desk-cancel-reason">
+                Reason (optional)
+              </label>
+              <textarea
+                id="front-desk-cancel-reason"
+                value={cancelReason}
+                onChange={event => setCancelReason(event.target.value)}
+                rows={2}
+                placeholder="e.g. patient called to cancel"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', resize: 'vertical' }}
+              />
+              <div className="flex justify-end gap-2 mt-5">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCancelTarget(null)}>{t('appointments.goBack')}</button>
+                <button type="button" className="btn btn-primary btn-sm" style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => void handleCancelAppointment()}>
+                  Cancel appointment
+                </button>
               </div>
             </div>
           </Modal>

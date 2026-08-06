@@ -14,11 +14,13 @@
  * same booking wherever it is started from.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import PortalModal from '@/components/Modal';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { useUsers } from '@/lib/hooks/useUsers';
+import { staffOptionLabel, type StaffSlotContext } from '@/lib/appointment-staff';
 import { useAuth } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { useToast } from '@/components/Toast';
@@ -70,8 +72,9 @@ export default function BookAppointmentModal({
   defaultPatientId?: string;
 }) {
   const { t } = useTranslation();
-  const { create } = useAppointments();
+  const { create, appointments } = useAppointments();
   const { patients } = usePatients();
+  const { users } = useUsers();
   const { currentUser } = useAuth();
   const { departments: facilityDepartments } = useSettings();
   const { showToast } = useToast();
@@ -79,7 +82,10 @@ export default function BookAppointmentModal({
   const today = jubaDate();
 
   const [patientId, setPatientId] = useState(defaultPatientId || '');
-  const [provider, setProvider] = useState(currentUser?.name || '');
+  // Provider is a staff-directory pick (id + name), not free text — the id is
+  // what arms the service's double-booking guard.
+  const [providerId, setProviderId] = useState('');
+  const [provider, setProvider] = useState('');
   const [date, setDate] = useState(defaultDate || today);
   const [time, setTime] = useState('09:00');
   const [duration, setDuration] = useState(30);
@@ -91,6 +97,17 @@ export default function BookAppointmentModal({
   const [notes, setNotes] = useState('');
   const [recurring, setRecurring] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('monthly');
+
+  // Same roster + availability labels as the appointments page: clinicians at
+  // this facility, each stating free-or-busy at the slot in the form.
+  const providerOptions = useMemo(() => users
+    .filter(u => (u.role === 'doctor' || u.role === 'clinical_officer')
+      && u.isActive !== false
+      && (!currentUser?.hospitalId || u.hospitalId === currentUser.hospitalId))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '')), [users, currentUser?.hospitalId]);
+  const providerSlotContext = useMemo<StaffSlotContext>(() => ({
+    appointments, date, time, duration,
+  }), [appointments, date, time, duration]);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -109,14 +126,8 @@ export default function BookAppointmentModal({
         patientId: patient._id,
         patientName: `${patient.firstName} ${patient.surname}`,
         patientPhone: patient.phone || undefined,
-        // `provider` is free text. Only file the booking under the current
-        // user's id when it still names them: otherwise the appointment lands
-        // on the wrong schedule and the conflict check tests the wrong
-        // person's diary.
-        providerId: !provider.trim() || provider.trim() === (currentUser?.name ?? '').trim()
-          ? currentUser?._id || ''
-          : '',
-        providerName: provider || currentUser?.name || '',
+        providerId,
+        providerName: provider,
         facilityId: currentUser?.hospitalId || '',
         facilityName: currentUser?.hospitalName || '',
         facilityLevel: 'payam' as FacilityLevel,
@@ -205,7 +216,21 @@ export default function BookAppointmentModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
             <div><label>{t('appointments.labelDepartment')}</label><select value={department} onChange={e => setDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-            <div><label>{t('appointments.labelProvider')}</label><input value={provider} onChange={e => setProvider(e.target.value)} placeholder={t('appointments.providerPlaceholder')} /></div>
+            <div><label>{t('appointments.labelProvider')}</label>
+              <select
+                value={providerId}
+                onChange={e => {
+                  const person = providerOptions.find(p => p._id === e.target.value);
+                  setProviderId(e.target.value);
+                  setProvider(person ? (person.name || person.username || '') : '');
+                }}
+              >
+                <option value="">Unassigned</option>
+                {providerOptions.map(person => (
+                  <option key={person._id} value={person._id}>{staffOptionLabel(person, providerSlotContext)}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div><label>{t('appointments.labelReason')}</label><textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder={t('appointments.reasonPlaceholder')} /></div>

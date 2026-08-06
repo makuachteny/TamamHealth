@@ -18,6 +18,7 @@
  */
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/context';
+import { useConfirm } from '@/components/ConfirmDialog';
 import FileUpload from '@/components/FileUpload';
 import { usePatientDocuments } from '@/lib/hooks/usePatientDocuments';
 import { makeCoalescer } from '@/lib/hooks/live-reload';
@@ -100,6 +101,7 @@ export default function DocumentsPanel({
   onNewReferral?: () => void;
 }) {
   const { currentUser } = useAuth();
+  const confirm = useConfirm();
   const { documents, add, remove } = usePatientDocuments(patient._id);
   const [view, setView] = useState<DocView>('documents');
   const [category, setCategory] = useState<PatientDocumentCategory>('radiology');
@@ -248,7 +250,26 @@ export default function DocumentsPanel({
         <button onClick={() => openPreview(d)} className="p-1.5 rounded flex-shrink-0" style={{ background: 'var(--accent-light)' }} title="Preview">
           <Eye className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
         </button>
-        <button onClick={() => remove(d._id, currentUser?._id)} className="p-1.5 rounded flex-shrink-0" style={{ background: 'rgba(229,46,66,0.12)' }} title="Remove">
+        {/* A bin icon sits one tap from Preview on a shared clinic machine, and
+            a deleted upload is not recoverable from here — so it asks, naming
+            the file so the answer is about a document rather than a dialog. */}
+        <button
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Delete this document?',
+              message: <>
+                <strong>{d.title || d.fileName}</strong> will be removed from this
+                patient&apos;s record. This cannot be undone.
+              </>,
+              confirmLabel: 'Delete',
+              tone: 'danger',
+            });
+            if (ok) await remove(d._id, currentUser?._id);
+          }}
+          className="p-1.5 rounded flex-shrink-0"
+          style={{ background: 'rgba(229,46,66,0.12)' }}
+          title="Remove"
+        >
           <X className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
         </button>
       </div>

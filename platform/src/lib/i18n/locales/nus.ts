@@ -1279,7 +1279,8 @@ const nus: TranslationMap = {
   'appointments.cancelReasonPlaceholder': 'Ŋo wäŋɛ ɛn?',
   'pharmacy.invStatus_low': 'Thii',
   'patientNew.errFirstNameRequired': 'Ciɔt thiɛk a kɔɔr',
-  'appointments.statusConfirmed': 'Aci ŋäc',
+  // Merged vocabulary: confirmed reads as Scheduled (Cuŋ = scheduled).
+  'appointments.statusConfirmed': 'Cuŋ',
   'deaths.causeContributing': 'Kuany:',
   'referrals.accept': 'Lɔm',
   'lab.donePrefix': 'Thuk: {{time}}',
@@ -1322,7 +1323,8 @@ const nus: TranslationMap = {
   'appointments.statusScheduled': 'Cuŋ',
   // No settled Nuer term for the triage rung yet — the English label stands in
   // rather than inventing one; the clinic uses "triage" in speech.
-  'appointments.statusTriaged': 'Triaged',
+  // Merged vocabulary: triaged reads as In Progress (Rɛy Lät).
+  'appointments.statusTriaged': 'Rɛy Lät',
   'anc.view': 'Nɛn',
   'patientNew.payam': 'Payam',
   'anc.riskAssessment': 'Liep Riɛk',

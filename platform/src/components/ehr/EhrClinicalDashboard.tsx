@@ -46,6 +46,7 @@ import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDay
 import EhrVisitPopup, { EhrQueueMoveDialog, PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
 import PatientDispenseModal from '@/components/pharmacy/PatientDispenseModal';
 import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
+import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
 import { useCreateNote } from '@/lib/clinical-notes/useCreateNote';
 import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -1680,6 +1681,11 @@ export default function EhrClinicalDashboard({
               ))}
             </div>
           </section>
+          {/* Patient flow — who moved where just now (triaged toward the
+              clinician, results back, treatment dispensed). The same card
+              every station rail carries; it renders nothing when the feed is
+              empty or the role has no configured slice. */}
+          <ProgressFeedCard />
         </aside>
         )}
       </section>

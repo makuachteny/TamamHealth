@@ -15,6 +15,7 @@
  */
 
 import { isTimeOverlap } from './appointment-time';
+import { APPOINTMENT_SLOT_RELEASED_STATUSES } from './appointment-status';
 import type { AppointmentDoc } from './db-types';
 
 /** The subset of UserDoc these pickers read. */
@@ -64,9 +65,11 @@ function holdsAppointment(person: StaffPickerPerson, appt: AppointmentDoc): bool
   return !!appt.providerName && appt.providerName === staffDisplayName(person);
 }
 
-/** Cancelled and no-show rows do not hold a slot. */
+/** Cancelled, no-show and rescheduled rows do not hold a slot — the same
+ *  release rule the service's conflict guard enforces, so a dropdown never
+ *  reports someone busy on a slot the guard would let through. */
 function isLiveBooking(appt: AppointmentDoc): boolean {
-  return appt.status !== 'cancelled' && appt.status !== 'no_show';
+  return !APPOINTMENT_SLOT_RELEASED_STATUSES.includes(appt.status);
 }
 
 export interface StaffAvailability {

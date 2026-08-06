@@ -213,6 +213,15 @@ export interface ProgressFeedConfig {
  * exist to respect.
  */
 export const PROGRESS_FEED_BY_ROLE: Readonly<Partial<Record<UserRole, ProgressFeedConfig>>> = {
+  // Clinicians watch the flow from the receiving end: who has been triaged
+  // toward them, whose results are back, whose treatment completed at the
+  // pharmacy. (Originally omitted on the theory that "Awaiting review"
+  // covered it — it covers results only, not patient movement.)
+  doctor: { title: 'Patient flow', kinds: ['triaged', 'lab_resulted', 'dispensed'] },
+  clinical_officer: { title: 'Patient flow', kinds: ['triaged', 'lab_resulted', 'dispensed'] },
+  clinician: { title: 'Patient flow', kinds: ['triaged', 'lab_resulted', 'dispensed'] },
+  medical_superintendent: { title: 'Patient flow', kinds: ['triaged', 'lab_resulted', 'dispensed'] },
+
   // Nurses hand patients on and receive them back — they care about movement
   // through triage and about results landing for someone they are watching.
   nurse: { title: 'Patient progress', kinds: ['triaged', 'lab_resulted', 'dispensed'] },

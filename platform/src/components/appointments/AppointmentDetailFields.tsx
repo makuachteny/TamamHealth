@@ -19,6 +19,7 @@ import { usePatientPayments } from '@/lib/hooks/usePayments';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { formatDate } from '@/lib/format-utils';
 import { isTimeOverlap } from '@/lib/appointment-time';
+import { APPOINTMENT_SLOT_RELEASED_STATUSES } from '@/lib/appointment-status';
 import { staffOptionLabel, type StaffSlotContext } from '@/lib/appointment-staff';
 import type { AppointmentDoc, PatientDoc } from '@/lib/db-types';
 import { AlertTriangle } from '@/components/icons/lucide';
@@ -90,8 +91,7 @@ export default function AppointmentDetailFields({
       other._id !== appointment?._id
       && other.providerId === providerId
       && other.appointmentDate === date
-      && other.status !== 'cancelled'
-      && other.status !== 'no_show'
+      && !APPOINTMENT_SLOT_RELEASED_STATUSES.includes(other.status)
       && isTimeOverlap(other.appointmentTime, other.duration, time, duration)
     ) || null;
   }, [appointments, appointment?._id, providerId, date, time, duration]);

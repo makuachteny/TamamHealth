@@ -10,6 +10,8 @@ import PreferenceEffects from '@/components/PreferenceEffects';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import LockScreen from '@/components/LockScreen';
 import ConnectivityNotice from '@/components/ConnectivityNotice';
+import MessagingDock from '@/components/MessagingDock';
+import { MessagingDockProvider } from '@/lib/messaging-dock-context';
 import { TourProvider } from '@/lib/tour/tour-context';
 import GetStartedCard from '@/components/onboarding/GetStartedCard';
 import ForcePasswordChange from '@/components/ForcePasswordChange';
@@ -19,6 +21,7 @@ import { useIsMobileViewport } from '@/lib/hooks/useIsMobileViewport';
 import { getMobileShellArchetype } from '@/lib/mobile-shell/dashboard-strategy';
 import MobileAppShell from '@/components/mobile/MobileAppShell';
 import UsageTracker from '@/components/UsageTracker';
+import { ConfirmProvider } from '@/components/ConfirmDialog';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -58,7 +61,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SettingsProvider>
+    <MessagingDockProvider>
     <TourProvider>
+    <ConfirmProvider>
     <div className="flex h-screen overflow-hidden tamam-solid-bg tamam-ehr-app">
       {isLocked && currentUser && (
         <LockScreen
@@ -93,9 +98,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <PreferenceEffects />
       <KeyboardShortcuts />
       <ConnectivityNotice />
+      {/* The floating bottom-right messages launcher (restored — removed in
+          da19f4d6). Desktop only: it collides with the mobile shell's tab
+          bar, where the Inbox tab is the messaging entry point instead. */}
+      {!useShell && <MessagingDock />}
       <UsageTracker />
     </div>
+    </ConfirmProvider>
     </TourProvider>
+    </MessagingDockProvider>
     </SettingsProvider>
   );
 }

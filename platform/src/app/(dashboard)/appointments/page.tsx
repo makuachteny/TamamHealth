@@ -7,7 +7,7 @@ import AppointmentDetailFields, { type AppointmentDetailFieldValues } from '@/co
 import {
   APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_I18N_KEYS,
   APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_PENDING_STATUSES, APPOINTMENT_STATUS_FLOW,
-  APPOINTMENT_STATUS_EXITS, priorAppointmentStatus,
+  APPOINTMENT_STATUS_EXITS, priorAppointmentStatus, canonicalAppointmentStatus,
 } from '@/lib/appointment-status';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -23,6 +23,8 @@ import {
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { useUsers } from '@/lib/hooks/useUsers';
+import { staffOptionLabel, type StaffSlotContext } from '@/lib/appointment-staff';
 import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
 import { initials, patientAgeLabel, patientFullName, stateTint } from '@/lib/patient-utils';
 import { useApp } from '@/lib/context';
@@ -131,6 +133,7 @@ function appointmentOperationalCue(apt: { appointmentType: AppointmentType; appo
 export default function AppointmentsPage() {
   const { appointments, create, updateStatus, reschedule, update } = useAppointments();
   const { patients } = usePatients();
+  const { users } = useUsers();
   const { currentUser, globalSearch } = useApp();
   const {
     canBookAppointments,
@@ -281,7 +284,11 @@ export default function AppointmentsPage() {
 
   // Form state
   const [formPatient, setFormPatient] = useState('');
-  const [formProvider, setFormProvider] = useState(currentUser?.name || '');
+  // Provider is a real user, carried as id + name. This was a free-text name
+  // with providerId always '' — which skipped the service's double-booking
+  // guard entirely and let names drift from the staff directory.
+  const [formProviderId, setFormProviderId] = useState('');
+  const [formProvider, setFormProvider] = useState('');
   const [formDate, setFormDate] = useState(jubaDate());
   const [formTime, setFormTime] = useState('09:00');
   const [formDuration, setFormDuration] = useState(30);
@@ -327,7 +334,7 @@ export default function AppointmentsPage() {
     if (filterStatus === 'pending_approval') {
       list = list.filter(a => a.status === 'scheduled' && a.appointmentDate >= today);
     } else if (filterStatus !== 'all') {
-      list = list.filter(a => a.status === filterStatus);
+      list = list.filter(a => canonicalAppointmentStatus(a.status) === filterStatus);
     }
     const q = `${search} ${globalSearch}`.toLowerCase().trim();
     if (q) list = list.filter(a =>
@@ -366,13 +373,18 @@ export default function AppointmentsPage() {
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: statusBaseList.length };
-    for (const a of statusBaseList) counts[a.status] = (counts[a.status] || 0) + 1;
+    // Counted on the merged rung, so the tab strip shows one "Scheduled" chip
+    // covering scheduled + reminder_sent + confirmed, not three lookalikes.
+    for (const a of statusBaseList) {
+      const k = canonicalAppointmentStatus(a.status);
+      counts[k] = (counts[k] || 0) + 1;
+    }
     return counts;
   }, [statusBaseList]);
 
   const statusTabs = useMemo(() => {
     const base = [{ key: 'all', label: t('appointments.allStatus'), count: statusCounts.all }];
-    const fromStatuses = (Object.keys(statusConfig) as AppointmentStatus[])
+    const fromStatuses = (['requested', ...APPOINTMENT_STATUS_FLOW, ...APPOINTMENT_STATUS_EXITS] as AppointmentStatus[])
       .filter(k => (statusCounts[k] || 0) > 0 || filterStatus === k)
       .map(k => ({ key: k, label: t(statusLabelKey[k]), count: statusCounts[k] || 0 }));
     return [...base, ...fromStatuses];
@@ -381,17 +393,40 @@ export default function AppointmentsPage() {
   // Pending approvals
   const pendingApprovals = useMemo(() => appointments.filter(a => a.status === 'scheduled' && a.appointmentDate >= today), [appointments, today]);
 
+  // Providers who can carry a visit at this facility — the same roster the
+  // edit modal offers, so every surface books against the same user list.
+  const providerOptions = useMemo(() => users
+    .filter(u => (u.role === 'doctor' || u.role === 'clinical_officer')
+      && u.isActive !== false
+      && (!currentUser?.hospitalId || u.hospitalId === currentUser.hospitalId))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '')), [users, currentUser?.hospitalId]);
+
+  // Availability is judged against the slot currently in the form, so the
+  // dropdown says "Busy 14:30" before the clerk saves into a clash.
+  const providerSlotContext = useMemo<StaffSlotContext>(() => ({
+    appointments, date: formDate, time: formTime, duration: formDuration,
+    excludeAppointmentId: editingApt || undefined,
+  }), [appointments, formDate, formTime, formDuration, editingApt]);
+
+  const selectFormProvider = (id: string) => {
+    const person = providerOptions.find(p => p._id === id);
+    setFormProviderId(id);
+    setFormProvider(person ? (person.name || person.username || '') : (id ? formProvider : ''));
+  };
+
   const resetForm = () => {
     setFormPatient(''); setFormDate(jubaDate()); setFormTime('09:00');
     setFormDuration(30); setFormType('general'); setFormPriority('routine');
     setFormDepartment('Outpatient'); setFormReason(''); setFormNotes(''); setFormRecurring(false);
     setFormStatus('scheduled');
+    setFormProviderId(''); setFormProvider('');
   };
 
   const loadEditForm = (apt: typeof appointments[0]) => {
     setFormDate(apt.appointmentDate); setFormTime(apt.appointmentTime); setFormDuration(apt.duration);
     setFormType(apt.appointmentType); setFormPriority(apt.priority); setFormDepartment(apt.department);
-    setFormProvider(apt.providerName); setFormReason(apt.reason); setFormNotes(apt.notes || '');
+    setFormProviderId(apt.providerId || ''); setFormProvider(apt.providerName);
+    setFormReason(apt.reason); setFormNotes(apt.notes || '');
     setFormStatus(apt.status);
     setFormDetail({
       // Legacy rows have no mode; a telehealth *type* is how a remote visit used
@@ -414,11 +449,10 @@ export default function AppointmentsPage() {
     try {
       await create({
         patientId: patient._id, patientName: `${patient.firstName} ${patient.surname}`,
-        // The form only captures a provider NAME (free text below), not a real
-        // clinician id — stamping the acting clerk's own id here put every
-        // desk-booked appointment on the clerk's own schedule.
-        patientPhone: patient.phone || undefined, providerId: '',
-        providerName: formProvider || currentUser?.name || '', facilityId: currentUser?.hospitalId || '',
+        // A real clinician id from the staff-directory select — this is what
+        // arms the service's double-booking guard for desk bookings.
+        patientPhone: patient.phone || undefined, providerId: formProviderId,
+        providerName: formProvider, facilityId: currentUser?.hospitalId || '',
         facilityName: currentUser?.hospitalName || '', facilityLevel: 'payam' as FacilityLevel,
         appointmentDate: formDate, appointmentTime: formTime, duration: formDuration,
         appointmentType: formType, priority: formPriority, department: formDepartment,
@@ -460,9 +494,28 @@ export default function AppointmentsPage() {
   };
 
   const handleStatusChange = useCallback(async (id: string, status: AppointmentStatus) => {
-    try { await updateStatus(id, status); showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success'); }
-    catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
-  }, [updateStatus, showToast, t, statusLabelKey]);
+    // Marking a slot Rescheduled takes it off the live day view — one
+    // accidental pick shouldn't cost a hunt through the Finished rows, so the
+    // toast itself carries the recovery: Undo restores the rung it was on.
+    const prevStatus = appointments.find(a => a._id === id)?.status;
+    try {
+      await updateStatus(id, status);
+      if (status === 'rescheduled' && prevStatus && prevStatus !== status) {
+        showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success', {
+          action: {
+            label: t('action.undo'),
+            onClick: async () => {
+              try { await updateStatus(id, prevStatus); showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[prevStatus]).toLowerCase() }), 'success'); }
+              catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedUpdate'), 'error'); }
+            },
+          },
+        });
+      } else {
+        showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success');
+      }
+    }
+    catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedUpdate'), 'error'); }
+  }, [appointments, updateStatus, showToast, t, statusLabelKey]);
 
   // Reversing a step reuses the same updateAppointmentStatus path (which
   // accepts any target status), so an accidental remind / confirm / check-in
@@ -472,12 +525,29 @@ export default function AppointmentsPage() {
   const handleReschedule = async () => {
     if (!rescheduleId || !rescheduleDate || !rescheduleTime) return;
     try { await reschedule(rescheduleId, rescheduleDate, rescheduleTime); showToast(t('appointments.toastRescheduled'), 'success'); setRescheduleId(null); }
-    catch { showToast(t('appointments.toastFailedReschedule'), 'error'); }
+    catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedReschedule'), 'error'); }
   };
 
   const handleCancel = async () => {
     if (!cancelId) return;
-    try { await updateStatus(cancelId, 'cancelled', { cancelledReason: cancelReason, cancelledByName: currentUser?.name }); showToast(t('appointments.toastCancelled'), 'success'); setCancelId(null); setCancelReason(''); }
+    // Capture the rung the booking was on BEFORE cancelling, so the toast's
+    // Undo can put it straight back (the cancel reason stays in the status
+    // history for the audit trail).
+    const id = cancelId;
+    const prevStatus = appointments.find(a => a._id === id)?.status;
+    try {
+      await updateStatus(id, 'cancelled', { cancelledReason: cancelReason, cancelledByName: currentUser?.name });
+      showToast(t('appointments.toastCancelled'), 'success', prevStatus && prevStatus !== 'cancelled' ? {
+        action: {
+          label: t('action.undo'),
+          onClick: async () => {
+            try { await updateStatus(id, prevStatus); showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[prevStatus]).toLowerCase() }), 'success'); }
+            catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedUpdate'), 'error'); }
+          },
+        },
+      } : undefined);
+      setCancelId(null); setCancelReason('');
+    }
     catch { showToast(t('appointments.toastFailedCancel'), 'error'); }
   };
 
@@ -510,7 +580,10 @@ export default function AppointmentsPage() {
   const tableRows = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
     return dayList
-      .filter(a => listStatus === 'all' || a.status === listStatus)
+      // Canonical match: filtering by "Scheduled" also catches reminder_sent
+      // and confirmed rows, "Checked In" catches arrived, "In Progress"
+      // catches triaged — the merged vocabulary users actually see.
+      .filter(a => listStatus === 'all' || canonicalAppointmentStatus(a.status) === listStatus)
       .filter(a => {
         if (!q) return true;
         const identifier = patientById.get(a.patientId)?.hospitalNumber || '';
@@ -674,7 +747,9 @@ export default function AppointmentsPage() {
                         aria-label="Filter appointments by status"
                       >
                         <option value="all">All statuses</option>
-                        {(Object.keys(statusConfig) as AppointmentStatus[]).map(k => (
+                        {/* The merged vocabulary only — one "Scheduled", not
+                            three; matching above is canonical to compensate. */}
+                        {(['requested', ...APPOINTMENT_STATUS_FLOW, ...APPOINTMENT_STATUS_EXITS] as AppointmentStatus[]).map(k => (
                           <option key={k} value={k}>{t(statusLabelKey[k])}</option>
                         ))}
                       </select>
@@ -728,7 +803,11 @@ export default function AppointmentsPage() {
                   return (
                     <div key={apt._id} className={isExpanded ? 'ehr-appointment-group is-expanded' : 'ehr-appointment-group'}>
                     <div
-                      className="ehr-appointment-row appointment-card-row"
+                      // Closed slots (cancelled / rescheduled / no-show /
+                      // checked out) stay in the day table but read as muted,
+                      // so live rows stand out while a cancelled booking is
+                      // still findable and reopenable from its row.
+                      className={`ehr-appointment-row appointment-card-row${APPOINTMENT_CLOSED_STATUSES.includes(apt.status) ? ' is-closed' : ''}`}
                       role="button"
                       tabIndex={0}
                       aria-expanded={isExpanded}
@@ -902,7 +981,20 @@ export default function AppointmentsPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
                 <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                <div><label>{t('appointments.labelProvider')}</label><input value={formProvider} onChange={e => setFormProvider(e.target.value)} placeholder={t('appointments.providerPlaceholder')} /></div>
+                {/* A real clinician from the staff directory, not free text —
+                    each option states role, free-or-busy at this slot, and the
+                    day's load; the id makes the double-booking guard bite. */}
+                <div><label>{t('appointments.labelProvider')}</label>
+                  <select value={formProviderId} onChange={e => selectFormProvider(e.target.value)}>
+                    <option value="">{!formProviderId && formProvider ? `${formProvider} (not on staff list)` : 'Unassigned'}</option>
+                    {formProviderId && !providerOptions.some(p => p._id === formProviderId) && (
+                      <option value={formProviderId}>{formProvider || 'Current provider'}</option>
+                    )}
+                    {providerOptions.map(person => (
+                      <option key={person._id} value={person._id}>{staffOptionLabel(person, providerSlotContext)}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div><label>{t('appointments.labelReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} placeholder={t('appointments.reasonPlaceholder')} /></div>
               <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} placeholder={t('appointments.notesPlaceholder')} /></div>
@@ -1149,7 +1241,7 @@ export default function AppointmentsPage() {
                     patient={patientById.get(apt.patientId)}
                     appointment={apt}
                     appointments={appointments}
-                    providerId={apt.providerId}
+                    providerId={formProviderId || apt.providerId}
                     providerName={formProvider || apt.providerName}
                     date={formDate}
                     time={formTime}
@@ -1169,13 +1261,26 @@ export default function AppointmentsPage() {
 
                 <div className="appt-edit-col">
                   <h4 className="appt-edit-section">Provider &amp; staff</h4>
-                  <div><label>{t('appointments.labelProvider')}</label><input value={formProvider} onChange={e => setFormProvider(e.target.value)} placeholder={t('appointments.providerPlaceholder')} /></div>
+                  {/* Same staff-directory select as the booking form, so an
+                      edit can only move the visit to a real clinician — and
+                      the id keeps the conflict guard live on save. */}
+                  <div><label>{t('appointments.labelProvider')}</label>
+                    <select value={formProviderId} onChange={e => selectFormProvider(e.target.value)}>
+                      <option value="">{!formProviderId && formProvider ? `${formProvider} (not on staff list)` : 'Unassigned'}</option>
+                      {formProviderId && !providerOptions.some(p => p._id === formProviderId) && (
+                        <option value={formProviderId}>{formProvider || 'Current provider'}</option>
+                      )}
+                      {providerOptions.map(person => (
+                        <option key={person._id} value={person._id}>{staffOptionLabel(person, providerSlotContext)}</option>
+                      ))}
+                    </select>
+                  </div>
                   <AppointmentDetailFields
                     section="provider"
                     patient={patientById.get(apt.patientId)}
                     appointment={apt}
                     appointments={appointments}
-                    providerId={apt.providerId}
+                    providerId={formProviderId || apt.providerId}
                     providerName={formProvider || apt.providerName}
                     date={formDate}
                     time={formTime}
@@ -1197,7 +1302,7 @@ export default function AppointmentsPage() {
                     patient={patientById.get(apt.patientId)}
                     appointment={apt}
                     appointments={appointments}
-                    providerId={apt.providerId}
+                    providerId={formProviderId || apt.providerId}
                     providerName={formProvider || apt.providerName}
                     date={formDate}
                     time={formTime}
@@ -1215,7 +1320,7 @@ export default function AppointmentsPage() {
                       await update(apt._id, {
                         appointmentDate: formDate, appointmentTime: formTime, duration: formDuration,
                         appointmentType: formType, priority: formPriority, department: formDepartment,
-                        providerName: formProvider, reason: formReason, notes: formNotes,
+                        providerId: formProviderId, providerName: formProvider, reason: formReason, notes: formNotes,
                         appointmentMode: formDetail.mode,
                         staffId: formDetail.staffId || undefined,
                         staffName: formDetail.staffName || undefined,
@@ -1229,7 +1334,7 @@ export default function AppointmentsPage() {
                       // field write would skip all three.
                       if (formStatus !== apt.status) await handleStatusChange(apt._id, formStatus);
                       showToast(t('appointments.toastUpdated'), 'success'); setEditingApt(null);
-                    } catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
+                    } catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedUpdate'), 'error'); }
                   }}
                   confirmLabel={t('appointments.saveChanges')}
                   cancelLabel={t('action.cancel')}

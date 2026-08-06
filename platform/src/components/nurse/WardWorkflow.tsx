@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/Toast';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
 import { patientFullName, patientAgeLabel, initials, stateTint } from '@/lib/patient-utils';
@@ -50,6 +51,28 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
 
   const { wardPatients, patientTriageMap, admissionByPatient } = useWardRoster();
   const { appointments, updateStatus } = useAppointments();
+  const { showToast } = useToast();
+
+  // Writes the picked rung; when it's Rescheduled — which drops the visit off
+  // the live board — the toast carries an Undo that restores the previous rung.
+  const changeVisitStatus = useCallback(async (apptId: string, prev: AppointmentStatus, next: AppointmentStatus, patientName: string) => {
+    try {
+      await updateStatus(apptId, next);
+      if (next === 'rescheduled' && prev !== next) {
+        showToast(`${patientName} — marked rescheduled`, 'success', {
+          action: {
+            label: 'Undo',
+            onClick: async () => {
+              try {
+                await updateStatus(apptId, prev);
+                showToast(`${patientName} — restored to ${appointmentStatusLabel(prev).toLowerCase()}`, 'success');
+              } catch { showToast('Could not restore the visit status', 'error'); }
+            },
+          },
+        });
+      }
+    } catch { showToast('Could not update the visit status', 'error'); }
+  }, [updateStatus, showToast]);
   const {
     canConfirmAppointments, canCheckInAppointments, canAdvanceAppointments, canManageAppointmentSchedule,
   } = usePermissions();
@@ -355,7 +378,7 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                                 layout="bare"
                                 label={`Visit status for ${patientFullName(patient)}`}
                                 allowedStatuses={visitStatusOptions}
-                                onChange={status => updateStatus(appointment._id, status)}
+                                onChange={status => changeVisitStatus(appointment._id, visitStatus, status, patientFullName(patient))}
                               />
                             </span>
                           ) : (

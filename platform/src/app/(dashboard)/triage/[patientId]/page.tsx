@@ -17,12 +17,14 @@
  * they need to assess.
  */
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useToast } from '@/components/Toast';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
+import type { AppointmentStatus } from '@/lib/db-types';
 import { APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_STATUS_FLOW, APPOINTMENT_STATUS_EXITS, APPOINTMENT_STATUS_TONES, appointmentStatusLabel } from '@/lib/appointment-status';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { jubaDate } from '@/lib/time-juba';
@@ -41,9 +43,31 @@ export default function PatientTriagePage() {
   const { patients, loading } = usePatients();
   const { triages } = useTriage();
   const { appointments, updateStatus } = useAppointments();
+  const { showToast } = useToast();
   const {
     canConfirmAppointments, canCheckInAppointments, canAdvanceAppointments, canManageAppointmentSchedule,
   } = usePermissions();
+
+  // Same undo affordance as the ward board: Rescheduled drops the visit off
+  // the live surfaces, so the toast carries the way back.
+  const changeVisitStatus = useCallback(async (apptId: string, prev: AppointmentStatus, next: AppointmentStatus, patientName: string) => {
+    try {
+      await updateStatus(apptId, next);
+      if (next === 'rescheduled' && prev !== next) {
+        showToast(`${patientName} — marked rescheduled`, 'success', {
+          action: {
+            label: t('action.undo'),
+            onClick: async () => {
+              try {
+                await updateStatus(apptId, prev);
+                showToast(`${patientName} — restored to ${appointmentStatusLabel(prev).toLowerCase()}`, 'success');
+              } catch { showToast('Could not restore the visit status', 'error'); }
+            },
+          },
+        });
+      }
+    } catch { showToast('Could not update the visit status', 'error'); }
+  }, [updateStatus, showToast, t]);
   // Same split the appointments list and ward board use: forward progression
   // for anyone who can move a visit along, the exits reserved for
   // schedule-management roles — a triage nurse here has check-in/advance
@@ -141,7 +165,7 @@ export default function PatientTriagePage() {
                 layout="bare"
                 label={`Visit status for ${name}`}
                 allowedStatuses={visitStatusOptions}
-                onChange={status => updateStatus(visit._id, status)}
+                onChange={status => changeVisitStatus(visit._id, visit.status, status, name)}
               />
             ) : (
               <span className={`appointment-status-pill status-${APPOINTMENT_STATUS_TONES[visit.status]}`}>

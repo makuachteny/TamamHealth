@@ -31,9 +31,10 @@ const searchStep = (route: string): TourStep => ({
 const messagingStep = (route: string): TourStep => ({
   id: 'messaging',
   route,
-  // The sidebar entry, which every role that can message has. This used to
-  // point at the floating dock launcher; the dock has been removed, so the
-  // nav link is the messaging entry point on every screen.
+  // The sidebar entry, which every role that can message has. The floating
+  // dock is back (restored after da19f4d6 removed it), but the nav link stays
+  // the tour anchor: it exists on every screen and viewport, while the dock's
+  // launcher is desktop-only and hidden under the mobile shell.
   target: 'a.nav-item[href="/messages"]',
   title: 'Message your team',
   body: 'Direct messages, plus group threads for a whole ward or department. A handover of care waiting on you appears on your dashboard under “Transfers to accept”.',

@@ -23,6 +23,7 @@ import { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
 import NoteSectionCard from './NoteSectionCard';
 import AssignPicker from './AssignPicker';
+import { useConfirm } from '@/components/ConfirmDialog';
 import PrescribeModal from './prescribe/PrescribeModal';
 import LabOrderModal from '@/components/lab/order/LabOrderModal';
 import type { NoteSectionActionId } from '@/lib/clinical-notes/section-actions';
@@ -89,6 +90,7 @@ export default function ClinicalNoteEditor({
 }: ClinicalNoteEditorProps) {
   const router = useRouter();
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const scope = useDataScope();
 
   const [note, setNote] = useState<ClinicalNoteDoc | null>(null);
@@ -538,7 +540,17 @@ export default function ClinicalNoteEditor({
                           className="cn-section-nav-remove"
                           aria-label={`Remove ${getSectionLabel(id)}`}
                           title={`Remove ${getSectionLabel(id)}`}
-                          onClick={() => void persist(() => removeNoteSection(noteId, id))}
+                          onClick={async () => {
+                            // The section's narrative goes with it, and the
+                            // control is a 20px box beside the section name.
+                            const ok = await confirm({
+                              title: `Remove the ${getSectionLabel(id)} section?`,
+                              message: 'Anything written in it will be removed from this note.',
+                              confirmLabel: 'Remove',
+                              tone: 'danger',
+                            });
+                            if (ok) await persist(() => removeNoteSection(noteId, id));
+                          }}
                         >
                           <Minus size={12} />
                         </button>

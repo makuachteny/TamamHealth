@@ -21,7 +21,7 @@
  * the `requested` handling above); omit it to offer the full ladder.
  */
 import { useState } from 'react';
-import { APPOINTMENT_STATUS_OPTIONS, appointmentStatusLabel } from '@/lib/appointment-status';
+import { APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_DESCRIPTIONS, appointmentStatusLabel, canonicalAppointmentStatus } from '@/lib/appointment-status';
 import type { AppointmentStatus } from '@/lib/db-types';
 import { CalendarClock } from '@/components/icons/lucide';
 
@@ -48,22 +48,37 @@ export default function AppointmentStatusSelect({
   const base = allowedStatuses
     ? APPOINTMENT_STATUS_OPTIONS.filter(option => allowedStatuses.includes(option))
     : APPOINTMENT_STATUS_OPTIONS;
-  const options = base.includes(status) ? base : [status, ...base];
+  // A fine-grained stored status (confirmed, arrived, triaged…) is shown as
+  // the simplified rung it folds into rather than being prepended as an extra
+  // option — otherwise the list would offer "Scheduled" twice. Only a status
+  // whose canonical rung is ALSO absent (requested) still gets prepended, so
+  // the control never misreports where a booking is.
+  const canonical = canonicalAppointmentStatus(status);
+  const shownValue = base.includes(status) ? status : base.includes(canonical) ? canonical : status;
+  const options = shownValue === status && !base.includes(status) ? [status, ...base] : base;
 
   const select = (
     <select
-      value={status}
+      value={shownValue}
       disabled={disabled || saving}
       aria-label={label}
+      // Hovering the control explains the CURRENT (stored) status; hovering an
+      // option (desktop browsers) explains that rung — this is where "booked
+      // vs patient-confirmed" gets settled without leaving the row.
+      title={APPOINTMENT_STATUS_DESCRIPTIONS[status]}
       onChange={async (event) => {
         const next = event.target.value as AppointmentStatus;
-        if (next === status) return;
+        // Re-picking the displayed rung is a no-op — it must not quietly
+        // downgrade a confirmed booking to plain scheduled.
+        if (next === shownValue) return;
         setSaving(true);
         try { await onChange(next); } finally { setSaving(false); }
       }}
     >
       {options.map(option => (
-        <option key={option} value={option}>{appointmentStatusLabel(option)}</option>
+        <option key={option} value={option} title={APPOINTMENT_STATUS_DESCRIPTIONS[option]}>
+          {appointmentStatusLabel(option)}
+        </option>
       ))}
     </select>
   );

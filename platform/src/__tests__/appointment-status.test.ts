@@ -22,6 +22,7 @@ import {
   appointmentStatusGroup,
   appointmentStatusLabel,
   priorAppointmentStatus,
+  canonicalAppointmentStatus,
 } from '../lib/appointment-status';
 import type { AppointmentStatus } from '../lib/db-types';
 import en from '../lib/i18n/locales/en';
@@ -29,20 +30,30 @@ import en from '../lib/i18n/locales/en';
 const ALL_STATUSES = Object.keys(APPOINTMENT_STATUS_LABELS) as AppointmentStatus[];
 
 describe('appointment status dropdown', () => {
-  it('offers the front desk ladder in order, exits last', () => {
+  it('offers the simplified front desk ladder in order, exits last', () => {
     expect(APPOINTMENT_STATUS_OPTIONS.map(s => APPOINTMENT_STATUS_LABELS[s])).toEqual([
       'Scheduled',
-      'Reminder Sent',
-      'Confirmed',
-      'Arrived',
       'Checked In',
-      'Triaged',
-      'Roomed',
-      'Checked Out',
+      'In Progress',
+      'Completed',
       'No Show',
       'Rescheduled',
       'Cancelled',
     ]);
+  });
+
+  it('folds every fine-grained status into a rung the ladder still offers', () => {
+    // System events keep writing reminder_sent / confirmed / arrived /
+    // triaged; each must display and file as one of the four offered rungs.
+    for (const status of ALL_STATUSES) {
+      if (status === 'requested' || APPOINTMENT_STATUS_EXITS.includes(status)) continue;
+      expect(APPOINTMENT_STATUS_FLOW).toContain(canonicalAppointmentStatus(status));
+    }
+    // ...and wears that rung's label, so pills and pickers agree.
+    expect(APPOINTMENT_STATUS_LABELS.reminder_sent).toBe(APPOINTMENT_STATUS_LABELS.scheduled);
+    expect(APPOINTMENT_STATUS_LABELS.confirmed).toBe(APPOINTMENT_STATUS_LABELS.scheduled);
+    expect(APPOINTMENT_STATUS_LABELS.arrived).toBe(APPOINTMENT_STATUS_LABELS.checked_in);
+    expect(APPOINTMENT_STATUS_LABELS.triaged).toBe(APPOINTMENT_STATUS_LABELS.in_progress);
   });
 
   it('never offers `requested` as a destination', () => {
@@ -142,15 +153,19 @@ describe('appointmentStatusGroup', () => {
 });
 
 describe('priorAppointmentStatus', () => {
-  it('steps one rung back down the ladder', () => {
-    expect(priorAppointmentStatus('reminder_sent')).toBe('scheduled');
-    expect(priorAppointmentStatus('confirmed')).toBe('reminder_sent');
-    expect(priorAppointmentStatus('arrived')).toBe('confirmed');
-    expect(priorAppointmentStatus('checked_in')).toBe('arrived');
-    // The nurse's ETAT assessment sits between check-in and the room.
-    expect(priorAppointmentStatus('triaged')).toBe('checked_in');
-    expect(priorAppointmentStatus('in_progress')).toBe('triaged');
+  it('steps one rung back down the simplified ladder', () => {
+    expect(priorAppointmentStatus('checked_in')).toBe('scheduled');
+    expect(priorAppointmentStatus('in_progress')).toBe('checked_in');
     expect(priorAppointmentStatus('completed')).toBe('in_progress');
+  });
+
+  it('steps fine-grained statuses from the rung they fold into', () => {
+    // reminder_sent / confirmed ARE the scheduled rung — nowhere lower to go.
+    expect(priorAppointmentStatus('reminder_sent')).toBeUndefined();
+    expect(priorAppointmentStatus('confirmed')).toBeUndefined();
+    // arrived files as Checked In; triaged as In Progress.
+    expect(priorAppointmentStatus('arrived')).toBe('scheduled');
+    expect(priorAppointmentStatus('triaged')).toBe('checked_in');
   });
 
   it('reopens an exit to scheduled, and bottoms out at scheduled', () => {
