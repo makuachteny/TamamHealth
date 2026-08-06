@@ -10,8 +10,7 @@ import { useUsers } from '@/lib/hooks/useUsers';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, AppointmentStatus, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
-import {
-  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
+import { APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
   APPOINTMENT_PENDING_STATUSES, appointmentStatusLabel, appointmentStatusGroup,
   APPOINTMENT_STATUS_GROUP_LABELS, type AppointmentStatusGroup,
 } from '@/lib/appointment-status';
@@ -1059,16 +1058,9 @@ export default function FrontDeskDashboardPage() {
         // desk's own work from it.
         status: appointment.status,
         statusLabel: appointmentStatusLabel(appointment.status),
-        // The pill itself is the picker for appointment-backed rows: reception
-        // moves a booking along the ladder from the list, no expanding needed.
+        // The row's pill is display-only; the booking is edited in the
+        // appointment editor's Status & billing tab.
         telehealth: appointment.appointmentMode === 'telehealth' || appointment.appointmentType === 'telehealth',
-        statusValue: appointment.status,
-        statusOptions: canSetAppointmentStatus
-          ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))
-          : undefined,
-        onStatusChange: canSetAppointmentStatus
-          ? value => handleAppointmentStatusChange(appointment, value as AppointmentStatus)
-          : undefined,
         statusSecondary: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
         statusTone: APPOINTMENT_STATUS_TONES[appointment.status],
         // Only a real acuity gets the RED/YELLOW pill — routine appointments
@@ -1223,27 +1215,8 @@ export default function FrontDeskDashboardPage() {
         statusLabel: ladderStatus ? appointmentStatusLabel(ladderStatus) : statusLabel,
         statusSecondary: statusContext,
         statusTone: ladderStatus ? APPOINTMENT_STATUS_TONES[ladderStatus] : statusTone,
-        // In Office and Finished rows carry the SAME ladder as Scheduled, so a
-        // patient's status is set the same way wherever they are in the day.
-        // Only rows backed by a booking can: a walk-in has no appointment to
-        // move, so its row still reports the queue's own stage (Waiting, In
-        // consult, Done) derived from triage and the encounter.
-        statusValue: ladderStatus,
-        statusOptions: ladderStatus && canSetAppointmentStatus
-          ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))
-          : undefined,
-        onStatusChange: canSetAppointmentStatus
-          ? async (value: string) => {
-              const next = value as AppointmentStatus;
-              // A walk-in has both records. The appointment handler writes the
-              // rung AND mirrors it onto the triage row in one action — so a
-              // status that routes to a dialog (check-in, no-show, cancel)
-              // defers BOTH writes until the clerk confirms, and Undo restores
-              // both together.
-              if (queueAppointment) await handleAppointmentStatusChange(queueAppointment, next, queueTriage);
-              else if (queueTriage) await handleWalkInStatusChange(queueTriage, next);
-            }
-          : undefined,
+        // Read-only here too: In Office and Finished rows report where the
+        // patient stands, and the booking is changed in the appointment editor.
         priority: acuity,
         room: entry.assignedRoom,
         careTeam: entry.assignedDoctorName || 'Doctor unassigned',

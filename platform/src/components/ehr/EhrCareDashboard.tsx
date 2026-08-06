@@ -10,11 +10,9 @@ import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
 import { initials, stateTint } from '@/lib/patient-utils';
 import { formatAppointmentTimeUntil } from '@/lib/format-utils';
 import { useAppointments } from '@/lib/hooks/useAppointments';
-import { usePermissions } from '@/lib/hooks/usePermissions';
 import {
-  APPOINTMENT_STATUS_OPTIONS, APPOINTMENT_STATUS_TONES, APPOINTMENT_STATUS_DESCRIPTIONS,
-  APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_GROUPS, appointmentStatusGroup,
-  appointmentStatusLabel, canonicalAppointmentStatus, type AppointmentStatusGroup,
+  APPOINTMENT_STATUS_TONES, APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_GROUPS,
+  appointmentStatusGroup, appointmentStatusLabel, type AppointmentStatusGroup,
 } from '@/lib/appointment-status';
 import { toIsoDate as visitIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import type { AppointmentStatus } from '@/lib/db-types';
@@ -94,17 +92,8 @@ export type EhrCareDashboardRow = {
    * both readings stay visible.
    */
   lockStatus?: boolean;
-  /**
-   * Set these two together and the status pill becomes a picker: the row's own
-   * state can be changed from the list without expanding it. Left unset, the
-   * pill stays a read-only chip — which is right for rows whose state is
-   * derived (a walk-in's "Waiting" comes from triage, not a settable ladder).
-   */
   /** Remote visit — the row shows a telehealth mark beside the patient's name. */
   telehealth?: boolean;
-  statusValue?: string;
-  statusOptions?: { value: string; label: string }[];
-  onStatusChange?: (value: string) => void | Promise<void>;
   priority?: string;
   room?: string;
   // No row-level `onClick`: the shell owns what a row click does (expand, or
@@ -312,25 +301,16 @@ export default function EhrCareDashboard({
 }) {
   const router = useRouter();
 
-  // ── One status control for every station ────────────────────────────────
+  // ── One status reading for every station ────────────────────────────────
   // Lab, pharmacy, radiology, nutrition and reception all render their rows
-  // through this component, and each used to show its own read-only pill. They
-  // now share the front desk's visit ladder, so a patient's status reads and
-  // sets the same way wherever they are seen.
+  // through this component, so a patient's visit status reads the same wherever
+  // they are seen. It is a READING only: the pill was once a picker, which made
+  // a list you were scrolling into a control that could move a booking, and
+  // duplicated the appointment editor's Status & billing tab without its reason
+  // prompts. The editor is the single place a booking changes, for every role.
   //
-  // The ladder writes to the patient's APPOINTMENT — the visit — and never to
-  // the order in front of the station. A specimen or a prescription has its own
-  // lifecycle, and "No Show" is not a state a blood sample can be in; letting
-  // this dropdown touch those records would put clinically meaningless values
-  // into them. A row whose patient has no visit today keeps its own pill.
-  const { appointments, updateStatus: updateVisitStatus } = useAppointments();
-  // The front desk gates the identical control behind this same pair of
-  // flags (front-desk/page.tsx). A lab tech, pharmacist, radiographer or
-  // nutritionist passes neither, so the ladder they see here must be the same
-  // read-only pill everyone without the permission gets — the queue row is
-  // not a side door around the front desk's own gate.
-  const { canManageAppointmentSchedule, canCheckInAppointments } = usePermissions();
-  const canSetAppointmentStatus = canManageAppointmentSchedule || canCheckInAppointments;
+  // A row whose patient has no visit today keeps its own pill text.
+  const { appointments } = useAppointments();
   const visitByPatient = useMemo(() => {
     const today = visitIsoDate(new Date());
     const map = new Map<string, { id: string; status: AppointmentStatus }>();
@@ -342,11 +322,6 @@ export default function EhrCareDashboard({
     }
     return map;
   }, [appointments]);
-
-  const visitLadder = useMemo(
-    () => APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) })),
-    [],
-  );
 
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   // The calendar main-view toggle was removed — the dashboard is the only view
@@ -657,32 +632,19 @@ export default function EhrCareDashboard({
                       ? (countdown.usesDate ? (countdown.isPastDay ? '' : (row.time || '')) : countdown.label)
                       : row.timeSecondary || '';
                     // Status pill tone reuses the appointment pill classes.
-                    // The row's own control wins when a dashboard sets one
-                    // (reception drives the booking directly); otherwise the
-                    // patient's visit today supplies the same ladder — unless
-                    // the row locks its own status (radiology's Pending/In
-                    // Progress/Complete, nutrition's SAM/MAM/At Risk), in which
-                    // case the visit is surfaced below the pill instead of on it.
+                    // Status is READ-ONLY on the row. It used to be a picker on the
+                    // pill, which meant a booking could be moved along the
+                    // ladder by a stray click on a list you were only reading —
+                    // and it was a second way to do what the appointment editor
+                    // (Status & billing) already does properly, with the reason
+                    // prompts and confirmations that come with it. The editor is
+                    // now the one place any role changes a booking; this pill
+                    // just says where it stands.
                     const visit = row.patientId ? visitByPatient.get(row.patientId) : undefined;
                     const ladderOwnsRow = !!visit && !row.lockStatus;
-                    const statusControl = row.statusOptions?.length && row.onStatusChange
-                      ? { options: row.statusOptions, value: row.statusValue, onChange: row.onStatusChange, text: '' }
-                      : ladderOwnsRow
-                        ? {
-                            // Only a role that could set this from the front
-                            // desk gets the picker here too — a lab tech,
-                            // pharmacist, radiographer or nutritionist has no
-                            // business writing to a visit from a queue row, so
-                            // they get the same status as everyone else, just
-                            // not as a control.
-                            options: canSetAppointmentStatus ? visitLadder : undefined,
-                            value: visit!.status as string,
-                            text: appointmentStatusLabel(visit!.status),
-                            onChange: canSetAppointmentStatus
-                              ? (value: string) => updateVisitStatus(visit!.id, value as AppointmentStatus)
-                              : undefined,
-                          }
-                        : { options: undefined, value: undefined, onChange: undefined, text: '' };
+                    const statusControl = {
+                      text: ladderOwnsRow ? appointmentStatusLabel(visit!.status) : '',
+                    };
                     // Pill colour follows whichever state owns the pill's text:
                     // the visit's tone when the ladder owns it, the row's own
                     // tone otherwise. The two used to be wired independently, so
@@ -783,46 +745,9 @@ export default function EhrCareDashboard({
                           </div>
 
                           <div className="appointment-card-status">
-                            {/* The pill is the control when the row offers
-                                somewhere to move to — same picker-on-a-pill as
-                                the appointments table. Rows whose state is
-                                derived rather than set (a walk-in's Waiting comes
-                                from triage, not the appointment ladder) keep a
-                                plain pill. */}
-                            {statusControl.options && statusControl.onChange ? (
-                              <span
-                                className={`appointment-status-pill appointment-status-pill--select ${statusPillClass}`.trim()}
-                                onClick={event => event.stopPropagation()}
-                              >
-                                {statusControl.text || statusText || '—'}
-                                <select
-                                  // Fine-grained stored statuses (confirmed,
-                                  // arrived, triaged…) display as the rung they
-                                  // fold into — the options list only offers
-                                  // the simplified ladder. Non-appointment
-                                  // ladders pass through unchanged.
-                                  value={statusControl.value ? canonicalAppointmentStatus(statusControl.value as AppointmentStatus) : ''}
-                                  aria-label="Appointment status"
-                                  // Status definitions as tooltips (booked vs
-                                  // patient-confirmed). Non-appointment ladders
-                                  // (SAM/MAM etc.) have no entry — no title.
-                                  title={APPOINTMENT_STATUS_DESCRIPTIONS[statusControl.value as AppointmentStatus] || undefined}
-                                  onChange={event => statusControl.onChange?.(event.target.value)}
-                                >
-                                  {statusControl.options.map(option => (
-                                    <option
-                                      key={option.value}
-                                      value={option.value}
-                                      title={APPOINTMENT_STATUS_DESCRIPTIONS[option.value as AppointmentStatus] || undefined}
-                                    >
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </span>
-                            ) : (
-                              <span className={`appointment-status-pill ${statusPillClass}`.trim()}>{statusControl.text || statusText || '—'}</span>
-                            )}
+                            <span className={`appointment-status-pill ${statusPillClass}`.trim()}>
+                              {statusControl.text || statusText || '—'}
+                            </span>
                             <small>{secondaryLine}</small>
                           </div>
                         </div>

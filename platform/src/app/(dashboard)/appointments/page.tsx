@@ -677,17 +677,8 @@ export default function AppointmentsPage() {
       </div>
 
       <div className="ehr-row-detail__actions">
-        {/* The whole ladder, same control the front desk uses. The buttons
-            beside it are shortcuts for the steps taken constantly; this is how
-            any other rung — reminded, arrived, rescheduled — gets set. */}
-        {(canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments) && (
-          <AppointmentStatusSelect
-            status={apt.status}
-            layout="bare"
-            allowedStatuses={statusPickerOptions}
-            onChange={status => { onDone(); handleStatusChange(apt._id, status); }}
-          />
-        )}
+        {/* No status control here: the row's own editor (Status & billing)
+            is where a booking changes. */}
         {canDoTelehealth && apt.appointmentType === 'telehealth' && apt.status !== 'cancelled' && apt.status !== 'completed' && (
           <button onClick={() => { onDone(); router.push(`/telehealth/visit/${encodeURIComponent(apt._id)}`); }} className="btn btn-primary btn-sm" style={{ gap: 6, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
             <Video size={14} /> Join session
@@ -875,24 +866,12 @@ export default function AppointmentsPage() {
                             along the ladder from the row it is reading, rather
                             than expanding it first. Roles without any
                             appointment-workflow permission get the plain pill. */}
-                        {canChangeAppointmentStatus ? (
-                          <span
-                            className={`appointment-status-pill appointment-status-pill--select status-${statusSlug(apt.status)}`}
-                            onClick={event => event.stopPropagation()}
-                          >
-                            {t(statusLabelKey[apt.status])}
-                            <AppointmentStatusSelect
-                              status={apt.status}
-                              layout="bare"
-                              allowedStatuses={statusPickerOptions}
-                              onChange={status => handleStatusChange(apt._id, status)}
-                            />
-                          </span>
-                        ) : (
-                          <span className={`appointment-status-pill status-${statusSlug(apt.status)}`}>
-                            {t(statusLabelKey[apt.status])}
-                          </span>
-                        )}
+                        {/* Display-only. Status is changed in the appointment
+                            editor's Status & billing tab, which is the one
+                            control every role uses. */}
+                        <span className={`appointment-status-pill status-${statusSlug(apt.status)}`}>
+                          {t(statusLabelKey[apt.status])}
+                        </span>
                         <small>{appointmentOperationalCue(apt)}</small>
                       </div>
                     </div>

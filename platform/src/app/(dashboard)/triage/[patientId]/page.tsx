@@ -23,7 +23,6 @@ import { useToast } from '@/components/Toast';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useAppointments } from '@/lib/hooks/useAppointments';
-import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
 import type { AppointmentStatus } from '@/lib/db-types';
 import { APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_STATUS_FLOW, APPOINTMENT_STATUS_EXITS, APPOINTMENT_STATUS_TONES, appointmentStatusLabel } from '@/lib/appointment-status';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -50,36 +49,6 @@ export default function PatientTriagePage() {
 
   // Same undo affordance as the ward board: Rescheduled drops the visit off
   // the live surfaces, so the toast carries the way back.
-  const changeVisitStatus = useCallback(async (apptId: string, prev: AppointmentStatus, next: AppointmentStatus, patientName: string) => {
-    try {
-      await updateStatus(apptId, next);
-      if (next === 'rescheduled' && prev !== next) {
-        showToast(`${patientName} — marked rescheduled`, 'success', {
-          action: {
-            label: t('action.undo'),
-            onClick: async () => {
-              try {
-                await updateStatus(apptId, prev);
-                showToast(`${patientName} — restored to ${appointmentStatusLabel(prev).toLowerCase()}`, 'success');
-              } catch { showToast('Could not restore the visit status', 'error'); }
-            },
-          },
-        });
-      }
-    } catch { showToast('Could not update the visit status', 'error'); }
-  }, [updateStatus, showToast, t]);
-  // Same split the appointments list and ward board use: forward progression
-  // for anyone who can move a visit along, the exits reserved for
-  // schedule-management roles — a triage nurse here has check-in/advance
-  // permission but no business cancelling or no-showing the visit she is
-  // actively assessing. `cancelled` stays off this control entirely: it needs
-  // a reason, which only the dedicated Cancel flow (on the appointments list)
-  // collects.
-  const canChangeVisitStatus = canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments;
-  const visitStatusOptions = useMemo(() => [
-    ...APPOINTMENT_STATUS_FLOW,
-    ...(canManageAppointmentSchedule ? APPOINTMENT_STATUS_EXITS.filter(s => s !== 'cancelled') : []),
-  ], [canManageAppointmentSchedule]);
 
   // Today's open visit, if there is one. Saving a triage puts it on the Triaged
   // rung; the nurse's next step — Roomed — is the next option in this same
@@ -159,19 +128,11 @@ export default function PatientTriagePage() {
         {visit && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Visit</span>
-            {canChangeVisitStatus ? (
-              <AppointmentStatusSelect
-                status={visit.status}
-                layout="bare"
-                label={`Visit status for ${name}`}
-                allowedStatuses={visitStatusOptions}
-                onChange={status => changeVisitStatus(visit._id, visit.status, status, name)}
-              />
-            ) : (
-              <span className={`appointment-status-pill status-${APPOINTMENT_STATUS_TONES[visit.status]}`}>
-                {appointmentStatusLabel(visit.status)}
-              </span>
-            )}
+            {/* Display-only: the booking is changed in the appointment
+                editor, so this page reports the visit rather than steering it. */}
+            <span className={`appointment-status-pill status-${APPOINTMENT_STATUS_TONES[visit.status]}`}>
+              {appointmentStatusLabel(visit.status)}
+            </span>
           </div>
         )}
         <button

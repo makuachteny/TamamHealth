@@ -18825,51 +18825,11 @@ textarea.ehr-handoff-input {
    states it — no expanding the row first. Same idea as the chart's condition
    status picker; kept as a real form control so keyboard and screen readers
    work for free. */
-.appointment-status-pill--select {
-  position: relative;
-  padding-right: 24px;
-  cursor: pointer;
-}
 
-.appointment-status-pill--select > select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  /* Transparent, not hidden: the select stays the hit target and keeps its
-     native dropdown, while the pill underneath paints the look. */
-  opacity: 0;
-  appearance: none;
-  cursor: pointer;
-}
 
-.appointment-status-pill--select > select:disabled {
-  cursor: default;
-}
 
 /* The caret that says "this can change". */
-.appointment-status-pill--select::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 9px;
-  width: 0;
-  height: 0;
-  margin-top: -1px;
-  border-top: 4px solid currentColor;
-  border-right: 3.5px solid transparent;
-  border-left: 3.5px solid transparent;
-  opacity: 0.75;
-  pointer-events: none;
-}
 
-.appointment-status-pill--select:focus-within {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 1px;
-}
 
 .checkin-patient-summary {
   display: flex;

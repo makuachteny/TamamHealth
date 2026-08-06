@@ -384,7 +384,6 @@ export default function DashboardPage() {
         patients={worklist.patients}
         appointments={worklist.appointments}
         outstanding={worklist.outstanding}
-        onUpdateAppointmentStatus={updateApptStatus}
       />
     </main>
   );

@@ -8,7 +8,6 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
-  Menu,
   MessageSquare,
   Plus,
   Search,

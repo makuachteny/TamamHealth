@@ -8,7 +8,6 @@ import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils'
 import { patientFullName, patientAgeLabel, initials, stateTint } from '@/lib/patient-utils';
 import { buildQueueFromTriage, stageForAppointmentStatus, STAGE_LABELS, type QueueEntry } from '@/lib/services/patient-queue-service';
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
-import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
 import { APPOINTMENT_STATUS_TONES, APPOINTMENT_STATUS_FLOW, APPOINTMENT_STATUS_EXITS, appointmentStatusLabel } from '@/lib/appointment-status';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { AppointmentStatus } from '@/lib/db-types';
@@ -55,38 +54,6 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
 
   // Writes the picked rung; when it's Rescheduled — which drops the visit off
   // the live board — the toast carries an Undo that restores the previous rung.
-  const changeVisitStatus = useCallback(async (apptId: string, prev: AppointmentStatus, next: AppointmentStatus, patientName: string) => {
-    try {
-      await updateStatus(apptId, next);
-      if (next === 'rescheduled' && prev !== next) {
-        showToast(`${patientName} — marked rescheduled`, 'success', {
-          action: {
-            label: 'Undo',
-            onClick: async () => {
-              try {
-                await updateStatus(apptId, prev);
-                showToast(`${patientName} — restored to ${appointmentStatusLabel(prev).toLowerCase()}`, 'success');
-              } catch { showToast('Could not restore the visit status', 'error'); }
-            },
-          },
-        });
-      }
-    } catch { showToast('Could not update the visit status', 'error'); }
-  }, [updateStatus, showToast]);
-  const {
-    canConfirmAppointments, canCheckInAppointments, canAdvanceAppointments, canManageAppointmentSchedule,
-  } = usePermissions();
-  // Same split as the appointments list: anyone who can move a visit along
-  // gets the ladder as a picker, but the exits stay with schedule-management
-  // roles — a nurse tapping this cell mid-shift should not be able to cancel
-  // or no-show someone. `cancelled` never appears here even for those roles:
-  // it needs a reason, which only the dedicated Cancel flow collects, and this
-  // board has no room for that dialog.
-  const canChangeVisitStatus = canConfirmAppointments || canCheckInAppointments || canAdvanceAppointments;
-  const visitStatusOptions = useMemo(() => [
-    ...APPOINTMENT_STATUS_FLOW,
-    ...(canManageAppointmentSchedule ? APPOINTMENT_STATUS_EXITS.filter(s => s !== 'cancelled') : []),
-  ], [canManageAppointmentSchedule]);
   const today = new Date().toISOString().slice(0, 10);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -365,27 +332,12 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                           onClick={event => event.stopPropagation()}
                           onKeyDown={event => event.stopPropagation()}
                         >
-                          {visitStatus && appointment && !patient._demo && canChangeVisitStatus ? (
-                            // Same picker-on-a-pill structure as the front desk's
-                            // control (EhrCareDashboard): a compact pill span
-                            // carries the look, with the real <select> laid
-                            // transparently over it as the hit target — not a
-                            // bare native <select> rendered on its own.
-                            <span className={`appointment-status-pill appointment-status-pill--select ${visitPillClass}`.trim()}>
-                              {appointmentStatusLabel(visitStatus)}
-                              <AppointmentStatusSelect
-                                status={visitStatus}
-                                layout="bare"
-                                label={`Visit status for ${patientFullName(patient)}`}
-                                allowedStatuses={visitStatusOptions}
-                                onChange={status => changeVisitStatus(appointment._id, visitStatus, status, patientFullName(patient))}
-                              />
-                            </span>
-                          ) : (
-                            <span className={`appointment-status-pill ${visitPillClass}`.trim()}>
-                              {visitStatus ? appointmentStatusLabel(visitStatus) : fallbackStatusText}
-                            </span>
-                          )}
+                          {/* Display-only. Status is changed in the appointment
+                              editor, so the board reports the visit rather than
+                              steering it. */}
+                          <span className={`appointment-status-pill ${visitPillClass}`.trim()}>
+                            {visitStatus ? appointmentStatusLabel(visitStatus) : fallbackStatusText}
+                          </span>
                           <small>{statusSubtext}</small>
                         </div>
                       </div>

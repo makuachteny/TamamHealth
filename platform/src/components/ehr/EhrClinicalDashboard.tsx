@@ -25,7 +25,7 @@ import {
 import { initials, stateTint, AVATAR_TINT_NEUTRAL } from '@/lib/patient-utils';
 import { formatAppointmentTimeUntil, formatClockTime } from '@/lib/format-utils';
 import {
-  APPOINTMENT_STATUS_OPTIONS, appointmentStatusLabel,
+  APPOINTMENT_STATUS_TONES, appointmentStatusLabel,
   APPOINTMENT_STATUS_GROUPS, APPOINTMENT_STATUS_GROUP_LABELS,
   appointmentStatusGroup, type AppointmentStatusGroup,
 } from '@/lib/appointment-status';
@@ -123,7 +123,6 @@ export type OutstandingItem = {
 /* The desk's ladder plus `requested`, which only the patient portal writes but
    a clinician may still be looking at. Order and labels come from the shared
    vocabulary so this dropdown and the front desk's offer the same thing. */
-const statusOptions: AppointmentStatus[] = ['requested', ...APPOINTMENT_STATUS_OPTIONS];
 
 const statusLabel = appointmentStatusLabel;
 
@@ -455,14 +454,12 @@ export default function EhrClinicalDashboard({
   patients,
   appointments,
   outstanding,
-  onUpdateAppointmentStatus,
 }: {
   clinicianName: string;
   facilityName?: string;
   patients: WorklistPatient[];
   appointments: AppointmentDoc[];
   outstanding: OutstandingItem[];
-  onUpdateAppointmentStatus?: (appointmentId: string, status: AppointmentStatus) => Promise<void> | void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -977,20 +974,11 @@ export default function EhrClinicalDashboard({
             <p className="appointment-detail-modal__reason">{openAppointment.reason || typeLabel(openAppointment.appointmentType)}</p>
           </div>
           <div className="appointment-detail-modal__header-right">
-            <select
-              value={openAppointment.status}
-              className="appointment-detail-modal__status-select"
-              aria-label="Appointment status"
-              onChange={event => {
-                const status = event.target.value as AppointmentStatus;
-                void onUpdateAppointmentStatus?.(openAppointment._id, status);
-                setOpenAppointment({ ...openAppointment, status });
-              }}
-            >
-              {statusOptions.map(status => (
-                <option key={status} value={status}>{statusLabel(status)}</option>
-              ))}
-            </select>
+            {/* Display-only: the appointment editor's Status & billing tab
+                is the one place a booking changes, for every role. */}
+            <span className={`appointment-status-pill ${APPOINTMENT_STATUS_TONES[openAppointment.status]}`}>
+              {statusLabel(openAppointment.status)}
+            </span>
             <button type="button" className="appointment-detail-modal__close" onClick={() => setOpenAppointment(null)} aria-label="Close appointment details">
               <X size={16} />
             </button>
@@ -1321,19 +1309,9 @@ export default function EhrClinicalDashboard({
                                 <b className={`ehr-department-pill ${departmentTone(appointment.department)}`}>{typeLabel(appointment.department || 'Telemedicine')}</b>
                               </span>
                               <div className="ehr-status-menu">
-                                <select
-                                  value={appointment.status}
-                                  className={statusTone(appointment.status)}
-                                  onClick={event => event.stopPropagation()}
-                                  onKeyDown={event => event.stopPropagation()}
-                                  onChange={event => {
-                                    void onUpdateAppointmentStatus?.(appointment._id, event.target.value as AppointmentStatus);
-                                  }}
-                                >
-                                  {statusOptions.map(status => (
-                                    <option key={status} value={status}>{statusLabel(status)}</option>
-                                  ))}
-                                </select>
+                                <span className={statusTone(appointment.status)}>
+                                  {statusLabel(appointment.status)}
+                                </span>
                               </div>
                             </article>
                           );
