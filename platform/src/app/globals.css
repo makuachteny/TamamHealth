@@ -4326,32 +4326,44 @@ html:has(.ehr-top-rail) {
   .ehr-top-navlinks { display: none; }
 }
 
+/* Hamburger trigger — a single glyph now (the chevron came off with the
+   module icon), so the standard 38px circle needs no widening. */
 .ehr-module-trigger {
-  width: 42px !important;
-  gap: 1px;
+  width: 38px !important;
 }
 
-.ehr-module-chevron {
-  margin-left: -3px;
-}
-
+/* The hamburger's own panel. Anchored to the trigger (`.ehr-top-modules` is
+   position: relative), opening flush from the button's bottom edge so button
+   and panel read as one attached piece — not a card floating under the logo.
+   The open trigger squares its bottom corners and takes the panel's surface
+   (see `.ehr-module-trigger.active` below) to complete the join. */
 .ehr-module-menu {
-  position: fixed;
-  top: calc(var(--ehr-top-rail-height) + 2px);
-  left: 12px;
-  width: 174px;
-  max-height: min(520px, calc(100vh - 66px));
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 264px;
+  max-height: min(560px, calc(100vh - 66px));
   overflow: hidden;
   border: 1px solid var(--ehr-border);
-  border-radius: 8px;
+  border-radius: 0 12px 12px 12px;
   background: var(--ehr-panel);
   color: var(--ehr-text);
-  box-shadow: none;
+  box-shadow: 0 14px 30px rgba(9, 30, 66, 0.16);
   z-index: 1250;
 }
 
+/* The open hamburger becomes the panel's tab: same surface, squared bottom,
+   so the dropdown connects to the button instead of hovering near it. */
+.ehr-top-modules .ehr-module-trigger.active {
+  background: var(--ehr-panel);
+  color: var(--ehr-text);
+  border-color: var(--ehr-border);
+  border-bottom-color: transparent;
+  border-radius: 12px 12px 0 0;
+}
+
 .ehr-module-menu-head {
-  padding: 8px 9px 7px;
+  padding: 12px 14px 10px;
   border-bottom: 1px solid var(--ehr-border);
   background: transparent;
 }
@@ -4363,48 +4375,48 @@ html:has(.ehr-top-rail) {
 
 .ehr-module-menu-head strong {
   color: var(--ehr-text);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }
 
 .ehr-module-menu-head span {
-  margin-top: 1px;
+  margin-top: 2px;
   color: var(--ehr-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .ehr-module-menu-scroll {
-  max-height: calc(min(520px, 100vh - 66px) - 43px);
+  max-height: calc(min(560px, 100vh - 66px) - 58px);
   overflow-y: auto;
-  padding: 4px;
+  padding: 8px;
 }
 
 .ehr-module-menu section + section {
-  margin-top: 4px;
-  padding-top: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
   border-top: 1px solid var(--ehr-border);
 }
 
 .ehr-module-menu section > p {
-  margin: 5px 7px 4px;
+  margin: 7px 10px 5px;
   color: var(--ehr-muted);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .ehr-module-menu section > button {
   width: 100%;
-  min-height: 30px;
+  min-height: 38px;
   justify-content: flex-start;
-  gap: 7px;
-  padding: 0 7px;
-  border-radius: 6px;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 8px;
   color: var(--nav-text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   text-align: left;
 }

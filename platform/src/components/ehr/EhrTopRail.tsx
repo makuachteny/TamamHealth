@@ -8,6 +8,7 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
+  Menu,
   MessageSquare,
   Plus,
   Search,
@@ -157,8 +158,6 @@ export default function EhrTopRail() {
   // three surfaces name the same module instead of each matching on its own.
   const activeModuleItem = useMemo(() => activeNavItem(navItems, pathname), [navItems, pathname]);
 
-  const ActiveModuleIcon = activeModuleItem?.icon || LayoutDashboard;
-
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (needle.length < 2) return [];
@@ -227,8 +226,10 @@ export default function EhrTopRail() {
           title="Open module menu"
           data-track="nav.module_menu"
         >
-          <ActiveModuleIcon className="w-5 h-5" />
-          <ChevronDown className="w-3 h-3 ehr-module-chevron" />
+          {/* A hamburger, not the current module's icon: the trigger is the
+              menu of ALL modules, and a changing glyph read as a mystery
+              button. The open panel attaches directly below this button. */}
+          <Menu className="w-5 h-5" />
         </button>
 
         {moduleOpen && (
