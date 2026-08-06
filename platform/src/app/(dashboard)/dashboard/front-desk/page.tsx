@@ -33,10 +33,11 @@ import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMet
 import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import {
   Calendar, ClipboardCheck, ArrowRightLeft,
-  UserPlus, ClipboardList,
+  UserPlus, ClipboardList, Plus,
   MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
   Send, Stethoscope, FileText, RotateCcw, type LucideIcon,
 } from '@/components/icons/lucide';
+import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
 /**
@@ -190,6 +191,8 @@ export default function FrontDeskDashboardPage() {
   const [cancelReason, setCancelReason] = useState('');
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  // "New appointments" — the same booking dialog the doctor module opens.
+  const [bookingOpen, setBookingOpen] = useState(false);
   const [encounters, setEncounters] = useState<EncounterDoc[]>([]);
 
   const [queueNowMs, setQueueNowMs] = useState(() => Date.now());
@@ -938,7 +941,12 @@ export default function FrontDeskDashboardPage() {
     return items.sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
   }, [panelView, patients, pendingAppointments, queueFilter, queueSearch]);
 
+  // First entry is promoted to the header's primary pill — "New appointments",
+  // matching the doctor module's CTA and opening the same booking dialog.
+  // Check in stays one slot over: it's still a core desk action, just not the
+  // headline one.
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
+    { label: 'New appointments', icon: Plus, onClick: () => setBookingOpen(true), tone: 'primary' as const },
     ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: LogIn, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patient-intake') ? [{ label: 'Send intake', icon: Send, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
@@ -1450,6 +1458,13 @@ export default function FrontDeskDashboardPage() {
             setRegisterOpen(true);
           }}
         />
+
+        {bookingOpen && (
+          <BookAppointmentModal
+            defaultDate={boardDate}
+            onClose={() => setBookingOpen(false)}
+          />
+        )}
 
         {editAppointment && (
           <AppointmentEditModal
