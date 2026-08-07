@@ -101,7 +101,6 @@ export default function ChartHeader({
   onCollectPayment, onMessage, onPrint, onPatientEd, onNote, onScripts, onOrders, onExchange, onEdit, onStickyNote, onAssignProvider,
   onShowAllergies,
 }: ChartHeaderProps) {
-  const [showMore, setShowMore] = useState(true);
   // Secondary actions live behind one ⋯ menu — the header previously stacked
   // up to 11 buttons in two rows, several of them duplicating the right-rail
   // workspace panels under different names.
@@ -156,19 +155,11 @@ export default function ChartHeader({
           {patientAgeLabel(patient)} &middot; {formatDobOmrs(patient.dateOfBirth)} &middot; Facility ID: {patientIdDisplay}
         </div>
 
-        {/* Contact line. The row itself always renders because it carries the
-            toggle that expands it — collapsed, only the toggle is left. */}
+        {/* Contact line — always on. It is two short fields, not enough to be
+            worth a collapse control. */}
         <div className="omrs-header-details">
-          {showMore && (
-            <>
-              <span>Phone: <strong>{patient.phone || '—'}</strong></span>
-              <span>Location: <strong>{patient.state || '—'}{patient.county ? `, ${patient.county}` : ''}</strong></span>
-            </>
-          )}
-          <button type="button" className="omrs-header-showmore no-print" onClick={() => setShowMore(v => !v)}>
-            {showMore ? 'Show less' : 'Show more'}
-            <span className="omrs-header-showmore-caret" aria-hidden>{showMore ? '⌃' : '⌄'}</span>
-          </button>
+          <span>Phone: <strong>{patient.phone || '—'}</strong></span>
+          <span>Location: <strong>{patient.state || '—'}{patient.county ? `, ${patient.county}` : ''}</strong></span>
         </div>
       </div>
 

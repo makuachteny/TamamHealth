@@ -524,7 +524,7 @@ export default function EhrClinicalDashboard({
   const [findPatientOpen, setFindPatientOpen] = useState(false);
   const [findPatientQuery, setFindPatientQuery] = useState('');
   const [dispensePatient, setDispensePatient] = useState<{ id: string; name: string } | null>(null);
-  // "New appointments" — the booking form as a dialog; it used to route to
+  // "Find availability" — the booking form as a dialog; it used to route to
   // /appointments?new=1 and leave the clinician on the schedule module.
   const [bookingOpen, setBookingOpen] = useState(false);
   // Inline search under the mini-calendar that filters the day's appointment list.
@@ -1142,8 +1142,8 @@ export default function EhrClinicalDashboard({
         <div className="ehr-clinical-dashboard-tabs">
           {canBookAppointments && (
             <div className="ehr-segmented ehr-segmented-single">
-              <button type="button" className="active" aria-label="New appointments" onClick={() => setBookingOpen(true)}>
-                <Plus className="w-4 h-4" /> New appointments
+              <button type="button" className="active" aria-label="Find availability" onClick={() => setBookingOpen(true)}>
+                <Plus className="w-4 h-4" /> Find availability
               </button>
             </div>
           )}

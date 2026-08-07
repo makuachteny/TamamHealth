@@ -438,7 +438,9 @@ export default function ClinicalNoteEditor({
     }
     showToast('Note saved.', 'success');
     if (onClose) onClose();
-    else router.push(note ? `/patients/${note.patientId}?tab=notes` : '/notes');
+    // Back always lands on a patient's own Notes tab; with no note to name a
+    // patient, the registry is the only honest destination.
+    else router.push(note ? `/patients/${note.patientId}?tab=notes` : '/patients');
   };
 
   // ── Render ──────────────────────────────────────────────────────────────

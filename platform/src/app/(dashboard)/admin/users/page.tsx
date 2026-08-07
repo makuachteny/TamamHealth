@@ -265,12 +265,10 @@ export default function AdminUsersPage() {
           {/* Same list anatomy as the clinical worklist and patient registry:
               card-list wrapper, compact column head, card rows. */}
           <div className="appointment-card-list">
-            {loading ? (
-              <div className="appointment-card-empty">{t('adminUsers.loadingUsers')}</div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="appointment-card-empty">{t('adminUsers.noUsersFound')}</div>
-            ) : (
-              <>
+                {/* The column head is the table's frame, not a label for the
+                    rows that happen to be loaded: it stays put while users
+                    load and when a filter matches nothing, so the list never
+                    collapses into a bare message. */}
                 <div className="appointment-card-head" aria-hidden="true" style={{ gridTemplateColumns: USER_GRID }}>
                   <span>{t('adminUsers.colName')}</span>
                   <span>{t('adminUsers.colRole')}</span>
@@ -282,7 +280,13 @@ export default function AdminUsersPage() {
                   <span style={{ justifySelf: 'end', paddingRight: 6 }}>{t('adminUsers.colStatus')}</span>
                   <span />
                 </div>
-                {filteredUsers.map(u => {
+                {loading && (
+                  <div className="appointment-card-empty">{t('adminUsers.loadingUsers')}</div>
+                )}
+                {!loading && filteredUsers.length === 0 && (
+                  <div className="appointment-card-empty">{t('adminUsers.noUsersFound')}</div>
+                )}
+                {!loading && filteredUsers.map(u => {
                   const isExpanded = expandedId === u._id;
                   return (
                     <Fragment key={u._id}>
@@ -378,8 +382,6 @@ export default function AdminUsersPage() {
                     </Fragment>
                   );
                 })}
-              </>
-            )}
           </div>
         </div>
 

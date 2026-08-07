@@ -170,7 +170,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/messages', label: 'Messages', icon: MessageSquare, badgeKey: 'messages' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: Stethoscope, section: 'CLINICAL' },
-      { href: '/notes', label: 'Clinical Notes', icon: FileText, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
       { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardPen, section: 'CLINICAL' },
@@ -199,7 +198,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/messages', label: 'Messages', icon: MessageSquare, badgeKey: 'messages' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: Stethoscope, section: 'CLINICAL' },
-      { href: '/notes', label: 'Clinical Notes', icon: FileText, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
       { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardPen, section: 'CLINICAL' },
@@ -225,7 +223,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.nurse.allowed],
     navItems: [
       { href: '/dashboard/nurse', label: 'Nurse Station', icon: LayoutDashboard, section: 'CLINICAL' },
-      { href: '/notes', label: 'Clinical Notes', icon: FileText, section: 'CLINICAL' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
@@ -249,7 +246,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.midwife.allowed],
     navItems: [
       { href: '/dashboard/nurse', label: 'Midwife Station', icon: LayoutDashboard, section: 'MATERNITY' },
-      { href: '/notes', label: 'Clinical Notes', icon: FileText, section: 'MATERNITY' },
       { href: '/patients', label: 'Mothers & Babies', icon: Users, section: 'MATERNITY' },
       { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'MATERNITY' },
       { href: '/births', label: 'Deliveries', icon: Baby, section: 'MATERNITY' },
@@ -443,7 +439,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: Stethoscope, section: 'CLINICAL' },
-      { href: '/notes', label: 'Clinical Notes', icon: FileText, section: 'CLINICAL' },
       { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardPen, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
@@ -612,7 +607,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.triage_nurse.allowed],
     navItems: [
       { href: '/dashboard/nurse', label: 'Nurse Station', icon: LayoutDashboard, section: 'CLINICAL' },
-      { href: '/notes', label: 'Clinical Notes', icon: FileText, section: 'CLINICAL' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
@@ -633,7 +627,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.rooming_nurse.allowed],
     navItems: [
       { href: '/dashboard/nurse', label: 'Nurse Station', icon: LayoutDashboard, section: 'CLINICAL' },
-      { href: '/notes', label: 'Clinical Notes', icon: FileText, section: 'CLINICAL' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINIC' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINIC' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINIC' },
@@ -656,7 +649,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'CLINICAL' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: Stethoscope, section: 'CLINICAL' },
-      { href: '/notes', label: 'Clinical Notes', icon: FileText, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },

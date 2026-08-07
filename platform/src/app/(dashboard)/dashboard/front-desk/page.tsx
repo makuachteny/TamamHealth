@@ -179,7 +179,7 @@ export default function FrontDeskDashboardPage() {
   const [cancelTarget, setCancelTarget] = useState<{ appt: AppointmentDoc; triage?: TriageDoc } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [registerOpen, setRegisterOpen] = useState(false);
-  // "New appointments" — the same booking dialog the doctor module opens.
+  // "Find availability" — the same booking dialog the doctor module opens.
   const [bookingOpen, setBookingOpen] = useState(false);
   const [encounters, setEncounters] = useState<EncounterDoc[]>([]);
 
@@ -1040,7 +1040,7 @@ export default function FrontDeskDashboardPage() {
     return items.sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
   }, [panelView, patients, pendingAppointments, queueFilter, queueSearch]);
 
-  // First entry is promoted to the header's primary pill — "New appointments",
+  // First entry is promoted to the header's primary pill — "Find availability",
   // matching the doctor module's CTA and opening the same booking dialog.
   //
   // There is no "Check in" action here any more: a patient is checked in from
@@ -1048,7 +1048,7 @@ export default function FrontDeskDashboardPage() {
   // dialog), so the booking is the one place a visit is started from rather
   // than a second, parallel front door.
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
-    { label: 'New Appointments', icon: Plus, onClick: () => setBookingOpen(true), tone: 'primary' as const },
+    { label: 'Find availability', icon: Plus, onClick: () => setBookingOpen(true), tone: 'primary' as const },
     ...(canUseRoute('/patient-intake') ? [{ label: 'Intake Form', icon: Send, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
   ]), [canUseRoute, router, t]);

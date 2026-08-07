@@ -86,14 +86,16 @@ export default function WeekSlotGrid({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${columns.length}, minmax(70px, 1fr))`,
+          gridTemplateColumns: `minmax(210px, 1.5fr) repeat(${columns.length}, minmax(76px, 1fr))`,
           alignItems: 'center',
-          gap: 8,
-          paddingBottom: 10,
-          borderBottom: '1px solid var(--border-light)',
+          gap: 10,
+          // The date strip is what the reader steers the whole grid by, so it
+          // gets the weight of a heading rather than of a caption — and hugs
+          // it, rather than sitting in a band of empty space twice its height.
+          padding: '0 0 12px',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: 4 }}>
           <NavButton
             direction="back"
             disabled={!canGoBack || loading}
@@ -105,10 +107,15 @@ export default function WeekSlotGrid({
           const { weekday, label } = dayParts(date);
           return (
             <div key={date} style={{ textAlign: 'center', position: 'relative' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+              <div style={{
+                fontSize: 12, fontWeight: 700, letterSpacing: '0.08em',
+                color: 'var(--text-muted)', marginBottom: 2,
+              }}>
                 {weekday}
               </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.15 }}>
+                {label}
+              </div>
               {index === columns.length - 1 && (
                 <div style={{ position: 'absolute', right: -6, top: '50%', transform: 'translateY(-50%)' }}>
                   <NavButton
@@ -183,28 +190,34 @@ function ProviderRow({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${columns.length}, minmax(70px, 1fr))`,
-        gap: 8,
+        gridTemplateColumns: `minmax(210px, 1.5fr) repeat(${columns.length}, minmax(76px, 1fr))`,
+        gap: 10,
+        // Top, not centre. The row's height is set by its busiest day, so
+        // centring floated the name level with whatever chip happened to be in
+        // the middle. Aligned to the top it reads against the clinician's FIRST
+        // opening, which is the one the eye goes to.
         alignItems: 'start',
-        padding: '14px 0',
-        borderBottom: '1px solid var(--border-light)',
+        // No rule between rows: the whitespace and the avatar already separate
+        // one clinician from the next, and three hairlines across a grid that
+        // is itself all boxes just added noise.
+        padding: '16px 0 20px',
       }}
     >
       {/* Clinician */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0 }}>
-        <StaffAvatar name={provider.providerName} photoUrl={provider.photoUrl} size={38} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, paddingTop: 2 }}>
+        <StaffAvatar name={provider.providerName} photoUrl={provider.photoUrl} size={72} />
         <div style={{ minWidth: 0 }}>
           {/* Wrapped, not truncated. "CO Deng Mabior K…" and "Dr. Achol Mayen
               De…" are the same nine characters for two different people —
               which is exactly the distinction this column exists to make. */}
           <div style={{
-            fontSize: 13, fontWeight: 700, color: 'var(--text-primary)',
+            fontSize: 14, fontWeight: 700, color: 'var(--text-primary)',
             lineHeight: 1.3, overflowWrap: 'anywhere',
           }}>
             {provider.providerName}
           </div>
           {provider.subtitle && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.35 }}>
               {provider.subtitle}
             </div>
           )}
@@ -231,14 +244,20 @@ function ProviderRow({
 
         if (daySlots.length === 0) {
           return (
-            <div key={date} style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 14, paddingTop: 8 }}>
+            <div key={date} style={{
+              textAlign: 'center', color: 'var(--text-muted)', fontSize: 15,
+              alignSelf: 'start', paddingTop: 9,
+            }}>
               —
             </div>
           );
         }
 
         return (
-          <div key={date} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 8,
+            alignItems: 'center', alignSelf: 'start',
+          }} key={date}>
             {shown.map(slot => {
               const isSelected = selected
                 && selected.providerId === slot.providerId
@@ -250,8 +269,9 @@ function ProviderRow({
                   type="button"
                   onClick={() => onPick(slot)}
                   style={{
-                    padding: '7px 2px',
-                    borderRadius: 999,
+                    padding: '8px 6px',
+                    width: '100%',
+                    maxWidth: 124,
                     border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-medium)'}`,
                     background: isSelected ? 'var(--accent-primary)' : 'var(--bg-card-solid)',
                     color: isSelected ? '#fff' : 'var(--accent-primary)',
@@ -270,9 +290,16 @@ function ProviderRow({
                 type="button"
                 onClick={() => setExpanded(isOpen ? null : date)}
                 style={{
-                  padding: '6px 2px', borderRadius: 999,
-                  border: '1px dashed var(--border-medium)', background: 'transparent',
-                  color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  // Same shape and weight as the slots it reveals. Dashed-and-
+                  // muted read as disabled — the one chip in the cell that
+                  // looked unavailable was the one that opens the rest.
+                  padding: '8px 6px',
+                  width: '100%',
+                  maxWidth: 124,
+                  border: '1px solid var(--border-medium)',
+                  background: 'var(--bg-card-solid)',
+                  color: 'var(--accent-primary)',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
                 }}
               >
                 {isOpen ? 'less' : `+${hidden} more`}
@@ -302,7 +329,7 @@ function NavButton({
       aria-label={label}
       title={label}
       style={{
-        width: 30, height: 30, borderRadius: 999,
+        width: 34, height: 34,
         border: '1px solid var(--border-medium)',
         background: 'var(--bg-card-solid)',
         color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',

@@ -348,7 +348,7 @@ export default function BookAppointmentModal({
   };
 
   return (
-    <PortalModal onClose={onClose} width={stepped && step === 1 ? 940 : 720}>
+    <PortalModal onClose={onClose} width={stepped && step === 1 ? 1080 : 720}>
       <div
         className="modal-panel modal-panel--lg"
         style={{
@@ -555,8 +555,15 @@ export default function BookAppointmentModal({
               ) : (
                 <div
                   style={{
-                    border: '1px solid var(--border-medium)',
-                    borderRadius: 12, padding: 14, background: 'var(--bg-card-solid)',
+                    // Full-bleed to the panel edges. The grid was sitting in a
+                    // bordered card inset inside a padded panel, so it carried
+                    // two frames and a white gutter between them — and the
+                    // widest thing in the dialog was the thing with the least
+                    // room. The panel pads itself 24px; this pulls back out
+                    // over that and repaints the band edge to edge.
+                    margin: '0 -24px',
+                    padding: '4px 24px 8px',
+                    background: 'var(--bg-card-solid)',
                   }}
                 >
                   <WeekSlotGrid

@@ -16,8 +16,9 @@
  * call site having to be found and rewritten (and one being missed).
  *
  * With a `patientId` it resumes today's draft for that patient or starts one;
- * without, it opens the notes queue, so "Consultation" in the nav still leads
- * somewhere useful.
+ * without, it opens the patient registry — the cross-patient notes queue is
+ * gone, because documentation belongs to the patient it documents and the
+ * chart's Notes tab is the same list already scoped to them.
  *
  * The wizard remains in git history if any of its order-entry steps need to be
  * recovered into the note's Plan section.
@@ -47,7 +48,10 @@ export default function ConsultationRedirectPage() {
     started.current = true;
 
     (async () => {
-      if (!patientId) { router.replace('/notes'); return; }
+      // No patient in the link: the notes queue used to catch this, but
+      // documentation is per-patient now, so the registry is where you pick
+      // one.
+      if (!patientId) { router.replace('/patients'); return; }
 
       try {
         const today = new Date().toISOString().slice(0, 10);
@@ -108,8 +112,8 @@ export default function ConsultationRedirectPage() {
     return (
       <div className="cn-empty">
         <p>{error}</p>
-        <button type="button" className="cn-btn" onClick={() => router.push('/notes')}>
-          Go to Clinical Notes
+        <button type="button" className="cn-btn" onClick={() => router.push('/patients')}>
+          Go to Patients
         </button>
       </div>
     );

@@ -377,10 +377,10 @@ export default function OrgUsersPage() {
           {/* Same list anatomy as the appointments page: card-list wrapper,
               compact column head, card rows. */}
           <div className="appointment-card-list">
-            {filteredUsers.length === 0 ? (
-              <EmptyState icon={Users} title={t('orgUsers.heading')} message={t('orgUsers.noUsersFound')} />
-            ) : (
-              <>
+                {/* The column head is the table's frame, not a label for the
+                    rows that happen to be loaded: it stays put when a filter
+                    matches nothing, so the list never collapses into a bare
+                    message. */}
                 <div className="appointment-card-head" aria-hidden="true" style={{ gridTemplateColumns: USER_GRID }}>
                   <span>{t('orgUsers.colName')}</span>
                   <span>{t('orgUsers.colRole')}</span>
@@ -391,6 +391,9 @@ export default function OrgUsersPage() {
                   <span style={{ justifySelf: 'end', paddingRight: 6 }}>{t('orgUsers.colStatus')}</span>
                   <span />
                 </div>
+                {filteredUsers.length === 0 && (
+                  <EmptyState icon={Users} title={t('orgUsers.heading')} message={t('orgUsers.noUsersFound')} />
+                )}
                 {filteredUsers.map(user => (
                     <div
                       key={user._id}
@@ -448,8 +451,6 @@ export default function OrgUsersPage() {
                       </div>
                     </div>
                 ))}
-              </>
-            )}
           </div>
         </div>
       </main>

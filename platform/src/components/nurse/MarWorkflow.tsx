@@ -377,26 +377,27 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
         </div>
       </div>
       <div className="flex-1" style={{ overflow: 'auto', minHeight: 0 }}>
-        {filteredEntries.length === 0 ? (
-          // No bare column-header row over an empty list — the guide only
-          // renders when there are rows to label.
-          <div className="ehr-empty-state">
-            <Pill className="w-8 h-8" />
-            <strong>{t('nurse.noMedications')}</strong>
-            <span>{search.trim() || statusFilter !== 'all'
-              ? 'Nothing matches the current search or filter.'
-              : 'Scheduled doses will appear here as prescriptions are charted.'}</span>
-          </div>
-        ) : (
         <div className="appointment-card-surface">
           {/* The appointments-page table, exactly: PATIENT / TIME / LOCATION /
               MEDICATION / STATUS with the dose as the status cue. */}
           <div className="appointment-card-flow">
+            {/* The column head is the table's frame, not a label for the rows
+                that happen to be loaded: it stays put when no doses are due,
+                so the list never collapses into a bare message. */}
             <div className="appointment-card-head" aria-hidden="true">
               {['Patient', 'Time', 'Location', 'Medication', 'Status'].map(head => (
                 <span key={head}>{head}</span>
               ))}
             </div>
+            {filteredEntries.length === 0 && (
+              <div className="ehr-empty-state">
+                <Pill className="w-8 h-8" />
+                <strong>{t('nurse.noMedications')}</strong>
+                <span>{search.trim() || statusFilter !== 'all'
+                  ? 'Nothing matches the current search or filter.'
+                  : 'Scheduled doses will appear here as prescriptions are charted.'}</span>
+              </div>
+            )}
             {filteredEntries.map(entry => {
               const sc = marStatusColor(entry.status);
               const tone = DUE_TONE[entry.status];
@@ -480,7 +481,6 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
             })}
           </div>
         </div>
-        )}
       </div>
 
     </div>

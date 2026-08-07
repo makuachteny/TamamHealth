@@ -26440,3 +26440,82 @@ table.patient-data-table.patient-data-table {
 .ehr-day-stats .ehr-week-activity-bars {
   margin-top: 12px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Popup headers — solid blue bar.
+
+   The shared `Modal` renders no header of its own: all 58 dialogs hand-roll
+   one, with inline styles and no common class. So rather than a class nobody
+   applies, this matches the header STRUCTURALLY — the panel's first block, the
+   one carrying the dialog's heading — and paints that.
+
+   Three guards keep it off the wrong element:
+     1. Anchored to `[role="dialog"]`, at most two levels in, so it can only
+        ever hit a panel's own first child.
+     2. `:has(h2, h3)` requires the dialog's heading somewhere inside it.
+        Depth varies — the booking dialog nests its h2 three levels down,
+        behind the back-button row — so this cannot be a child selector.
+     3. `:not(:has(...))` excludes anything containing a form control, table or
+        list — a title row never does, a body wrapper almost always does. That
+        is what stops a modal whose first child wraps everything from turning
+        blue end to end.
+
+   `!important` on the colours is not decoration: every one of those headers
+   sets `color: var(--text-primary)` inline on its own `<h2>`, and inline wins
+   over any selector. Dark ink on a blue bar is unreadable, so it has to be
+   overridden here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)),
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) {
+  /* Full-bleed to the panel edges. The panels pad themselves (14–20px), so the
+     bar is pulled back out to meet the border and the radius is matched to the
+     dialog's own 6px so the two corners sit flush. */
+  margin: -20px -20px 18px !important;
+  padding: 14px 18px !important;
+  border-radius: 6px 6px 0 0 !important;
+  background: var(--accent-primary, #2191D0) !important;
+  color: #fff !important;
+}
+
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) :is(h2, h3, p, span, small, b),
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) :is(h2, h3, p, span, small, b) {
+  color: #fff !important;
+}
+
+/* The subtitle line ("Step 1 of 4 · Visit") is muted grey inline — on blue it
+   needs to stay secondary without disappearing. */
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) p,
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) p {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+/* Close and back buttons: the tinted grey disc they carry inline is invisible
+   on blue, so they become a translucent white one. */
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button,
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button:hover,
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button:hover {
+  background: rgba(255, 255, 255, 0.28) !important;
+}
+
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) svg,
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) svg {
+  color: #fff !important;
+  stroke: currentColor !important;
+}
+
+/* Panels pad themselves by different amounts, and a negative margin larger
+   than the padding pushes the bar past the padding box — which, on
+   `.modal-panel` (overflow: auto), buys a scrollbar rather than a wider bar.
+   So the generic rule above stays conservative and the two panel classes that
+   carry a known padding get an exact match here. */
+.modal-portal-backdrop [role="dialog"] > .modal-panel > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) {
+  margin: -24px -24px 20px !important;
+  padding: 16px 22px !important;
+}
