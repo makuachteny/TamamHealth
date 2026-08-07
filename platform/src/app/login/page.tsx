@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, ChevronRight, X, WifiOff, Users, BarChart3 } from '@/components/icons/lucide';
+import { Eye, EyeOff, ChevronRight, X, WifiOff } from '@/components/icons/lucide';
 import { Icon } from '@/components/icons';
 import { useAuth } from '@/lib/context';
 import { resolveLandingPage } from '@/lib/user-prefs';
@@ -310,13 +310,8 @@ export default function LoginPage() {
             <div className="tl-meeting">
               <div className="tl-meeting-top">
                 <span className="tl-meeting-title">HMIS-ready reporting</span>
-                <span className="tl-meeting-dot" />
               </div>
               <div className="tl-meeting-time">Built for national programmes</div>
-              <ul className="tl-meeting-points">
-                <li><Users size={13} /> One chart across every clinic</li>
-                <li><BarChart3 size={13} /> Indicators ready to submit</li>
-              </ul>
             </div>
           </section>
         </div>
@@ -483,11 +478,7 @@ const sharedStyles = (
     .tl-meeting { position: absolute; z-index: 2; left: 30px; bottom: 36px; width: 244px; padding: 15px 17px; border-radius: 18px; background: var(--bg-card-solid); }
     .tl-meeting-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .tl-meeting-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
-    .tl-meeting-dot { width: 8px; height: 8px; border-radius: 50%; background: ${ACCENT}; flex: none; }
     .tl-meeting-time { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-    .tl-meeting-points { margin: 11px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
-    .tl-meeting-points li { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
-    .tl-meeting-points svg { flex: none; color: ${ACCENT}; }
 
     .tl-spin { width: 13px; height: 13px; border: 2px solid var(--accent-border); border-top-color: ${ACCENT}; border-radius: 50%; display: inline-block; animation: tl-rot .7s linear infinite; }
     .tl-spin-light { border-color: color-mix(in srgb, var(--color-white) 40%, transparent); border-top-color: var(--color-white); }

@@ -67,7 +67,6 @@ export default function RegistrationProgressRail({
       // variable so the growth animates instead of jumping.
       style={{ '--omrs-reg-fill': `${requiredTotal ? (requiredDone / requiredTotal) * 100 : 0}%` } as CSSProperties}
     >
-      <span className="omrs-reg-spine" aria-hidden />
       {steps.map((label, i) => {
         const { done, total } = sectionProgress[i];
         const hasErrors = errorSections.has(i);
@@ -97,13 +96,10 @@ export default function RegistrationProgressRail({
             // untranslated, and a screen reader still hears the progress.
             aria-label={total > 0 ? `${label} ${done}/${total}` : label}
           >
-            <span
-              className="omrs-reg-node"
-              aria-hidden
-              // Drives the conic sweep on a partly-filled node, so the marker
-              // itself shows how far into the section you are.
-              style={{ '--omrs-reg-node-pct': `${total ? (done / total) * 100 : 0}%` } as CSSProperties}
-            />
+            {/* OpenMRS marks a jump link with a corner arrow, not a progress
+                marker. `data-state` still carries the section's completeness
+                for the label's own weight and the error colour. */}
+            <span className="omrs-reg-navarrow" aria-hidden>↳</span>
             <span className="omrs-reg-navlabel">{label}</span>
             {meta && <span className="omrs-reg-navmeta" aria-hidden>{meta}</span>}
           </button>

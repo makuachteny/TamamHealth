@@ -537,8 +537,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-demographics">
                 <header className="omrs-reg-sectionhead">
-                  <h2>{steps[0]}</h2>
+                  <h2>1. {steps[0]}</h2>
+                  <p>{t('patientNew.requiredFieldsNote')}</p>
                 </header>
+                <div className="omrs-reg-fields">
                 <div className="registration-field-grid registration-field-grid--three">
                   <div>
                     <label htmlFor="pt-firstName">{t('patientNew.firstName')}</label>
@@ -596,6 +598,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     {errors.primaryLanguage && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.primaryLanguage}</p>}
                   </div>
                 </div>
+                </div>
               </section>
             )}
 
@@ -603,8 +606,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-contact">
                 <header className="omrs-reg-sectionhead">
-                  <h2>{steps[1]}</h2>
+                  <h2>2. {steps[1]}</h2>
+                  <p>{t('patientNew.requiredFieldsNote')}</p>
                 </header>
+                <div className="omrs-reg-fields">
                 <div className="registration-field-grid registration-field-grid--three">
                   <div>
                     <label htmlFor="pt-phone">{t('patientNew.phone')}</label>
@@ -695,6 +700,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     <textarea id="pt-address" value={form.address} onChange={e => update('address', e.target.value)} rows={2} placeholder={t('patientNew.residentialAddressPlaceholder')} />
                   </div>
                 </div>
+                </div>
               </section>
             )}
 
@@ -702,8 +708,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-nextofkin">
                 <header className="omrs-reg-sectionhead">
-                  <h2>{steps[2]}</h2>
+                  <h2>3. {steps[2]}</h2>
+                  <p>{t('patientNew.requiredFieldsNote')}</p>
                 </header>
+                <div className="omrs-reg-fields">
                 <p className="registration-section-note">
                   {t('patientNew.nokSectionNote')}
                 </p>
@@ -715,12 +723,14 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                   </div>
                   <div className="registration-field-grid registration-field-grid--two">
                     <div>
-                      <label>{t('patientNew.fullName')} *</label>
+                      {/* No ` *` appended here — these three strings already
+                          end in one, and the pair rendered as "Full Name * *". */}
+                      <label>{t('patientNew.fullName')}</label>
                       <input type="text" value={form.nokName} onChange={e => update('nokName', e.target.value)} placeholder={t('patientNew.nokNamePlaceholder')} aria-invalid={!!errors.nokName} style={errors.nokName ? { borderColor: 'var(--color-danger)' } : {}} />
                       {errors.nokName && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.nokName}</p>}
                     </div>
                     <div>
-                      <label>{t('patientNew.relationship')} *</label>
+                      <label>{t('patientNew.relationship')}</label>
                       <Select value={form.nokRelationship} onChange={e => update('nokRelationship', e.target.value)} aria-invalid={!!errors.nokRelationship} style={errors.nokRelationship ? { borderColor: 'var(--color-danger)' } : {}}>
                         <option value="">{t('patientNew.selectRelationship')}</option>
                         {relationshipOptions.map(r => (
@@ -729,7 +739,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                       </Select>
                     </div>
                     <div>
-                      <label>{t('patientNew.nokPhone')} *</label>
+                      <label>{t('patientNew.nokPhone')}</label>
                       <input type="tel" value={form.nokPhone} onChange={e => update('nokPhone', e.target.value)} placeholder={t('patientNew.phonePlaceholder')} aria-invalid={!!errors.nokPhone} style={errors.nokPhone ? { borderColor: 'var(--color-danger)' } : {}} />
                       {errors.nokPhone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.nokPhone}</p>}
                     </div>
@@ -779,6 +789,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     + {t('patientNew.addAnotherContact')}
                   </button>
                 )}
+                </div>
               </section>
             )}
 
@@ -786,8 +797,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-biometrics">
                 <header className="omrs-reg-sectionhead">
-                  <h2>{steps[3]}</h2>
+                  <h2>4. {steps[3]}</h2>
+                  <p>{t('patientNew.requiredFieldsNote')}</p>
                 </header>
+                <div className="omrs-reg-fields">
                 <p className="registration-section-note">
                   {t('patientNew.biometricsNote')}
                 </p>
@@ -825,6 +838,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                 </div>
 
                 <FingerprintCapture value={fingerprints} onChange={setFingerprints} />
+                </div>
               </section>
             )}
 
@@ -832,8 +846,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-coverage">
                 <header className="omrs-reg-sectionhead">
-                  <h2>{steps[4]}</h2>
+                  <h2>5. {steps[4]}</h2>
+                  <p>{t('patientNew.requiredFieldsNote')}</p>
                 </header>
+                <div className="omrs-reg-fields">
                 <p className="registration-section-note">
                     {t('patientNew.coverageNote')}
                 </p>
@@ -897,6 +913,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                   <p>
                     {t('patientNew.medicalHistoryDeferredNote')}
                   </p>
+                </div>
                 </div>
               </section>
             )}

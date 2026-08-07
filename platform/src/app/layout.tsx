@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { DM_Sans, JetBrains_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/lib/context";
 
@@ -14,6 +14,15 @@ const dmSans = DM_Sans({
 const jetBrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+// Carbon's typeface, used only by the OpenMRS-styled surfaces (`--font-omrs`
+// in globals.css). Scoped rather than global: the rest of the platform is DM
+// Sans, and OpenMRS in anything but Plex reads as an imitation of it.
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "600"],
+  variable: "--font-ibm-plex-sans",
   display: "swap",
 });
 import { ToastProvider } from "@/components/Toast";
@@ -49,7 +58,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${jetBrainsMono.variable}`} data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html lang="en" className={`${dmSans.variable} ${jetBrainsMono.variable} ${ibmPlexSans.variable}`} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/svg+xml" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
         <link rel="apple-touch-icon" sizes="192x192" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
