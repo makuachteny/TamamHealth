@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { enrollFingerprint } from '@/lib/services/fingerprint-service';
-import { isValidPhone, isValidNationalId, normalizePhone, normalizeNationalId } from '@/lib/field-formats';
+import { isValidPhone, isValidEmail, isValidNationalId, normalizePhone, normalizeEmail, normalizeNationalId } from '@/lib/field-formats';
 import { isPathAllowed } from '@/lib/role-routes';
 import Select from '@/components/Select';
 import RegistrationProgressRail from './RegistrationProgressRail';
@@ -63,7 +63,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
   const [form, setForm] = useState({
     firstName: '', middleName: '', surname: '', maidenName: '',
     dateOfBirth: '', estimatedAge: '', gender: '', tribe: '', primaryLanguage: '',
-    phone: '', altPhone: '', whatsapp: '',
+    phone: '', altPhone: '', whatsapp: '', email: '',
     state: '', county: '', payam: '', boma: '', bomaCode: '', householdNumber: '', address: '',
     nationalId: '',
     nokName: '', nokRelationship: '', nokPhone: '', nokAddress: '',
@@ -223,6 +223,9 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
       if (!isValidPhone(form.phone)) errs.phone = t('validation.errPhone');
       if (!isValidPhone(form.altPhone)) errs.altPhone = t('validation.errPhone');
       if (!isValidPhone(form.whatsapp)) errs.whatsapp = t('validation.errPhone');
+      // Optional like the phones — isValidEmail returns true for empty, so
+      // this only flags something the clerk actually typed wrong.
+      if (!isValidEmail(form.email)) errs.email = t('validation.errEmail');
       if (!isValidNationalId(form.nationalId)) errs.nationalId = t('validation.errNationalId');
     } else if (s === 2) {
       if (!form.nokName.trim()) errs.nokName = t('patientNew.errNokNameRequired');
@@ -321,6 +324,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
       const normWhatsapp = normalizePhone(form.whatsapp) ?? form.whatsapp;
       const normNokPhone = normalizePhone(form.nokPhone) ?? form.nokPhone;
       const normNationalId = normalizeNationalId(form.nationalId);
+      const normEmail = normalizeEmail(form.email);
       const exemptionReason = form.payorCoverageType === 'exemption'
         ? (form.payorExemptionReason === 'Other' ? form.payorExemptionOther.trim() : form.payorExemptionReason)
         : '';
@@ -342,6 +346,9 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
         phone: normPhone,
         altPhone: normAltPhone,
         whatsapp: normWhatsapp,
+        // Omitted rather than stored empty, so `patient.email` being set is a
+        // reliable test for "can we email this patient".
+        email: normEmail || undefined,
         state: form.state,
         county: form.county,
         payam: form.payam,
@@ -596,8 +603,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-contact">
                 <header className="omrs-reg-sectionhead">
-                  <h2>2. {steps[1]}</h2>
-                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                  <h2>{steps[1]}</h2>
                 </header>
                 <div className="registration-field-grid registration-field-grid--three">
                   <div>
@@ -614,6 +620,15 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     <label htmlFor="pt-whatsapp">{t('patientNew.whatsapp')}</label>
                     <input id="pt-whatsapp" type="tel" value={form.whatsapp} onChange={e => update('whatsapp', e.target.value)} placeholder={t('patientNew.whatsappPlaceholder')} aria-invalid={!!errors.whatsapp} style={errors.whatsapp ? { borderColor: 'var(--color-danger)' } : {}} />
                     {errors.whatsapp && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.whatsapp}</p>}
+                  </div>
+                  {/* The patient's OWN address, used for things sent to them —
+                      the intake-form request first. Optional: most patients
+                      here are reachable by phone only, so the send dialog has
+                      to handle its absence rather than assume it. */}
+                  <div>
+                    <label htmlFor="pt-email">{t('hospitals.fieldEmail')}</label>
+                    <input id="pt-email" type="email" inputMode="email" autoComplete="email" value={form.email} onChange={e => update('email', e.target.value)} aria-invalid={!!errors.email} style={errors.email ? { borderColor: 'var(--color-danger)' } : {}} />
+                    {errors.email && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.email}</p>}
                   </div>
                 </div>
 
@@ -687,8 +702,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-nextofkin">
                 <header className="omrs-reg-sectionhead">
-                  <h2>3. {steps[2]}</h2>
-                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                  <h2>{steps[2]}</h2>
                 </header>
                 <p className="registration-section-note">
                   {t('patientNew.nokSectionNote')}
@@ -772,8 +786,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-biometrics">
                 <header className="omrs-reg-sectionhead">
-                  <h2>4. {steps[3]}</h2>
-                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                  <h2>{steps[3]}</h2>
                 </header>
                 <p className="registration-section-note">
                   {t('patientNew.biometricsNote')}
@@ -819,8 +832,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-coverage">
                 <header className="omrs-reg-sectionhead">
-                  <h2>5. {steps[4]}</h2>
-                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                  <h2>{steps[4]}</h2>
                 </header>
                 <p className="registration-section-note">
                     {t('patientNew.coverageNote')}

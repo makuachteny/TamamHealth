@@ -86,7 +86,7 @@ const PROVIDER_ROLES: UserRole[] = [
  * in the chart column it belongs to.
  */
 const INTAKE_PACKETS: Record<string, string[]> = {
-  'Basic Information': ['Date of birth', 'Phone', 'Address'],
+  'Basic Information': ['Date of birth', 'Phone', 'Email', 'Address'],
   'Demographics': ['Primary Language', 'County', 'State', 'Tribe'],
   'Emergency Contact': ['Emergency contact'],
   'Financial Information': ['Payment method', 'Insurance provider'],
@@ -124,6 +124,7 @@ const MERGEABLE_FIELDS: Record<string, keyof PatientDoc> = {
   'Phone': 'phone',
   'Primary Phone': 'phone',
   'Phone Number': 'phone',
+  'Email': 'email',
   'Address': 'address',
   'Language': 'primaryLanguage',
   'Primary Language': 'primaryLanguage',
@@ -674,12 +675,20 @@ export default function PatientIntakePage() {
               <div className="flex flex-col gap-2">
                 <label
                   className="inline-flex items-center gap-2 text-[13px]"
-                  style={{ color: 'var(--text-muted)', cursor: 'not-allowed' }}
-                  title="No email on file for this patient"
+                  style={{
+                    color: sendPatient?.email ? 'var(--text-primary)' : 'var(--text-muted)',
+                    cursor: sendPatient?.email ? 'pointer' : 'not-allowed',
+                  }}
+                  title={sendPatient?.email ? undefined : 'No email on file for this patient'}
                 >
-                  <input type="checkbox" checked={sendEmail} disabled onChange={e => setSendEmail(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={sendEmail}
+                    disabled={!sendPatient?.email}
+                    onChange={e => setSendEmail(e.target.checked)}
+                  />
                   <Mail className="w-3.5 h-3.5" />
-                  Email to {'no email on file'}
+                  Email to {sendPatient?.email || 'no email on file'}
                 </label>
                 <label
                   className="inline-flex items-center gap-2 text-[13px]"

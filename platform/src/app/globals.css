@@ -25266,9 +25266,14 @@ table.patient-data-table.patient-data-table {
    a question out of order or see what was still to come. */
 .omrs-reg {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 32px;
   align-items: start;
+  /* Capped so the three-column field rows keep a sane measure. Uncapped, a
+     wide monitor stretched each input to ~470px — a 30-character name typed
+     into a field wide enough for a paragraph, which reads as a web form
+     rather than a clinical one. */
+  max-width: 1240px;
 }
 
 @media (max-width: 900px) {
@@ -25288,18 +25293,27 @@ table.patient-data-table.patient-data-table {
 .omrs-reg-title {
   font-size: 19px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
-  margin: 0 0 14px;
+  margin: 0 0 6px;
   line-height: 1.25;
 }
 
-.omrs-reg-jump {
+/* The required-fields hint, said once for the whole form. */
+.omrs-reg-railnote {
   font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  margin: 0 0 22px;
+}
+
+.omrs-reg-jump {
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--text-muted);
-  margin: 0 0 6px;
+  margin: 0 0 10px;
 }
 
 /* The marker line is the rail: each item hangs off one continuous rule, so
@@ -25309,15 +25323,20 @@ table.patient-data-table.patient-data-table {
   display: flex;
   flex-direction: column;
   position: relative;
+  /* Every item is exactly this tall, so a node's centre is always half of it
+     from the item's top edge. The track and the fill are positioned off that
+     number rather than off an estimate of line-height + padding, which is
+     what let the rule overshoot the first and last markers before. */
+  --omrs-reg-step: 44px;
 }
 
-/* Unfilled track, full height of the list. */
+/* Unfilled track, running centre-to-centre between the outer markers. */
 .omrs-reg-nav::before {
   content: '';
   position: absolute;
   left: 5px;
-  top: 10px;
-  bottom: 10px;
+  top: calc(var(--omrs-reg-step) / 2);
+  bottom: calc(var(--omrs-reg-step) / 2);
   width: 2px;
   background: var(--border-light, #E2E8F0);
   border-radius: 2px;
@@ -25328,9 +25347,9 @@ table.patient-data-table.patient-data-table {
 .omrs-reg-spine {
   position: absolute;
   left: 5px;
-  top: 10px;
+  top: calc(var(--omrs-reg-step) / 2);
   width: 2px;
-  height: calc((100% - 20px) * var(--omrs-reg-fill, 0%) / 100%);
+  height: calc((100% - var(--omrs-reg-step)) * var(--omrs-reg-fill, 0%) / 100%);
   background: var(--accent-primary);
   border-radius: 2px;
   transition: height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
@@ -25342,9 +25361,10 @@ table.patient-data-table.patient-data-table {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 8px 0 8px 22px;
+  height: var(--omrs-reg-step);
+  padding: 0 0 0 26px;
   border: none;
   background: none;
   font-family: inherit;
@@ -25423,38 +25443,21 @@ table.patient-data-table.patient-data-table {
 }
 .omrs-reg-navitem.is-current[data-state="optional"] .omrs-reg-node { transform: scale(0.85); }
 
-/* Trailing count / tick / "Optional". */
+/* Trailing mark — "Optional", or the error flag. Counts used to live here
+   too; the node carries those now. */
 .omrs-reg-navmeta {
   flex: none;
   font-size: 11px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   letter-spacing: 0.02em;
 }
-.omrs-reg-navitem[data-state="complete"] .omrs-reg-navmeta { color: var(--accent-primary); }
 .omrs-reg-navitem[data-state="error"] .omrs-reg-navmeta { color: var(--color-danger, #dc2626); }
 .omrs-reg-navitem[data-state="optional"] .omrs-reg-navmeta {
   font-weight: 500;
   text-transform: lowercase;
   opacity: 0.75;
 }
-
-/* Overall tally beside the "Jump to" heading. */
-.omrs-reg-jumphead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-.omrs-reg-tally {
-  font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  margin: 0 0 6px;
-}
-.omrs-reg-tally.is-complete { color: var(--accent-primary); }
 
 @media (prefers-reduced-motion: reduce) {
   .omrs-reg-spine, .omrs-reg-node { transition: none; }
@@ -25464,7 +25467,7 @@ table.patient-data-table.patient-data-table {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 22px;
+  margin-top: 26px;
 }
 .omrs-reg-railactions .btn { width: 100%; justify-content: center; }
 
@@ -25489,19 +25492,26 @@ table.patient-data-table.patient-data-table {
   background: var(--bg-card, #fff);
   border: 1px solid var(--border-light, #E2E8F0);
   border-radius: 12px;
-  padding: 20px 22px 24px;
+  padding: 22px 24px 26px;
   box-shadow: var(--card-shadow, 0 1px 2px rgba(16, 42, 67, 0.06));
 }
 
+/* Just the section's name. It used to carry a number ("1. Demographics") and
+   a repeat of the required-fields note; the rail already says which section
+   this is and where it sits in the sequence. */
+/* No bottom margin: the section is a flex column, so its own gap already
+   separates the rule from the first row of fields — a margin here stacked on
+   top of that and left the heading floating clear of its own content. */
 .omrs-reg-sectionhead {
-  margin: 0 0 18px;
-  padding-bottom: 12px;
+  margin: 0;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--border-light, #E2E8F0);
 }
 .omrs-reg-sectionhead h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 15.5px;
   font-weight: 700;
+  letter-spacing: -0.005em;
   color: var(--text-primary);
 }
 .omrs-reg-sectionhead p {
@@ -25513,7 +25523,7 @@ table.patient-data-table.patient-data-table {
 /* Every section is on the page at once now; they need air between them. The
    selector is loose on purpose — the sections are not always direct children
    of the body wrapper. */
-.omrs-reg-form .omrs-reg-section + .omrs-reg-section { margin-top: 18px; }
+.omrs-reg-form .omrs-reg-section + .omrs-reg-section { margin-top: 20px; }
 
 /* The shell is now just a column: the cards carry the surface. */
 .omrs-reg-form.patient-registration-shell {
@@ -25543,12 +25553,26 @@ table.patient-data-table.patient-data-table {
   margin-bottom: 6px;
 }
 
-/* Inputs sit on white cards now, so they need their own edge to stay legible. */
+/* Inputs sit on white cards now, so they need their own edge to stay legible.
+   The platform default is 10px/16px, which on a form of this length adds up
+   to a lot of empty box; a tighter, squarer control reads as data entry. */
 .omrs-reg input,
 .omrs-reg select,
 .omrs-reg textarea {
   background: var(--bg-card-solid, #fff);
+  padding: 9px 12px;
+  font-size: 0.86rem;
 }
+.omrs-reg select { padding-right: 34px; background-position: right 11px center; }
+
+/* Fields inside a section: one row's worth of air, not two. */
+.omrs-reg .registration-section { gap: 20px; }
+.omrs-reg .registration-field-grid { gap: 16px 20px; }
+.omrs-reg .registration-subsection { gap: 14px; padding: 16px 18px; }
+.omrs-reg .registration-subsection h4,
+.omrs-reg .registration-panel-heading h4 { font-size: 13px; font-weight: 700; }
+.omrs-reg .registration-subsection > p,
+.omrs-reg .registration-section-note { font-size: 12.5px; }
 
 /* A section the last submit couldn't accept. The rail is where the Register
    button lives, so the rail is where the answer to "why didn't it save?"

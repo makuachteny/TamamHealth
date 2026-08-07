@@ -57,6 +57,7 @@ export function buildReviewGroups(
         [t('patientNew.phone'), form.phone],
         [t('patientNew.altPhone'), form.altPhone],
         [t('patientNew.whatsapp'), form.whatsapp],
+        [t('hospitals.fieldEmail'), form.email],
         [t('patientNew.state'), form.state],
         [t('patientNew.county'), form.county],
         [t('patientNew.payam'), form.payam],
