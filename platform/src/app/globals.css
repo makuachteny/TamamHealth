@@ -25631,13 +25631,13 @@ table.patient-data-table.patient-data-table {
   outline-offset: -2px;
   border-bottom-color: transparent;
   box-shadow: none !important;
-  background: var(--cds-field-01);
+  background-color: var(--cds-field-01);
 }
 
 .omrs-reg input:disabled,
 .omrs-reg select:disabled,
 .omrs-reg textarea:disabled {
-  background: var(--cds-field-01);
+  background-color: var(--cds-field-01);
   border-bottom-color: #c6c6c6;
   color: #c6c6c6;
   cursor: not-allowed;
@@ -25657,7 +25657,7 @@ table.patient-data-table.patient-data-table {
 
 /* A read-only computed value (the geocode ID) — Carbon greys the surface. */
 .omrs-reg input[readonly] {
-  background: var(--cds-ui-01) !important;
+  background-color: var(--cds-ui-01) !important;
   color: var(--cds-text-02);
   border-bottom-color: var(--cds-ui-04);
 }
@@ -25747,11 +25747,11 @@ table.patient-data-table.patient-data-table {
   min-height: 88px;
   padding: 16px;
   border-radius: 0;
-  background: var(--cds-field-01) !important;
+  background-color: var(--cds-field-01) !important;
   border: 1px solid var(--cds-ui-03) !important;
-  transition: border-color 0.11s, background 0.11s;
+  transition: border-color 0.11s, background-color 0.11s;
 }
-.omrs-reg .registration-option-button:hover { transform: none; background: #e8e8e8 !important; }
+.omrs-reg .registration-option-button:hover { transform: none; background-color: #e8e8e8 !important; }
 .omrs-reg .registration-option-button[data-selected="true"] {
   border: 2px solid var(--cds-interactive) !important;
 }
@@ -25780,7 +25780,7 @@ table.patient-data-table.patient-data-table {
 .omrs-reg .registration-media-row > div:first-child {
   border-radius: 0 !important;
   border: 1px solid var(--cds-ui-03) !important;
-  background: var(--cds-field-01) !important;
+  background-color: var(--cds-field-01) !important;
 }
 
 @media (max-width: 1024px) {
