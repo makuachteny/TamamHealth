@@ -5239,6 +5239,7 @@ const ar: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'رقم الهاتف',
   'patientNew.phoneOptionalLabel': 'الهاتف',
   'patientNew.phoneOptionalNote': 'حقول الهاتف اختيارية إلا إذا استُخدمت',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'المريض',
   'patientNew.photoFingerprintHeading': 'الصورة وبصمة الإصبع',
   'patientNew.photoHelp': 'التقط صورة بالكاميرا أو ارفع صورة. استخدم صورة واضحة للوجه من الأمام. JPG أو PNG أو WebP، بحد أقصى 5 ميجابايت.',

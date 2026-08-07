@@ -11,6 +11,7 @@ import {
   assetsDB, leaveRequestsDB, payrollEntriesDB,
   problemsDB, telehealthDB, patientNotesDB, orderSetsDB,
   phoneNotesDB, assessmentsDB, intakeFormsDB, bloodBankDB, patientDocumentsDB,
+  bookingPoliciesDB, visitReasonsDB, providerProfilesDB,
   isSeeded, markSeeded, resetAllDatabases, getDB,
   isSeedInProgress, markSeedStarted
 } from './db';
@@ -1035,13 +1036,43 @@ const seedAdmissions: Omit<AdmissionDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'admission-mercy-5', type: 'admission', patientId: 'pat-mercy-007', patientName: 'Margaret Nyanut Riek', hospitalNumber: 'MGH-000007', admissionDate: daysAgo(3), admittingDiagnosis: 'Severe anaemia (sickle cell crisis)', icd11Code: '3A51', severity: 'critical', admittedBy: 'user-dr.mercy', admittedByName: 'Dr. Grace Lado', wardId: 'ward-mercy-1', wardName: 'General Ward', bedId: 'bed-mercy-3', bedNumber: 'MG1-B03', facilityId: 'hosp-mercy-001', facilityName: 'Mercy General Hospital', facilityLevel: 'state', attendingPhysician: 'user-dr.mercy', attendingPhysicianName: 'Dr. Grace Lado', nurseAssigned: 'user-nurse.mercy', nurseAssignedName: 'Nurse Josephine Poni Wani', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(0) },
 ];
 
-// Provider availability windows for TODAY (full-day) so the facility
-// dashboard's Doctors panel shows "Available" status. Two of the doctors are
-// left without a window so the panel shows a realistic Available/Unavailable mix.
+/**
+ * Provider availability — recurring weekday clinics, not one open-ended day.
+ *
+ * These used to be a single 00:00–23:59 window dated today, which made the
+ * facility dashboard's Doctors panel say "Available" and nothing else. Now that
+ * the slot engine turns windows into bookable times, an all-day window would
+ * advertise a 24-hour clinic offering slots at 3am, so each provider gets the
+ * hours they actually work, repeating on the days they actually work them.
+ *
+ * Two clinicians deliberately share the same morning hours: a clinic where two
+ * doctors both see patients at 09:00 is the normal case, and the schedule and
+ * the day view are both built to show it.
+ *
+ * Two of the facility's doctors are still left without any window, so the
+ * Doctors panel keeps a realistic Available/Unavailable mix.
+ */
 const seedAvailability: Record<string, unknown>[] = [
-  { providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga' },
-  { providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng' },
-  { providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol' },
+  {
+    providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga',
+    // Mon/Wed/Fri mornings, general outpatient clinic.
+    daysOfWeek: [1, 3, 5], startTime: '08:00', endTime: '13:00', modality: 'in_person',
+  },
+  {
+    providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng',
+    // Mon–Fri mornings, running alongside Dr. Wani — the parallel clinic.
+    daysOfWeek: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '12:00', modality: 'in_person',
+  },
+  {
+    providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng',
+    // Tue/Thu afternoons, remote follow-ups.
+    daysOfWeek: [2, 4], startTime: '14:00', endTime: '16:30', modality: 'telehealth',
+  },
+  {
+    providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol',
+    // Mon–Sat, the long day the clinical officer actually covers.
+    daysOfWeek: [1, 2, 3, 4, 5, 6], startTime: '09:00', endTime: '16:00', modality: 'both',
+  },
 ].map((p, i) => ({
   _id: `availability-demo-${i + 1}`,
   type: 'availability',
@@ -1049,15 +1080,175 @@ const seedAvailability: Record<string, unknown>[] = [
   providerName: p.providerName,
   facilityId: 'hosp-001',
   facilityName: 'Juba Teaching Hospital',
-  date: dateAgo(0),
-  startTime: '00:00',
-  endTime: '23:59',
+  // Series starts a fortnight back so the pattern is already established, and
+  // runs a year out so a fresh demo is never staring at an empty calendar.
+  date: dateAgo(14),
+  startTime: p.startTime,
+  endTime: p.endTime,
   slotMinutes: 30,
-  modality: 'in_person',
+  modality: p.modality,
   status: 'open',
+  recurrence: { daysOfWeek: p.daysOfWeek, until: dateFromNow(365) },
+  bookableOnline: true,
+  capacity: 1,
   orgId: PUBLIC_ORG_ID,
-  createdAt: daysAgo(0),
-  updatedAt: daysAgo(0),
+  createdAt: daysAgo(14),
+  updatedAt: daysAgo(14),
+}));
+
+// ═══ Online booking configuration ═════════════════════════════════
+//
+// One practice (Juba Teaching Hospital) is set up as bookable so the booking
+// surfaces have something real to render. Everything else stays unconfigured,
+// which is the correct default: a facility does not become publicly bookable
+// because someone deployed a new version.
+
+const seedBookingPolicies: Record<string, unknown>[] = [
+  {
+    _id: 'booking-policy-hosp-001',
+    type: 'booking_policy',
+    orgId: PUBLIC_ORG_ID,
+    facilityId: 'hosp-001',
+    onlineBookingEnabled: true,
+    // Requests are reviewed at the desk before they occupy a clinician's day.
+    confirmationMode: 'request',
+    minLeadTimeMinutes: 120,
+    maxAdvanceDays: 60,
+    bufferBeforeMinutes: 0,
+    bufferAfterMinutes: 10,
+    defaultCapacity: 1,
+    cancellationWindowHours: 24,
+    requireInsurance: false,
+    // Two doctors, one building, both seeing patients at 09:00.
+    singleSlotPerFacility: false,
+    policyText:
+      'Please arrive 15 minutes before your appointment and bring any referral letter, '
+      + 'previous test results, and your insurance details if you have cover. '
+      + 'If you cannot attend, cancel at least 24 hours ahead so the slot can go to someone else.',
+    consentTextPrivacy:
+      'I have read and agree to the Privacy Policy and Terms of Use, am at least 18, '
+      + 'and have the authority to make this appointment.',
+    consentTextSms:
+      'I agree to receive text messages from this facility about my appointment. '
+      + 'Message frequency and data rates may apply.',
+    publicPhone: '+211 920 000 001',
+    publicEmail: 'appointments@jubateaching.ss',
+    publicSlug: 'juba-teaching-hospital',
+    embedAllowedOrigins: [],
+    createdAt: daysAgo(30),
+    updatedAt: daysAgo(30),
+  },
+];
+
+/**
+ * The bookable service menu. Durations differ on purpose — a new-patient visit
+ * is the reason the slot engine steps by the reason's own length rather than a
+ * fixed grid, and a demo where everything is 30 minutes never shows that.
+ */
+const seedVisitReasons: Record<string, unknown>[] = [
+  {
+    name: 'New Patient Visit', slug: 'new-patient-visit', durationMinutes: 40,
+    description: 'First visit at this facility — bring any previous records.',
+    newPatients: true, returningPatients: false, modality: 'in_person',
+    department: 'Outpatient', appointmentType: 'general',
+  },
+  {
+    name: 'Established Patient Visit', slug: 'established-patient-visit', durationMinutes: 20,
+    description: 'A routine visit if you have been seen here before.',
+    newPatients: false, returningPatients: true, modality: 'in_person',
+    department: 'Outpatient', appointmentType: 'general',
+  },
+  {
+    name: 'Follow-up Review', slug: 'follow-up-review', durationMinutes: 20,
+    description: 'Review of an ongoing problem or recent test results.',
+    newPatients: false, returningPatients: true, modality: 'both',
+    department: 'Outpatient', appointmentType: 'follow_up',
+  },
+  {
+    name: 'Antenatal Visit', slug: 'antenatal-visit', durationMinutes: 30,
+    description: 'Scheduled antenatal check during pregnancy.',
+    newPatients: true, returningPatients: true, modality: 'in_person',
+    department: 'Obstetrics & Gynecology', appointmentType: 'anc',
+  },
+  {
+    name: 'Child Immunization', slug: 'child-immunization', durationMinutes: 15,
+    description: 'Routine vaccination for a child under five.',
+    newPatients: true, returningPatients: true, modality: 'in_person',
+    department: 'Pediatrics', appointmentType: 'immunization',
+  },
+  {
+    name: 'Telehealth Consultation', slug: 'telehealth-consultation', durationMinutes: 20,
+    description: 'Speak to a clinician by video without travelling.',
+    newPatients: false, returningPatients: true, modality: 'telehealth',
+    department: 'Outpatient', appointmentType: 'telehealth',
+  },
+].map((r, i) => ({
+  _id: `visit-reason-demo-${i + 1}`,
+  type: 'visit_reason',
+  orgId: PUBLIC_ORG_ID,
+  facilityId: 'hosp-001',
+  name: r.name,
+  slug: r.slug,
+  description: r.description,
+  durationMinutes: r.durationMinutes,
+  availableToNewPatients: r.newPatients,
+  availableToReturningPatients: r.returningPatients,
+  modality: r.modality,
+  providerIds: [],
+  department: r.department,
+  appointmentType: r.appointmentType,
+  requiresInsurance: false,
+  sortOrder: i,
+  isActive: true,
+  createdAt: daysAgo(30),
+  updatedAt: daysAgo(30),
+}));
+
+/**
+ * Public clinician profiles. Only the three with real clinic hours are
+ * published — a profile that books nothing is worse than no profile.
+ */
+const seedProviderProfiles: Record<string, unknown>[] = [
+  {
+    userId: 'user-dr.wani', slug: 'dr-james-wani-igga',
+    displayName: 'Dr. James Wani Igga, MD', credentials: 'MD',
+    specialtyLabel: 'Internal Medicine Physician',
+    bio: 'Consultant physician at Juba Teaching Hospital with a special interest in '
+      + 'hypertension, diabetes, and the long-term management of chronic disease.',
+    languages: ['English', 'Juba Arabic', 'Bari'],
+  },
+  {
+    userId: 'user-dr.achol', slug: 'dr-achol-mayen-deng',
+    displayName: 'Dr. Achol Mayen Deng, MD', credentials: 'MD',
+    specialtyLabel: 'Obstetrics & Gynecology Physician',
+    bio: 'Obstetrician and gynaecologist providing antenatal care, delivery, and '
+      + 'women’s health services, including remote follow-up consultations.',
+    languages: ['English', 'Dinka', 'Juba Arabic'],
+  },
+  {
+    userId: 'user-co.deng', slug: 'co-deng-mabior-kuol',
+    displayName: 'CO Deng Mabior Kuol', credentials: 'Clinical Officer',
+    specialtyLabel: 'Clinical Officer — General Outpatient',
+    bio: 'Clinical officer running the general outpatient clinic six days a week, '
+      + 'covering common illness, minor procedures, and referrals.',
+    languages: ['English', 'Dinka'],
+  },
+].map((p, i) => ({
+  _id: `provider-profile-demo-${i + 1}`,
+  type: 'provider_profile',
+  userId: p.userId,
+  orgId: PUBLIC_ORG_ID,
+  publicSlug: p.slug,
+  displayName: p.displayName,
+  credentials: p.credentials,
+  specialtyLabel: p.specialtyLabel,
+  bio: p.bio,
+  languages: p.languages,
+  acceptingNewPatients: true,
+  facilityIds: ['hosp-001'],
+  isPublished: true,
+  createdAt: daysAgo(30),
+  updatedAt: daysAgo(30),
 }));
 
 // ═══ Pharmacy inventory seed data ═════════════════════════════════
@@ -1326,14 +1517,19 @@ const walkInAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = seedTri
 seedAppointments.push(...walkInAppointments);
 
 /**
- * One appointment per slot, per facility — the same rule the booking service
+ * One appointment at a time per CLINICIAN — the same rule the booking service
  * enforces (`assertNoBookingConflicts`), applied to the seed.
  *
  * Seed rows are written straight to the database and never pass through that
- * guard, so the curated list and the generated blocks between them could put
- * two appointments in one slot. The calendar draws a day as a single stack, one
- * row per time, which leaves a collision nowhere to go: the two either overlap
- * or split the column into slivers.
+ * guard, so the curated list and the generated blocks between them could book
+ * one doctor into two visits at once.
+ *
+ * Scoped to the provider, not the facility. Facility-wide de-collision used to
+ * fan every clinic out into one long single-file queue, which is not what a
+ * multi-doctor practice looks like — and now that the calendar draws concurrent
+ * bookings as side-by-side columns, the demo should show exactly that: two
+ * doctors, two patients, 09:00. Unassigned walk-ins have no clinician to
+ * collide on and keep the time they were given.
  *
  * Colliding rows are pushed to the next free quarter-hour rather than dropped —
  * the demo keeps its volume, and a nudged appointment is a truthful one, where
@@ -1347,9 +1543,9 @@ seedAppointments.push(...walkInAppointments);
  */
 (() => {
   const CLOSED = new Set(['completed', 'cancelled', 'no_show', 'rescheduled']);
-  // Scoped org + facility + day, the same three the booking guard scopes to.
-  const dayKey = (a: { orgId?: string; facilityId?: string; appointmentDate: string }) =>
-    `${a.orgId || ''}|${a.facilityId || ''}|${a.appointmentDate}`;
+  // Scoped org + facility + provider + day, the same keys the booking guard uses.
+  const dayKey = (a: { orgId?: string; facilityId?: string; providerId?: string; appointmentDate: string }) =>
+    `${a.orgId || ''}|${a.facilityId || ''}|${a.providerId || ''}|${a.appointmentDate}`;
   const booked = new Map<string, { start: number; end: number }[]>();
   const toMinutes = (time: string) => {
     const [h, m] = time.split(':').map(Number);
@@ -1362,6 +1558,7 @@ seedAppointments.push(...walkInAppointments);
 
   for (const appointment of seedAppointments) {
     if (CLOSED.has(appointment.status)) continue;
+    if (!appointment.providerId) continue;
     const key = dayKey(appointment);
     const taken = booked.get(key) || [];
     const duration = appointment.duration || 30;
@@ -1715,14 +1912,19 @@ async function migrateOrgBrandingColors(): Promise<void> {
 }
 
 /**
- * Delete appointments that double-book a slot.
+ * Delete appointments that double-book one CLINICIAN.
  *
- * `assertNoBookingConflicts` keeps one live appointment per slot per facility,
+ * `assertNoBookingConflicts` keeps one live appointment per provider at a time,
  * but only for bookings written through the service. Rows that predate the
  * rule, seed rows (written straight to the database), and anything arriving
- * over sync bypass it — so an already-seeded browser can still be holding
- * overlapping bookings that make the day column draw two blocks on top of each
- * other. This sweeps them out on boot.
+ * over sync bypass it — so an already-seeded browser can still be holding a
+ * doctor booked into two visits at once. This sweeps those out on boot.
+ *
+ * Scoped to the provider, NOT the facility. This pass used to delete any two
+ * overlapping bookings in a building, which would now destroy real data: two
+ * doctors seeing two patients at 09:00 is legitimate, and the day view draws
+ * them as side-by-side columns. An unassigned booking (walk-in with no
+ * clinician yet) has no provider to collide on and is left alone.
  *
  * Which one survives: the earliest-created booking in each clash. That is the
  * one the desk made first, and the later row is the accident. Note this uses
@@ -1742,7 +1944,7 @@ async function migrateRemoveOverlappingAppointments(): Promise<void> {
 
     type Row = {
       _id: string; _rev?: string; type?: string; status?: string;
-      orgId?: string; facilityId?: string;
+      orgId?: string; facilityId?: string; providerId?: string;
       appointmentDate?: string; appointmentTime?: string; duration?: number;
       createdAt?: string;
     };
@@ -1750,13 +1952,13 @@ async function migrateRemoveOverlappingAppointments(): Promise<void> {
     const live = all.rows
       .map(r => r.doc as unknown as Row)
       .filter((d): d is Row =>
-        Boolean(d && d.type === 'appointment' && d.appointmentDate && d.appointmentTime)
+        Boolean(d && d.type === 'appointment' && d.appointmentDate && d.appointmentTime && d.providerId)
         && !APPOINTMENT_SLOT_RELEASED_STATUSES.includes(d.status as never));
 
-    // Group by the same key the guard scopes to: org + facility + day.
+    // Group by the same key the guard scopes to: org + facility + provider + day.
     const byDay = new Map<string, Row[]>();
     for (const row of live) {
-      const key = `${row.orgId || ''}|${row.facilityId || ''}|${row.appointmentDate}`;
+      const key = `${row.orgId || ''}|${row.facilityId || ''}|${row.providerId}|${row.appointmentDate}`;
       const bucket = byDay.get(key);
       if (bucket) bucket.push(row);
       else byDay.set(key, [row]);
@@ -3802,10 +4004,25 @@ async function seedDatabaseExclusive(): Promise<void> {
     await safePut(wDB, adm as unknown as Record<string, unknown>);
   }
 
-  // Seed today's provider availability (facility dashboard "Available" status).
+  // Seed recurring provider clinics (facility dashboard "Available" status and
+  // the slot engine both read these).
   const availDB = availabilityDB();
   for (const a of seedAvailability) {
     await safePut(availDB, a as Record<string, unknown>);
+  }
+
+  // Seed online-booking configuration for the one bookable demo practice.
+  const bpDB = bookingPoliciesDB();
+  for (const p of seedBookingPolicies) {
+    await safePut(bpDB, p as Record<string, unknown>);
+  }
+  const vrDB = visitReasonsDB();
+  for (const r of seedVisitReasons) {
+    await safePut(vrDB, r as Record<string, unknown>);
+  }
+  const ppDB = providerProfilesDB();
+  for (const p of seedProviderProfiles) {
+    await safePut(ppDB, p as Record<string, unknown>);
   }
 
   // Seed pharmacy inventory
@@ -3996,10 +4213,10 @@ async function seedDatabaseExclusive(): Promise<void> {
   // monograms for every hand-authored patient until the app is restarted.
   await migratePatientPhotos();
 
-  // Same reasoning for the slot sweep: the de-collision pass over
-  // `seedAppointments` compares exact start times only, so a curated 09:00×60
-  // and a generated 09:30×30 still land on top of each other. Clear them here
-  // rather than leaving a first-run demo with a doubled column.
+  // Same reasoning for the slot sweep: rows written outside `seedAppointments`
+  // (walk-ins, per-facility generators) never pass the de-collision pass, so a
+  // clinician can still end up double-booked on a first-run demo. Clear those
+  // here rather than leaving the day with one doctor in two visits at once.
   await migrateRemoveOverlappingAppointments();
 
   await markSeeded();

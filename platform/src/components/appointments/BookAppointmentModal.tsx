@@ -14,10 +14,13 @@
  * same booking wherever it is started from.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PortalModal from '@/components/Modal';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
+import SlotPicker, { to12Hour } from '@/components/booking/SlotPicker';
 import { useAppointments } from '@/lib/hooks/useAppointments';
+import { useBookingSlots } from '@/lib/hooks/useBookingSlots';
+import { useVisitReasons } from '@/lib/hooks/useVisitReasons';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { staffOptionLabel, type StaffSlotContext } from '@/lib/appointment-staff';
@@ -111,6 +114,55 @@ export default function BookAppointmentModal({
   }), [appointments, date, time, duration]);
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Real availability ──────────────────────────────────────────────────
+  // The time field used to be a fixed 07:00–18:30 half-hour list, offered
+  // whether or not anyone was working — so a clash was only discovered on
+  // save. When the facility has a service menu configured, the desk picks a
+  // visit reason and gets the times that clinician is actually free, computed
+  // by the same engine the patient-facing surfaces use. A facility with no
+  // reasons configured keeps the manual fields, so nothing is taken away from
+  // a site that has not set booking up yet.
+  const { reasons, loading: reasonsLoading } = useVisitReasons();
+  const [visitReasonId, setVisitReasonId] = useState('');
+  const visitReason = useMemo(
+    () => reasons.find(r => r._id === visitReasonId) ?? null,
+    [reasons, visitReasonId],
+  );
+  const useSlotPicker = reasons.length > 0;
+
+  const { slots, firstAvailableDate, loading: slotsLoading } = useBookingSlots({
+    facilityId: currentUser?.hospitalId,
+    orgId: currentUser?.orgId,
+    visitReason,
+    patientClass: 'returning',
+    modality: visitReason?.modality === 'telehealth' ? 'telehealth' : 'in_person',
+    channel: 'staff',
+    from: today,
+    days: 60,
+    providerIds: providerId ? [providerId] : undefined,
+    enabled: useSlotPicker,
+  });
+
+  // Land on the first day that has openings rather than on an empty today.
+  useEffect(() => {
+    if (!useSlotPicker || !firstAvailableDate) return;
+    if (slots.some(s => s.date === date)) return;
+    setDate(firstAvailableDate);
+  }, [useSlotPicker, firstAvailableDate, slots, date]);
+
+  // Choosing a reason sets what the visit IS — duration, department, and how
+  // it is recorded on the chart — so those stop being three separate guesses.
+  const pickVisitReason = (id: string) => {
+    setVisitReasonId(id);
+    const picked = reasons.find(r => r._id === id);
+    if (!picked) return;
+    setDuration(picked.durationMinutes);
+    setDepartment(picked.department);
+    setType(picked.appointmentType);
+    if (!reason.trim()) setReason(picked.name);
+    setTime('');   // the previous time belongs to the previous duration
+  };
+
   const handleSubmit = async () => {
     if (!patientId || !date || !time || !reason) {
       showToast(t('appointments.toastFillRequired'), 'error');
@@ -141,6 +193,11 @@ export default function BookAppointmentModal({
         reason,
         notes: notes || undefined,
         status,
+        source: 'staff',
+        visitReasonId: visitReason?._id,
+        // Denormalised so the booking still reads correctly if the reason is
+        // later renamed or retired.
+        visitReasonName: visitReason?.name,
         reminderSent: false,
         isRecurring: recurring,
         recurrencePattern: recurring ? recurrencePattern : undefined,
@@ -193,11 +250,69 @@ export default function BookAppointmentModal({
             </Select>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-            <div><label>{t('appointments.labelDate')}</label><input type="date" value={date} onChange={e => setDate(e.target.value)} min={today} /></div>
-            <div><label>{t('appointments.labelTime')}</label><Select value={time} onChange={e => setTime(e.target.value)}>{TIME_SLOTS.map(ts => <option key={ts} value={ts}>{ts}</option>)}</Select></div>
-            <div><label>{t('appointments.labelDuration')}</label><Select value={duration} onChange={e => setDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</Select></div>
-          </div>
+          {useSlotPicker ? (
+            <>
+              <div>
+                <label>Reason for visit</label>
+                <Select value={visitReasonId} onChange={e => pickVisitReason(e.target.value)}>
+                  <option value="">Select a visit type to see available times</option>
+                  {reasons.map(r => (
+                    <option key={r._id} value={r._id}>
+                      {r.name} · {t('appointments.durationMin', { count: r.durationMinutes })}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              {visitReason ? (
+                <div
+                  style={{
+                    border: '1px solid var(--border-medium)',
+                    borderRadius: 12,
+                    padding: 14,
+                    background: 'var(--overlay-subtle)',
+                  }}
+                >
+                  <SlotPicker
+                    slots={slots}
+                    date={date}
+                    onDateChange={d => { setDate(d); setTime(''); }}
+                    onPick={slot => {
+                      setTime(slot.startTime);
+                      setDate(slot.date);
+                      setDuration(slot.durationMinutes);
+                      // Booking a specific opening also settles who it is with.
+                      setProviderId(slot.providerId);
+                      setProvider(slot.providerName);
+                    }}
+                    selectedStartTime={time}
+                    loading={slotsLoading}
+                    minDate={today}
+                    showProvider={!providerId}
+                  />
+                  {time && (
+                    <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
+                      {to12Hour(time)}
+                      {provider ? ` with ${provider}` : ''}
+                      <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>
+                        {' '}· {t('appointments.durationMin', { count: duration })}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+                  {reasonsLoading ? 'Loading visit types…' : 'Choose a reason for the visit to see when a clinician is free.'}
+                </p>
+              )}
+            </>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
+              <div><label>{t('appointments.labelDate')}</label><input type="date" value={date} onChange={e => setDate(e.target.value)} min={today} /></div>
+              <div><label>{t('appointments.labelTime')}</label><Select value={time} onChange={e => setTime(e.target.value)}>{TIME_SLOTS.map(ts => <option key={ts} value={ts}>{ts}</option>)}</Select></div>
+              <div><label>{t('appointments.labelDuration')}</label><Select value={duration} onChange={e => setDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</Select></div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
             <div><label>{t('appointments.labelType')}</label><Select value={type} onChange={e => setType(e.target.value as AppointmentType)}>{TYPE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>)}</Select></div>

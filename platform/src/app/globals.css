@@ -2778,6 +2778,26 @@ thead th {
   transform: translateY(-1px);
 }
 
+/* The tile's two lines. These carried inline colours keyed off the selected
+   state; that beat every stylesheet, so the tile could not be restyled. */
+.registration-option-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.registration-option-desc {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.registration-option-button[data-selected="true"] {
+  border-color: var(--accent-primary);
+  background: var(--accent-light);
+}
+.registration-option-button[data-selected="true"] .registration-option-label {
+  color: var(--accent-primary);
+}
+
 .registration-info-note {
   padding: 14px 16px;
   border: 1px solid rgba(33,145,208,0.15);
@@ -7077,20 +7097,75 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   padding: 12px;
 }
 
+/* The registration dialog has no header band — see the note in the front
+   desk page. It is the positioning context for the two controls that band
+   used to carry. */
 .ehr-registration-dialog {
+  position: relative;
   width: 100%;
+  height: min(880px, calc(100vh - 32px));
   max-height: min(880px, calc(100vh - 32px));
 }
 
+/* Expand and close, pinned over the top-right of the body. Pinned, not
+   sticky: they belong to the dialog frame, which does not scroll, so they
+   stay exactly where they are however far the form is scrolled. */
 .ehr-registration-dialog-actions {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 3;
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
+  gap: 6px;
 }
 
+.ehr-registration-dialog-actions button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--ehr-border);
+  border-radius: 6px;
+  background: var(--ehr-panel, #fff);
+  color: var(--accent-primary);
+}
+.ehr-registration-dialog-actions button:hover {
+  background: var(--tb-blue-50, #EFF8FD);
+  border-color: var(--accent-primary);
+}
+
+/* The dialog's scrollport. `min-height: 0` is what actually lets it scroll —
+   a flex child defaults to min-height:auto and refuses to shrink below its
+   content, so the overflow had nowhere to happen and the dialog grew instead.
+   The right padding clears the pinned controls above. */
 .ehr-registration-dialog .ehr-checkin-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0;
+}
+
+/* The rail must not travel with the form. It is `position: sticky`, which
+   needs a scrollport ANCESTOR and an unclipped path to it — so nothing
+   between it and the dialog body may establish its own scroll container. The
+   embedded page wrapper is a `.page-container`, which is one, and that is
+   what pinned the rail to the top of the form and carried it away. */
+.ehr-registration-dialog .patient-registration-page--embedded {
+  overflow: visible;
+  max-height: none;
+  height: auto;
+}
+.ehr-registration-dialog .omrs-reg-rail {
+  position: sticky;
+  top: 0;
+  /* Its own scrollport, so a rail taller than the dialog can still reach its
+     buttons instead of overflowing behind the form. */
+  max-height: min(880px, calc(100vh - 32px));
+  overflow-y: auto;
+  padding-top: 4px;
 }
 
 .patient-registration-page--embedded {
@@ -25288,20 +25363,30 @@ table.patient-data-table.patient-data-table {
    run it to four screens. Set the two `--reg-cols` values to 1 to match O3
    exactly. */
 .omrs-reg {
-  /* Carbon greys */
-  --cds-ui-01: #f4f4f4;      /* form container */
-  --cds-ui-03: #e0e0e0;      /* subtle divider */
-  --cds-ui-04: #8d8d8d;      /* field underline */
-  --cds-ui-05: #161616;      /* strong text */
-  --cds-text-02: #525252;    /* labels, secondary text */
-  --cds-field-01: #ffffff;   /* field surface on gray-10 */
-  /* Carbon accents */
-  --cds-interactive: #0f62fe;   /* blue-60 — links, focus, selection */
-  --cds-primary: #007d79;       /* teal-60 — OpenMRS primary action */
-  --cds-primary-hover: #006d69;
-  --cds-secondary: #393939;     /* gray-80 — secondary action */
-  --cds-secondary-hover: #4c4c4c;
-  --cds-danger: #da1e28;        /* red-60 */
+  /* Carbon's GEOMETRY in Tamam's palette. OpenMRS ships IBM's greys, teal-60
+     and blue-60; this platform is white and blue, so every Carbon slot below
+     is filled from the Tamam ramp instead. The square edges, the field
+     underline, the slab and the flush button stack are unchanged — the shape
+     is what makes it read as OpenMRS, not the colours. */
+  --cds-ui-01: var(--tb-blue-50, #EFF8FD);        /* form slab */
+  --cds-ui-02: var(--tb-blue-100, #DDF2FB);       /* slab edge */
+  --cds-ui-03: var(--color-slate-150, #DDE6EE);   /* subtle divider */
+  --cds-ui-04: var(--color-slate-300, #CBD5E1);   /* field underline */
+  --cds-ui-05: var(--text-primary, #0F172A);      /* strong text */
+  --cds-text-02: var(--text-muted, #64748B);      /* labels, secondary text */
+  --cds-field-01: var(--color-white, #fff);       /* field surface on the slab */
+  /* Accents — Tamam blue in every slot Carbon fills with blue-60 / teal-60. */
+  --cds-interactive: var(--accent-primary, #2191D0);
+  --cds-interactive-soft: var(--tb-blue-100, #DDF2FB);
+  --cds-primary: var(--accent-primary, #2191D0);
+  --cds-primary-hover: var(--accent-hover, #015697);
+  /* Secondary is white-with-a-blue-edge rather than Carbon's charcoal slab:
+     a dark grey button is the one thing in the reference that has no place in
+     a white-and-blue theme. */
+  --cds-secondary: var(--color-white, #fff);
+  --cds-secondary-hover: var(--tb-blue-50, #EFF8FD);
+  --cds-secondary-ink: var(--accent-primary, #2191D0);
+  --cds-danger: var(--color-danger, #DC2626);
 
   --reg-cols-three: 3;
   --reg-cols-two: 2;
@@ -25315,13 +25400,28 @@ table.patient-data-table.patient-data-table {
   color: var(--cds-ui-05);
 }
 
-/* Carbon's own typeface, loaded in layout.tsx. */
+/* Carbon's own typeface, loaded in layout.tsx.
+   `!important` is not decoration: `.tamam-ehr-app, .tamam-ehr-app input, …`
+   near the top of this file pins `--font-platform` with `!important`, and the
+   registration page renders inside that shell. Same specificity, later in the
+   file, so these win.
+
+   Headings and labels are listed even though they would inherit: globals.css
+   matches `h1`…`h6` and `label` DIRECTLY with `--font-platform`, and a direct
+   match always beats an inherited value however specific the ancestor is. */
 .omrs-reg,
 .omrs-reg input,
 .omrs-reg select,
 .omrs-reg textarea,
-.omrs-reg button {
-  font-family: var(--font-omrs);
+.omrs-reg button,
+.omrs-reg h1,
+.omrs-reg h2,
+.omrs-reg h3,
+.omrs-reg h4,
+.omrs-reg h5,
+.omrs-reg h6,
+.omrs-reg label {
+  font-family: var(--font-omrs) !important;
 }
 
 @media (max-width: 900px) {
@@ -25406,8 +25506,8 @@ table.patient-data-table.patient-data-table {
 
 /* Review stays out of reach until the form would actually submit — offering
    it earlier only produces a bounce back to the first missing field. */
-.omrs-reg-navitem:disabled { cursor: not-allowed; color: #a8a8a8; }
-.omrs-reg-navitem:disabled .omrs-reg-navarrow { color: #c6c6c6; }
+.omrs-reg-navitem:disabled { cursor: not-allowed; color: var(--color-slate-300, #CBD5E1); }
+.omrs-reg-navitem:disabled .omrs-reg-navarrow { color: var(--color-slate-300, #CBD5E1); }
 
 .omrs-reg-navlabel {
   flex: 1;
@@ -25417,18 +25517,10 @@ table.patient-data-table.patient-data-table {
   white-space: nowrap;
 }
 
-/* Where you are. Carbon marks the current item with a blue left bar, not a
-   fill — "I am looking at this" must never read as "this is finished". */
+/* Where you are — carried by the label's colour alone. The blue bar that
+   used to sit in the left margin is gone: it read as a scrollbar or a stray
+   rule rather than as a marker. */
 .omrs-reg-navitem.is-current { color: var(--cds-interactive); }
-.omrs-reg-navitem.is-current::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 4px;
-  bottom: 4px;
-  width: 3px;
-  background: var(--cds-interactive);
-}
 
 /* Trailing mark — "optional", or the error flag. */
 .omrs-reg-navmeta {
@@ -25502,20 +25594,31 @@ table.patient-data-table.patient-data-table {
 
 .omrs-reg-railactions .btn-secondary {
   background: var(--cds-secondary);
-  color: #fff;
+  color: var(--cds-secondary-ink);
+  box-shadow: inset 0 0 0 1px var(--cds-interactive);
 }
 .omrs-reg-railactions .btn-secondary:hover:not(:disabled) { background: var(--cds-secondary-hover); }
 
-.omrs-reg-railactions .btn:disabled { background: #c6c6c6; color: #8d8d8d; cursor: not-allowed; }
+.omrs-reg-railactions .btn:disabled {
+  background: var(--cds-ui-03);
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+}
 
 /* Cancel is the last action in the set, so it takes the same slab treatment
    rather than reading as a link floating under the buttons. */
 .omrs-reg-cancel {
   background: var(--cds-secondary);
-  color: #fff;
+  color: var(--cds-secondary-ink);
+  box-shadow: inset 0 0 0 1px var(--cds-interactive);
   font-family: var(--font-omrs);
 }
-.omrs-reg-cancel:hover { background: var(--cds-secondary-hover); color: #fff; text-decoration: none; }
+.omrs-reg-cancel:hover {
+  background: var(--cds-secondary-hover);
+  color: var(--cds-secondary-ink);
+  text-decoration: none;
+}
 
 /* ══════════════════ Sections ══════════════════
    The numbered title and its note sit ON the page, above the container —
@@ -25558,6 +25661,7 @@ table.patient-data-table.patient-data-table {
   flex-direction: column;
   gap: 24px;
   background: var(--cds-ui-01);
+  border: 1px solid var(--cds-ui-02);
   padding: 24px 20px 28px;
 }
 
@@ -25605,7 +25709,9 @@ table.patient-data-table.patient-data-table {
   background-color: var(--cds-field-01);
   border: none;
   border-bottom: 1px solid var(--cds-ui-04);
-  border-radius: 0;
+  /* `.tamam-ehr-app input { border-radius: 4px !important }` also matches
+     here; Carbon fields are square, so this has to out-shout it. */
+  border-radius: 0 !important;
   font-size: 14px;
   font-weight: 400;
   letter-spacing: 0.16px;
@@ -25621,7 +25727,7 @@ table.patient-data-table.patient-data-table {
 .omrs-reg select { padding-right: 40px; background-position: right 14px center; }
 
 .omrs-reg input::placeholder,
-.omrs-reg textarea::placeholder { color: #a8a8a8; }
+.omrs-reg textarea::placeholder { color: var(--text-muted, #64748B); opacity: 0.75; }
 
 /* Carbon focus is a 2px inset blue outline on the whole field, not a ring. */
 .omrs-reg input:focus,
@@ -25638,8 +25744,8 @@ table.patient-data-table.patient-data-table {
 .omrs-reg select:disabled,
 .omrs-reg textarea:disabled {
   background-color: var(--cds-field-01);
-  border-bottom-color: #c6c6c6;
-  color: #c6c6c6;
+  border-bottom-color: var(--cds-ui-03);
+  color: var(--color-slate-300, #CBD5E1);
   cursor: not-allowed;
 }
 
@@ -25728,15 +25834,15 @@ table.patient-data-table.patient-data-table {
   border: none;
   border-left: 3px solid var(--cds-interactive);
   border-radius: 0;
-  background: #edf5ff;       /* Carbon blue-10 */
+  background: var(--cds-interactive-soft);
 }
 .omrs-reg .registration-info-note p { font-size: 12px; color: var(--cds-ui-05); }
 
 /* The primary next-of-kin badge — Carbon tag, square-ish, blue-10 on blue-70. */
 .omrs-reg .registration-contact-card > .flex > span:first-child {
   border-radius: 0;
-  background: #edf5ff;
-  color: #0043ce;
+  background: var(--cds-interactive-soft);
+  color: var(--accent-hover, #015697);
 }
 
 /* ══════════════════ Coverage tiles ══════════════════
@@ -25751,9 +25857,25 @@ table.patient-data-table.patient-data-table {
   border: 1px solid var(--cds-ui-03) !important;
   transition: border-color 0.11s, background-color 0.11s;
 }
-.omrs-reg .registration-option-button:hover { transform: none; background-color: #e8e8e8 !important; }
+.omrs-reg .registration-option-button:hover { transform: none; background-color: var(--cds-ui-01) !important; }
 .omrs-reg .registration-option-button[data-selected="true"] {
   border: 2px solid var(--cds-interactive) !important;
+  background-color: var(--cds-field-01) !important;
+}
+.omrs-reg .registration-option-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.29;
+  color: var(--cds-ui-05);
+}
+.omrs-reg .registration-option-button[data-selected="true"] .registration-option-label {
+  color: var(--cds-interactive);
+}
+.omrs-reg .registration-option-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.34;
+  color: var(--cds-text-02);
 }
 
 /* ══════════════════ Buttons inside the form ══════════════════
@@ -25775,12 +25897,85 @@ table.patient-data-table.patient-data-table {
   color: #fff;
 }
 
-/* The photo well — Carbon has no dashed rounded drop zones; it is a plain
-   bordered square with a grey placeholder. */
-.omrs-reg .registration-media-row > div:first-child {
-  border-radius: 0 !important;
-  border: 1px solid var(--cds-ui-03) !important;
-  background-color: var(--cds-field-01) !important;
+/* ══════════════════ Photo well ══════════════════
+   The OpenMRS shape: a plain bordered square holding the picture, with one
+   dark action bar welded to its foot carrying "Edit" and a pencil. No dashed
+   rounded drop zone, and no separate button beside it — the bar is the
+   control. */
+.omrs-reg .registration-media-row {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.omrs-reg-photo {
+  width: 168px;
+  border: 1px solid var(--cds-ui-04);
+  background: var(--cds-field-01);
+}
+
+.omrs-reg-photo-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 168px;
+  overflow: hidden;
+  background: var(--cds-field-01);
+}
+.omrs-reg-photo-frame img { width: 100%; height: 100%; object-fit: cover; }
+
+/* The placeholder wraps mid-phrase in the reference ("No image / to display"),
+   so the string carries its own newline and the box honours it. */
+.omrs-reg-photo-empty {
+  white-space: pre-line;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.43;
+  color: var(--cds-text-02);
+}
+
+.omrs-reg-photo-edit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 0;
+  /* The one dark surface the reference keeps. Tamam's deep blue rather than
+     Carbon's gray-80, so it belongs to the white-and-blue palette. */
+  background: var(--accent-hover, #015697);
+  color: #fff;
+  font-family: var(--font-omrs);
+  font-size: 14px;
+  line-height: 1.29;
+  letter-spacing: 0.16px;
+  cursor: pointer;
+  transition: background 0.11s;
+}
+.omrs-reg-photo-edit:hover { background: var(--cds-primary); }
+.omrs-reg-photo-edit:focus-visible { outline: 2px solid var(--cds-interactive); outline-offset: -3px; }
+/* The pencil is drawn by the shared Icon renderer, which hardcodes its own
+   stroke unless told otherwise — see the icon trap in globals. */
+.omrs-reg-photo-edit svg.lucide { color: inherit; stroke: currentColor; }
+
+.omrs-reg-photo-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.omrs-reg-photo-remove {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-omrs);
+  font-size: 12px;
+  color: var(--cds-danger);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 @media (max-width: 1024px) {
@@ -26214,3 +26409,97 @@ table.patient-data-table.patient-data-table {
 /* Left blank. Shown, not hidden — "not recorded" is worth seeing before the
    record is committed. */
 .omrs-reg-reviewgroup dl > div.is-empty dd { color: var(--text-muted); opacity: 0.7; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Public patient intake form (/intake/[token])
+
+   No app shell: the person here is a patient on their own phone, not a
+   member of staff. One centred card, large touch targets, and nothing that
+   implies a logged-in session. Standalone rules rather than the form styles
+   above, which assume the dashboard's grid and uppercase label treatment.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.pintake {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px 48px;
+  background: var(--bg-secondary, #F6F8FA);
+}
+
+.pintake-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--bg-card-solid, #fff);
+  border: 1px solid var(--border-light, #E2E8F0);
+  border-radius: 14px;
+  padding: 24px;
+  margin-top: 24px;
+}
+
+.pintake-card h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pintake-card > p {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary, var(--text-primary));
+}
+
+.pintake-form { display: flex; flex-direction: column; gap: 16px; }
+
+/* Sentence case and full size — the global `label` rule uppercases and shrinks
+   every label for the dense dashboard, which is wrong on a patient's phone. */
+.pintake-form label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-primary);
+}
+
+/* 16px minimum: anything smaller makes iOS Safari zoom on focus. */
+.pintake-form input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-family: var(--font-platform);
+  border: 1px solid var(--border-medium, #CBD5E1);
+  border-radius: 10px;
+  background: var(--bg-card-solid, #fff);
+  color: var(--text-primary);
+}
+
+.pintake-form input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.pintake-form button {
+  margin-top: 4px;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent-primary);
+  color: #fff;
+  font-family: var(--font-platform);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pintake-form button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.pintake-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-danger, #dc2626);
+}

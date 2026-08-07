@@ -5218,6 +5218,7 @@ const so: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'Lambarka telefoonka',
   'patientNew.phoneOptionalLabel': 'Telefoon',
   'patientNew.phoneOptionalNote': 'Goobaha telefoonka waa ikhtiyaari haddii aan la isticmaalin',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'Bukaanka',
   'patientNew.photoFingerprintHeading': 'Sawir & Far-raac',
   'patientNew.photoHelp': 'Kaamerada ku qaad sawir, ama soo geli mid. Isticmaal sawir cad oo hore u eegaya. JPG, PNG ama WebP, ugu badnaan 5 MB.',

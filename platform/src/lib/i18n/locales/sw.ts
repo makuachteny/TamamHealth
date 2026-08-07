@@ -5240,6 +5240,7 @@ const sw: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'Nambari ya simu',
   'patientNew.phoneOptionalLabel': 'Simu',
   'patientNew.phoneOptionalNote': 'Sehemu za simu si za lazima isipokuwa zinatumika',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'Mgonjwa',
   'patientNew.photoFingerprintHeading': 'Picha na Alama ya Kidole',
   'patientNew.photoHelp': 'Piga picha kwa kamera, au pakia moja. Tumia picha wazi ya uso wa mbele. JPG, PNG au WebP, upeo wa 5 MB.',

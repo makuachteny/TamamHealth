@@ -19,6 +19,48 @@ export async function getAvailabilityByProvider(providerId: string): Promise<Ava
   return all.filter(a => a.providerId === providerId);
 }
 
+/**
+ * Availability windows that actually apply on a given date.
+ *
+ * A window is either dated (it applies on its own day) or recurring (it applies
+ * on the weekdays in its pattern, until its end date, minus exceptions). Every
+ * caller asking "who is available today?" must go through this rather than
+ * matching `doc.date === today`, which silently sees nothing for a clinic that
+ * runs every Monday.
+ */
+export async function getAvailabilityOnDate(date: string, scope?: DataScope): Promise<AvailabilityDoc[]> {
+  const all = await getAllAvailability(scope);
+  return all.filter(a => appliesOnDate(a, date));
+}
+
+/** Whether one window covers a given date, recurrence included. */
+export function appliesOnDate(window: AvailabilityDoc, date: string): boolean {
+  if (window.status === 'cancelled') return false;
+  if (!window.recurrence) return window.date === date;
+
+  const { daysOfWeek, until, exceptions } = window.recurrence;
+  if (!daysOfWeek?.length) return false;
+  if (date < window.date || date > until) return false;
+  if (exceptions?.includes(date)) return false;
+
+  // Parsed as UTC so the weekday cannot shift with the reader's timezone.
+  const [y, m, d] = date.split('-').map(Number);
+  return daysOfWeek.includes(new Date(Date.UTC(y, m - 1, d)).getUTCDay());
+}
+
+/** Whether a provider is inside a window right now, for presence indicators. */
+export function isProviderAvailableAt(
+  windows: AvailabilityDoc[],
+  providerId: string,
+  date: string,
+  time: string,
+): boolean {
+  return windows.some(w =>
+    w.providerId === providerId &&
+    appliesOnDate(w, date) &&
+    w.startTime <= time && w.endTime >= time);
+}
+
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;

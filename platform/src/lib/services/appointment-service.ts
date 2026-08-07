@@ -108,8 +108,10 @@ interface BookingSlot {
   patientId?: string;
   patientName?: string;
   orgId?: string;
-  /** Scopes the one-appointment-per-slot rule to a single facility. */
+  /** Scopes the facility-wide rule, where a facility still opts into it. */
   facilityId?: string;
+  /** Exam room, when the booking names one. Two visits cannot share a room. */
+  room?: string;
   appointmentDate: string;
   appointmentTime: string;
   duration: number;
@@ -137,15 +139,24 @@ export class BookingConflictError extends Error {
  * field edits that move the slot, and approving a portal request. Throws with
  * a human-readable message the booking surfaces show as-is.
  *
- * Two checks:
- *  - PROVIDER: the doctor cannot be in two visits at once. An empty
- *    providerId (walk-ins booked with no clinician chosen yet) is not a real
- *    provider to collide on. Scoped to the booking's own org so one tenant's
- *    schedule can never block another's — getAppointmentsByProvider() is
- *    unscoped and would match every org.
- *  - PATIENT: the same patient cannot hold two overlapping live bookings —
- *    this is where duplicate appointments were slipping in. Non-overlapping
- *    same-day bookings (a morning lab, an afternoon review) stay legal.
+ * What genuinely cannot happen at once:
+ *  - PROVIDER: the doctor cannot be in two visits. An empty providerId
+ *    (walk-ins booked with no clinician chosen yet) is not a real provider to
+ *    collide on. Scoped to the booking's own org so one tenant's schedule can
+ *    never block another's — getAppointmentsByProvider() is unscoped and would
+ *    match every org.
+ *  - ROOM: two visits cannot share an exam room, whoever is running them.
+ *  - PATIENT: the same patient cannot hold two overlapping live bookings, and
+ *    cannot hold two open visits on one day. Non-overlapping same-day bookings
+ *    (a morning lab, an afternoon review) stay legal once the first is closed.
+ *
+ * What is NOT a conflict: two different clinicians seeing two different
+ * patients at the same time in the same building. That is simply what a clinic
+ * with more than one doctor looks like. It used to be refused because the day
+ * view drew a single stack and had nowhere to put the second booking — a
+ * drawing preference enforced as a clinical rule. A facility that wants the
+ * older, stricter behaviour keeps it by setting `singleSlotPerFacility` on its
+ * booking policy; an unconfigured facility does not have it.
  */
 export async function assertNoBookingConflicts(
   data: BookingSlot,
@@ -157,22 +168,34 @@ export async function assertNoBookingConflicts(
     holdsSlot(a) &&
     isTimeOverlap(a.appointmentTime, a.duration, data.appointmentTime, data.duration);
 
-  // ── One appointment per slot, facility-wide ──
-  // Not just per provider: the calendar draws a day as a single stack, one
-  // appointment per row at its own time, so two bookings in the same slot have
-  // nowhere to go — they either overlap or split the column into unreadable
-  // slivers. Making the slot exclusive is what lets the day read straight down.
-  // Scoped to the facility (and org), so two clinics in different buildings do
-  // not block each other.
+  // ── Facility-wide exclusivity, only where a facility asked for it ──
   if (data.facilityId) {
-    const sameDay = (await getAppointmentsByDate(data.appointmentDate))
-      .filter(a => a.orgId === data.orgId && a.facilityId === data.facilityId);
-    const taken = sameDay.find(overlaps);
-    if (taken) {
-      throw new BookingConflictError(
-        `Scheduling conflict: that slot is taken — ${taken.patientName} at ${taken.appointmentTime} on ${taken.appointmentDate}` +
-        `${taken.providerName ? ` with ${taken.providerName}` : ''}. Pick another time.`,
-      );
+    const { getEffectiveBookingPolicy } = await import('./booking-policy-service');
+    const policy = await getEffectiveBookingPolicy(data.facilityId, data.orgId);
+    if (policy.singleSlotPerFacility) {
+      const sameDay = (await getAppointmentsByDate(data.appointmentDate))
+        .filter(a => a.orgId === data.orgId && a.facilityId === data.facilityId);
+      const taken = sameDay.find(overlaps);
+      if (taken) {
+        throw new BookingConflictError(
+          `Scheduling conflict: that slot is taken — ${taken.patientName} at ${taken.appointmentTime} on ${taken.appointmentDate}` +
+          `${taken.providerName ? ` with ${taken.providerName}` : ''}. Pick another time.`,
+        );
+      }
+    }
+
+    // ── One visit per room ──
+    // Independent of who is running it: a room holds one consultation.
+    if (data.room) {
+      const sameDay = (await getAppointmentsByDate(data.appointmentDate))
+        .filter(a => a.orgId === data.orgId && a.facilityId === data.facilityId && a.room === data.room);
+      const roomClash = sameDay.find(overlaps);
+      if (roomClash) {
+        throw new BookingConflictError(
+          `Room conflict: ${data.room} is in use at ${roomClash.appointmentTime} on ${roomClash.appointmentDate}` +
+          `${roomClash.providerName ? ` by ${roomClash.providerName}` : ''}. Pick another room or time.`,
+        );
+      }
     }
   }
 

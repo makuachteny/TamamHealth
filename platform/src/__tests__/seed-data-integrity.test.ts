@@ -229,10 +229,15 @@ describe('Seed Data Integrity', () => {
     });
 
     /**
-     * A slot holds one appointment. The calendar draws a day as a single stack
-     * — one row per time — so two bookings in the same slot have nowhere to go.
-     * The service refuses them; this keeps the seed to the same rule, since
-     * seed rows are written straight to the database.
+     * A CLINICIAN holds one appointment at a time.
+     *
+     * Scoped to the provider, not the facility. Two doctors seeing two patients
+     * at 09:00 in the same building is what a clinic with more than one doctor
+     * looks like, and the calendar now draws those as equal side-by-side
+     * columns. What remains impossible is one doctor in two rooms at once,
+     * which is the rule `assertNoBookingConflicts` enforces at the service —
+     * this keeps the seed honest, since seed rows are written straight to the
+     * database and never pass through that check.
      *
      * Duration-aware on purpose, matching the service's `isTimeOverlap`. This
      * assertion used to compare start times only, which let a 12:00×45min and
@@ -240,14 +245,17 @@ describe('Seed Data Integrity', () => {
      * pairs were reaching every fresh demo before the seed's de-collision pass
      * was taught about duration.
      */
-    test('no two open appointments overlap at one facility', () => {
+    test('no clinician holds two overlapping open appointments', () => {
       const CLOSED = new Set(['completed', 'cancelled', 'no_show', 'rescheduled']);
       const byDay = new Map<string, typeof seedAppointments>();
       const collisions: string[] = [];
 
       for (const a of seedAppointments) {
         if (CLOSED.has(a.status)) continue;
-        const key = `${a.orgId || ''}|${a.facilityId || ''}|${a.appointmentDate}`;
+        // An unassigned booking (walk-in with no clinician yet) has no provider
+        // to collide on, exactly as the service treats it.
+        if (!a.providerId) continue;
+        const key = `${a.orgId || ''}|${a.facilityId || ''}|${a.providerId}|${a.appointmentDate}`;
         const bucket = byDay.get(key);
         if (bucket) bucket.push(a);
         else byDay.set(key, [a]);

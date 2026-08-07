@@ -11,6 +11,7 @@ import { useUsers } from '@/lib/hooks/useUsers';
 import { isRouteAllowed, getDefaultDashboard } from '@/lib/permissions';
 import { patientFullName, patientGenderAge } from '@/lib/patient-utils';
 import { formatPhoneDisplay } from '@/lib/field-formats';
+import type { SmsChannel } from '@/lib/sms';
 import type {
   IntakeFormStatus,
   PatientDoc,
@@ -214,6 +215,12 @@ export default function PatientIntakePage() {
   const [sendForms, setSendForms] = useState<string[]>([]);
   const [sendEmail, setSendEmail] = useState(false);
   const [sendSms, setSendSms] = useState(false);
+  /**
+   * Which channel the text message goes out on. Defaults to WhatsApp when that
+   * is the only number on file, otherwise SMS — reception should not have to
+   * pick when there is nothing to pick between.
+   */
+  const [sendChannel, setSendChannel] = useState<SmsChannel>('sms');
   const [sending, setSending] = useState(false);
 
   const providerUsers = useMemo(
@@ -303,7 +310,13 @@ export default function PatientIntakePage() {
     setSendPatient(p);
     setSendPatientQuery(patientFullName(p));
     setSendEmail(false);
-    setSendSms(!!p.phone);
+    // Either number is reachable, so the message is on by default whenever
+    // there is somewhere to send it.
+    setSendSms(!!p.phone || !!p.whatsapp);
+    // Default to whichever channel the patient actually has. When they have
+    // both, SMS leads and the radio pair below lets reception switch — a clerk
+    // should only be asked to choose when there is a choice.
+    setSendChannel(!p.phone && p.whatsapp ? 'whatsapp' : 'sms');
   }
 
   function resetSend() {
@@ -313,13 +326,20 @@ export default function PatientIntakePage() {
     setSendForms([]);
     setSendEmail(false);
     setSendSms(false);
+    setSendChannel('sms');
   }
+
+  // The number the chosen channel actually reaches. WhatsApp is its own field
+  // on the chart, so this is not always the same digits as `phone`.
+  const smsTarget = sendChannel === 'whatsapp'
+    ? (sendPatient?.whatsapp || sendPatient?.phone)
+    : (sendPatient?.phone || sendPatient?.whatsapp);
 
   async function handleSend() {
     if (!sendPatient || !sendProviderId || sendForms.length === 0) return;
     setSending(true);
     try {
-      const willSendSms = sendSms && !!sendPatient.phone;
+      const willSendSms = sendSms && !!smsTarget;
       const willSendEmail = sendEmail && !!sendPatient.email;
       const result = await sendRequest(
         sendPatient._id,
@@ -334,7 +354,8 @@ export default function PatientIntakePage() {
         },
         {
           send: willSendSms,
-          phone: sendPatient.phone,
+          phone: smsTarget,
+          channel: sendChannel,
           facilityName: currentUser?.hospitalName,
         },
         {
@@ -349,7 +370,8 @@ export default function PatientIntakePage() {
       const name = patientFullName(sendPatient);
       const delivered: string[] = [];
       const failed: string[] = [];
-      if (willSendSms) (result.sms?.ok ? delivered : failed).push('SMS');
+      const smsLabel = sendChannel === 'whatsapp' ? 'WhatsApp message' : 'SMS';
+      if (willSendSms) (result.sms?.ok ? delivered : failed).push(smsLabel);
       if (willSendEmail) (result.email?.ok ? delivered : failed).push('email');
 
       if (failed.length > 0) {
@@ -690,19 +712,41 @@ export default function PatientIntakePage() {
                   <Mail className="w-3.5 h-3.5" />
                   Email to {sendPatient?.email || 'no email on file'}
                 </label>
+                {/* One text message, on whichever channel the patient actually
+                    reads. Both are the same Twilio send, so this is a channel
+                    choice rather than a second delivery — and the WhatsApp
+                    number is its own field on the chart, because plenty of
+                    patients use WhatsApp on a different number from the one
+                    reception has for calls. */}
                 <label
                   className="inline-flex items-center gap-2 text-[13px]"
-                  style={{ color: sendPatient?.phone ? 'var(--text-primary)' : 'var(--text-muted)', cursor: sendPatient?.phone ? 'pointer' : 'not-allowed' }}
+                  style={{ color: smsTarget ? 'var(--text-primary)' : 'var(--text-muted)', cursor: smsTarget ? 'pointer' : 'not-allowed' }}
                 >
                   <input
                     type="checkbox"
                     checked={sendSms}
-                    disabled={!sendPatient?.phone}
+                    disabled={!smsTarget}
                     onChange={e => setSendSms(e.target.checked)}
                   />
                   <MessageSquare className="w-3.5 h-3.5" />
-                  Send SMS to {sendPatient?.phone ? formatPhoneDisplay(sendPatient.phone) : 'no phone on file'}
+                  Message {smsTarget ? formatPhoneDisplay(smsTarget) : 'no phone on file'}
                 </label>
+                {/* Only offered when there is a real choice to make. */}
+                {sendSms && sendPatient?.phone && sendPatient?.whatsapp && (
+                  <div className="flex items-center gap-3 pl-6 text-[12px]">
+                    {(['sms', 'whatsapp'] as const).map(channel => (
+                      <label key={channel} className="inline-flex items-center gap-1.5" style={{ cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="intake-sms-channel"
+                          checked={sendChannel === channel}
+                          onChange={() => setSendChannel(channel)}
+                        />
+                        {channel === 'sms' ? 'SMS' : 'WhatsApp'}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

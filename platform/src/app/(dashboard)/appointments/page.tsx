@@ -5,6 +5,7 @@ import { formatClockTime } from '@/lib/format-utils';
 import AppointmentStatusSelect from '@/components/appointments/AppointmentStatusSelect';
 import AppointmentDetailFields, { type AppointmentDetailFieldValues } from '@/components/appointments/AppointmentDetailFields';
 import AppointmentEditModal from '@/components/appointments/AppointmentEditModal';
+import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
 import {
   APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_I18N_KEYS,
   APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_PENDING_STATUSES, APPOINTMENT_STATUS_FLOW,
@@ -273,7 +274,6 @@ export default function AppointmentsPage() {
   }, []);
 
   // Form state
-  const [formPatient, setFormPatient] = useState('');
   // Provider is a real user, carried as id + name. This was a free-text name
   // with providerId always '' — which skipped the service's double-booking
   // guard entirely and let names drift from the staff directory.
@@ -295,8 +295,6 @@ export default function AppointmentsPage() {
   const [formDepartment, setFormDepartment] = useState('Outpatient');
   const [formReason, setFormReason] = useState('');
   const [formNotes, setFormNotes] = useState('');
-  const [formRecurring, setFormRecurring] = useState(false);
-  const [formRecurrencePattern, setFormRecurrencePattern] = useState<'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('monthly');
   const [submitting, setSubmitting] = useState(false);
 
   // Walk-in form
@@ -441,9 +439,9 @@ export default function AppointmentsPage() {
   };
 
   const resetForm = () => {
-    setFormPatient(''); setFormDate(jubaDate()); setFormTime('09:00');
+    setFormDate(jubaDate()); setFormTime('09:00');
     setFormDuration(30); setFormType('general'); setFormPriority('routine');
-    setFormDepartment('Outpatient'); setFormReason(''); setFormNotes(''); setFormRecurring(false);
+    setFormDepartment('Outpatient'); setFormReason(''); setFormNotes('');
     setFormStatus('scheduled');
     setFormProviderId(''); setFormProvider('');
   };
@@ -463,34 +461,6 @@ export default function AppointmentsPage() {
       staffName: apt.staffName || '',
       room: apt.room || '',
     });
-  };
-
-  const handleSubmit = async () => {
-    if (!formPatient || !formDate || !formTime || !formReason) {
-      showToast(t('appointments.toastFillRequired'), 'error'); return;
-    }
-    const patient = patients.find(p => p._id === formPatient);
-    if (!patient) { showToast(t('appointments.toastSelectValidPatient'), 'error'); return; }
-    setSubmitting(true);
-    try {
-      await create({
-        patientId: patient._id, patientName: `${patient.firstName} ${patient.surname}`,
-        // A real clinician id from the staff-directory select — this is what
-        // arms the service's double-booking guard for desk bookings.
-        patientPhone: patient.phone || undefined, providerId: formProviderId,
-        providerName: formProvider, facilityId: currentUser?.hospitalId || '',
-        facilityName: currentUser?.hospitalName || '', facilityLevel: 'payam' as FacilityLevel,
-        appointmentDate: formDate, appointmentTime: formTime, duration: formDuration,
-        appointmentType: formType, priority: formPriority, department: formDepartment,
-        reason: formReason, notes: formNotes || undefined, status: formStatus,
-        reminderSent: false, isRecurring: formRecurring,
-        recurrencePattern: formRecurring ? formRecurrencePattern : undefined,
-        bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
-        orgId: currentUser?.orgId,
-      });
-      showToast(t('appointments.toastBooked'), 'success'); setShowNewForm(false); resetForm();
-    } catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedBook'), 'error'); }
-    finally { setSubmitting(false); }
   };
 
   const handleWalkIn = async () => {
@@ -966,58 +936,20 @@ export default function AppointmentsPage() {
 
         {/* ═══ Modals ═══ */}
 
-        {/* Book Appointment */}
+        {/* Book Appointment — the shared dialog, so the desk books from the
+            same form (and the same real availability) as every other surface.
+            This page used to carry a second copy of it, which is how the two
+            drifted apart. The reschedule panel below still uses the page's own
+            form state; only the new-booking dialog moved. */}
         {showNewForm && canBookAppointments && (
-          <Modal onClose={() => { setShowNewForm(false); resetForm(); }} title={t('appointments.bookAppointment')} size="lg">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label>{t('appointments.labelPatient')}</label>
-                <Select value={formPatient} onChange={e => setFormPatient(e.target.value)}>
-                  <option value="">{t('appointments.selectPatient')}</option>
-                  {patients.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.surname} {p.hospitalNumber ? `(${p.hospitalNumber})` : ''}</option>)}
-                </Select>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelDate')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
-                <div><label>{t('appointments.labelTime')}</label><Select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</Select></div>
-                <div><label>{t('appointments.labelDuration')}</label><Select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</Select></div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelType')}</label><Select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</Select></div>
-                <div><label>{t('appointments.labelPriority')}</label><Select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></Select></div>
-                {/* Usually left at Scheduled, but the desk books patients already
-                    standing at the window, and data entry back-fills visits that
-                    have happened — both need to start on a different rung. */}
-                <div><label>{t('appointments.labelStatus')}</label><AppointmentStatusSelect status={formStatus} layout="bare" onChange={setFormStatus} /></div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelDepartment')}</label><Select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</Select></div>
-                {/* A real clinician from the staff directory, not free text —
-                    each option states role, free-or-busy at this slot, and the
-                    day's load; the id makes the double-booking guard bite. */}
-                <div><label>{t('appointments.labelProvider')}</label>
-                  <Select value={formProviderId} onChange={e => selectFormProvider(e.target.value)}>
-                    <option value="">{!formProviderId && formProvider ? `${formProvider} (not on staff list)` : 'Unassigned'}</option>
-                    {formProviderId && !providerOptions.some(p => p._id === formProviderId) && (
-                      <option value={formProviderId}>{formProvider || 'Current provider'}</option>
-                    )}
-                    {providerOptions.map(person => (
-                      <option key={person._id} value={person._id}>{staffOptionLabel(person, providerSlotContext)}</option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-              <div><label>{t('appointments.labelReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} placeholder={t('appointments.reasonPlaceholder')} /></div>
-              <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} placeholder={t('appointments.notesPlaceholder')} /></div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', textTransform: 'none', fontSize: 13 }}>
-                <input type="checkbox" checked={formRecurring} onChange={e => setFormRecurring(e.target.checked)} /> {t('appointments.recurringAppointment')}
-                {formRecurring && <Select value={formRecurrencePattern} onChange={e => setFormRecurrencePattern(e.target.value as typeof formRecurrencePattern)} style={{ width: 'auto' }}>
-                  <option value="weekly">{t('appointments.recurrenceWeekly')}</option><option value="biweekly">{t('appointments.recurrenceBiweekly')}</option><option value="monthly">{t('appointments.recurrenceMonthly')}</option><option value="quarterly">{t('appointments.recurrenceQuarterly')}</option>
-                </Select>}
-              </label>
-              <ModalActions onCancel={() => { setShowNewForm(false); resetForm(); }} onConfirm={handleSubmit} confirmLabel={submitting ? t('appointments.booking') : t('appointments.bookAppointment')} cancelLabel={t('action.cancel')} disabled={submitting} />
-            </div>
-          </Modal>
+          <BookAppointmentModal
+            /* The day popup and the calendar both pre-set `formDate` before
+               opening this, so that stays the way a chosen day reaches the
+               form. `useAppointments` re-reads on its own PouchDB
+               subscription, so there is nothing to refresh by hand. */
+            defaultDate={formDate}
+            onClose={() => { setShowNewForm(false); resetForm(); }}
+          />
         )}
 
         {/* Walk-In */}

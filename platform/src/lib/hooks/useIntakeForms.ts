@@ -5,7 +5,7 @@ import { makeCoalescer } from './live-reload';
 import type { IntakeFormField, PatientIntakeFormDoc } from '../db-types';
 import { intakeFormsDB } from '../db';
 import { useApp } from '../context';
-import type { SmsSendResult } from '../sms';
+import type { SmsSendResult, SmsChannel } from '../sms';
 import { sendEmail, type EmailSendResult } from '../email';
 
 // Extra field persisted on the intake doc when an SMS notification is
@@ -87,21 +87,31 @@ export function useIntakeForms() {
     // the contact details on their own record. Best-effort in both cases: a
     // delivery failure never blocks the intake request itself from being
     // created, and the raw result is stored so staff can see what happened.
-    smsOptions?: { send: boolean; phone?: string; facilityName?: string },
+    smsOptions?: { send: boolean; phone?: string; facilityName?: string; channel?: SmsChannel },
     emailOptions?: { send: boolean; email?: string; facilityName?: string },
   ): Promise<{ sms?: SmsSendResult; email?: EmailSendResult }> => {
     const { sendIntakeFormRequest } = await import('../services/intake-form-service');
     const created = await sendIntakeFormRequest(patientId, patientName, fields, data);
 
     const formList = fields.map(f => f.label).join(', ');
+    // The link the patient opens. Built from the browser's own origin so it is
+    // right in local dev and on the deployed site without extra config. Sent
+    // only when the request actually carries a token — an older document
+    // without one would otherwise produce a link to nowhere.
+    const { intakeFormPath } = await import('../services/intake-form-service');
+    const link = created.accessToken && typeof window !== 'undefined'
+      ? `${window.location.origin}${intakeFormPath(created.accessToken)}`
+      : '';
 
     let smsResult: SmsSendResult | undefined;
     if (smsOptions?.send && smsOptions.phone) {
       const facility = smsOptions.facilityName || 'Your clinic';
-      const body = `${facility}: please complete your intake forms (${formList}) at reception or on your next visit.`;
+      const body = link
+        ? `${facility}: please complete your intake forms (${formList}) here: ${link} — you will be asked for your surname and date of birth.`
+        : `${facility}: please complete your intake forms (${formList}) at reception or on your next visit.`;
       try {
         const { sendSms } = await import('../sms');
-        smsResult = await sendSms({ to: smsOptions.phone, body });
+        smsResult = await sendSms({ to: smsOptions.phone, body, channel: smsOptions.channel });
       } catch (err) {
         smsResult = { ok: false, providerId: 'error', error: err instanceof Error ? err.message : 'unknown_error' };
       }
@@ -137,7 +147,10 @@ export function useIntakeForms() {
         // was requested so the mail is actionable on its own.
         body: `Hello ${patientName},\n\n`
           + `${facility} has asked you to complete the following before your visit: ${formList}.\n\n`
-          + `You can fill these in at reception when you arrive, or ask staff for help completing them in advance.\n\n`
+          + (link
+            ? `Open your forms here:\n${link}\n\n`
+              + `You will be asked for your surname and date of birth to confirm the forms are yours.\n\n`
+            : `You can fill these in at reception when you arrive, or ask staff for help completing them in advance.\n\n`)
           + `Please do not reply to this message.`,
       });
 
@@ -157,6 +170,20 @@ export function useIntakeForms() {
           hospitalId: updated.hospitalId,
         });
       } catch { /* best-effort; do not surface as a send failure */ }
+    }
+
+    // What the desk needs later: which channels carried the link, not just
+    // whether a gateway accepted it. Written once, after both attempts, so a
+    // single put covers them.
+    const sentVia: ('sms' | 'whatsapp' | 'email')[] = [];
+    if (smsResult?.ok) sentVia.push(smsOptions?.channel === 'whatsapp' ? 'whatsapp' : 'sms');
+    if (emailResult?.ok) sentVia.push('email');
+    if (sentVia.length > 0) {
+      try {
+        const db = intakeFormsDB();
+        const doc = await db.get(created._id) as IntakeFormWithSms;
+        await db.put({ ...doc, sentVia, updatedAt: new Date().toISOString() });
+      } catch { /* best-effort record-keeping; the sends already happened */ }
     }
 
     await loadForms();

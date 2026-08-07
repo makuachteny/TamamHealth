@@ -105,12 +105,16 @@ export default function FacilityManagementDashboard() {
         if (!cancelled) setEnquiries(m.slice(0, 5));
       } catch { /* leave empty */ }
       try {
-        const { getAllAvailability } = await import('@/lib/services/availability-service');
+        // Recurrence-aware: a clinic that runs every Monday has no row dated
+        // today, so matching on `a.date === today` showed every provider as
+        // unavailable the moment availability became a weekly pattern.
+        const { getAllAvailability, appliesOnDate } = await import('@/lib/services/availability-service');
+        const { jubaDate, jubaTime } = await import('@/lib/time-juba');
         const av = await getAllAvailability(scope);
-        const today = new Date().toISOString().slice(0, 10);
-        const now = new Date().toTimeString().slice(0, 5);
+        const today = jubaDate();
+        const now = jubaTime();
         const ids = new Set(
-          av.filter(a => a.status !== 'cancelled' && a.date === today && a.startTime <= now && a.endTime >= now)
+          av.filter(a => appliesOnDate(a, today) && a.startTime <= now && a.endTime >= now)
             .map(a => a.providerId),
         );
         if (!cancelled) setAvailableProviderIds(ids);

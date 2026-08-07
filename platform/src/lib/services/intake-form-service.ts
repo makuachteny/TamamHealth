@@ -188,6 +188,25 @@ export async function submitIntakeFormAnswers(
   return updated;
 }
 
+/**
+ * The secret that goes in the patient's link.
+ *
+ * 32 hex characters from the platform crypto source — `Math.random` is not
+ * acceptable for something that addresses a health record. Generated per
+ * request so revoking one form never affects another.
+ */
+function newAccessToken(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** The path a patient opens to fill the form in. Relative — the caller adds
+ *  the origin, which differs between local dev and the deployed site. */
+export function intakeFormPath(token: string): string {
+  return `/intake/${token}`;
+}
+
 export async function sendIntakeFormRequest(
   patientId: string | undefined,
   patientName: string,
@@ -199,6 +218,7 @@ export async function sendIntakeFormRequest(
     patientName,
     status: 'not_submitted',
     requestedAt: new Date().toISOString(),
+    accessToken: newAccessToken(),
     fields,
     ...data,
   });

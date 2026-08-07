@@ -5218,6 +5218,7 @@ const ha: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'Lambar waya',
   'patientNew.phoneOptionalLabel': 'Waya',
   'patientNew.phoneOptionalNote': 'Filayen waya na zaɓi sai an yi amfani da su',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'Majiyyaci',
   'patientNew.photoFingerprintHeading': 'Hoto & Alamar Yatsa',
   'patientNew.photoHelp': 'Ɗauki hoto da kyamara, ko loda ɗaya. Yi amfani da hoto bayyananne na fuska. JPG, PNG ko WebP, mafi girma 5 MB.',

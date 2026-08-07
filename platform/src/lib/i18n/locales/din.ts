@@ -5236,6 +5236,7 @@ const din: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'Namba de Tëlpün',
   'patientNew.phoneOptionalLabel': 'Tëlpün',
   'patientNew.phoneOptionalNote': 'Namba tëlpün cïï tɛ̈k lɛ̈ɛ̈ ke gam',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'Raan Tuany',
   'patientNew.photoFingerprintHeading': 'Thwoŋ ku Cïï Tetni',
   'patientNew.photoHelp': 'Gam thwoŋ kɛ camera, ku upload tok. Gam thwoŋ mi tɔ̈ ku nyuɔ̈th nyin. JPG, PNG ku WebP, 5 MB tueŋ.',

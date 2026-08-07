@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2, Camera } from '@/components/icons/lucide';
+import { ArrowLeft, Trash2, Pencil } from '@/components/icons/lucide';
 import FingerprintCapture, { type CapturedFingerprint } from '@/components/FingerprintCapture';
 import PhotoCaptureModal from '@/components/patients/PhotoCaptureModal';
 import { statesAndCounties, states, tribes, languages } from '@/data/mock';
@@ -18,7 +18,9 @@ import RegistrationProgressRail from './RegistrationProgressRail';
 import RegistrationReview from './RegistrationReview';
 import { buildReviewGroups } from './review-groups';
 import {
-  SECTION_ANCHORS, REVIEW_SECTION, scrollParentOf, sectionRequirementProgress,
+  SECTION_ANCHORS, REVIEW_SECTION, VALIDATED_SECTIONS,
+  DEMOGRAPHICS_SECTION, CONTACT_SECTION, NEXTOFKIN_SECTION,
+  scrollParentOf, sectionRequirementProgress,
 } from './registration-progress';
 
 interface PatientRegistrationFormProps {
@@ -32,9 +34,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
   const { t } = useTranslation();
   // Memoized because the review read-back is derived from it — a fresh array
   // each render would rebuild that on every keystroke.
+  // In SECTION_ANCHORS order — Biometrics second, under Demographics.
   const steps = useMemo(() => [
-    t('patientNew.stepDemographics'), t('patientNew.stepContactLocation'),
-    t('patientNew.stepNextOfKin'), t('patientNew.stepBiometrics'),
+    t('patientNew.stepDemographics'), t('patientNew.stepBiometrics'),
+    t('patientNew.stepContactLocation'), t('patientNew.stepNextOfKin'),
     t('patientNew.stepPaymentCoverage'), t('patientNew.stepReview'),
   ], [t]);
   // Short per-step hint shown once in the card header. Previously each step
@@ -205,7 +208,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
   // Validate current step before allowing navigation
   const validateStep = (s: number): Record<string, string> => {
     const errs: Record<string, string> = {};
-    if (s === 0) {
+    if (s === DEMOGRAPHICS_SECTION) {
       if (!form.firstName.trim()) errs.firstName = t('patientNew.errFirstNameRequired');
       if (!form.surname.trim()) errs.surname = t('patientNew.errSurnameRequired');
       if (!form.gender) errs.gender = t('patientNew.errGenderRequired');
@@ -215,7 +218,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
         if (isNaN(age) || age < 0 || age > 150) errs.estimatedAge = t('patientNew.errAgeRange');
       }
       if (!form.primaryLanguage) errs.primaryLanguage = t('patientNew.errPrimaryLanguageRequired');
-    } else if (s === 1) {
+    } else if (s === CONTACT_SECTION) {
       if (!form.state) errs.state = t('patientNew.errStateRequired');
       if (form.state && !form.county) errs.county = t('patientNew.errCountyRequired');
       // Phone/altPhone/whatsapp are optional — only flag a non-empty malformed
@@ -227,7 +230,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
       // this only flags something the clerk actually typed wrong.
       if (!isValidEmail(form.email)) errs.email = t('validation.errEmail');
       if (!isValidNationalId(form.nationalId)) errs.nationalId = t('validation.errNationalId');
-    } else if (s === 2) {
+    } else if (s === NEXTOFKIN_SECTION) {
       if (!form.nokName.trim()) errs.nokName = t('patientNew.errNokNameRequired');
       if (!form.nokRelationship) errs.nokRelationship = t('patientNew.errRelationshipRequired');
       if (!form.nokPhone.trim()) errs.nokPhone = t('patientNew.errNokPhoneRequired');
@@ -253,28 +256,33 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
    * it, pressing the button looked like it did nothing at all.
    */
   const validateAll = (): boolean => {
-    const perSection = [validateStep(0), validateStep(1), validateStep(2)];
-    const allErrors = Object.assign({}, ...perSection);
+    // Kept as [sectionIndex, errors] pairs rather than a bare array. The
+    // sections that validate are no longer 0,1,2 — Biometrics sits at 1 and
+    // requires nothing — so a position in this list is not a section index,
+    // and treating it as one flagged the wrong section in the rail and
+    // scrolled to the wrong anchor.
+    const perSection = VALIDATED_SECTIONS
+      .map(section => [section, validateStep(section)] as const);
+    const allErrors = Object.assign({}, ...perSection.map(([, errs]) => errs));
     if (Object.keys(allErrors).length === 0) {
       setErrorSections(new Set());
       return true;
     }
     setErrors(allErrors);
-    const failed = perSection
-      .map((errs, i) => (Object.keys(errs).length > 0 ? i : -1))
-      .filter(i => i >= 0);
-    setErrorSections(new Set(failed));
+    const failed = perSection.filter(([, errs]) => Object.keys(errs).length > 0);
+    setErrorSections(new Set(failed.map(([section]) => section)));
     // A failure found from the review page has to put the form back on screen,
     // otherwise the scroll below targets a section that is not rendered.
     setReviewMode(false);
     showToast(t('patientNew.toastFillRequired'), 'error');
-    const firstField = Object.keys(perSection[failed[0]])[0];
+    const [firstSection, firstErrors] = failed[0];
+    const firstField = Object.keys(firstErrors)[0];
     // Deferred a frame: when we have just come back from review the form is
     // still being mounted, and scrollIntoView on a detached node does nothing.
     requestAnimationFrame(() => {
       const target =
         document.querySelector<HTMLElement>(`[data-field="${firstField}"]`) ??
-        document.getElementById(`reg-${SECTION_ANCHORS[failed[0]]}`);
+        document.getElementById(`reg-${SECTION_ANCHORS[firstSection]}`);
       target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
     return false;
@@ -533,7 +541,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                 rather than sitting underneath, so the clerk never scrolls
                 through a summary of fields they have not filled yet. */}
             {!reviewMode && (<>
-            {/* Step 0: Demographics */}
+            {/* Section 0: Demographics */}
             {(
               <section className="registration-section omrs-reg-section" id="reg-demographics">
                 <header className="omrs-reg-sectionhead">
@@ -602,11 +610,75 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               </section>
             )}
 
-            {/* Step 1: Contact & Location */}
+            {/* Section 1: Biometrics — patient photo and fingerprint enrollment.
+                Directly under Demographics: the photo and prints are taken
+                while the patient is still being identified, not after their
+                address and next of kin have been typed. */}
+            {(
+              <section className="registration-section omrs-reg-section" id="reg-biometrics">
+                <header className="omrs-reg-sectionhead">
+                  <h2>2. {steps[1]}</h2>
+                </header>
+                <div className="omrs-reg-fields">
+                <p className="registration-section-note">
+                  {t('patientNew.biometricsNote')}
+                </p>
+
+                {/* Patient photo capture */}
+                <div className="registration-inline-panel registration-inline-panel--media">
+                  <div className="registration-panel-heading">
+                    <h4>{t('patientNew.patientPhotoHeading')}</h4>
+                    <span>{t('patientNew.optionalLabel')}</span>
+                  </div>
+                  {/* The OpenMRS photo well: a plain bordered square holding
+                      the picture (or the words that stand in for it), with one
+                      dark action bar welded to its foot. The bar IS the button
+                      — there is no separate "Take photo" control beside it. */}
+                  <div className="registration-media-row">
+                    <div className="omrs-reg-photo">
+                      <div className="omrs-reg-photo-frame">
+                        {patientPhotoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={patientPhotoUrl} alt={t('patientNew.photoAlt')} />
+                        ) : (
+                          <span className="omrs-reg-photo-empty">{t('patientNew.noImageToDisplay')}</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPhotoModal(true)}
+                        className="omrs-reg-photo-edit"
+                        aria-label={patientPhotoUrl ? t('patientNew.retakePhoto') : t('patientNew.takePhoto')}
+                      >
+                        <span>{t('action.edit')}</span>
+                        <Pencil className="w-4 h-4" aria-hidden />
+                      </button>
+                    </div>
+                    <div className="omrs-reg-photo-aside">
+                      <p>{t('patientNew.photoHelp')}</p>
+                      {patientPhotoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setPatientPhotoUrl(null)}
+                          className="omrs-reg-photo-remove"
+                        >
+                          {t('action.remove')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <FingerprintCapture value={fingerprints} onChange={setFingerprints} />
+                </div>
+              </section>
+            )}
+
+            {/* Section 2: Contact & Location */}
             {(
               <section className="registration-section omrs-reg-section" id="reg-contact">
                 <header className="omrs-reg-sectionhead">
-                  <h2>2. {steps[1]}</h2>
+                  <h2>3. {steps[2]}</h2>
                   <p>{t('patientNew.requiredFieldsNote')}</p>
                 </header>
                 <div className="omrs-reg-fields">
@@ -704,11 +776,11 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               </section>
             )}
 
-            {/* Step 2: Next of Kin (multiple contacts supported) */}
+            {/* Section 3: Next of Kin (multiple contacts supported) */}
             {(
               <section className="registration-section omrs-reg-section" id="reg-nextofkin">
                 <header className="omrs-reg-sectionhead">
-                  <h2>3. {steps[2]}</h2>
+                  <h2>4. {steps[3]}</h2>
                   <p>{t('patientNew.requiredFieldsNote')}</p>
                 </header>
                 <div className="omrs-reg-fields">
@@ -793,61 +865,11 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               </section>
             )}
 
-            {/* Step 3: Biometrics — patient photo and fingerprint enrollment */}
-            {(
-              <section className="registration-section omrs-reg-section" id="reg-biometrics">
-                <header className="omrs-reg-sectionhead">
-                  <h2>4. {steps[3]}</h2>
-                  <p>{t('patientNew.requiredFieldsNote')}</p>
-                </header>
-                <div className="omrs-reg-fields">
-                <p className="registration-section-note">
-                  {t('patientNew.biometricsNote')}
-                </p>
-
-                {/* Patient photo capture */}
-                <div className="registration-inline-panel registration-inline-panel--media">
-                  <div className="registration-panel-heading">
-                    <h4>{t('patientNew.patientPhotoHeading')}</h4>
-                    <span>{t('patientNew.optionalLabel')}</span>
-                  </div>
-                  <div className="registration-media-row">
-                    <div className="flex-shrink-0" style={{ width: 72, height: 72, borderRadius: 12, overflow: 'hidden', border: '2px dashed var(--border-light)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {patientPhotoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={patientPhotoUrl} alt={t('patientNew.photoAlt')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--text-muted)', opacity: 0.4 }}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <button type="button" onClick={() => setShowPhotoModal(true)} className="btn btn-secondary btn-sm flex items-center gap-1.5">
-                        <Camera className="w-3.5 h-3.5" />
-                        {patientPhotoUrl ? t('patientNew.retakePhoto') : t('patientNew.takePhoto')}
-                      </button>
-                      {patientPhotoUrl && (
-                        <button type="button" onClick={() => setPatientPhotoUrl(null)} className="btn btn-sm text-xs" style={{ color: 'var(--text-muted)', background: 'transparent' }}>
-                          {t('action.remove')}
-                        </button>
-                      )}
-                    </div>
-                    <p>
-                      {t('patientNew.photoHelp')}
-                    </p>
-                  </div>
-                </div>
-
-                <FingerprintCapture value={fingerprints} onChange={setFingerprints} />
-                </div>
-              </section>
-            )}
-
-            {/* Step 4: Payment Coverage */}
+            {/* Section 4: Payment Coverage */}
             {(
               <section className="registration-section omrs-reg-section" id="reg-coverage">
                 <header className="omrs-reg-sectionhead">
                   <h2>5. {steps[4]}</h2>
-                  <p>{t('patientNew.requiredFieldsNote')}</p>
                 </header>
                 <div className="omrs-reg-fields">
                 <p className="registration-section-note">
@@ -868,13 +890,15 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                         type="button"
                         onClick={() => updateCoverageType(opt.value)}
                         className="registration-option-button"
-                        style={{
-                          border: `2px solid ${form.payorCoverageType === opt.value ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                          background: form.payorCoverageType === opt.value ? 'var(--accent-light)' : 'var(--overlay-subtle)',
-                        }}
+                        // Selection as an attribute rather than an inline
+                        // style: inline wins over every stylesheet, so the
+                        // hard-coded blue/tint here overrode the Carbon tile
+                        // treatment no matter how the rule was written.
+                        data-selected={form.payorCoverageType === opt.value ? 'true' : 'false'}
+                        aria-pressed={form.payorCoverageType === opt.value}
                       >
-                        <span className="text-sm font-semibold" style={{ color: form.payorCoverageType === opt.value ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{t(opt.labelKey)}</span>
-                        <span className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{t(opt.descKey)}</span>
+                        <span className="registration-option-label">{t(opt.labelKey)}</span>
+                        <span className="registration-option-desc">{t(opt.descKey)}</span>
                       </button>
                     ))}
                   </div>

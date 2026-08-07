@@ -5218,6 +5218,7 @@ const am: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'የስልክ ቁጥር',
   'patientNew.phoneOptionalLabel': 'ስልክ',
   'patientNew.phoneOptionalNote': 'የስልክ መስኮች ካልተጠቀሙባቸው በስተቀር አማራጭ ናቸው',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'ታካሚ',
   'patientNew.photoFingerprintHeading': 'ፎቶ እና የጣት አሻራ',
   'patientNew.photoHelp': 'በካሜራ ፎቶ አንሳ ወይም ስቀል። ግልጽ ፊት ለፊት ፎቶ ተጠቀም። JPG, PNG ወይም WebP, ከፍተኛ 5 ሜባ.',

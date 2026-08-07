@@ -5241,6 +5241,7 @@ const fr: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'Numéro de téléphone',
   'patientNew.phoneOptionalLabel': 'Téléphone',
   'patientNew.phoneOptionalNote': 'Les champs téléphone sont facultatifs sauf si utilisés',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'Patient',
   'patientNew.photoFingerprintHeading': 'Photo et empreinte digitale',
   'patientNew.photoHelp': 'Prenez une photo avec la caméra, ou téléversez-en une. Utilisez une photo nette, de face. JPG, PNG ou WebP, max 5 Mo.',

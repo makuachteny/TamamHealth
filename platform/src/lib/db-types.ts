@@ -278,6 +278,18 @@ export interface PatientIntakeFormDoc extends BaseDoc {
   requestedAt: string;
   /** When the patient submitted the form. Unset while status is not_submitted. */
   receivedAt?: string;
+  /**
+   * Secret in the link sent to the patient. Looks the form up at
+   * `/intake/<accessToken>`; on its own it grants nothing — the patient still
+   * confirms their surname and date of birth against the chart before any
+   * field is returned (see /api/intake/[token]).
+   *
+   * Long and random rather than derived from `_id`: the document id appears in
+   * sync traffic and staff URLs, and must not be guessable from them.
+   */
+  accessToken?: string;
+  /** How the link was delivered, for the desk's own record. */
+  sentVia?: ('sms' | 'whatsapp' | 'email')[];
   mergedAt?: string;
   mergedBy?: string;
   /** Submitted form answers, shown to staff during review. Free-form
@@ -1894,6 +1906,39 @@ export interface AvailabilityDoc extends BaseDoc {
   status: AvailabilityStatus;
   orgId?: string;
   payam?: string;
+
+  // ── Online booking (all optional; absent fields read as the old behaviour) ──
+  /**
+   * Weekly recurrence. When set, `date` is the first day of the series and the
+   * window repeats on `daysOfWeek` until `until`.
+   *
+   * Without this a clinic running Mon–Fri needs ~260 rows per provider per
+   * year, which is why availability was only ever filled in for demo days.
+   */
+  recurrence?: {
+    /** 0 = Sunday … 6 = Saturday. */
+    daysOfWeek: number[];
+    until: string;                 // YYYY-MM-DD, inclusive
+    /** Dates in range that are skipped (leave, holiday, conference). */
+    exceptions?: string[];
+  };
+  /** Restrict this window to specific visit reasons. Empty/unset = all. */
+  visitReasonIds?: string[];
+  /** Restrict to new or returning patients. Unset = both. */
+  patientClass?: 'new' | 'returning';
+  /** Concurrent bookings per slot. Unset = the facility policy default. */
+  capacity?: number;
+  /** Exam room this window occupies, for room-level conflict checking. */
+  roomId?: string;
+  /**
+   * Offered to patients booking themselves.
+   *
+   * Opt-in, not opt-out: an unset value means NO on the public channel. A
+   * window recorded before online booking existed was never reviewed for
+   * public exposure, and the seeded 00:00–23:59 demo windows would otherwise
+   * advertise a 24-hour clinic. Staff booking ignores this flag.
+   */
+  bookableOnline?: boolean;
 }
 
 // ===== Announcements (broadcast notices to staff) =====
@@ -1970,6 +2015,15 @@ export type AppointmentStatus =
   | 'cancelled' | 'no_show' | 'rescheduled';
 export type AppointmentType = 'general' | 'follow_up' | 'specialist' | 'anc' | 'immunization' | 'lab' | 'telehealth' | 'surgical' | 'dental' | 'mental_health' | 'walk_in';
 export type AppointmentPriority = 'routine' | 'urgent' | 'emergency';
+/**
+ * Which door the booking came in through. Absent on rows written before online
+ * booking existed, which are all staff-booked.
+ *
+ * `portal` — the signed-in patient portal.
+ * `public_widget` — the practice's own website (embedded widget) or link.
+ * `directory` — a provider's public profile page.
+ */
+export type AppointmentSource = 'staff' | 'portal' | 'public_widget' | 'directory';
 
 export interface AppointmentDoc extends BaseDoc {
   type: 'appointment';
@@ -2048,6 +2102,51 @@ export interface AppointmentDoc extends BaseDoc {
   state: string;
   county?: string;
   orgId?: string;
+
+  // ── Online booking (all optional; absent = staff-booked, the old shape) ──
+  /** Where the booking came from. Absent on every pre-existing row. */
+  source?: AppointmentSource;
+  /** What the booker said about themselves. Claimed, not verified. */
+  isNewPatient?: boolean;
+  visitReasonId?: string;
+  /** Denormalised: the exact label the patient chose, kept even if the
+   *  underlying visit reason is later renamed or retired. */
+  visitReasonName?: string;
+  /**
+   * Contact details for a booker with no chart yet.
+   *
+   * Public traffic never creates a `PatientDoc` — an unmatched booking parks
+   * its identity here and in the linked intake form until someone at the desk
+   * links it to an existing patient or registers a new one. Cleared on merge.
+   */
+  requester?: {
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone?: string;
+    dateOfBirth?: string;      // YYYY-MM-DD
+  };
+  /** Insurance as the patient typed it, plus the result of checking it. */
+  insuranceSubmitted?: {
+    provider: string;
+    memberId: string;
+    groupId?: string;
+    verifiedAt?: string;
+    verificationStatus?: 'verified' | 'denied' | 'pending';
+  };
+  /** "Additional notes for the practice" from the booking form. */
+  patientNotes?: string;
+  /** What the patient agreed to, and to which version of the wording. */
+  consent?: {
+    privacyAcceptedAt: string;
+    smsOptIn: boolean;
+    policyVersion: string;
+  };
+  /** Short public reference shown on the confirmation screen (e.g. TMH-8F3K2).
+   *  Also the key for the unauthenticated status/cancel links. */
+  bookingReference?: string;
+  /** The intake form carrying this booking's answers, pending desk review. */
+  intakeFormId?: string;
 }
 
 // ===== Telehealth Services (Private Sector) =====

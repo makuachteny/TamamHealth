@@ -1599,19 +1599,23 @@ export default function FrontDeskDashboardPage() {
         {registerOpen && (
           <Modal onClose={() => setRegisterOpen(false)} width={1180} align="center" disableBackdropClose labelledBy="patient-registration-dialog-title">
             <div className="ehr-checkin-dialog ehr-registration-dialog">
-              <div className="ehr-checkin-dialog-header">
-                <div>
-                  <h2 id="patient-registration-dialog-title">Register new patient</h2>
-                  <p>Complete the full patient registration without leaving the front desk.</p>
-                </div>
-                <div className="ehr-registration-dialog-actions">
-                  <button type="button" onClick={openFullRegistration} aria-label="Expand patient registration">
-                    <Maximize2 className="w-5 h-5" />
-                  </button>
-                  <button type="button" onClick={() => setRegisterOpen(false)} aria-label="Close patient registration">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+              {/* No header band. The form states its own title in the rail
+                  ("Register New Patient"), so the bar above it repeated that
+                  and spent 60px of a dialog that has to hold a long form.
+                  The two controls it carried are pinned over the body instead
+                  — they stay put while the form scrolls under them. The
+                  heading the dialog is labelled by moves with them, visually
+                  hidden, so `aria-labelledby` still resolves. */}
+              <div className="ehr-registration-dialog-actions">
+                <h2 id="patient-registration-dialog-title" className="sr-only">
+                  {t('frontDesk.registerNewPatient')}
+                </h2>
+                <button type="button" onClick={openFullRegistration} aria-label="Expand patient registration">
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+                <button type="button" onClick={() => setRegisterOpen(false)} aria-label="Close patient registration">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
               <div className="ehr-checkin-dialog-body">
                 <PatientRegistrationForm

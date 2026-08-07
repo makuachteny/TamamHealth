@@ -3955,6 +3955,7 @@ const en: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'Phone number',
   'patientNew.phoneOptionalLabel': 'Phone',
   'patientNew.phoneOptionalNote': 'Phone fields are optional unless used',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'Patient',
   'patientNew.photoFingerprintHeading': 'Photo & Fingerprint',
   'patientNew.photoHelp': 'Clear and front-facing. JPG, PNG or WebP, max 5 MB.',

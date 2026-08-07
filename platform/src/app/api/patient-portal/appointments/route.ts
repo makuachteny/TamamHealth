@@ -64,9 +64,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // Bypass appointment-service.createAppointment: it enforces conflict-checks
-  // and demands provider/booker identities the patient app does not supply.
   // Patient-initiated requests land in 'requested' for front-desk triage.
+  //
+  // The conflict guard runs on this path (see below). It used to be skipped —
+  // the route wrote straight to the database on the reasoning that the patient
+  // app supplies no provider or booker identity. That was survivable while
+  // every request was read by a human before it meant anything, but a portal
+  // that shows real bookable times is a real double-booking path: two patients
+  // pick the same 10:30 and one of them gets a phone call. The guard tolerates
+  // the missing identities on its own (an empty providerId is nothing to
+  // collide on), so there was never anything to bypass it for.
   const now = new Date().toISOString();
   const id = (typeof body._id === 'string' && body._id) || `apt-${uuidv4().slice(0, 8)}`;
 
@@ -100,6 +107,18 @@ export async function POST(req: NextRequest) {
   };
 
   try {
+    const { assertNoBookingConflicts, BookingConflictError } = await import('@/lib/services/appointment-service');
+    try {
+      await assertNoBookingConflicts(doc);
+    } catch (conflict) {
+      if (conflict instanceof BookingConflictError) {
+        // 409, not 500: the request was well-formed, the time just went. The
+        // patient app shows this message and refreshes the slot list.
+        return NextResponse.json({ error: conflict.message, code: 'slot_unavailable' }, { status: 409 });
+      }
+      throw conflict;
+    }
+
     const db = appointmentsDB();
     const resp = await db.put(doc);
     doc._rev = resp.rev;

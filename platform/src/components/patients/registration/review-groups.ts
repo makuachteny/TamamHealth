@@ -54,6 +54,15 @@ export function buildReviewGroups(
       section: 1,
       title: steps[1],
       rows: [
+        [t('patientNew.reviewFingerprints'), fingerprintCount > 0
+          ? t('patientNew.reviewFingerprintsEnrolled', { count: fingerprintCount })
+          : t('patientNew.reviewFingerprintsNotCaptured')],
+      ] as [string, string][],
+    },
+    {
+      section: 2,
+      title: steps[2],
+      rows: [
         [t('patientNew.phone'), form.phone],
         [t('patientNew.altPhone'), form.altPhone],
         [t('patientNew.whatsapp'), form.whatsapp],
@@ -70,8 +79,8 @@ export function buildReviewGroups(
       ] as [string, string][],
     },
     {
-      section: 2,
-      title: steps[2],
+      section: 3,
+      title: steps[3],
       rows: [
         [t('patientNew.fullName'), form.nokName],
         [t('patientNew.relationship'), form.nokRelationship],
@@ -85,15 +94,6 @@ export function buildReviewGroups(
           [`${i + 2}. ${t('patientNew.nokPhone')}`, nok.phone],
           [`${i + 2}. ${t('patientNew.nokAddress')}`, nok.address],
         ])),
-      ] as [string, string][],
-    },
-    {
-      section: 3,
-      title: steps[3],
-      rows: [
-        [t('patientNew.reviewFingerprints'), fingerprintCount > 0
-          ? t('patientNew.reviewFingerprintsEnrolled', { count: fingerprintCount })
-          : t('patientNew.reviewFingerprintsNotCaptured')],
       ] as [string, string][],
     },
     {

@@ -22,16 +22,22 @@ const calendarLocalizer = dateFnsLocalizer({
 export type CalEvent = { id: string; title: string; start: Date; end: Date; resource: AppointmentDoc };
 
 /**
- * Every appointment full width, one under the other.
+ * Full width when a booking is alone at its time; equal columns when it is not.
  *
- * Both built-in algorithms divide the column between concurrent appointments:
- * `overlap` cascades them on top of each other and `no-overlap` splits the
- * width, which is what produced the ragged half/third/full mix — a day where
- * some names were readable and others were a truncated sliver, and the eye had
- * to work out which column belonged to which time. The schedule now forbids two
- * appointments in the same slot (see `assertNoBookingConflicts`), so there is
- * nothing to divide the width between: each one takes the whole column at its
- * own time, and the day reads as a single stack.
+ * The day used to be drawn as a single stack, one appointment per row, because
+ * the schedule refused two bookings in the same slot anywhere in the facility.
+ * That rule is gone: two clinicians genuinely do see two patients at 09:00, so
+ * the column has to divide.
+ *
+ * Neither built-in algorithm is right here. `overlap` cascades events on top of
+ * each other, and `no-overlap` narrows an event whenever anything *anywhere in
+ * the day* chains into it, which is what produced the ragged half/third/full
+ * mix where some names were readable and others were a sliver.
+ *
+ * This splits by CONCURRENCY CLUSTER instead: events are grouped into runs that
+ * actually overlap in time, and each cluster divides its width evenly. A 09:00
+ * on its own still takes the full column; two at 09:00 take half each and stay
+ * equal — the eye can compare them without working out which width means what.
  *
  * Signature is react-big-calendar's `dayLayoutAlgorithm` contract — it hands us
  * the events plus the `slotMetrics` that convert a time range into the column's
@@ -48,15 +54,39 @@ export function stackedDayLayout({
   slotMetrics: SlotMetrics;
   accessors: { start: (e: CalEvent) => Date; end: (e: CalEvent) => Date };
 }) {
-  return [...events]
-    .sort((a, b) => +accessors.start(a) - +accessors.start(b))
-    .map(event => {
+  const sorted = [...events].sort((a, b) => (
+    +accessors.start(a) - +accessors.start(b) || +accessors.end(a) - +accessors.end(b)
+  ));
+
+  // Walk the day once, breaking a cluster whenever a booking starts at or after
+  // everything before it has finished.
+  const clusters: CalEvent[][] = [];
+  let current: CalEvent[] = [];
+  let clusterEnd = -Infinity;
+
+  for (const event of sorted) {
+    const start = +accessors.start(event);
+    const end = +accessors.end(event);
+    if (current.length && start >= clusterEnd) {
+      clusters.push(current);
+      current = [];
+      clusterEnd = -Infinity;
+    }
+    current.push(event);
+    clusterEnd = Math.max(clusterEnd, end);
+  }
+  if (current.length) clusters.push(current);
+
+  return clusters.flatMap(cluster => {
+    const width = 100 / cluster.length;
+    return cluster.map((event, index) => {
       const { top, height } = slotMetrics.getRange(accessors.start(event), accessors.end(event));
       return {
         event,
-        style: { top, height, width: 100, xOffset: 0 },
+        style: { top, height, width, xOffset: width * index },
       };
     });
+  });
 }
 
 /**
@@ -292,8 +322,9 @@ export default function AppointmentsCalendar({
       popup
       style={{ height: '100%' }}
       scrollToTime={new Date(1970, 0, 1, 7, 0, 0)}
-      // One stack, full width — see `stackedDayLayout`. Neither built-in
-      // algorithm does this: both divide the column between concurrent events.
+      // Full width alone, equal columns when concurrent — see
+      // `stackedDayLayout`. Neither built-in algorithm does this: `overlap`
+      // cascades and `no-overlap` narrows events that never actually collide.
       dayLayoutAlgorithm={stackedDayLayout as never}
       // The label is now a single ellipsised line, so the tooltip carries what
       // the block had to cut. (It was blanked while events wrapped and showed

@@ -97,6 +97,17 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_payment_plans',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_invoices',              direction: 'both', orgScoped: true },
 
+  // ----- Online booking & self-intake -----
+  // Config (reasons, policies, published profiles) is authored in the app but
+  // read by public server routes, so it replicates both ways like any other
+  // org data. Slot holds are deliberately absent: they live for ten minutes,
+  // are written and read only by the server, and replicating them to every
+  // clinician's browser would be pure churn.
+  { localName: 'tamamhealth_visit_reasons',         direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_booking_policies',      direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_provider_profiles',     direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_provider_reviews',      direction: 'both', orgScoped: true },
+
   // ----- Sync infrastructure (offline-first conflict surfaces) -----
   { localName: 'tamamhealth_sync_events',           direction: 'push', orgScoped: true },
   { localName: 'tamamhealth_conflict_queue',        direction: 'both', orgScoped: true },

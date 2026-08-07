@@ -13,7 +13,7 @@ export const noopProvider: SmsProvider = {
     const preview = input.body.length > 60
       ? `${input.body.slice(0, 60)}...`
       : input.body;
-    console.warn(`[sms:noop] would send to ${input.to}: ${preview}`);
+    console.warn(`[sms:noop] would send via ${input.channel || 'sms'} to ${input.to}: ${preview}`);
     return { ok: true, providerId: 'noop' };
   },
 };

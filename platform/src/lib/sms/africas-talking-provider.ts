@@ -13,6 +13,18 @@ import type { SmsProvider, SmsSendInput, SmsSendResult } from './provider';
 export const africasTalkingProvider: SmsProvider = {
   name: 'africastalking',
   async send(input: SmsSendInput): Promise<SmsSendResult> {
+    // This endpoint is SMS-only. Reported rather than silently downgraded to
+    // SMS: the caller chose WhatsApp because that is where the patient reads
+    // messages, and quietly texting them instead hides a delivery the clerk
+    // believes happened on the other channel.
+    if (input.channel === 'whatsapp') {
+      return {
+        ok: false,
+        providerId: 'africastalking',
+        error: 'whatsapp_not_supported',
+      };
+    }
+
     const username = process.env.AFRICAS_TALKING_USERNAME;
     const apiKey = process.env.AFRICAS_TALKING_API_KEY;
     const senderId = input.sender || process.env.AFRICAS_TALKING_SENDER_ID;

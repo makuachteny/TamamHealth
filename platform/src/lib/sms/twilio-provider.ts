@@ -14,7 +14,13 @@ export const twilioProvider: SmsProvider = {
   async send(input: SmsSendInput): Promise<SmsSendResult> {
     const sid = process.env.TWILIO_ACCOUNT_SID;
     const token = process.env.TWILIO_AUTH_TOKEN;
-    const from = input.sender || process.env.TWILIO_FROM_NUMBER;
+    // WhatsApp sends from a WhatsApp-enabled sender, which is a different
+    // number from the SMS long code on most accounts — fall back to the SMS
+    // one so a single-number account still works.
+    const whatsapp = input.channel === 'whatsapp';
+    const from = input.sender
+      || (whatsapp ? process.env.TWILIO_WHATSAPP_FROM : undefined)
+      || process.env.TWILIO_FROM_NUMBER;
 
     if (!sid || !token || !from) {
       return {
@@ -24,9 +30,15 @@ export const twilioProvider: SmsProvider = {
       };
     }
 
+    // Same Messages endpoint for both channels; WhatsApp is addressed by
+    // prefixing both ends. Prefixes are not doubled if the caller already
+    // supplied them.
+    const address = (raw: string) =>
+      whatsapp && !raw.startsWith('whatsapp:') ? `whatsapp:${raw}` : raw;
+
     const form = new URLSearchParams();
-    form.set('To', input.to);
-    form.set('From', from);
+    form.set('To', address(input.to));
+    form.set('From', address(from));
     form.set('Body', input.body);
 
     const auth = Buffer.from(`${sid}:${token}`).toString('base64');

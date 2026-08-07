@@ -55,4 +55,4 @@ export async function sendSms(input: SmsSendInput): Promise<SmsSendResult> {
   return provider.send({ ...input, to });
 }
 
-export type { SmsProvider, SmsSendInput, SmsSendResult };
+export type { SmsProvider, SmsSendInput, SmsSendResult, SmsChannel } from './provider';

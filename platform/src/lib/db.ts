@@ -250,6 +250,20 @@ export const ledgerDB = () => getDB('tamamhealth_ledger');
 // the matching patient's chart.
 export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 
+// ── Online booking & self-intake (see db-types-booking.ts) ──
+// Patient-facing service menu ("Reason for visit"), per org/facility.
+export const visitReasonsDB = () => getDB('tamamhealth_visit_reasons');
+// Per-facility rules every booking surface obeys (lead time, buffers, consent
+// wording, whether online booking is on at all).
+export const bookingPoliciesDB = () => getDB('tamamhealth_booking_policies');
+// Public-facing clinician profiles. Deliberately NOT fields on the user doc,
+// which carries password and PIN hashes.
+export const providerProfilesDB = () => getDB('tamamhealth_provider_profiles');
+// Short-lived claims on a slot while a patient fills in the booking form.
+export const slotHoldsDB = () => getDB('tamamhealth_slot_holds');
+// Patient reviews of completed visits, moderated before publication.
+export const providerReviewsDB = () => getDB('tamamhealth_provider_reviews');
+
 // Internal transfers of care ownership (provider/department/facility), with
 // their request → accept → complete workflow and append-only audit trail.
 // Distinct from `tamamhealth_referrals`, which moves a patient between
@@ -342,7 +356,13 @@ export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 // facility on the same day — duration-aware, so it also catches the pairs the
 // seed's exact-start-time de-collision pass leaves behind. Runs on fresh seeds
 // and on already-seeded browsers, keeping the earliest-created booking.
-export const SEED_VERSION = 69;
+// Bumped to 70: concurrent bookings across clinicians are legal. Double-booking
+// is now judged per PROVIDER (and per room) instead of per facility, in the
+// booking guard, the seed's de-collision pass, and the overlap sweep — so a
+// clinic with two doctors seeing two patients at 09:00 keeps both bookings, and
+// the day view draws them as equal side-by-side columns. Re-seed so demo days
+// show real parallel clinics rather than one single-file queue.
+export const SEED_VERSION = 70;
 
 export async function isSeeded(): Promise<boolean> {
   try {

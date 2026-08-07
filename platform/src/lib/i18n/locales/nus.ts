@@ -5247,6 +5247,7 @@ const nus: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'Namba Talɛpun',
   'patientNew.phoneOptionalLabel': 'Talɛpun',
   'patientNew.phoneOptionalNote': 'Namba talɛpun ke tɛ̈k lɛ̈ɛ̈ ke jɔ̈k lɛ̈ny',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'Raan Tuany',
   'patientNew.photoFingerprintHeading': 'Thuɔrä kɛ Cïï Tetni',
   'patientNew.photoHelp': 'Cap thuɔrä kɛ camera, kɛnɛ upload tɛ̈k. Cam thuɔrä mi tɔ̈ ku nyuɔ̈th nyin. JPG, PNG kɛnɛ WebP, 5 MB tueŋ.',

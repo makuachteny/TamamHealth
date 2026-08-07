@@ -6,15 +6,39 @@
  * counting can be tested without rendering anything.
  */
 
-/** Anchor ids for the rail's jump links, in the same order as the step labels. */
+/**
+ * Anchor ids for the rail's jump links, in the same order as the step labels
+ * and the sections on the page.
+ *
+ * Biometrics sits second, directly under Demographics: the photo and
+ * fingerprints are taken while the patient is still being identified, not
+ * after their address and next of kin have been typed.
+ *
+ * This array is the ONE place the order is written down. The step labels, the
+ * requirement counts, the review read-back and the validation all index into
+ * it, so a reorder here has to be a reorder there — use the named constants
+ * below rather than literals.
+ */
 export const SECTION_ANCHORS = [
-  'demographics', 'contact', 'nextofkin', 'biometrics', 'coverage', 'review',
+  'demographics', 'biometrics', 'contact', 'nextofkin', 'coverage', 'review',
 ] as const;
 
 export type SectionAnchor = typeof SECTION_ANCHORS[number];
 
+/** Named positions, so nothing downstream hard-codes 0/1/2. */
+export const DEMOGRAPHICS_SECTION = 0;
+export const BIOMETRICS_SECTION = 1;
+export const CONTACT_SECTION = 2;
+export const NEXTOFKIN_SECTION = 3;
+export const COVERAGE_SECTION = 4;
+
 /** Index of the Review step — a destination rather than a part of the form. */
 export const REVIEW_SECTION = SECTION_ANCHORS.length - 1;
+
+/** The sections that have anything to validate, in page order. */
+export const VALIDATED_SECTIONS = [
+  DEMOGRAPHICS_SECTION, CONTACT_SECTION, NEXTOFKIN_SECTION,
+] as const;
 
 export interface SectionProgress {
   /** Required fields answered in this section. */
@@ -49,14 +73,15 @@ const filled = (value: string) => Boolean(value && value.trim());
  * read as optional rather than as permanently unfinished.
  */
 export function sectionRequirementProgress(form: RegistrationRequirementInput): SectionProgress[] {
+  // One entry per SECTION_ANCHORS position, in that order.
   const requirements: boolean[][] = [
-    [filled(form.firstName), filled(form.surname), filled(form.gender),
+    /* demographics */ [filled(form.firstName), filled(form.surname), filled(form.gender),
       filled(form.dateOfBirth) || filled(form.estimatedAge), filled(form.primaryLanguage)],
-    [filled(form.state), filled(form.county)],
-    [filled(form.nokName), filled(form.nokRelationship), filled(form.nokPhone)],
-    [],
-    [],
-    [],
+    /* biometrics   */ [],
+    /* contact      */ [filled(form.state), filled(form.county)],
+    /* next of kin  */ [filled(form.nokName), filled(form.nokRelationship), filled(form.nokPhone)],
+    /* coverage     */ [],
+    /* review       */ [],
   ];
   return requirements.map(flags => ({
     done: flags.filter(Boolean).length,

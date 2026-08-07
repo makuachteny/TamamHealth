@@ -55,6 +55,10 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_clinical_notes',        // clinical-notes module (SOAP/H&P/consult/etc.) — facility-operational PHI narrative, not national analytics
   'tamamhealth_text_shortcuts',        // per-clinician "dot phrase" shortcuts for the notes module — personal/operational preference data, not national analytics
   'tamamhealth_facility_census',       // per-facility periodic census submissions — facility-operational reporting, not (yet) wired to a national analytics table
+  'tamamhealth_visit_reasons',         // a practice's own bookable service menu — facility configuration, not national analytics
+  'tamamhealth_booking_policies',      // per-facility online-booking rules (lead time, consent wording) — facility configuration, not national analytics
+  'tamamhealth_provider_profiles',     // public-facing clinician profiles (photo, bio, slug) — facility marketing content, not national analytics
+  'tamamhealth_provider_reviews',      // patient reviews of a clinician — facility reputation content, not a national health indicator
   // (tamamhealth_nutrition_screenings is NOT excluded — SAM/MAM now writes back
   //  to the `nutrition_screenings` national table via DB_TABLE_MAP + mapper.
   //  tamamhealth_program_enrollments is NOT excluded either — ART/TB/PMTCT/
@@ -65,6 +69,10 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
 const LOCAL_ONLY_DBS = new Set<string>([
   'tamamhealth_meta', // local sync cursors / device metadata
   'tamamhealth_usage_events', // facility analytics; not part of national sync
+  // Ten-minute claims on a booking slot, written and read by the server while a
+  // patient fills in the form. Replicating them to every clinician's browser
+  // would be pure churn for documents that are gone before they arrive.
+  'tamamhealth_slot_holds',
 ]);
 
 const repoRoot = process.cwd();

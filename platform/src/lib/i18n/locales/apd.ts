@@ -5223,6 +5223,7 @@ const apd: TranslationMap = {
   'patientNew.phoneNumberPlaceholder': 'رقم التلفون',
   'patientNew.phoneOptionalLabel': 'التلفون',
   'patientNew.phoneOptionalNote': 'حقول التلفون اختيارية إلا لو استخدمت',
+  'patientNew.noImageToDisplay': 'No image\nto display',
   'patientNew.photoAlt': 'العيان',
   'patientNew.photoFingerprintHeading': 'الصورة وبصمة الإصبع',
   'patientNew.photoHelp': 'صوّر بالكاميرا أو ارفع صورة. استخدم صورة واضحة من قدام. JPG أو PNG أو WebP، أقصاه 5 ميجا.',
