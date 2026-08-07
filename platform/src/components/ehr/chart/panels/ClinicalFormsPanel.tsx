@@ -19,17 +19,29 @@ import { useANC } from '@/lib/hooks/useANC';
 import { useNutritionScreenings } from '@/lib/hooks/useNutritionScreenings';
 import { useWards } from '@/lib/hooks/useWards';
 import { formatDate } from '@/lib/format-utils';
+import { isPathAllowed } from '@/lib/role-routes';
 import type { PatientDoc } from '@/lib/db-types';
-import type { ChartPanelRouter } from './types';
+import type { ChartPanelRouter, ChartPanelUser } from './types';
+
+interface ClinicalFormItem {
+  id: string;
+  name: string;
+  lastCompleted: string;
+  href: string;
+  enabled: boolean;
+  /** Shown as the row's tooltip when `enabled` is false. */
+  disabledReason?: string;
+}
 
 interface ClinicalFormsPanelProps {
   patient: PatientDoc;
   router: ChartPanelRouter;
   canConsult: boolean;
+  currentUser: ChartPanelUser | null | undefined;
   onClose: () => void;
 }
 
-export default function ClinicalFormsPanel({ patient, router, canConsult, onClose }: ClinicalFormsPanelProps) {
+export default function ClinicalFormsPanel({ patient, router, canConsult, currentUser, onClose }: ClinicalFormsPanelProps) {
   const [search, setSearch] = useState('');
   const { records } = useMedicalRecords(patient._id);
   const { triages } = useTriage(patient._id);
@@ -41,7 +53,11 @@ export default function ClinicalFormsPanel({ patient, router, canConsult, onClos
   const patientScreenings = (screenings || []).filter(s => s.patientId === patient._id);
   const patientAdmissions = (admissions || []).filter(a => a.patientId === patient._id);
 
-  const forms = useMemo(() => {
+  // The triage form lives on the nursing route, which reception cannot open —
+  // gate the row rather than letting the click land on "Access Restricted".
+  const canTriage = isPathAllowed(currentUser?.role || '', '/triage');
+
+  const forms = useMemo<ClinicalFormItem[]>(() => {
     const lastRecord = records[0];
     const lastTriage = triages[0];
     const lastANC = [...patientANC].sort((a, b) => (b.visitDate || '').localeCompare(a.visitDate || ''))[0];
@@ -55,13 +71,17 @@ export default function ClinicalFormsPanel({ patient, router, canConsult, onClos
         lastCompleted: lastRecord ? formatDate(lastRecord.consultedAt || lastRecord.visitDate) : 'Never',
         href: `/consultation?patientId=${patient._id}`,
         enabled: canConsult,
+        disabledReason: 'Requires consultation permission',
       },
       {
         id: 'triage',
         name: 'Triage / ETAT Assessment',
         lastCompleted: lastTriage ? formatDate(lastTriage.triagedAt) : 'Never',
-        href: `/check-in?patientId=${patient._id}`,
-        enabled: true,
+        // The standalone Check-In module is retired; the per-patient triage
+        // route is the ETAT form's real home and is addressable by patient id.
+        href: `/triage/${patient._id}`,
+        enabled: canTriage,
+        disabledReason: 'Requires triage permission',
       },
       {
         id: 'anc',
@@ -85,7 +105,7 @@ export default function ClinicalFormsPanel({ patient, router, canConsult, onClos
         enabled: true,
       },
     ];
-  }, [records, triages, patientANC, patientScreenings, patientAdmissions, patient._id, canConsult]);
+  }, [records, triages, patientANC, patientScreenings, patientAdmissions, patient._id, canConsult, canTriage]);
 
   const filtered = forms.filter(f => f.name.toLowerCase().includes(search.trim().toLowerCase()));
 
@@ -112,7 +132,7 @@ export default function ClinicalFormsPanel({ patient, router, canConsult, onClos
           type="button"
           className="omrs-panel-list-item"
           disabled={!f.enabled}
-          title={f.enabled ? undefined : 'Requires consultation permission'}
+          title={f.enabled ? undefined : f.disabledReason}
           style={f.enabled ? undefined : { opacity: 0.5, cursor: 'not-allowed' }}
           onClick={() => { if (f.enabled) { router.push(f.href); onClose(); } }}
         >

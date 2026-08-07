@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/context';
 import type { AnnouncementDoc, AnnouncementAudience, AnnouncementPriority } from '@/lib/db-types';
 import type { DataScope } from '@/lib/services/data-scope';
 import { Megaphone, X, Loader2, Send, Plus, Check } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const PRIORITY_STYLE: Record<AnnouncementPriority, { color: string; bg: string; label: string }> = {
   normal: { color: 'var(--text-secondary)', bg: 'var(--overlay-medium)', label: 'Normal' },
@@ -116,15 +117,15 @@ export default function AnnouncementsPanel({ onClose, onUnreadChange }: { onClos
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" className="w-full px-2.5 py-1.5 rounded-md text-sm" style={inputStyle} />
           <textarea value={bodyText} onChange={e => setBodyText(e.target.value)} placeholder="Message…" rows={3} className="w-full px-2.5 py-1.5 rounded-md text-sm" style={inputStyle} />
           <div className="grid grid-cols-2 gap-2">
-            <select value={audience} onChange={e => setAudience(e.target.value as AnnouncementAudience)} className="px-2.5 py-1.5 rounded-md text-sm" style={inputStyle}>
+            <Select value={audience} onChange={e => setAudience(e.target.value as AnnouncementAudience)} className="px-2.5 py-1.5 rounded-md text-sm" style={inputStyle}>
               <option value="organization">Whole organization</option>
               <option value="facility">My facility</option>
-            </select>
-            <select value={priority} onChange={e => setPriority(e.target.value as AnnouncementPriority)} className="px-2.5 py-1.5 rounded-md text-sm" style={inputStyle}>
+            </Select>
+            <Select value={priority} onChange={e => setPriority(e.target.value as AnnouncementPriority)} className="px-2.5 py-1.5 rounded-md text-sm" style={inputStyle}>
               <option value="normal">Normal</option>
               <option value="important">Important</option>
               <option value="urgent">Urgent</option>
-            </select>
+            </Select>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => { setComposing(false); setError(''); }} className="btn btn-secondary btn-sm">Cancel</button>

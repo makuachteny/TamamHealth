@@ -1136,6 +1136,19 @@
   --color-danger-border: #F87171;
   --color-info-border: var(--tb-blue-700);
 
+  /* ETAT triage acuity — Emergency / Urgent / Routine.
+     The single definition of what an acuity looks like: the CSS rules for the
+     worklist cue read these, and so does lib/clinical/triage-display.ts, which
+     paints the same three words inline elsewhere. Before this, RED text was
+     #EF4444 in TSX and --color-danger in CSS — one acuity, two reds. Amber
+     uses the -text variant because #D97706 on white fails AA at this size. */
+  --acuity-red: var(--color-danger);
+  --acuity-yellow: var(--color-warning-text);
+  --acuity-green: var(--color-success);
+  --acuity-red-bg: var(--color-danger-bg);
+  --acuity-yellow-bg: var(--color-warning-bg);
+  --acuity-green-bg: var(--color-success-bg);
+
   /* Workflow semantics — use these in shared rows, pills, queues, and admin
      surfaces so color carries the same meaning across departments. */
   --semantic-active: var(--color-info-text);
@@ -16417,7 +16430,6 @@ textarea.ehr-handoff-input {
   border-radius: 0;
   background: transparent;
   color: var(--ehr-text);
-  transition: color 120ms ease, background 120ms ease, padding 120ms ease;
 }
 
 .ehr-right-rail .ehr-outstanding-chips button:last-child,
@@ -16425,21 +16437,38 @@ textarea.ehr-handoff-input {
   border-bottom: 0;
 }
 
+/* Hover recolours the row and nothing else.
+   It used to also tint the background, round the corners and grow
+   padding-inline — all of it animated — so pointing at a row slid its label
+   sideways and pulled it out of line with the rows above and below.
+   (This is the same objection the base .ehr-side-card rules already record
+   about an earlier expanded pill; this override reintroduced it.) */
 .ehr-right-rail .ehr-outstanding-chips button:hover,
 .ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row):hover {
-  padding-inline: 10px;
-  border-radius: 8px;
-  background: rgba(33, 145, 208, 0.07);
   color: var(--tb-blue-800, #015697);
 }
 
+/* Selected changes colour and nothing else — same rule as hover above.
+   It used to grow padding-inline, round its corners, drop its divider and
+   fill with a tint, which turned the clicked row into a pill: the row
+   physically changed shape and width and stopped lining up with its
+   neighbours. Every row now keeps identical geometry in every state. */
 .ehr-right-rail .ehr-outstanding-chips button.is-open,
 .ehr-right-rail .ehr-side-card > button:not(.ehr-side-card-icon-row).active {
-  padding-inline: 10px;
-  border-bottom-color: transparent;
-  border-radius: 8px;
-  background: rgba(33, 145, 208, 0.12);
+  /* Explicitly transparent: the unscoped `.ehr-outstanding-chips button.is-open`
+     rule still fills the selected chip with --ehr-blue-light, and this rule
+     only wins for the properties it names. */
+  background: transparent;
   color: var(--tb-blue-800, #015697);
+}
+
+/* Clicking a row opens a panel; it must not be left wearing a focus ring,
+   which reads as a second box drawn around the row. Keyboard focus
+   (:focus-visible) still gets the global outline. The sibling rule for
+   .ehr-side-card buttons already does this — the outstanding-items rows share
+   this row language and were missing it. */
+.ehr-right-rail .ehr-outstanding-chips button:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .ehr-right-rail .ehr-outstanding-chips button span,
@@ -18812,16 +18841,18 @@ textarea.ehr-handoff-input {
   font-weight: 800;
 }
 
+/* Straight from the acuity tokens, so this cue and the same words rendered
+   inline elsewhere cannot drift apart. YELLOW was a loose #B45309 here. */
 .appointment-card-status[data-priority='RED'] > small {
-  color: var(--color-danger);
+  color: var(--acuity-red);
 }
 
 .appointment-card-status[data-priority='YELLOW'] > small {
-  color: #B45309;
+  color: var(--acuity-yellow);
 }
 
 .appointment-card-status[data-priority='GREEN'] > small {
-  color: var(--color-success);
+  color: var(--acuity-green);
 }
 
 .appointment-status-pill.status-checked-in,
@@ -25271,21 +25302,162 @@ table.patient-data-table.patient-data-table {
   margin: 0 0 6px;
 }
 
-.omrs-reg-nav { display: flex; flex-direction: column; }
-
 /* The marker line is the rail: each item hangs off one continuous rule, so
-   the list reads as a route through the form rather than five loose links. */
+   the list reads as a route through the form rather than five loose links.
+   The rule is now a progress track — see .omrs-reg-spine. */
+.omrs-reg-nav {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Unfilled track, full height of the list. */
+.omrs-reg-nav::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--border-light, #E2E8F0);
+  border-radius: 2px;
+}
+
+/* Filled portion, growing top-down with the share of required fields
+   answered. Separate from the track so it can animate its own height. */
+.omrs-reg-spine {
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  width: 2px;
+  height: calc((100% - 20px) * var(--omrs-reg-fill, 0%) / 100%);
+  background: var(--accent-primary);
+  border-radius: 2px;
+  transition: height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* A button, not a link: the item has to be able to leave the review page as
+   well as scroll, and Review itself is a destination with no anchor. */
 .omrs-reg-navitem {
   position: relative;
-  padding: 8px 0 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 0 8px 22px;
+  border: none;
+  background: none;
+  font-family: inherit;
   font-size: 13.5px;
+  text-align: left;
   color: var(--text-secondary, var(--text-primary));
   text-decoration: none;
-  border-left: 2px solid var(--border-light, #E2E8F0);
+  cursor: pointer;
 }
-.omrs-reg-navitem:hover {
-  color: var(--accent-primary);
-  border-left-color: var(--accent-primary);
+.omrs-reg-navitem:hover:not(:disabled) { color: var(--accent-primary); }
+
+/* Review stays out of reach until the form would actually submit — offering
+   it earlier only produces a bounce back to the first missing field. */
+.omrs-reg-navitem:disabled { cursor: not-allowed; opacity: 0.5; }
+.omrs-reg-navitem[data-state="locked"] .omrs-reg-node {
+  background: var(--bg-card-solid, #fff);
+  box-shadow: 0 0 0 2px var(--border-light, #E2E8F0) inset;
+}
+
+.omrs-reg-navlabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── The node: one marker per section, sitting on the spine ──
+   Empty ring → conic sweep as fields are answered → solid once the section
+   is complete. The marker is the progress, so the eye reads the rail as a
+   route with distance covered rather than a plain list of links. */
+.omrs-reg-node {
+  position: absolute;
+  left: 0;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg-card-solid, #fff);
+  box-shadow: 0 0 0 2px var(--border-light, #E2E8F0) inset;
+  transition: box-shadow 0.25s ease, background 0.25s ease, transform 0.25s ease;
+}
+
+/* The sweep is painted as a conic gradient clipped to a ring, so a section
+   two fields into three reads as two-thirds round. */
+.omrs-reg-navitem[data-state="partial"] .omrs-reg-node {
+  background:
+    conic-gradient(var(--accent-primary) var(--omrs-reg-node-pct, 0%), var(--border-light, #E2E8F0) 0);
+  box-shadow: 0 0 0 2px var(--bg-card-solid, #fff) inset;
+}
+
+.omrs-reg-navitem[data-state="complete"] .omrs-reg-node {
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary) inset;
+}
+
+.omrs-reg-navitem[data-state="optional"] .omrs-reg-node {
+  background: var(--border-light, #E2E8F0);
+  box-shadow: none;
+  transform: scale(0.6);
+}
+
+.omrs-reg-navitem[data-state="error"] .omrs-reg-node {
+  background: var(--color-danger, #dc2626);
+  box-shadow: 0 0 0 2px var(--color-danger, #dc2626) inset;
+}
+
+/* Where you are, as distinct from what is done: a halo, not a fill, so it
+   never reads as "this section is complete". */
+.omrs-reg-navitem.is-current { color: var(--text-primary); font-weight: 650; }
+.omrs-reg-navitem.is-current .omrs-reg-node {
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 2px var(--accent-primary) inset,
+    0 0 0 4px var(--accent-light);
+}
+.omrs-reg-navitem.is-current[data-state="optional"] .omrs-reg-node { transform: scale(0.85); }
+
+/* Trailing count / tick / "Optional". */
+.omrs-reg-navmeta {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+.omrs-reg-navitem[data-state="complete"] .omrs-reg-navmeta { color: var(--accent-primary); }
+.omrs-reg-navitem[data-state="error"] .omrs-reg-navmeta { color: var(--color-danger, #dc2626); }
+.omrs-reg-navitem[data-state="optional"] .omrs-reg-navmeta {
+  font-weight: 500;
+  text-transform: lowercase;
+  opacity: 0.75;
+}
+
+/* Overall tally beside the "Jump to" heading. */
+.omrs-reg-jumphead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.omrs-reg-tally {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+.omrs-reg-tally.is-complete { color: var(--accent-primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .omrs-reg-spine, .omrs-reg-node { transition: none; }
 }
 
 .omrs-reg-railactions {
@@ -25383,14 +25555,12 @@ table.patient-data-table.patient-data-table {
    belongs. */
 .omrs-reg-navitem.has-errors {
   color: var(--color-danger, #dc2626);
-  border-left-color: var(--color-danger, #dc2626);
   font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
-.omrs-reg-navitem.has-errors span {
+/* Scoped to the trailing badge only. This used to be `.has-errors span`, which
+   now also matches the node and the label — an errored section rendered its
+   own name as a 16px red circle. */
+.omrs-reg-navitem.has-errors .omrs-reg-navmeta {
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
@@ -25402,3 +25572,426 @@ table.patient-data-table.patient-data-table {
   line-height: 16px;
   text-align: center;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Searchable select (components/Select.tsx)
+
+   The trigger is still a real <select>, so it inherits every `select` rule
+   above and needs no styling here. These rules are only for the popup that
+   replaces the OS dropdown, portalled to <body> so no ancestor's
+   `overflow: hidden` can clip it.
+
+   Two shapes come out of that. A short list gets a plain menu under the
+   trigger. A long one gets the in-place form: the popup opens *on* the
+   trigger, its filter box wearing the field's own metrics and focus ring, so
+   the bar does not appear to be replaced by a panel — it appears to have been
+   focused, with its options spilling out underneath.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.tsel-menu {
+  position: fixed;
+  z-index: 3000;                /* above the modal backdrop (2000), matching
+                                   CodedSearchField — a select inside a dialog
+                                   must still be able to open, and below that
+                                   the popup is both dimmed and unclickable. */
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 12px 32px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+  outline: none;
+  animation: tselMenuIn 0.13s cubic-bezier(0.2, 0, 0.2, 1);
+  transform-origin: top center;
+}
+
+.tsel-menu.is-flipped {
+  animation-name: tselMenuInUp;
+  transform-origin: bottom center;
+}
+
+@keyframes tselMenuIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.99); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes tselMenuInUp {
+  from { opacity: 0; transform: translateY(4px) scale(0.99); }
+  to   { opacity: 1; transform: none; }
+}
+
+.tsel-search {
+  position: relative;
+  flex: none;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.tsel-search .tsel-search-icon {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  /* globals.css restyles icons broadly; pin this one so it stays muted. */
+  color: var(--text-muted);
+}
+
+/* Scoped rather than relying on the global input rule: this box sits inside a
+   popup, so it needs its own compact metrics and no focus ring shouting over
+   the list beneath it. */
+.tsel-menu .tsel-search input {
+  width: 100%;
+  padding: 8px 10px 8px 34px;
+  font-family: var(--font-platform);
+  font-size: 0.85rem;
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  background: var(--bg-card-solid);
+  color: var(--text-primary);
+}
+
+.tsel-menu .tsel-search input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: none !important;
+}
+
+/* ── In-place filter box ──────────────────────────────────────────────
+   The popup opens over the trigger rather than under it, and this box takes
+   the trigger's exact height and type size, so clicking a dropdown turns that
+   same bar into the field you type in — the rows below narrow letter by
+   letter while the bar keeps its place in the form. */
+
+/* The field's own focus treatment (see `input:focus` above), worn by the whole
+   popup: same 10px radius, same accent hairline, same 3px halo. Opening reads
+   as focusing the field, not as a panel landing on top of it. */
+.tsel-menu.is-inline {
+  border-radius: var(--input-radius);
+  border-color: var(--accent-primary);
+  box-shadow:
+    0 0 0 3px var(--accent-light),
+    0 16px 36px rgba(15, 23, 42, 0.13);
+}
+
+.tsel-menu.is-inline .tsel-search {
+  height: var(--tsel-trigger-h, 42px);
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.tsel-menu.is-inline .tsel-search .tsel-search-icon {
+  left: 15px;
+  width: 16px;
+  height: 16px;
+  color: var(--accent-primary);
+}
+
+.tsel-menu.is-inline .tsel-search input {
+  height: 100%;
+  /* Left clears the magnifier; right clears the caret/count. Matches the
+     field's own 16px text inset closely enough to look untouched. */
+  padding: 0 44px 0 41px;
+  font-size: var(--tsel-trigger-fs, 0.85rem);
+  font-weight: 500;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* The placeholder here is the current selection, not a hint — it carries the
+   trigger's text weight so the bar's contents do not visibly dim on open. */
+.tsel-menu.is-inline .tsel-search input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.tsel-menu.is-inline .tsel-search-caret {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  /* Pointing up while the list is down — the one bit of state the bar can
+     still show now that its own chevron is covered. */
+  transform: translateY(-50%) rotate(180deg);
+  pointer-events: none;
+  color: var(--accent-primary);
+}
+
+/* Rows left after filtering, sitting where the chevron was. */
+.tsel-menu.is-inline .tsel-search-count {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 22px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--overlay-subtle);
+  color: var(--accent-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Opened upward: the box still sits on the trigger, so the rows have to stack
+   above it — column-reverse puts the list on top without moving the box. */
+.tsel-menu.is-inline.is-flipped {
+  flex-direction: column-reverse;
+}
+
+.tsel-menu.is-inline.is-flipped .tsel-search {
+  border-bottom: none;
+  border-top: 1px solid var(--border-light);
+}
+
+.tsel-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-slate-300) transparent;
+
+  /* Scroll shadows. macOS hides overlay scrollbars until you actually scroll,
+     which leaves a full list looking like a finished one — these say "more
+     below" instead. The two `local` gradients scroll with the content and
+     cover the two `scroll` ones, so each shadow fades out exactly as that end
+     of the list is reached. No JS, no measuring. */
+  background:
+    linear-gradient(var(--bg-card-solid) 30%, rgba(255, 255, 255, 0)) top / 100% 16px local no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0), var(--bg-card-solid) 70%) bottom / 100% 16px local no-repeat,
+    radial-gradient(farthest-side at 50% 0, rgba(15, 23, 42, 0.11), rgba(15, 23, 42, 0)) top / 100% 7px scroll no-repeat,
+    radial-gradient(farthest-side at 50% 100%, rgba(15, 23, 42, 0.11), rgba(15, 23, 42, 0)) bottom / 100% 7px scroll no-repeat;
+}
+
+/* Inset track, so the thumb reads as part of the card rather than a bar
+   glued to its edge. */
+.tsel-list::-webkit-scrollbar { width: 11px; }
+.tsel-list::-webkit-scrollbar-track { background: transparent; }
+.tsel-list::-webkit-scrollbar-thumb {
+  background: var(--color-slate-300);
+  border: 3px solid var(--bg-card-solid);
+  border-radius: 999px;
+}
+.tsel-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+.tsel-row {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: var(--font-platform);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+/* Labels start where the typed query starts (6px list padding + 35px = the
+   input's 41px inset), so the eye follows one column from the box down through
+   the matches rather than two staggered edges. */
+.tsel-menu.is-inline .tsel-row {
+  padding-left: 35px;
+}
+
+/* Keyboard and pointer share one highlight, so arrowing down and hovering
+   never disagree about which row is about to be chosen. */
+.tsel-row.is-active {
+  background: var(--overlay-subtle);
+}
+
+.tsel-row.is-selected {
+  background: var(--accent-light);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+/* Already chosen *and* under the cursor — needs to sit a step above both, or
+   arrowing onto the current row looks like nothing happened. */
+.tsel-row.is-selected.is-active {
+  background: rgba(33, 145, 208, 0.16);
+}
+
+.tsel-row:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tsel-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The matched run of characters. Flat treatment — weight and accent colour,
+   no highlighter block, which would fight the row tints above. */
+.tsel-mark {
+  background: none;
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.tsel-row.is-selected .tsel-mark {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tsel-row-tick {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--accent-primary);
+}
+
+.tsel-empty {
+  margin: 0;
+  padding: 18px 12px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tsel-menu { animation: none; }
+  .tsel-row { transition: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Registration review page (patients/new)
+
+   Reached from the rail once every required field is answered; replaces the
+   form rather than sitting under it. A plain definition list per section —
+   the point is to be read straight down and checked against the person at
+   the desk, so it stays denser and quieter than the form it summarises.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.omrs-reg-reviewavatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.omrs-reg-reviewavatar img { width: 100%; height: 100%; object-fit: cover; }
+.omrs-reg-reviewavatar svg { opacity: 0.4; }
+
+.omrs-reg-reviewgroups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.omrs-reg-reviewgroup {
+  border: 1px solid var(--border-light, #E2E8F0);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-card-solid, #fff);
+}
+
+.omrs-reg-reviewgroup > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--overlay-subtle);
+  border-bottom: 1px solid var(--border-light, #E2E8F0);
+}
+
+.omrs-reg-reviewgroup > header h4 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.omrs-reg-reviewgroup > header button {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  cursor: pointer;
+}
+.omrs-reg-reviewgroup > header button:hover { text-decoration: underline; }
+
+/* Two columns on a roomy screen, one when the pane narrows. The label column
+   is fixed so values line up down the page and a missing one is obvious. */
+.omrs-reg-reviewgroup dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .omrs-reg-reviewgroup dl { grid-template-columns: minmax(0, 1fr); }
+}
+
+.omrs-reg-reviewgroup dl > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-light, #E2E8F0);
+  min-width: 0;
+}
+
+/* Last row of each column loses its rule; with an odd count the final cell
+   spans both so the grid does not end on a half-drawn line. */
+.omrs-reg-reviewgroup dl > div:nth-last-child(-n+2):nth-child(odd),
+.omrs-reg-reviewgroup dl > div:last-child { border-bottom: none; }
+
+.omrs-reg-reviewgroup dt {
+  flex: 0 0 42%;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.omrs-reg-reviewgroup dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* Left blank. Shown, not hidden — "not recorded" is worth seeing before the
+   record is committed. */
+.omrs-reg-reviewgroup dl > div.is-empty dd { color: var(--text-muted); opacity: 0.7; }

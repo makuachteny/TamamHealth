@@ -23,6 +23,7 @@ import {
   ALL_PAYMENT_METHODS,
   ALL_PAYORS,
 } from '@/lib/settings/facility-settings';
+import Select from '@/components/Select';
 
 const STATION_LABELS: Record<EncounterStationKey, string> = {
   registration: 'Registration',
@@ -294,14 +295,14 @@ export function FacilitySettingsView({ embedded = false }: { embedded?: boolean 
                         />
                       </td>
                       <td className="px-3 py-2" style={{ width: 150 }}>
-                        <select
+                        <Select
                           className="fs-input"
                           value={test.tier}
                           onChange={e => updateLabRow(draft, setDraft, i, { tier: e.target.value as LabTestDef['tier'] })}
                         >
                           <option value="basic">Basic</option>
                           <option value="special">Special</option>
-                        </select>
+                        </Select>
                       </td>
                       <td className="px-3 py-2" style={{ width: 180 }}>
                         <input

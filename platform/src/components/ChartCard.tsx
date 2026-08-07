@@ -11,6 +11,7 @@
  */
 
 import { useState, type ReactNode } from 'react';
+import Select from '@/components/Select';
 
 export type ChartType = 'line' | 'area' | 'bar';
 export type ChartPeriod = 'week' | 'month' | 'quarter' | 'year';
@@ -97,7 +98,7 @@ export default function ChartCard({
 
           {/* Period selector */}
           {periods.length > 1 && (
-            <select
+            <Select
               value={period}
               onChange={e => setPeriod(e.target.value as ChartPeriod)}
               style={{
@@ -115,7 +116,7 @@ export default function ChartCard({
               {periods.map(p => (
                 <option key={p} value={p}>{PERIOD_LABELS[p]}</option>
               ))}
-            </select>
+            </Select>
           )}
         </div>
       </div>

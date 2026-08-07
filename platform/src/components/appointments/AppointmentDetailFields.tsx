@@ -23,6 +23,7 @@ import { APPOINTMENT_SLOT_RELEASED_STATUSES } from '@/lib/appointment-status';
 import { staffOptionLabel, type StaffSlotContext } from '@/lib/appointment-staff';
 import type { AppointmentDoc, PatientDoc } from '@/lib/db-types';
 import { AlertTriangle } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 export interface AppointmentDetailFieldValues {
   mode: 'in_office' | 'telehealth';
@@ -134,22 +135,22 @@ export default function AppointmentDetailFields({
       <>
         <div>
           <label>Room</label>
-          <select value={values.room} onChange={e => onChange({ room: e.target.value })}>
+          <Select value={values.room} onChange={e => onChange({ room: e.target.value })}>
             <option value="">No room</option>
             {rooms.map(room => <option key={room} value={room}>{room}</option>)}
-          </select>
+          </Select>
         </div>
       </>
 
       <div>
         <label>Recurrence</label>
-        <select value={values.recurrence} onChange={e => onChange({ recurrence: e.target.value as AppointmentDetailFieldValues['recurrence'] })}>
+        <Select value={values.recurrence} onChange={e => onChange({ recurrence: e.target.value as AppointmentDetailFieldValues['recurrence'] })}>
           <option value="">Does not repeat</option>
           <option value="weekly">Weekly</option>
           <option value="biweekly">Every 2 weeks</option>
           <option value="monthly">Monthly</option>
           <option value="quarterly">Quarterly</option>
-        </select>
+        </Select>
       </div>
       </>)}
 
@@ -158,7 +159,7 @@ export default function AppointmentDetailFields({
         <div>
           <label>Staff</label>
           <span className="appt-assign-field">
-<select
+<Select
             value={values.staffId}
             onChange={e => {
               const person = staffOptions.find(candidate => candidate._id === e.target.value);
@@ -172,7 +173,7 @@ export default function AppointmentDetailFields({
             {staffOptions.map(person => (
               <option key={person._id} value={person._id}>{staffOptionLabel(person, slotContext)}</option>
             ))}
-          </select>
+          </Select>
             {onAssignStaff && (
               <button type="button" className="appt-assign-btn" onClick={onAssignStaff} disabled={staffAssignDisabled}>Assign</button>
             )}

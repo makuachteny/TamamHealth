@@ -22,6 +22,7 @@ import {
   XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3, Download,
   MessageSquare, Send,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const VACCINES = ['BCG', 'OPV', 'Penta', 'PCV', 'Rota', 'Measles', 'Yellow Fever', 'Vitamin A'];
 const SITES: Array<'left arm' | 'right arm' | 'left thigh' | 'right thigh' | 'oral'> = ['left arm', 'right arm', 'left thigh', 'right thigh', 'oral'];
@@ -378,7 +379,7 @@ export default function ImmunizationsPage() {
             >
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Vaccine</span>
-                <select
+                <Select
                   value={vaccineFilter}
                   onChange={e => setVaccineFilter(e.target.value)}
                   className="w-full text-sm py-2 px-3"
@@ -386,7 +387,7 @@ export default function ImmunizationsPage() {
                 >
                   <option value="all">All vaccines</option>
                   {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
-                </select>
+                </Select>
               </label>
             </EhrListFilters>
             {canRecordVitalEvents && (
@@ -739,7 +740,7 @@ export default function ImmunizationsPage() {
             <span className="text-sm font-medium flex-1" style={{ color: 'var(--text-primary)' }}>
               {t('immun.vaccinationRecords', { count: filteredChildren.length })}
             </span>
-            <select
+            <Select
               value={childStatusFilter}
               onChange={e => setChildStatusFilter(e.target.value as 'all' | 'up_to_date' | 'has_overdue')}
               className="listpage-status-select"
@@ -748,7 +749,7 @@ export default function ImmunizationsPage() {
               <option value="all">All children</option>
               <option value="up_to_date">Up to date</option>
               <option value="has_overdue">Has overdue doses</option>
-            </select>
+            </Select>
             <button
               type="button"
               onClick={handleDownloadCsv}
@@ -933,10 +934,10 @@ export default function ImmunizationsPage() {
                   </div>
                   <div>
                     <label>{t('immun.gender')}</label>
-                    <select value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value as 'Male' | 'Female' })}>
+                    <Select value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value as 'Male' | 'Female' })}>
                       <option value="Male">{t('immun.male')}</option>
                       <option value="Female">{t('immun.female')}</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
 
@@ -948,9 +949,9 @@ export default function ImmunizationsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label>{t('immun.vaccine')}</label>
-                    <select value={form.vaccine} onChange={e => setForm({ ...form, vaccine: e.target.value })}>
+                    <Select value={form.vaccine} onChange={e => setForm({ ...form, vaccine: e.target.value })}>
                       {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label>{t('immun.doseNumber')}</label>
@@ -976,9 +977,9 @@ export default function ImmunizationsPage() {
                   </div>
                   <div>
                     <label>{t('immun.site')}</label>
-                    <select value={form.site} onChange={e => setForm({ ...form, site: e.target.value as typeof SITES[number] })}>
+                    <Select value={form.site} onChange={e => setForm({ ...form, site: e.target.value as typeof SITES[number] })}>
                       {SITES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    </Select>
                   </div>
                 </div>
 
@@ -1024,9 +1025,9 @@ export default function ImmunizationsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label>{t('immun.vaccine')}</label>
-                    <select value={editDose.vaccine} onChange={e => setEditDose({ ...editDose, vaccine: e.target.value })}>
+                    <Select value={editDose.vaccine} onChange={e => setEditDose({ ...editDose, vaccine: e.target.value })}>
                       {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label>{t('immun.doseNumber')}</label>
@@ -1052,9 +1053,9 @@ export default function ImmunizationsPage() {
                   </div>
                   <div>
                     <label>{t('immun.site')}</label>
-                    <select value={editDose.site} onChange={e => setEditDose({ ...editDose, site: e.target.value as typeof SITES[number] })}>
+                    <Select value={editDose.site} onChange={e => setEditDose({ ...editDose, site: e.target.value as typeof SITES[number] })}>
                       {SITES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    </Select>
                   </div>
                 </div>
 

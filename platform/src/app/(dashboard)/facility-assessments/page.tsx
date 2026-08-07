@@ -11,6 +11,7 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Building2, ClipboardCheck, Wifi, Droplets, Users, Activity, TrendingUp, ChevronDown, ChevronUp, Plus, X } from '@/components/icons/lucide';
 import Badge from '@/components/Badge';
+import Select from '@/components/Select';
 
 /**
  * Default values for the minimal create-assessment form. The full
@@ -278,10 +279,10 @@ export default function FacilityAssessmentsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('facilityAssessments.formFacility')}</label>
-                  <select value={form.facilityId} onChange={e => setForm({ ...form, facilityId: e.target.value })}>
+                  <Select value={form.facilityId} onChange={e => setForm({ ...form, facilityId: e.target.value })}>
                     <option value="">{t('facilityAssessments.selectFacility')}</option>
                     {hospitals.map(h => <option key={h._id} value={h._id}>{h.name} ({h.state})</option>)}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('facilityAssessments.formAssessmentDate')}</label>

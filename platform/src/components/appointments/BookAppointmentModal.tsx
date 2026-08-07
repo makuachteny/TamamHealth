@@ -30,6 +30,7 @@ import { X } from '@/components/icons/lucide';
 import type {
   AppointmentType, AppointmentPriority, AppointmentStatus, FacilityLevel,
 } from '@/lib/db-types';
+import Select from '@/components/Select';
 
 const FALLBACK_DEPARTMENTS = [
   'Internal Medicine', 'Pediatrics', 'Obstetrics & Gynecology', 'Surgery',
@@ -182,31 +183,31 @@ export default function BookAppointmentModal({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label>{t('appointments.labelPatient')}</label>
-            <select value={patientId} onChange={e => setPatientId(e.target.value)}>
+            <Select value={patientId} onChange={e => setPatientId(e.target.value)}>
               <option value="">{t('appointments.selectPatient')}</option>
               {patients.map(p => (
                 <option key={p._id} value={p._id}>
                   {p.firstName} {p.surname} {p.hospitalNumber ? `(${p.hospitalNumber})` : ''}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
             <div><label>{t('appointments.labelDate')}</label><input type="date" value={date} onChange={e => setDate(e.target.value)} min={today} /></div>
-            <div><label>{t('appointments.labelTime')}</label><select value={time} onChange={e => setTime(e.target.value)}>{TIME_SLOTS.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
-            <div><label>{t('appointments.labelDuration')}</label><select value={duration} onChange={e => setDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
+            <div><label>{t('appointments.labelTime')}</label><Select value={time} onChange={e => setTime(e.target.value)}>{TIME_SLOTS.map(ts => <option key={ts} value={ts}>{ts}</option>)}</Select></div>
+            <div><label>{t('appointments.labelDuration')}</label><Select value={duration} onChange={e => setDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</Select></div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-            <div><label>{t('appointments.labelType')}</label><select value={type} onChange={e => setType(e.target.value as AppointmentType)}>{TYPE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>)}</select></div>
+            <div><label>{t('appointments.labelType')}</label><Select value={type} onChange={e => setType(e.target.value as AppointmentType)}>{TYPE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>)}</Select></div>
             <div>
               <label>{t('appointments.labelPriority')}</label>
-              <select value={priority} onChange={e => setPriority(e.target.value as AppointmentPriority)}>
+              <Select value={priority} onChange={e => setPriority(e.target.value as AppointmentPriority)}>
                 <option value="routine">{t('appointments.priorityRoutine')}</option>
                 <option value="urgent">{t('appointments.priorityUrgent')}</option>
                 <option value="emergency">{t('appointments.priorityEmergency')}</option>
-              </select>
+              </Select>
             </div>
             {/* Usually left at Scheduled, but the desk books patients already
                 standing at the window, and data entry back-fills visits that
@@ -215,9 +216,9 @@ export default function BookAppointmentModal({
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-            <div><label>{t('appointments.labelDepartment')}</label><select value={department} onChange={e => setDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+            <div><label>{t('appointments.labelDepartment')}</label><Select value={department} onChange={e => setDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</Select></div>
             <div><label>{t('appointments.labelProvider')}</label>
-              <select
+              <Select
                 value={providerId}
                 onChange={e => {
                   const person = providerOptions.find(p => p._id === e.target.value);
@@ -229,7 +230,7 @@ export default function BookAppointmentModal({
                 {providerOptions.map(person => (
                   <option key={person._id} value={person._id}>{staffOptionLabel(person, providerSlotContext)}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -239,12 +240,12 @@ export default function BookAppointmentModal({
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', textTransform: 'none', fontSize: 13 }}>
             <input type="checkbox" checked={recurring} onChange={e => setRecurring(e.target.checked)} /> {t('appointments.recurringAppointment')}
             {recurring && (
-              <select value={recurrencePattern} onChange={e => setRecurrencePattern(e.target.value as typeof recurrencePattern)} style={{ width: 'auto' }}>
+              <Select value={recurrencePattern} onChange={e => setRecurrencePattern(e.target.value as typeof recurrencePattern)} style={{ width: 'auto' }}>
                 <option value="weekly">{t('appointments.recurrenceWeekly')}</option>
                 <option value="biweekly">{t('appointments.recurrenceBiweekly')}</option>
                 <option value="monthly">{t('appointments.recurrenceMonthly')}</option>
                 <option value="quarterly">{t('appointments.recurrenceQuarterly')}</option>
-              </select>
+              </Select>
             )}
           </label>
 

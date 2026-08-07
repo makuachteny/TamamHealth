@@ -8,7 +8,7 @@ import { useToast } from '@/components/Toast';
 import { useIntakeForms } from '@/lib/hooks/useIntakeForms';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useUsers } from '@/lib/hooks/useUsers';
-import { isRouteAllowed } from '@/lib/permissions';
+import { isRouteAllowed, getDefaultDashboard } from '@/lib/permissions';
 import { patientFullName, patientGenderAge } from '@/lib/patient-utils';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 import type {
@@ -19,6 +19,41 @@ import type {
 } from '@/lib/db-types';
 import { ClipboardPen, Mail, MessageSquare, Plus, X } from '@/components/icons/lucide';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import Select from '@/components/Select';
+
+/**
+ * The day the reception board should open on after a form is merged: the
+ * patient's next booking that still expects them, today or later.
+ *
+ * The intake document holds no appointment reference — it is addressed to a
+ * patient, not a slot — so the booking is resolved here at merge time. Returns
+ * undefined when the patient has none, in which case the board keeps its own
+ * default (today) rather than being sent to an arbitrary date.
+ *
+ * Local calendar day, not a UTC slice: the board's own `today` comes from
+ * `toIsoDate(new Date())`, and comparing against a UTC date would disagree with
+ * it for anyone working west of UTC in the evening.
+ */
+async function nextBookingDate(patientId: string): Promise<string | undefined> {
+  try {
+    const [{ getAppointmentsByPatient }, { APPOINTMENT_PENDING_STATUSES }, { toIsoDate }] = await Promise.all([
+      import('@/lib/services/appointment-service'),
+      import('@/lib/appointment-status'),
+      import('@/components/ehr/EhrMiniCalendar'),
+    ]);
+    const today = toIsoDate(new Date());
+    const upcoming = (await getAppointmentsByPatient(patientId))
+      .filter(a => APPOINTMENT_PENDING_STATUSES.includes(a.status) && a.appointmentDate >= today)
+      .sort((a, b) =>
+        a.appointmentDate.localeCompare(b.appointmentDate)
+        || (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
+    return upcoming[0]?.appointmentDate;
+  } catch {
+    // Best-effort: a lookup failure must not cost the clerk the merge they
+    // just completed. The board falls back to today.
+    return undefined;
+  }
+}
 
 const TABS: { key: IntakeFormStatus; label: string }[] = [
   { key: 'pending_review', label: 'Pending Review' },
@@ -70,6 +105,17 @@ const MERGEABLE_FIELDS: Record<string, keyof PatientDoc> = {
   'Blood Type': 'bloodType',
   'Blood Group': 'bloodType',
 };
+
+/**
+ * Did the patient actually answer this line? A skipped field comes back empty,
+ * and a form still out with the patient carries the 'Requested' placeholder the
+ * request was created with — neither is an answer, and neither may be written
+ * over a chart value that is already there.
+ */
+function isAnswered(value?: string): boolean {
+  const trimmed = (value || '').trim();
+  return trimmed !== '' && trimmed.toLowerCase() !== 'requested';
+}
 
 function formatDate(iso?: string): string {
   if (!iso) return '—';
@@ -163,10 +209,12 @@ export default function PatientIntakePage() {
   );
 
   function openReview(form: PatientIntakeFormDoc) {
-    // Default every mergeable field to checked.
+    // Default every ANSWERED mergeable field to checked. A field the patient
+    // left blank gets no checkbox at all: ticking it could only have written an
+    // empty value over whatever the desk already had on the chart.
     const defaults: Record<string, boolean> = {};
     for (const field of form.fields) {
-      if (MERGEABLE_FIELDS[field.label]) defaults[field.label] = true;
+      if (MERGEABLE_FIELDS[field.label] && isAnswered(field.value)) defaults[field.label] = true;
     }
     setCheckedFields(defaults);
     setReviewing(form);
@@ -235,18 +283,38 @@ export default function PatientIntakePage() {
       const updates: Record<string, unknown> = {};
       for (const field of reviewing.fields) {
         const key = MERGEABLE_FIELDS[field.label];
-        if (key && checkedFields[field.label]) updates[key] = field.value;
+        // Answered-only: the merge adds to the chart, it never clears it.
+        if (key && checkedFields[field.label] && isAnswered(field.value)) {
+          updates[key] = field.value.trim();
+        }
       }
       const patientName = reviewing.patientName;
+      const patientId = reviewing.patientId;
       await merge(reviewing._id, updates, currentUser?.name || currentUser?.username || 'Staff');
       showToast(`${patientName}'s form merged into their chart.`, 'success');
       setReviewing(null);
-      // A merged form means the paperwork is done and the visit is next: land
-      // on the reception board's Scheduled lane with this patient's booking in
-      // front of the desk. Clinician roles reviewing intake stay here — the
-      // reception board is not theirs to open.
+
+      // A merged form means the paperwork is done and the visit is next, so the
+      // reviewer is handed straight to the board with this patient in front of
+      // them.
+      //
+      // The board shows ONE day at a time and defaults to today, so the lane
+      // and the search term are not enough on their own: an intake completed
+      // ahead of a booking later in the week used to land the clerk on today's
+      // Scheduled lane, filtered to a patient with nothing on it — a board that
+      // looked empty and read as "the merge did nothing". Resolve the booking
+      // the intake was for and open the board on ITS day.
+      const boardDate = patientId ? await nextBookingDate(patientId) : undefined;
+      const query = new URLSearchParams({ lane: 'scheduled', q: patientName });
+      if (boardDate) query.set('date', boardDate);
+
+      // Roles that cannot open reception's board still get a dashboard — their
+      // own. Previously they were left sitting on the intake list with no
+      // acknowledgement beyond the toast.
       if (currentUser && isRouteAllowed(currentUser.role, '/dashboard/front-desk')) {
-        router.push(`/dashboard/front-desk?lane=scheduled&q=${encodeURIComponent(patientName)}`);
+        router.push(`/dashboard/front-desk?${query}`);
+      } else if (currentUser) {
+        router.push(getDefaultDashboard(currentUser.role));
       }
     } catch {
       showToast('Could not merge this form. Try again.', 'error');
@@ -323,23 +391,14 @@ export default function PatientIntakePage() {
               ]}
               search={{ value: patientQuery, onChange: setPatientQuery, placeholder: 'Patient', ariaLabel: 'Search by patient' }}
               actions={
-                <>
-                  <a
-                    href="mailto:support.tamam@gmail.com?subject=Patient%20Intake%20feedback"
-                    className="text-[12px] font-medium hidden sm:inline"
-                    style={{ color: 'var(--accent-primary)' }}
-                  >
-                    How can we improve this feature? <span className="underline">Let us know</span>
-                  </a>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    style={{ background: 'var(--color-warning-600)', borderColor: 'var(--color-warning-600)', color: '#fff' }}
-                    onClick={() => setSendOpen(true)}
-                  >
-                    Send forms
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ background: 'var(--color-warning-600)', borderColor: 'var(--color-warning-600)', color: '#fff' }}
+                  onClick={() => setSendOpen(true)}
+                >
+                  Send forms
+                </button>
               }
             />
 
@@ -425,10 +484,10 @@ export default function PatientIntakePage() {
               {/* Provider */}
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-muted)' }}>Provider</label>
-                <select value={sendProviderId} onChange={e => setSendProviderId(e.target.value)} style={inputStyle}>
+                <Select value={sendProviderId} onChange={e => setSendProviderId(e.target.value)} style={inputStyle}>
                   <option value="">Select a provider</option>
                   {providerUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-                </select>
+                </Select>
               </div>
 
               {/* Patient typeahead */}
@@ -491,7 +550,7 @@ export default function PatientIntakePage() {
                 )}
                 <div className="relative">
                   <Plus className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                  <select
+                  <Select
                     value=""
                     onChange={e => { if (e.target.value) setSendForms(prev => [...prev, e.target.value]); }}
                     disabled={availableFormOptions.length === 0}
@@ -499,7 +558,7 @@ export default function PatientIntakePage() {
                   >
                     <option value="">Add a form…</option>
                     {availableFormOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -564,13 +623,19 @@ export default function PatientIntakePage() {
                 </p>
                 <div className="flex flex-col gap-2.5">
                   {reviewing.fields.map(field => {
-                    const mergeable = !!MERGEABLE_FIELDS[field.label];
+                    const answered = isAnswered(field.value);
+                    // Only an answered mergeable field can be written. An
+                    // unanswered one keeps its row — the reviewer should see
+                    // what the patient skipped — but offers no tick, since the
+                    // only thing it could write is a blank over existing data.
+                    const mergeable = !!MERGEABLE_FIELDS[field.label] && answered;
                     return (
                       <div key={field.label} className="flex items-start gap-2">
                         {mergeable ? (
                           <input
                             type="checkbox"
                             className="mt-0.5"
+                            aria-label={`Merge ${field.label} into the chart`}
                             checked={!!checkedFields[field.label]}
                             onChange={e => setCheckedFields(prev => ({ ...prev, [field.label]: e.target.checked }))}
                           />
@@ -579,7 +644,9 @@ export default function PatientIntakePage() {
                         )}
                         <p className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
                           {field.label}:{' '}
-                          <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{field.value}</span>
+                          {answered
+                            ? <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{field.value}</span>
+                            : <span style={{ color: 'var(--text-muted)' }}>Not answered — chart value kept</span>}
                         </p>
                       </div>
                     );

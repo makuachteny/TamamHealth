@@ -31,6 +31,7 @@ import {
   notificationBucket,
   relativeNotificationTime,
 } from '@/lib/notification-meta';
+import Select from '@/components/Select';
 
 /** Rows rendered before "Show more" — long feeds stay responsive. */
 const PAGE_SIZE = 60;
@@ -152,7 +153,7 @@ function NotificationsPageInner() {
               >
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>State</span>
-                  <select
+                  <Select
                     value={status}
                     onChange={e => applyStatus(e.target.value as StatusFilter)}
                     className="w-full text-sm py-2 px-3"
@@ -163,11 +164,11 @@ function NotificationsPageInner() {
                     <option value="critical">Critical ({severityCounts.critical})</option>
                     <option value="warning">Needs action ({severityCounts.warning})</option>
                     <option value="info">For information ({severityCounts.info})</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Source</span>
-                  <select
+                  <Select
                     value={source}
                     onChange={e => applySource(e.target.value as SourceFilter)}
                     className="w-full text-sm py-2 px-3"
@@ -181,7 +182,7 @@ function NotificationsPageInner() {
                           {NOTIFICATION_META[type].label} ({sourceCounts.get(type)})
                         </option>
                       ))}
-                  </select>
+                  </Select>
                 </label>
               </EhrListFilters>
               {unreadCount > 0 && (

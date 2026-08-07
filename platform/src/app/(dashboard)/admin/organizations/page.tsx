@@ -12,6 +12,7 @@ import {
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import EhrListHeader from '@/components/ehr/EhrListHeader';
+import Select from '@/components/Select';
 
 type OrgFormData = {
   name: string;
@@ -329,10 +330,10 @@ export default function AdminOrganizationsPage() {
                   </div>
                   <div>
                     <label style={labelStyle}>{t('orgAdmin.labelOrgType')}</label>
-                    <select value={form.orgType} onChange={e => setForm(p => ({ ...p, orgType: e.target.value as 'public' | 'private' }))} style={selectStyle}>
+                    <Select value={form.orgType} onChange={e => setForm(p => ({ ...p, orgType: e.target.value as 'public' | 'private' }))} style={selectStyle}>
                       <option value="public">{t('orgAdmin.typePublic')}</option>
                       <option value="private">{t('orgAdmin.typePrivate')}</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label style={labelStyle}>{t('orgAdmin.labelContactEmail')}</label>
@@ -353,20 +354,20 @@ export default function AdminOrganizationsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label style={labelStyle}>{t('orgAdmin.labelPlan')}</label>
-                    <select value={form.subscriptionPlan} onChange={e => setForm(p => ({ ...p, subscriptionPlan: e.target.value as OrgFormData['subscriptionPlan'] }))} style={selectStyle}>
+                    <Select value={form.subscriptionPlan} onChange={e => setForm(p => ({ ...p, subscriptionPlan: e.target.value as OrgFormData['subscriptionPlan'] }))} style={selectStyle}>
                       <option value="basic">{t('orgAdmin.planBasic')}</option>
                       <option value="professional">{t('orgAdmin.planProfessional')}</option>
                       <option value="enterprise">{t('orgAdmin.planEnterprise')}</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label style={labelStyle}>{t('orgAdmin.labelStatus')}</label>
-                    <select value={form.subscriptionStatus} onChange={e => setForm(p => ({ ...p, subscriptionStatus: e.target.value as OrgFormData['subscriptionStatus'] }))} style={selectStyle}>
+                    <Select value={form.subscriptionStatus} onChange={e => setForm(p => ({ ...p, subscriptionStatus: e.target.value as OrgFormData['subscriptionStatus'] }))} style={selectStyle}>
                       <option value="trial">{t('orgAdmin.statusTrial')}</option>
                       <option value="active">{t('orgAdmin.statusActive')}</option>
                       <option value="suspended">{t('orgAdmin.statusSuspended')}</option>
                       <option value="cancelled">{t('orgAdmin.statusCancelled')}</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label style={labelStyle}>{t('orgAdmin.labelMaxUsers')}</label>

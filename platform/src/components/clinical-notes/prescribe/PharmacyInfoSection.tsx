@@ -6,6 +6,7 @@
  */
 
 import type { RxDraft } from './types';
+import Select from '@/components/Select';
 
 interface PharmacyInfoSectionProps {
   draft: RxDraft;
@@ -22,14 +23,14 @@ export default function PharmacyInfoSection({
     <div className="cn-rx-grid">
       <label className="cn-rx-field cn-rx-field--wide">
         <span>Pharmacy *</span>
-        <select
+        <Select
           className="cn-select"
           value={pharmacy}
           onChange={e => onPharmacyChange(e.target.value)}
           aria-label="Pharmacy"
         >
           {pharmacies.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+        </Select>
       </label>
 
       <label className="cn-rx-field cn-rx-field--wide">

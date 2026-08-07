@@ -8,6 +8,7 @@ import type { FeeScheduleDoc } from '@/lib/db-types-billing';
 import type { SuperbillSelection } from '@/lib/services/superbill-service';
 import { Plus, X } from '@/components/icons/lucide';
 import { patientFullName } from '@/lib/patient-utils';
+import Select from '@/components/Select';
 
 interface Line {
   fee: FeeScheduleDoc;
@@ -143,7 +144,7 @@ export function useSuperbill({
 export function SuperbillPicker({ sb }: { sb: Superbill }) {
   const noFees = sb.fees.length === 0;
   return (
-    <select
+    <Select
       className="bl-toolbar-select"
       value={sb.picker}
       disabled={noFees}
@@ -155,7 +156,7 @@ export function SuperbillPicker({ sb }: { sb: Superbill }) {
       {sb.available.map((f) => (
         <option key={f._id} value={f._id}>{f.serviceName} — {sb.money(f.unitPrice)} ({f.category})</option>
       ))}
-    </select>
+    </Select>
   );
 }
 

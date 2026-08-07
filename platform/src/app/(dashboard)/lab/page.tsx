@@ -24,6 +24,7 @@ import type { LabOrderStatus } from '@/lib/clinical-flow/order-lifecycles';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import PageInstructionCard from '@/components/PageInstructionCard';
 import type { LabResultDoc } from '@/lib/db-types';
+import Select from '@/components/Select';
 
 // Human labels for the granular diagnostics lifecycle (Stage 6).
 const ORDER_STAGE_LABEL: Record<LabOrderStatus, string> = {
@@ -330,31 +331,31 @@ export default function LabPage() {
                         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                           <label className="flex flex-col gap-1">
                             <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('lab.testName')}</span>
-                            <select value={colFilters.test} onChange={e => setColFilter('test', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                            <Select value={colFilters.test} onChange={e => setColFilter('test', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
                               <option value="">{t('patients.all')}</option>
                               {testTypeOptions.map(name => <option key={name} value={name}>{name}</option>)}
-                            </select>
+                            </Select>
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('lab.status')}</span>
-                            <select value={colFilters.status} onChange={e => setColFilter('status', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                            <Select value={colFilters.status} onChange={e => setColFilter('status', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
                               <option value="">{t('patients.all')}</option>
                               <option value="pending">{t('lab.filterPending')}</option>
                               <option value="in_progress">{t('lab.inProgress')}</option>
                               <option value="completed">{t('referral.completed')}</option>
-                            </select>
+                            </Select>
                           </label>
                           {/* The queue's own worklists — the same table, narrowed
                               to one job, rather than four separate screens. */}
                           <label className="flex flex-col gap-1 sm:col-span-2">
                             <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('lab.worklist')}</span>
-                            <select value={colFilters.worklist} onChange={e => setColFilter('worklist', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                            <Select value={colFilters.worklist} onChange={e => setColFilter('worklist', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
                               <option value="">{t('lab.worklistAll')}</option>
                               <option value="due">{t('lab.worklistDue')}</option>
                               <option value="scheduled">{t('lab.worklistScheduled')}</option>
                               <option value="send_out">{t('lab.worklistSendOut')}</option>
                               <option value="overdue_review">{t('lab.worklistOverdueReview')}</option>
-                            </select>
+                            </Select>
                           </label>
                         </div>
                       </div>

@@ -16,6 +16,7 @@ import EhrListHeader, { EhrListFilters, LIST_STAT_COLORS } from '@/components/eh
 // Shared control styling inside the header's Filters popover.
 const filterFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
 import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 export default function DeathsPage() {
   const { t } = useTranslation();
@@ -157,10 +158,10 @@ export default function DeathsPage() {
   const ICD11Select = ({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) => (
     <div>
       <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
+      <Select value={value} onChange={e => onChange(e.target.value)} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
         <option value="">{t('deaths.selectIcd11')}</option>
         {COMMON_ICD11_CODES.map(c => <option key={c.code} value={c.code}>{c.code} — {c.title}</option>)}
-      </select>
+      </Select>
     </div>
   );
 
@@ -186,19 +187,19 @@ export default function DeathsPage() {
                 >
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('nurse.colGender')}</span>
-                    <select value={colFilters.sex} onChange={e => setColFilter('sex', e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
+                    <Select value={colFilters.sex} onChange={e => setColFilter('sex', e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
                       <option value="">All Genders</option>
                       <option value="Male">{t('patient.male')}</option>
                       <option value="Female">{t('patient.female')}</option>
-                    </select>
+                    </Select>
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('deaths.colRegistered')}</span>
-                    <select value={colFilters.registered} onChange={e => setColFilter('registered', e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
+                    <Select value={colFilters.registered} onChange={e => setColFilter('registered', e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
                       <option value="">All Status</option>
                       <option value="yes">{t('deaths.yes')}</option>
                       <option value="no">{t('deaths.no')}</option>
-                    </select>
+                    </Select>
                   </label>
                 </EhrListFilters>
                 {canRecordVitalEvents && (
@@ -358,10 +359,10 @@ export default function DeathsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.firstNameRequired')}</label><input type="text" value={form.deceasedFirstName} onChange={e => setForm({ ...form, deceasedFirstName: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
                   <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.surname')}</label><input type="text" value={form.deceasedSurname} onChange={e => setForm({ ...form, deceasedSurname: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.gender')}</label><select value={form.deceasedGender} onChange={e => setForm({ ...form, deceasedGender: e.target.value as 'Male' | 'Female' })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}><option value="Male">{t('deaths.male')}</option><option value="Female">{t('deaths.female')}</option></select></div>
+                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.gender')}</label><Select value={form.deceasedGender} onChange={e => setForm({ ...form, deceasedGender: e.target.value as 'Male' | 'Female' })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}><option value="Male">{t('deaths.male')}</option><option value="Female">{t('deaths.female')}</option></Select></div>
                   <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.colDateOfDeath')}</label><input type="date" value={form.dateOfDeath} onChange={e => setForm({ ...form, dateOfDeath: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
                   <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.ageAtDeath')}</label><input type="number" value={form.ageAtDeath} onChange={e => setForm({ ...form, ageAtDeath: Number(e.target.value) })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.mannerOfDeath')}</label><select value={form.mannerOfDeath} onChange={e => setForm({ ...form, mannerOfDeath: e.target.value as typeof form.mannerOfDeath })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}><option value="natural">{t('deaths.mannerNatural')}</option><option value="accident">{t('deaths.mannerAccident')}</option><option value="intentional_self_harm">{t('deaths.mannerSelfHarm')}</option><option value="assault">{t('deaths.mannerAssault')}</option><option value="pending_investigation">{t('deaths.mannerPending')}</option><option value="unknown">{t('deaths.mannerUnknown')}</option></select></div>
+                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.mannerOfDeath')}</label><Select value={form.mannerOfDeath} onChange={e => setForm({ ...form, mannerOfDeath: e.target.value as typeof form.mannerOfDeath })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}><option value="natural">{t('deaths.mannerNatural')}</option><option value="accident">{t('deaths.mannerAccident')}</option><option value="intentional_self_harm">{t('deaths.mannerSelfHarm')}</option><option value="assault">{t('deaths.mannerAssault')}</option><option value="pending_investigation">{t('deaths.mannerPending')}</option><option value="unknown">{t('deaths.mannerUnknown')}</option></Select></div>
                 </div>
 
                 <hr className="section-divider" />

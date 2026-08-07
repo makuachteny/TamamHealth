@@ -40,6 +40,7 @@ import {
   AlertOctagon, Check, CheckCircle2, ClipboardList, Clock, Loader2, Pill, ShieldCheck, X,
   type LucideIcon,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 type StepKey = 'received' | 'review' | 'checked' | 'payment' | 'dispensed' | 'counseled' | 'cleared';
 
@@ -479,7 +480,7 @@ function DispenseConfirm({
               Controlled substance{inv.controlledSchedule ? ` (Schedule ${inv.controlledSchedule})` : ''} — witness required
             </span>
           </div>
-          <select
+          <Select
             value={witnessId}
             onChange={e => onWitnessChange(e.target.value)}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none"
@@ -487,7 +488,7 @@ function DispenseConfirm({
           >
             <option value="">Select witnessing staff…</option>
             {witnesses.map(u => <option key={u._id} value={u._id}>{u.name} — {u.role}</option>)}
-          </select>
+          </Select>
         </div>
       )}
 

@@ -237,13 +237,10 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                       : visitStage ? STAGE_LABELS[visitStage]
                       : null;
                   const fallbackStatusText = queueStageText ?? (admission ? 'Admitted' : '—');
-                  const statusSubtext = entry?.acuity === 'RED'
-                    ? 'Critical'
-                    : entry?.acuity === 'YELLOW'
-                      ? 'Watch'
-                      : entry?.acuity === 'GREEN' || priority === 'GREEN'
-                        ? 'Stable'
-                        : ACUITY_META[priority].label;
+                  // One lookup, not a ternary re-stating the table two dozen
+                  // lines above it: the queue's live acuity when there is one,
+                  // else the roster's.
+                  const statusSubtext = ACUITY_META[entry?.acuity ?? priority].label;
                   // Location column (design): the admitted bed wins; otherwise
                   // the queue stage / appointment department stands in.
                   const location = admission

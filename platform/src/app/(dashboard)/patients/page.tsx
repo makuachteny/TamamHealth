@@ -19,6 +19,7 @@ import FingerprintIdentifyModal from '@/components/FingerprintIdentifyModal';
 import { isFingerprintEnabled } from '@/lib/services/fingerprint-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import PageInstructionCard from '@/components/PageInstructionCard';
+import Select from '@/components/Select';
 
 // Pagination cap — capped to keep DOM-node count manageable on low-end devices.
 // Each row produces ~20 DOM nodes; 100 rows ≈ 2k nodes which renders smoothly.
@@ -310,18 +311,18 @@ export default function PatientsPage() {
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('nurse.colGender')}</span>
-                          <select value={filters.gender} onChange={e => setF('gender', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
+                          <Select value={filters.gender} onChange={e => setF('gender', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
                             <option value="">{t('patients.all')}</option>
                             <option value="Male">{t('patient.male')}</option>
                             <option value="Female">{t('patient.female')}</option>
-                          </select>
+                          </Select>
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patient.location')}</span>
-                          <select value={filters.state} onChange={e => setF('state', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
+                          <Select value={filters.state} onChange={e => setF('state', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
                             <option value="">{t('patients.all')}</option>
                             {states.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
+                          </Select>
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterRegisteredFrom')}</span>

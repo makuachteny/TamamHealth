@@ -337,7 +337,12 @@ export const patientTransfersDB = () => getDB('tamamhealth_patient_transfers');
 // generator now books one visit per patient per day, never marks a
 // future-slot appointment checked-in/completed, and staggers walk-in
 // arrival times.
-export const SEED_VERSION = 68;
+// Bumped to 69: no double-booked slots. `migrateRemoveOverlappingAppointments`
+// sweeps out appointments that overlap another live booking at the same
+// facility on the same day — duration-aware, so it also catches the pairs the
+// seed's exact-start-time de-collision pass leaves behind. Runs on fresh seeds
+// and on already-seeded browsers, keeping the earliest-created booking.
+export const SEED_VERSION = 69;
 
 export async function isSeeded(): Promise<boolean> {
   try {

@@ -6,6 +6,7 @@ import type { PatientDoc } from '@/lib/db-types';
 import type { DirectiveType } from '@/data/mock';
 import { ShieldCheck, Plus, Edit3, Trash2, X } from '@/components/icons/lucide';
 import Modal from '@/components/Modal';
+import Select from '@/components/Select';
 
 const TYPE_LABELS: Record<DirectiveType, string> = {
   informed_consent:      'Informed consent',
@@ -102,9 +103,9 @@ export default function DirectiveList({ patient, hideAddButton = false }: { pati
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Type</label>
-              <select value={addForm.type} onChange={(e) => setAddForm({ ...addForm, type: e.target.value as DirectiveType })} className="w-full p-2.5 rounded-md text-[12px]" style={inputStyle}>
+              <Select value={addForm.type} onChange={(e) => setAddForm({ ...addForm, type: e.target.value as DirectiveType })} className="w-full p-2.5 rounded-md text-[12px]" style={inputStyle}>
                 {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
-              </select>
+              </Select>
             </div>
             <input autoFocus value={addForm.description} onChange={(e) => setAddForm({ ...addForm, description: e.target.value })} placeholder="Description (e.g. Consent to treat signed)" className={inputCls} style={inputStyle} />
             {error && <p className="text-[11px]" style={{ color: 'var(--color-danger)' }}>{error}</p>}
@@ -126,9 +127,9 @@ export default function DirectiveList({ patient, hideAddButton = false }: { pati
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Type</label>
-              <select value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value as DirectiveType })} className="w-full p-2.5 rounded-md text-[12px]" style={inputStyle}>
+              <Select value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value as DirectiveType })} className="w-full p-2.5 rounded-md text-[12px]" style={inputStyle}>
                 {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
-              </select>
+              </Select>
             </div>
             <input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className={inputCls} style={inputStyle} />
             {error && <p className="text-[11px]" style={{ color: 'var(--color-danger)' }}>{error}</p>}

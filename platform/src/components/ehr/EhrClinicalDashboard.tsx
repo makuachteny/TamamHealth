@@ -43,7 +43,8 @@ import {
   formatMonthTitle,
 } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
-import EhrVisitPopup, { EhrQueueMoveDialog, PRIORITY_META, waitLabel } from '@/components/ehr/EhrVisitPopup';
+import EhrVisitPopup, { EhrQueueMoveDialog, waitLabel } from '@/components/ehr/EhrVisitPopup';
+import { PRIORITY_META, appointmentTriage } from '@/lib/clinical/triage-display';
 import PatientDispenseModal from '@/components/pharmacy/PatientDispenseModal';
 import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
@@ -56,12 +57,6 @@ import type { TriageDoc } from '@/lib/db-types';
 import { encountersDB, labResultsDB } from '@/lib/db';
 import { makeCoalescer } from '@/lib/hooks/live-reload';
 import { tooltipStyle, axisTick } from '@/components/ChartCard';
-
-export function appointmentTriage(priority: AppointmentDoc['priority']) {
-  if (priority === 'emergency') return 'RED';
-  if (priority === 'urgent') return 'YELLOW';
-  return 'GREEN';
-}
 
 export type WorklistPatient = {
   _id: string;
@@ -1145,10 +1140,10 @@ export default function EhrClinicalDashboard({
           <button
             type="button"
             className="primary"
-            aria-label="Send intake"
+            aria-label="Intake form"
             onClick={() => router.push('/patient-intake')}
           >
-            <Send className="w-4 h-4" /> Send intake
+            <Send className="w-4 h-4" /> Intake form
           </button>
         </div>
       </section>

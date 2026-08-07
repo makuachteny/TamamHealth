@@ -87,6 +87,7 @@ import ProceduresSection from '@/components/ehr/chart/sections/ProceduresSection
 import ProgramsSection from '@/components/ehr/chart/sections/ProgramsSection';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import NurseVitalsModal from '@/components/nurse/NurseVitalsModal';
+import Select from '@/components/Select';
 
 // Administrative tabs are the only ones a non-clinical role (e.g. Medical
 // Receptionist) may see — the "minimum necessary" rule: contact details,
@@ -1907,10 +1908,10 @@ export default function PatientDetailPage() {
                 </div>
                 <div>
                   <label htmlFor="edit-gender" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Gender</label>
-                  <select id="edit-gender" value={editForm.gender} onChange={e => setEditForm({ ...editForm, gender: e.target.value as 'Male' | 'Female' })}>
+                  <Select id="edit-gender" value={editForm.gender} onChange={e => setEditForm({ ...editForm, gender: e.target.value as 'Male' | 'Female' })}>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
               <div>
@@ -1927,7 +1928,7 @@ export default function PatientDetailPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="edit-state" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>State</label>
-                  <select
+                  <Select
                     id="edit-state"
                     value={editForm.state}
                     onChange={e => setEditForm({ ...editForm, state: e.target.value, county: '' })}
@@ -1937,11 +1938,11 @@ export default function PatientDetailPage() {
                       <option value={editForm.state}>{editForm.state} (on record)</option>
                     )}
                     {SOUTH_SUDAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label htmlFor="edit-county" className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>County</label>
-                  <select
+                  <Select
                     id="edit-county"
                     value={editForm.county}
                     onChange={e => setEditForm({ ...editForm, county: e.target.value })}
@@ -1952,7 +1953,7 @@ export default function PatientDetailPage() {
                       <option value={editForm.county}>{editForm.county} (on record)</option>
                     )}
                     {editCounties.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  </Select>
                 </div>
               </div>
             </div>

@@ -19,6 +19,7 @@ import {
 import type { PatientDoc, AppointmentDoc, LabResultDoc, MedicalRecordDoc, PrescriptionDoc, ImmunizationDoc } from '@/lib/db-types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { formatMoney, formatClockTime , formatRxSig } from '@/lib/format-utils';
+import Select from '@/components/Select';
 
 type Tab = 'overview' | 'appointments' | 'records' | 'lab' | 'prescriptions' | 'radiology' | 'immunizations' | 'messages' | 'chat' | 'billing' | 'profile';
 
@@ -844,12 +845,12 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               </div>
               <div style={{ flex: 1, minWidth: 150 }}>
                 <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 4 }}>{t('patientPortal.department')}</label>
-                <select value={chatDepartment} onChange={e => setChatDepartment(e.target.value)}
+                <Select value={chatDepartment} onChange={e => setChatDepartment(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-card-solid)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>
                   {['General / OPD', 'Internal Medicine', 'Obstetrics', 'Pediatrics', 'Surgery', 'Laboratory', 'Pharmacy', 'Dental', 'Emergency'].map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
           </div>
@@ -1415,24 +1416,24 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               </div>
               <div><label>{t('patientPortal.preferredDate')}</label><input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} /></div>
               <div><label>{t('patientPortal.preferredTime')}</label>
-                <select value={bookingTime} onChange={e => setBookingTime(e.target.value as typeof bookingTime)}>
+                <Select value={bookingTime} onChange={e => setBookingTime(e.target.value as typeof bookingTime)}>
                   <option value="morning">{t('patientPortal.timeMorning')}</option>
                   <option value="afternoon">{t('patientPortal.timeAfternoon')}</option>
                   <option value="any">{t('patientPortal.timeAnyTime')}</option>
-                </select>
+                </Select>
               </div>
               <div><label>{t('patientPortal.department')}</label>
-                <select value={bookingDepartment} onChange={e => setBookingDepartment(e.target.value)}>
+                <Select value={bookingDepartment} onChange={e => setBookingDepartment(e.target.value)}>
                   <option>General / OPD</option><option>Obstetrics</option><option>Internal Medicine</option><option>Pediatrics</option><option>Surgery</option><option>Laboratory</option><option>Dental</option>
-                </select>
+                </Select>
               </div>
               <div><label>{t('patientPortal.reason')}</label><textarea rows={3} placeholder={t('patientPortal.reasonPlaceholder')} value={bookingReason} onChange={e => setBookingReason(e.target.value)} /></div>
               <div><label>{t('patientPortal.visitType')}</label>
-                <select value={bookingVisitType} onChange={e => setBookingVisitType(e.target.value as typeof bookingVisitType)}>
+                <Select value={bookingVisitType} onChange={e => setBookingVisitType(e.target.value as typeof bookingVisitType)}>
                   <option value="in_person">{t('patientPortal.visitInPerson')}</option>
                   <option value="telehealth_video">{t('patientPortal.visitTelehealthVideo')}</option>
                   <option value="telehealth_audio">{t('patientPortal.visitTelehealthAudio')}</option>
-                </select>
+                </Select>
               </div>
               {bookingError && <p style={{ fontSize: 12, color: 'var(--color-danger)' }}>{bookingError}</p>}
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>

@@ -12,6 +12,7 @@ import { useSettings } from '@/lib/settings/SettingsProvider';
 import { useToast } from '@/components/Toast';
 import FileUpload from '@/components/FileUpload';
 import type { Attachment } from '@/data/mock';
+import Select from '@/components/Select';
 
 // Fallback list used only when the facility hasn't configured its departments
 // in Facility Settings (settings.departments drives the picker when present).
@@ -184,25 +185,25 @@ export default function ReferralFormModal({ onClose, onSent }: { onClose: () => 
           {/* Destination Hospital */}
           <div>
             <label>{t('referrals.destinationHospital')}</label>
-            <select value={formHospital} onChange={(e) => setFormHospital(e.target.value)}>
+            <Select value={formHospital} onChange={(e) => setFormHospital(e.target.value)}>
               <option value="">{t('referrals.selectHospital')}</option>
               {otherHospitals.map(h => (
                 <option key={h._id} value={h._id}>
                   {h.name} ({h.state})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Department */}
           <div>
             <label>{t('referrals.department')}</label>
-            <select value={formDepartment} onChange={(e) => setFormDepartment(e.target.value)}>
+            <Select value={formDepartment} onChange={(e) => setFormDepartment(e.target.value)}>
               <option value="">{t('referrals.selectDepartment')}</option>
               {departments.map(d => (
                 <option key={d} value={d}>{d}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Urgency */}

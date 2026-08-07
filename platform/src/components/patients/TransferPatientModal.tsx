@@ -26,6 +26,7 @@ import {
   ArrowRightLeft, ArrowRight, Check, AlertTriangle, X, Building2, Hospital,
   Timer, Users, Clock, Siren,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 type IconCmp = typeof ArrowRight;
 
@@ -325,7 +326,7 @@ export default function TransferPatientModal({
             <div className="xfer-grid">
               <label className="xfer-field">
                 Provider
-                <select
+                <Select
                   className="form-input"
                   value={providerId}
                   onChange={e => setProviderId(e.target.value)}
@@ -336,24 +337,24 @@ export default function TransferPatientModal({
                       {u.name}{u.specialty ? ` · ${u.specialty}` : ''}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label className="xfer-field">
                 Department
-                <select
+                <Select
                   className="form-input"
                   value={department}
                   onChange={e => setDepartment(e.target.value)}
                 >
                   <option value="">— Unchanged —</option>
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
+                </Select>
               </label>
             </div>
           ) : (
             <label className="xfer-field">
               <span>Receiving facility <span className="xfer-req">*</span></span>
-              <select
+              <Select
                 className="form-input"
                 value={facilityId}
                 onChange={e => setFacilityId(e.target.value)}
@@ -362,7 +363,7 @@ export default function TransferPatientModal({
                 {hospitals
                   .filter(h => h._id !== currentUser?.hospitalId)
                   .map(h => <option key={h._id} value={h._id}>{h.name}</option>)}
-              </select>
+              </Select>
             </label>
           )}
           {!hasDestination && (

@@ -17,6 +17,7 @@ import type { LeaveSummary } from '@/lib/services/leave-service';
 import type { PayrollSummary } from '@/lib/services/payroll-service';
 import type { StaffScheduleDoc } from '@/lib/db-types';
 import { formatMoney } from '@/lib/format-utils';
+import Select from '@/components/Select';
 
 const LEAVE_TYPES: { id: LeaveType; label: string }[] = [
   { id: 'annual', label: 'Annual' },
@@ -407,7 +408,7 @@ export default function HRPage() {
                   <EhrListFilters activeCount={rosterRole !== 'all' ? 1 : 0} onClear={() => setRosterRole('all')}>
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.colRole')}</label>
-                      <select
+                      <Select
                         value={rosterRole}
                         onChange={e => setRosterRole(e.target.value)}
                         aria-label={t('hr.colRole')}
@@ -418,7 +419,7 @@ export default function HRPage() {
                             {role.replace(/_/g, ' ')} ({count})
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                   </EhrListFilters>
                   <EhrListHeaderButton onClick={handleDownloadCsv} ariaLabel="Download">
@@ -730,19 +731,19 @@ export default function HRPage() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelStaffRequired')}</label>
-                  <select value={leaveForm.userId} onChange={e => setLeaveForm({ ...leaveForm, userId: e.target.value })}>
+                  <Select value={leaveForm.userId} onChange={e => setLeaveForm({ ...leaveForm, userId: e.target.value })}>
                     <option value="">{t('hr.selectStaffOption')}</option>
                     {(isApprover ? users : users.filter(u => u._id === currentUser?._id)).map(u => (
                       <option key={u._id} value={u._id}>{u.name} ({u.role.replace(/_/g, ' ')})</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelType')}</label>
-                    <select value={leaveForm.leaveType} onChange={e => setLeaveForm({ ...leaveForm, leaveType: e.target.value as LeaveType })}>
+                    <Select value={leaveForm.leaveType} onChange={e => setLeaveForm({ ...leaveForm, leaveType: e.target.value as LeaveType })}>
                       {LEAVE_TYPES.map(lt => <option key={lt.id} value={lt.id}>{t(`hr.leaveType_${lt.id}`)}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelStart')}</label>
@@ -779,19 +780,19 @@ export default function HRPage() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelStaffRequired')}</label>
-                  <select value={scheduleForm.userId} onChange={e => setScheduleForm({ ...scheduleForm, userId: e.target.value })}>
+                  <Select value={scheduleForm.userId} onChange={e => setScheduleForm({ ...scheduleForm, userId: e.target.value })}>
                     <option value="">{t('hr.selectStaffOption')}</option>
                     {facilityUsers.map(u => (
                       <option key={u._id} value={u._id}>{u.name} ({u.role.replace(/_/g, ' ')})</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelShift')}</label>
-                    <select value={scheduleForm.shiftType} onChange={e => setScheduleForm({ ...scheduleForm, shiftType: e.target.value as StaffScheduleDoc['shiftType'] })}>
+                    <Select value={scheduleForm.shiftType} onChange={e => setScheduleForm({ ...scheduleForm, shiftType: e.target.value as StaffScheduleDoc['shiftType'] })}>
                       {SHIFT_TYPES.map(s => <option key={s} value={s} className="capitalize">{t(`hr.shiftType_${s}`)}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.date')}</label>
@@ -840,19 +841,19 @@ export default function HRPage() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelStaffRequired')}</label>
-                  <select value={payrollForm.userId} onChange={e => setPayrollForm({ ...payrollForm, userId: e.target.value })}>
+                  <Select value={payrollForm.userId} onChange={e => setPayrollForm({ ...payrollForm, userId: e.target.value })}>
                     <option value="">{t('hr.selectStaffOption')}</option>
                     {facilityUsers.map(u => (
                       <option key={u._id} value={u._id}>{u.name} ({u.role.replace(/_/g, ' ')})</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelCurrency')}</label>
-                    <select value={payrollForm.currency} onChange={e => setPayrollForm({ ...payrollForm, currency: e.target.value })}>
+                    <Select value={payrollForm.currency} onChange={e => setPayrollForm({ ...payrollForm, currency: e.target.value })}>
                       <option value="SSP">SSP</option><option value="USD">USD</option><option value="KES">KES</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelBaseSalary')}</label>

@@ -11,7 +11,7 @@ import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { jubaYearMonth } from '@/lib/time-juba';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
-import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
+import { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { formatDateTitle, toIsoDate, parseIsoDate, addDays } from '@/components/ehr/EhrMiniCalendar';
 import { Download, Activity, TrendingUp, Table as TableIcon } from '@/components/icons/lucide';
 import { tooltipStyle, axisTick } from '@/components/ChartCard';
@@ -345,14 +345,8 @@ export default function StateDashboardPage() {
           actions={[
             { label: t('action.export'), icon: Download, onClick: exportCountyData },
           ]}
-          chart={(
-            <EhrWeekActivityChart
-              items={stateChartItems}
-              seriesNames={['Births', 'Deaths']}
-              selectedDate={todayIso}
-              todayIso={todayIso}
-            />
-          )}
+          chartSeriesNames={['Births', 'Deaths']}
+          chartItems={stateChartItems}
           rows={visibleCounties.map((c): EhrCareDashboardRow => {
             const facilityCount = c.facilityIds.size;
             // "Current" vs "behind" is only claimed once we actually have a

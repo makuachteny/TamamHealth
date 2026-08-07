@@ -27,6 +27,7 @@ import { formatDateTime } from '@/lib/format-utils';
 import {
   ArrowRightLeft, Check, X, Clock, AlertTriangle, ChevronDown, ChevronUp, Plus,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const STATUS_STYLE: Record<PatientTransferStatus, { label: string; bg: string; fg: string }> = {
   draft: { label: 'Draft', bg: 'var(--border-light)', fg: 'var(--text-muted)' },
@@ -416,10 +417,10 @@ function TransferOperations({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <label className="text-[11px]">Destination ward
-          {wards.length > 0 ? <select className="form-input w-full mt-1 text-[12px]" value={wardId} disabled={!canEdit || busy} onChange={e => { const next = wards.find(w => w._id === e.target.value); setWardId(e.target.value); setWardName(next?.name || ''); setBedId(''); setBedNumber(''); }}><option value="">Select ward</option>{wards.map(w => <option key={w._id} value={w._id}>{w.name} ({w.availableBeds} available)</option>)}</select> : <input className="form-input w-full mt-1 text-[12px]" value={wardName} disabled={!canEdit || busy} onChange={e => setWardName(e.target.value)} placeholder="Ward or unit" />}
+          {wards.length > 0 ? <Select className="form-input w-full mt-1 text-[12px]" value={wardId} disabled={!canEdit || busy} onChange={e => { const next = wards.find(w => w._id === e.target.value); setWardId(e.target.value); setWardName(next?.name || ''); setBedId(''); setBedNumber(''); }}><option value="">Select ward</option>{wards.map(w => <option key={w._id} value={w._id}>{w.name} ({w.availableBeds} available)</option>)}</Select> : <input className="form-input w-full mt-1 text-[12px]" value={wardName} disabled={!canEdit || busy} onChange={e => setWardName(e.target.value)} placeholder="Ward or unit" />}
         </label>
         <label className="text-[11px]">Room / bed
-          {selectedWardBeds.length > 0 ? <select className="form-input w-full mt-1 text-[12px]" value={bedId} disabled={!canEdit || busy} onChange={e => { const next = selectedWardBeds.find(b => b._id === e.target.value); setBedId(e.target.value); setBedNumber(next?.bedNumber || ''); }}><option value="">Select available bed</option>{selectedWardBeds.map(b => <option key={b._id} value={b._id}>{b.bedNumber}</option>)}</select> : <input className="form-input w-full mt-1 text-[12px]" value={bedNumber} disabled={!canEdit || busy} onChange={e => setBedNumber(e.target.value)} placeholder="Room or bed number" />}
+          {selectedWardBeds.length > 0 ? <Select className="form-input w-full mt-1 text-[12px]" value={bedId} disabled={!canEdit || busy} onChange={e => { const next = selectedWardBeds.find(b => b._id === e.target.value); setBedId(e.target.value); setBedNumber(next?.bedNumber || ''); }}><option value="">Select available bed</option>{selectedWardBeds.map(b => <option key={b._id} value={b._id}>{b.bedNumber}</option>)}</Select> : <input className="form-input w-full mt-1 text-[12px]" value={bedNumber} disabled={!canEdit || busy} onChange={e => setBedNumber(e.target.value)} placeholder="Room or bed number" />}
         </label>
       </div>
       <div className="rounded border p-2 space-y-2" style={{ borderColor: 'var(--border-light)' }}>
@@ -427,7 +428,7 @@ function TransferOperations({
         <div className="flex flex-wrap items-center gap-3 text-[11px]">
           <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={patientInformed} disabled={!canEdit || busy} onChange={e => setPatientInformed(e.target.checked)} /> Patient informed</label>
           <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={familyContacted} disabled={!canEdit || busy} onChange={e => setFamilyContacted(e.target.checked)} /> Family contacted</label>
-          {familyContacted && <select className="form-input text-[11px]" value={familyMethod} disabled={!canEdit || busy} onChange={e => setFamilyMethod(e.target.value as typeof familyMethod)}><option value="phone">Phone</option><option value="in_person">In person</option><option value="portal">Portal</option><option value="not_available">Not available</option></select>}
+          {familyContacted && <Select className="form-input text-[11px]" value={familyMethod} disabled={!canEdit || busy} onChange={e => setFamilyMethod(e.target.value as typeof familyMethod)}><option value="phone">Phone</option><option value="in_person">In person</option><option value="portal">Portal</option><option value="not_available">Not available</option></Select>}
           {canEdit && <button className="btn btn-secondary text-[11px]" disabled={busy} onClick={saveCommunication}>Save communication</button>}
         </div>
       </div>

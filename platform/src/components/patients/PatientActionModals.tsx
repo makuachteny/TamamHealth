@@ -26,6 +26,7 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { patientFullName } from '@/lib/patient-utils';
 import type { PatientDoc } from '@/lib/db-types';
+import Select from '@/components/Select';
 
 // Minimal shape of the logged-in user needed by these modals. The patient
 // detail page passes `currentUser` from useApp(); we only read these fields.
@@ -177,18 +178,18 @@ export function PrescribeModal({ isOpen, onClose, patient, currentUser }: BaseMo
             </div>
             <div>
               <label>Route</label>
-              <select value={route} onChange={e => setRoute(e.target.value)}>
+              <Select value={route} onChange={e => setRoute(e.target.value)}>
                 {routeOptions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label>Frequency</label>
-              <select value={frequency} onChange={e => setFrequency(e.target.value)}>
+              <Select value={frequency} onChange={e => setFrequency(e.target.value)}>
                 <option value="">Select frequency…</option>
                 {frequencyOptions.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label>Duration</label>
@@ -197,10 +198,10 @@ export function PrescribeModal({ isOpen, onClose, patient, currentUser }: BaseMo
           </div>
           <div>
             <label>{t('referrals.urgency')}</label>
-            <select value={urgency} onChange={e => setUrgency(e.target.value as 'immediate' | 'definitive')}>
+            <Select value={urgency} onChange={e => setUrgency(e.target.value as 'immediate' | 'definitive')}>
               <option value="definitive">Definitive</option>
               <option value="immediate">Immediate (stat)</option>
-            </select>
+            </Select>
           </div>
           <div>
             <label>Instructions</label>
@@ -293,19 +294,19 @@ export function ReferModal({ isOpen, onClose, patient, currentUser }: BaseModalP
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
           <div>
             <label>{t('referrals.destinationHospital')}</label>
-            <select value={toHospital} onChange={e => setToHospital(e.target.value)}>
+            <Select value={toHospital} onChange={e => setToHospital(e.target.value)}>
               <option value="">{t('referrals.selectHospital')}</option>
               {otherHospitals.map(h => (
                 <option key={h._id} value={h._id}>{h.name} ({h.state})</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label>{t('referrals.department')}</label>
-            <select value={department} onChange={e => setDepartment(e.target.value)}>
+            <Select value={department} onChange={e => setDepartment(e.target.value)}>
               <option value="">{t('referrals.selectDepartment')}</option>
               {departments.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
+            </Select>
           </div>
           <div className="col-span-2">
             <label>{t('referrals.urgency')}</label>

@@ -17,27 +17,29 @@ import { APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
 } from '@/lib/appointment-status';
 import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
 import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel } from '@/lib/patient-utils';
-import { priorityColor } from '@/lib/clinical/triage-display';
+import { PRIORITY_META, appointmentPriorityLabel, appointmentTriage, priorityColor, priorityLabelKey } from '@/lib/clinical/triage-display';
 import { buildQueueFromTriage, STAGE_LABELS, type QueueStage } from '@/lib/services/patient-queue-service';
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
 import AppointmentEditModal from '@/components/appointments/AppointmentEditModal';
-import { PatientRegistrationForm } from '@/app/(dashboard)/patients/new/page';
+import { PatientRegistrationForm } from '@/components/patients/registration/PatientRegistrationForm';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { getRoleConfig } from '@/lib/permissions';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMetric, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import {
   Calendar, ClipboardCheck, ArrowRightLeft,
   UserPlus, ClipboardList, Plus,
-  MapPin, LogIn, LogOut, Wallet, CheckCircle, X, Maximize2,
+  MapPin, LogOut, Wallet, CheckCircle, X, Maximize2,
   Send, Stethoscope, FileText, RotateCcw, type LucideIcon,
 } from '@/components/icons/lucide';
 import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
 import { formatPhoneDisplay } from '@/lib/field-formats';
+import Select from '@/components/Select';
 
 /**
  * Front-desk operations workspace.
@@ -153,22 +155,10 @@ export default function FrontDeskDashboardPage() {
   // role dashboard and the mobile shell.
   const [queueFilter, setQueueFilter] = useState<AppointmentStatusGroup>('scheduled');
   const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered'>('all');
+  const searchParams = useSearchParams();
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
 
-  // Deep link: ?lane= lands on a specific lane tab and ?q= prefills the queue
-  // search — how "merge intake → land on the patient's Scheduled row" works
-  // from /patient-intake (and any other surface that wants to point here).
-  const searchParams = useSearchParams();
-  useEffect(() => {
-    const lane = searchParams?.get('lane');
-    if (lane === 'scheduled' || lane === 'in_office' || lane === 'finished') {
-      setQueueFilter(lane);
-      setPanelView('all');
-    }
-    const q = searchParams?.get('q');
-    if (q) setQueueSearch(q);
-  }, [searchParams]);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   // The appointment open in the shared edit form, if any.
   const [editAppointment, setEditAppointment] = useState<AppointmentDoc | null>(null);
@@ -212,6 +202,29 @@ export default function FrontDeskDashboardPage() {
   const [boardDate, setBoardDate] = useState<string>(today);
   const viewingToday = boardDate === today;
 
+  // Deep link: ?lane= lands on a specific lane tab, ?q= prefills the queue
+  // search and ?date= opens the board on a specific day — how "merge intake →
+  // land on the patient's Scheduled row" works from /patient-intake (and any
+  // other surface that wants to point here).
+  //
+  // ?date= matters because this board only ever shows one day and defaults to
+  // today: pointing at a patient whose booking is later in the week without it
+  // lands the clerk on a lane filtered to someone with nothing on it, which
+  // reads as "the link did nothing".
+  useEffect(() => {
+    const lane = searchParams?.get('lane');
+    if (lane === 'scheduled' || lane === 'in_office' || lane === 'finished') {
+      setQueueFilter(lane);
+      setPanelView('all');
+    }
+    const q = searchParams?.get('q');
+    if (q) setQueueSearch(q);
+    // Validated shape, not just truthiness — boardDate drives every row filter
+    // on the page, so a malformed value would empty the whole board.
+    const date = searchParams?.get('date');
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) setBoardDate(date);
+  }, [searchParams]);
+
   useEffect(() => {
     if (!currentUser) return;
     let cancelled = false;
@@ -253,6 +266,22 @@ export default function FrontDeskDashboardPage() {
       // appointmentTime can be missing on seeded/synced rows — guard before sort
       .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || '')),
     [appointments, boardDate]
+  );
+
+  // Work plotted on the "Day activity" week chart. Drawn from the whole booking
+  // list rather than the day-scoped rows in the worklist, so all seven columns
+  // carry their real numbers; cancellations and no-shows are left out because
+  // they are neither active work nor completed work.
+  const weekChartItems = useMemo<DayStatsItem[]>(() =>
+    appointments
+      .filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
+      .map(a => ({
+        date: isoDateKey(a.appointmentDate),
+        time: formatClockTime(a.appointmentTime) || undefined,
+        // The same split the rows use: finished visits form the second series.
+        series: APPOINTMENT_STATUS_TONES[a.status] === 'done' ? 1 : 0,
+      })),
+    [appointments]
   );
 
   // ── Real today's triages (pending/seen = still in queue) ──
@@ -456,7 +485,11 @@ export default function FrontDeskDashboardPage() {
         patientId: a.patientId,
         patientName: a.patientName,
         type: 'appointment',
-        priority: a.priority === 'emergency' ? 'RED' : a.priority === 'urgent' ? 'YELLOW' : 'normal',
+        // A booking always has an acuity — routine is one, not the absence of
+        // one. 'normal' is left for rows that genuinely carry none (a bare
+        // registration), which is the only case that falls back to the stage
+        // or department under the pill.
+        priority: appointmentTriage(a.priority),
         complaint: a.reason || 'Scheduled visit',
         department: a.department || 'OPD',
         gender: genderOf(a.patientId),
@@ -1016,7 +1049,7 @@ export default function FrontDeskDashboardPage() {
   // than a second, parallel front door.
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
     { label: 'New appointments', icon: Plus, onClick: () => setBookingOpen(true), tone: 'primary' as const },
-    ...(canUseRoute('/patient-intake') ? [{ label: 'Send intake', icon: Send, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
+    ...(canUseRoute('/patient-intake') ? [{ label: 'Intake form', icon: Send, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
   ]), [canUseRoute, router, t]);
 
@@ -1071,11 +1104,18 @@ export default function FrontDeskDashboardPage() {
           ? value => handleAppointmentStatusChange(appointment, value as AppointmentStatus)
           : undefined,
         telehealth: appointment.appointmentMode === 'telehealth' || appointment.appointmentType === 'telehealth',
-        statusSecondary: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
+        // The line under the pill states the booking's urgency in the shared
+        // Emergency/Urgent/Routine words. It used to write 'Appointment' for
+        // anything routine — the row's type, not its priority — so the column
+        // read in two vocabularies at once and the majority of rows said
+        // nothing about how urgent they were.
+        statusSecondary: appointmentPriorityLabel(appointment.priority),
         statusTone: APPOINTMENT_STATUS_TONES[appointment.status],
-        // Only a real acuity gets the RED/YELLOW pill — routine appointments
-        // show no priority pill rather than a free-text 'Appointment' label.
-        priority: appointment.priority === 'emergency' ? 'RED' : appointment.priority === 'urgent' ? 'YELLOW' : undefined,
+        // Every booking carries its acuity code, routine included. The word and
+        // its colour come from the same value, so "Routine" is green here and
+        // on the clinician's worklist rather than green on rows that happen to
+        // have been triaged and grey on the ones that have not.
+        priority: appointmentTriage(appointment.priority),
         date: isoDateKey(appointment.appointmentDate),
         patientId: appointment.patientId,
         // The row drops down into the appointment itself, the way the doctor
@@ -1134,13 +1174,10 @@ export default function FrontDeskDashboardPage() {
       const context = entry.stage ? STAGE_LABELS[entry.stage]
         : entry.type === 'appointment' ? entry.department
         : entry.location || entry.department;
-      const statusContext = entry.priority === 'RED'
-        ? 'Critical'
-        : entry.priority === 'YELLOW'
-          ? 'Urgent'
-          : entry.priority === 'GREEN'
-            ? 'Routine'
-            : entry.stageLabel || context;
+      // Same shared acuity words the Appointments tab of this very dashboard
+      // uses; this branch called RED "Critical", so one column said two
+      // different things depending on which tab you were on.
+      const statusContext = acuity ? PRIORITY_META[acuity].label : entry.stageLabel || context;
       // Wait column: actual queue/slot time on the first line; the shared
       // dashboard row renders hours/minutes underneath from `timeAt`.
       const waitTime = entry.time || entry.date || undefined;
@@ -1488,10 +1525,11 @@ export default function FrontDeskDashboardPage() {
           filters={[]}
           actions={actions}
           actionStrip={actionStrip}
-          // Rows now carry `time`; the done→series1 default already matches
-          // this queue (checked-out visits are 'done', everything still
-          // scheduled/waiting/in consult is not).
           chartSeriesNames={['Active', 'Completed']}
+          // The list below is one day's schedule, so charting it left a single
+          // bar under a "This week" heading. The chart reads the whole booking
+          // list instead — the same source the mini-calendar above it dots.
+          chartItems={weekChartItems}
           rows={frontDeskRows}
           metrics={metrics}
           calendarEventDates={appointments.map(appointment => appointment.appointmentDate)}
@@ -1606,9 +1644,9 @@ export default function FrontDeskDashboardPage() {
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>New time</label>
-                  <select value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}>
+                  <Select value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}>
                     {RESCHEDULE_SLOTS.map(slot => <option key={slot} value={slot}>{formatClockTime(slot)}</option>)}
-                  </select>
+                  </Select>
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-5">
@@ -1766,7 +1804,7 @@ function StaffAssignmentControl({
     <div className="ehr-care-rooming">
       <Icon className="w-4 h-4" />
       <span>{label}</span>
-      <select value={draft} onChange={event => setDraft(event.target.value)}>
+      <Select value={draft} onChange={event => setDraft(event.target.value)}>
         <option value="">{emptyLabel}</option>
         {/* A provider assigned from elsewhere may not be in this facility's
             staff list; keep them selectable so the control never misreports. */}
@@ -1776,7 +1814,7 @@ function StaffAssignmentControl({
         {staff.map(person => (
           <option key={person._id} value={person._id}>{person.name || person.username}</option>
         ))}
-      </select>
+      </Select>
       <button
         type="button"
         disabled={saving || draft === (currentId || '')}
@@ -1815,12 +1853,12 @@ function RoomAssignmentControl({
           button — that extra line was what knocked this control out of
           alignment with the doctor and nurse pickers beside it. */}
       <span style={{ color: priorityColor(priority) }}>
-        {priority === 'RED' ? t('appointments.priorityEmergency') : priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
+        {t(priorityLabelKey(priority))}
       </span>
-      <select value={draft} onChange={(event) => setDraft(event.target.value)}>
+      <Select value={draft} onChange={(event) => setDraft(event.target.value)}>
         <option value="">Unassigned</option>
         {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
-      </select>
+      </Select>
       <button
         type="button"
         disabled={saving}

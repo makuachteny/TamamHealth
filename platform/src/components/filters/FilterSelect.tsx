@@ -1,5 +1,7 @@
 'use client';
 
+import Select from '@/components/Select';
+
 export interface FilterOption {
   value: string;
   label: string;
@@ -23,10 +25,11 @@ interface FilterSelectProps {
 }
 
 /**
- * Styled categorical filter. A plain native <select> under the hood (so it
- * stays keyboard- and mobile-friendly) but with a clear active state: once a
- * non-neutral value is chosen it adopts the accent tint + border, so users can
- * see at a glance which filters are narrowing the list.
+ * Styled categorical filter. The searchable `Select` under the hood (which
+ * keeps a real native control as its trigger, so this stays keyboard- and
+ * mobile-friendly) but with a clear active state: once a non-neutral value is
+ * chosen it adopts the accent tint + border, so users can see at a glance
+ * which filters are narrowing the list.
  */
 export default function FilterSelect({
   value,
@@ -53,7 +56,7 @@ export default function FilterSelect({
           {label}
         </span>
       )}
-      <select
+      <Select
         value={value}
         aria-label={ariaLabel ?? label}
         onChange={e => onChange(e.target.value)}
@@ -74,7 +77,7 @@ export default function FilterSelect({
             {o.label}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }

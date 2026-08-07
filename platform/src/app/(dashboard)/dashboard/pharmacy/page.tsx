@@ -20,6 +20,7 @@ import EhrCareDashboard, {
   type EhrCareDashboardRow,
   type EhrCareDashboardAction,
 } from '@/components/ehr/EhrCareDashboard';
+import { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { toIsoDate, addDays } from '@/components/ehr/EhrMiniCalendar';
 import { tooltipStyle, axisTick } from '@/components/ChartCard';
 import {
@@ -31,6 +32,7 @@ import {
   AlertOctagon, X, Check, Plus, Users, BarChart3, Loader2,
   type LucideIcon,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const ACCENT = 'var(--accent-primary)';
 type WorkflowStepKey = 'received' | 'review' | 'checked' | 'payment' | 'dispensed' | 'counseled' | 'cleared';
@@ -159,7 +161,7 @@ function DispenseModal({
                 Controlled substance{inv.controlledSchedule ? ` (Schedule ${inv.controlledSchedule})` : ''} — witness required
               </span>
             </div>
-            <select
+            <Select
               value={witnessId}
               onChange={(e) => onWitnessChange(e.target.value)}
               className="w-full px-3 py-2 rounded-lg text-sm outline-none"
@@ -169,7 +171,7 @@ function DispenseModal({
               {users.filter(u => u._id !== currentUserId).map(u => (
                 <option key={u._id} value={u._id}>{u.name} — {u.role}</option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
 
@@ -444,6 +446,19 @@ export default function PharmacyDashboardPage() {
     const hasOther = days.some(d => d.Other > 0);
     return { days, medNames: topMeds, hasOther };
   }, [rxQueue]);
+
+  // Day-activity rail: the visible queue is the *pending* pipeline by design,
+  // so charting it could never draw a Dispensed bar — the second series was
+  // empty on every day of the week. Built from the whole prescription list
+  // instead, each order plotted at the moment that series is about: a pending
+  // one when it was written, a dispensed one when it left the counter.
+  const chartItems = useMemo<DayStatsItem[]>(() => rxQueue
+    .filter(rx => rx.status !== 'discontinued')
+    .map(rx => {
+      const dispensed = DISPENSED_DONE_STAGES.has(pharmacyStage(rx));
+      const at = (dispensed && rx.dispensedAt) || rx.createdAt;
+      return { date: at.slice(0, 10), time: formatTime(at), series: (dispensed ? 1 : 0) as 0 | 1 };
+    }), [rxQueue]);
 
   // (b) Pending-dispensing queue depth + average wait for orders currently
   // sitting in the queue (real orderStatus stage via pharmacyStage(), same
@@ -854,10 +869,8 @@ export default function PharmacyDashboardPage() {
           filters={[]}
           actions={headerActions}
           hideRowList={centerPanel !== null}
-          // Rows already carry `time` (order.createdAt); the default done→series1
-          // split matches this pipeline exactly (dispensed/counseled/complete are
-          // 'done', everything still moving through review/payment is not).
           chartSeriesNames={['Pending', 'Dispensed']}
+          chartItems={chartItems}
           rows={visibleQueue.map((rx): EhrCareDashboardRow => {
             const stage = pharmacyStage(rx);
             const balance = patientBalanceFor(rx);

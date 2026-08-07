@@ -8,6 +8,7 @@ import { AlertTriangle, Plus, Edit3, Trash2, X } from '@/components/icons/lucide
 import { isNoAllergySentinel } from '@/lib/clinical-roles';
 import Modal from '@/components/Modal';
 import AddAllergyModal from '@/components/patients/AddAllergyModal';
+import Select from '@/components/Select';
 
 const CRIT_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
   severe:   { bg: 'var(--color-danger-bg, rgba(196,69,54,0.12))', fg: 'var(--color-danger)',  label: 'Severe'   },
@@ -138,15 +139,15 @@ export default function AllergyList({ patient, hideAddButton = false }: { patien
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Classification</label>
-                <select value={editForm.classification} onChange={(e) => setEditForm({ ...editForm, classification: e.target.value as AllergyEntry['classification'] })} className="p-2.5 rounded-md text-[12px]" style={inputStyle}>
+                <Select value={editForm.classification} onChange={(e) => setEditForm({ ...editForm, classification: e.target.value as AllergyEntry['classification'] })} className="p-2.5 rounded-md text-[12px]" style={inputStyle}>
                   {CLASSIFICATIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                </Select>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Criticality</label>
-                <select value={editForm.criticality} onChange={(e) => setEditForm({ ...editForm, criticality: e.target.value as NonNullable<AllergyEntry['criticality']> })} className="p-2.5 rounded-md text-[12px]" style={inputStyle}>
+                <Select value={editForm.criticality} onChange={(e) => setEditForm({ ...editForm, criticality: e.target.value as NonNullable<AllergyEntry['criticality']> })} className="p-2.5 rounded-md text-[12px]" style={inputStyle}>
                   {CRITICALITIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
             <input value={editForm.reaction} onChange={(e) => setEditForm({ ...editForm, reaction: e.target.value })} placeholder="Reaction" className={inputCls} style={inputStyle} />

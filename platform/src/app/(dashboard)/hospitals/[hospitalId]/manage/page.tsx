@@ -48,6 +48,7 @@ import type { AssetDoc } from '@/lib/db-types-asset';
 import type { DataScope } from '@/lib/services/data-scope';
 import { useToast } from '@/components/Toast';
 import { isValidPhone, isValidEmail, normalizePhone, normalizeEmail } from '@/lib/field-formats';
+import Select from '@/components/Select';
 
 // ── Permission ───────────────────────────────────────────────────────────────
 const MANAGE_ROLES: UserRole[] = [
@@ -703,7 +704,7 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: 10, alignItems: 'center' }}>
-        <select
+        <Select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
           style={{
@@ -718,7 +719,7 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
           <option value="under_repair">{t('hospitals.equipUnderRepair')}</option>
           <option value="decommissioned">{t('hospitals.equipDecommissioned')}</option>
           <option value="lost_or_stolen">{t('hospitals.equipLostStolen')}</option>
-        </select>
+        </Select>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
           {t('hospitals.countOf', { shown: filtered.length, total: assets.length })}
         </span>
@@ -1182,7 +1183,7 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
             {fieldErrors.email && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{fieldErrors.email}</p>}
           </Field>
           <Field label={t('hospitals.operatingStatus')}>
-            <select
+            <Select
               disabled={!canWrite}
               value={operationalStatus}
               onChange={e => setOperationalStatus(e.target.value)}
@@ -1192,7 +1193,7 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
               <option value="partially_functional">{t('hospitals.statusPartiallyFunctional')}</option>
               <option value="non_functional">{t('hospitals.statusNonFunctional')}</option>
               <option value="closed">{t('hospitals.statusClosed')}</option>
-            </select>
+            </Select>
           </Field>
         </div>
       </div>

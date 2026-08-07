@@ -26,6 +26,7 @@ import { useRouter } from 'next/navigation';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { Video } from '@/components/icons/lucide';
 import type { AppointmentDoc, AppointmentPriority, AppointmentStatus, AppointmentType, PatientDoc } from '@/lib/db-types';
+import Select from '@/components/Select';
 
 const TYPE_OPTIONS: { value: AppointmentType; label: string }[] = [
   { value: 'general', label: 'General consultation' },
@@ -211,9 +212,9 @@ export default function AppointmentEditModal({
               )}
               <div>
                 <label>Visit type</label>
-                <select value={type} onChange={e => setType(e.target.value as AppointmentType)}>
+                <Select value={type} onChange={e => setType(e.target.value as AppointmentType)}>
                   {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
+                </Select>
               </div>
               </>
             )}
@@ -222,8 +223,8 @@ export default function AppointmentEditModal({
           {!inline && <h4 className="appt-edit-section">Date &amp; time</h4>}
           <div className="appt-edit-row">
             <div><label>Date</label><input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-            <div><label>Time</label><select value={time} onChange={e => setTime(e.target.value)}>{TIME_SLOTS.map(slot => <option key={slot} value={slot}>{slot}</option>)}</select></div>
-            <div><label>Duration</label><select value={duration} onChange={e => setDuration(Number(e.target.value))}>{DURATIONS.map(d => <option key={d} value={d}>{d} min</option>)}</select></div>
+            <div><label>Time</label><Select value={time} onChange={e => setTime(e.target.value)}>{TIME_SLOTS.map(slot => <option key={slot} value={slot}>{slot}</option>)}</Select></div>
+            <div><label>Duration</label><Select value={duration} onChange={e => setDuration(Number(e.target.value))}>{DURATIONS.map(d => <option key={d} value={d}>{d} min</option>)}</Select></div>
           </div>
           <div><label>Notes</label><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} /></div>
         </div>
@@ -237,7 +238,7 @@ export default function AppointmentEditModal({
           <div>
             <label>Provider</label>
             <span className="appt-assign-field">
-              <select
+              <Select
                 value={providerId}
                 onChange={e => {
                   const person = providerOptions.find(p => p._id === e.target.value);
@@ -257,7 +258,7 @@ export default function AppointmentEditModal({
                     {staffOptionLabel(person, providerSlotContext)}
                   </option>
                 ))}
-              </select>
+              </Select>
               <button type="button" className="appt-assign-btn" onClick={save} disabled={saving || (providerId === (appointment.providerId || '') && provider === appointment.providerName)}>
                 {saving ? '…' : 'Assign'}
               </button>
@@ -268,9 +269,9 @@ export default function AppointmentEditModal({
           {!inline && <h4 className="appt-edit-section">Visit detail</h4>}
           <div>
             <label>Department</label>
-            <select value={department} onChange={e => setDepartment(e.target.value)}>
+            <Select value={department} onChange={e => setDepartment(e.target.value)}>
               {(departments.length ? departments : [department]).map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
+            </Select>
           </div>
           <div><label>Reason</label><textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} /></div>
         </div>
@@ -282,11 +283,11 @@ export default function AppointmentEditModal({
           <div><label>Status</label><AppointmentStatusSelect status={status} layout="bare" onChange={setStatus} /></div>
           <div>
             <label>Priority</label>
-            <select value={priority} onChange={e => setPriority(e.target.value as AppointmentPriority)}>
+            <Select value={priority} onChange={e => setPriority(e.target.value as AppointmentPriority)}>
               <option value="routine">Routine</option>
               <option value="urgent">Urgent</option>
               <option value="emergency">Emergency</option>
-            </select>
+            </Select>
           </div>
           <AppointmentDetailFields section="billing" {...detailProps} />
         </div>

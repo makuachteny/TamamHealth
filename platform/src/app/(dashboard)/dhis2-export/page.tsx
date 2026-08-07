@@ -18,6 +18,7 @@ import {
   isDhis2Configured, getDhis2BaseUrlHost, groupDhis2DataValues, getMetric,
   type Dhis2SyncLogDoc,
 } from '@/lib/services/dhis2-sync-log-service';
+import Select from '@/components/Select';
 
 // ── HMIS report catalog (South Sudan standard report names/cadence). This is
 // structural metadata, not per-record data — the completeness/status shown
@@ -394,7 +395,7 @@ export default function DHIS2ExportPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('dhis2.aggregationLevel')}</label>
-                  <select
+                  <Select
                     value={exportLevel}
                     onChange={e => setExportLevel(e.target.value as typeof exportLevel)}
                     className="w-full p-2.5 rounded-xl text-sm outline-none"
@@ -405,7 +406,7 @@ export default function DHIS2ExportPage() {
                     <option value="county" disabled={!u?.county}>{t('dhis2.levelCounty')}{u?.county ? '' : ` ${t('dhis2.noneSetOnUser')}`}</option>
                     <option value="state" disabled={!u?.state}>{t('dhis2.levelState')}{u?.state ? '' : ` ${t('dhis2.noneSetOnUser')}`}</option>
                     <option value="national" disabled={!nationalAllowed}>{t('dhis2.levelNational')}{nationalAllowed ? '' : ` ${t('dhis2.nationalRestricted')}`}</option>
-                  </select>
+                  </Select>
                   <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>{t('dhis2.tierHelp')}</p>
                 </div>
                 <div>

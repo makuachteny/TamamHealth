@@ -39,6 +39,7 @@ import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import { jubaDate, jubaTime } from '@/lib/time-juba';
 import PageInstructionCard from '@/components/PageInstructionCard';
+import Select from '@/components/Select';
 
 // react-big-calendar (and its CSS) is a heavy client-only library. Split it out
 // of the route's initial bundle so it loads only when the calendar view renders.
@@ -306,6 +307,30 @@ export default function AppointmentsPage() {
   const [wiPriority, setWiPriority] = useState<AppointmentPriority>('routine');
   const [wiNotes, setWiNotes] = useState('');
 
+  // Deep link: registration's "Register & check in" routes here with ?walkIn=
+  // so the clerk lands on the walk-in dialog with the patient they just created
+  // already selected. Checking a patient in is an action on an appointment now
+  // that the standalone Check-In module is gone, and a just-registered patient
+  // standing at the desk has none — so the walk-in booking IS their check-in.
+  // Lives here rather than beside the other deep links because it writes the
+  // walk-in form state declared just above. Waits for `patients` to load.
+  const walkInParamRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || walkInParamRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const walkInId = params.get('walkIn');
+    if (!walkInId) return;
+    if (!patients.some(p => p._id === walkInId)) return;
+    walkInParamRef.current = true;
+    if (canBookAppointments) {
+      setWiPatient(walkInId);
+      setShowWalkIn(true);
+    }
+    params.delete('walkIn');
+    const qs = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  }, [patients, canBookAppointments]);
+
   // Reschedule / Cancel
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
@@ -475,7 +500,7 @@ export default function AppointmentsPage() {
     if (!patient) { showToast(t('appointments.toastSelectValidPatientShort'), 'error'); return; }
     setSubmitting(true);
     try {
-      await create({
+      const created = await create({
         patientId: patient._id, patientName: `${patient.firstName} ${patient.surname}`,
         // The desk registering a walk-in is not their clinician; the queue
         // assigns one. `bookedBy` below already records who took them in.
@@ -489,6 +514,35 @@ export default function AppointmentsPage() {
         bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
         orgId: currentUser?.orgId,
       });
+      // A walk-in booking is written `checked_in` — the patient is already at
+      // the desk — so it has to open the visit thread too. Writing the status
+      // alone leaves them with no encounter for triage, rooming, the
+      // clinician's note or the checkout gate to join, which is the same gap
+      // handleStatusChange closes for scheduled patients via
+      // checkInAppointment. Best-effort: the booking is what puts them in the
+      // queue, so an encounter failure must not lose the registration.
+      try {
+        const { findOpenEncounterForPatient, createArrivalEncounter } = await import('@/lib/services/encounter-service');
+        const { deriveAttendanceType } = await import('@/lib/services/check-in-service');
+        const facilityId = currentUser?.hospitalId || '';
+        const existing = await findOpenEncounterForPatient(patient._id, facilityId);
+        if (!existing) {
+          await createArrivalEncounter({
+            patientId: patient._id,
+            patientName: `${patient.firstName} ${patient.surname}`,
+            hospitalNumber: patient.hospitalNumber,
+            hospitalId: facilityId,
+            hospitalName: currentUser?.hospitalName || '',
+            orgId: currentUser?.orgId,
+            arrivalChannel: 'walk_in',
+            appointmentId: created?._id,
+            attendanceType: await deriveAttendanceType(patient._id),
+            actorId: currentUser?._id,
+          });
+        }
+      } catch {
+        // encounter creation is best-effort; the walk-in booking still stands
+      }
       showToast(t('appointments.toastWalkInRegistered'), 'success'); setShowWalkIn(false);
       setWiPatient(''); setWiReason(''); setWiNotes(''); setWiDepartment('Outpatient'); setWiPriority('routine');
     } catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailed'), 'error'); }
@@ -713,7 +767,7 @@ export default function AppointmentsPage() {
                     />
                     <div className={`listpage-icon-select ${listStatus !== 'all' ? 'is-active' : ''}`} title="Filter appointments by status">
                       <Filter size={16} />
-                      <select
+                      <Select
                         value={listStatus}
                         onChange={e => setListStatus(e.target.value)}
                         aria-label="Filter appointments by status"
@@ -724,7 +778,7 @@ export default function AppointmentsPage() {
                         {(['requested', ...APPOINTMENT_STATUS_FLOW, ...APPOINTMENT_STATUS_EXITS] as AppointmentStatus[]).map(k => (
                           <option key={k} value={k}>{t(statusLabelKey[k])}</option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                     {canExportAppointments && (
                       <button type="button" className="listpage-icon-btn" onClick={handleDownloadCsv} title="Download" aria-label="Download">
@@ -921,31 +975,31 @@ export default function AppointmentsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label>{t('appointments.labelPatient')}</label>
-                <select value={formPatient} onChange={e => setFormPatient(e.target.value)}>
+                <Select value={formPatient} onChange={e => setFormPatient(e.target.value)}>
                   <option value="">{t('appointments.selectPatient')}</option>
                   {patients.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.surname} {p.hospitalNumber ? `(${p.hospitalNumber})` : ''}</option>)}
-                </select>
+                </Select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
                 <div><label>{t('appointments.labelDate')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
-                <div><label>{t('appointments.labelTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
-                <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
+                <div><label>{t('appointments.labelTime')}</label><Select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</Select></div>
+                <div><label>{t('appointments.labelDuration')}</label><Select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</Select></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
-                <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
+                <div><label>{t('appointments.labelType')}</label><Select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</Select></div>
+                <div><label>{t('appointments.labelPriority')}</label><Select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></Select></div>
                 {/* Usually left at Scheduled, but the desk books patients already
                     standing at the window, and data entry back-fills visits that
                     have happened — both need to start on a different rung. */}
                 <div><label>{t('appointments.labelStatus')}</label><AppointmentStatusSelect status={formStatus} layout="bare" onChange={setFormStatus} /></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                <div><label>{t('appointments.labelDepartment')}</label><Select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</Select></div>
                 {/* A real clinician from the staff directory, not free text —
                     each option states role, free-or-busy at this slot, and the
                     day's load; the id makes the double-booking guard bite. */}
                 <div><label>{t('appointments.labelProvider')}</label>
-                  <select value={formProviderId} onChange={e => selectFormProvider(e.target.value)}>
+                  <Select value={formProviderId} onChange={e => selectFormProvider(e.target.value)}>
                     <option value="">{!formProviderId && formProvider ? `${formProvider} (not on staff list)` : 'Unassigned'}</option>
                     {formProviderId && !providerOptions.some(p => p._id === formProviderId) && (
                       <option value={formProviderId}>{formProvider || 'Current provider'}</option>
@@ -953,16 +1007,16 @@ export default function AppointmentsPage() {
                     {providerOptions.map(person => (
                       <option key={person._id} value={person._id}>{staffOptionLabel(person, providerSlotContext)}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
               <div><label>{t('appointments.labelReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} placeholder={t('appointments.reasonPlaceholder')} /></div>
               <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} placeholder={t('appointments.notesPlaceholder')} /></div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', textTransform: 'none', fontSize: 13 }}>
                 <input type="checkbox" checked={formRecurring} onChange={e => setFormRecurring(e.target.checked)} /> {t('appointments.recurringAppointment')}
-                {formRecurring && <select value={formRecurrencePattern} onChange={e => setFormRecurrencePattern(e.target.value as typeof formRecurrencePattern)} style={{ width: 'auto' }}>
+                {formRecurring && <Select value={formRecurrencePattern} onChange={e => setFormRecurrencePattern(e.target.value as typeof formRecurrencePattern)} style={{ width: 'auto' }}>
                   <option value="weekly">{t('appointments.recurrenceWeekly')}</option><option value="biweekly">{t('appointments.recurrenceBiweekly')}</option><option value="monthly">{t('appointments.recurrenceMonthly')}</option><option value="quarterly">{t('appointments.recurrenceQuarterly')}</option>
-                </select>}
+                </Select>}
               </label>
               <ModalActions onCancel={() => { setShowNewForm(false); resetForm(); }} onConfirm={handleSubmit} confirmLabel={submitting ? t('appointments.booking') : t('appointments.bookAppointment')} cancelLabel={t('action.cancel')} disabled={submitting} />
             </div>
@@ -978,14 +1032,14 @@ export default function AppointmentsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label>{t('appointments.labelPatient')}</label>
-                <select value={wiPatient} onChange={e => setWiPatient(e.target.value)}>
+                <Select value={wiPatient} onChange={e => setWiPatient(e.target.value)}>
                   <option value="">{t('appointments.selectPatient')}</option>
                   {patients.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.surname}</option>)}
-                </select>
+                </Select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelDepartment')}</label><select value={wiDepartment} onChange={e => setWiDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                <div><label>{t('appointments.labelPriority')}</label><select value={wiPriority} onChange={e => setWiPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
+                <div><label>{t('appointments.labelDepartment')}</label><Select value={wiDepartment} onChange={e => setWiDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</Select></div>
+                <div><label>{t('appointments.labelPriority')}</label><Select value={wiPriority} onChange={e => setWiPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></Select></div>
               </div>
               <div><label>{t('appointments.labelReasonForVisit')}</label><textarea value={wiReason} onChange={e => setWiReason(e.target.value)} rows={2} placeholder={t('appointments.reasonForVisitPlaceholder')} /></div>
               <div><label>{t('appointments.labelNotes')}</label><textarea value={wiNotes} onChange={e => setWiNotes(e.target.value)} rows={2} placeholder={t('appointments.walkInNotesPlaceholder')} /></div>
@@ -1061,7 +1115,7 @@ export default function AppointmentsPage() {
           <Modal onClose={() => setRescheduleId(null)} title={t('appointments.rescheduleTitle')} size="sm">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div><label>{t('appointments.labelNewDate')}</label><input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)} min={today} /></div>
-              <div><label>{t('appointments.labelNewTime')}</label><select value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
+              <div><label>{t('appointments.labelNewTime')}</label><Select value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</Select></div>
               <ModalActions onCancel={() => setRescheduleId(null)} onConfirm={handleReschedule} confirmLabel={t('appointments.actionReschedule')} cancelLabel={t('action.cancel')} />
             </div>
           </Modal>
@@ -1193,7 +1247,7 @@ export default function AppointmentsPage() {
                     right. Each column is a stack of titled sections. */}
                 <div className="appt-edit-col">
 
-                  <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
+                  <div><label>{t('appointments.labelType')}</label><Select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</Select></div>
 
                   <h4 className="appt-edit-section">Appointment mode &amp; location</h4>
                   <AppointmentDetailFields
@@ -1213,8 +1267,8 @@ export default function AppointmentsPage() {
                   <h4 className="appt-edit-section">Date &amp; time</h4>
                   <div className="appt-edit-row">
                     <div><label>{t('frontDesk.date')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
-                    <div><label>{t('frontDesk.colTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
-                    <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
+                    <div><label>{t('frontDesk.colTime')}</label><Select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</Select></div>
+                    <div><label>{t('appointments.labelDuration')}</label><Select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</Select></div>
                   </div>
                   <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={3} /></div>
                 </div>
@@ -1225,7 +1279,7 @@ export default function AppointmentsPage() {
                       edit can only move the visit to a real clinician — and
                       the id keeps the conflict guard live on save. */}
                   <div><label>{t('appointments.labelProvider')}</label>
-                    <select value={formProviderId} onChange={e => selectFormProvider(e.target.value)}>
+                    <Select value={formProviderId} onChange={e => selectFormProvider(e.target.value)}>
                       <option value="">{!formProviderId && formProvider ? `${formProvider} (not on staff list)` : 'Unassigned'}</option>
                       {formProviderId && !providerOptions.some(p => p._id === formProviderId) && (
                         <option value={formProviderId}>{formProvider || 'Current provider'}</option>
@@ -1233,7 +1287,7 @@ export default function AppointmentsPage() {
                       {providerOptions.map(person => (
                         <option key={person._id} value={person._id}>{staffOptionLabel(person, providerSlotContext)}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   <AppointmentDetailFields
                     section="provider"
@@ -1249,14 +1303,14 @@ export default function AppointmentsPage() {
                     onChange={patch => setFormDetail(current => ({ ...current, ...patch }))}
                   />
                   <h4 className="appt-edit-section">Visit detail</h4>
-                  <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                  <div><label>{t('appointments.labelDepartment')}</label><Select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</Select></div>
                   <div><label>{t('appointments.detailReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} /></div>
                 </div>
 
                 <div className="appt-edit-col">
                   <h4 className="appt-edit-section">Status &amp; priority</h4>
                   <div><label>{t('appointments.labelStatus')}</label><AppointmentStatusSelect status={formStatus} layout="bare" onChange={setFormStatus} /></div>
-                  <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
+                  <div><label>{t('appointments.labelPriority')}</label><Select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></Select></div>
                   <AppointmentDetailFields
                     section="billing"
                     patient={patientById.get(apt.patientId)}

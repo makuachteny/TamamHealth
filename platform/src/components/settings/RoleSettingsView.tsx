@@ -51,6 +51,7 @@ import {
   FileText, FlaskConical, KeyRound, List, Lock, Palette, Pencil, Pill, Plus, RefreshCw,
   Settings, Shield, Stethoscope, Trash2, User, Users, Zap, type LucideIcon,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const SECTION_ICONS: Record<string, LucideIcon> = {
   user: User, bell: Bell, shield: Shield, steth: Stethoscope, pill: Pill,
@@ -404,7 +405,7 @@ export default function RoleSettingsView() {
         : row.options;
       const value = String(draft[row.key] ?? row.def);
       return (
-        <select
+        <Select
           className="ehr-set-select"
           value={value}
           aria-label={row.label}
@@ -413,7 +414,7 @@ export default function RoleSettingsView() {
           {(options.includes(value) ? options : [value, ...options]).map(option => (
             <option key={option} value={option}>{option}</option>
           ))}
-        </select>
+        </Select>
       );
     }
     if (row.kind === 'text') {

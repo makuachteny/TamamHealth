@@ -240,6 +240,7 @@ export default function OpenmrsChartShell({
             patient={patient}
             router={router}
             canConsult={canConsult}
+            currentUser={currentUser}
             onClose={closeDrawer}
           />
         );

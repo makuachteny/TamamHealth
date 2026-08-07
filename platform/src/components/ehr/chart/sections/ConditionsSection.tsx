@@ -23,6 +23,7 @@ import { useProblems } from '@/lib/hooks/useProblems';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
 import { formatDate , humanizeStatus } from '@/lib/format-utils';
 import type { ProblemStatus } from '@/lib/db-types';
+import Select from '@/components/Select';
 
 const STATUS_BADGE: Record<ProblemStatus, string> = {
   active: 'omrs-panel-badge omrs-panel-badge--active',
@@ -161,7 +162,7 @@ export default function ConditionsSection({
                         row that records it, not from a separate edit screen. */}
                     <span className={`omrs-status-picker ${STATUS_BADGE[p.status]}`}>
                       {humanizeStatus(p.status)}
-                      <select
+                      <Select
                         aria-label={`Status for ${p.name}`}
                         value={p.status}
                         disabled={savingStatus === p._id}
@@ -170,7 +171,7 @@ export default function ConditionsSection({
                         {STATUS_OPTIONS.map(option => (
                           <option key={option} value={option}>{humanizeStatus(option)}</option>
                         ))}
-                      </select>
+                      </Select>
                     </span>
                   </td>
                 </tr>

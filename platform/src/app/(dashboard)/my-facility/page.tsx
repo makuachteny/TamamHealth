@@ -9,6 +9,7 @@ import {
   Building2, BedDouble, Users, Zap,
   Activity, Save, CheckCircle, AlertTriangle, Loader2, Send, Clock,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 export default function MyFacilityPage() {
   const { t } = useTranslation();
@@ -237,7 +238,7 @@ export default function MyFacilityPage() {
             {sectionTitle(<Activity className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />, t('myFacility.operationalStatus'))}
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('myFacility.currentStatus')}</label>
-              <select
+              <Select
                 value={operationalStatus}
                 onChange={e => setOperationalStatus(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg text-sm font-medium"
@@ -252,7 +253,7 @@ export default function MyFacilityPage() {
                 <option value="partially_functional">{t('myFacility.statusPartiallyFunctional')}</option>
                 <option value="non_functional">{t('myFacility.statusNonFunctional')}</option>
                 <option value="closed">{t('myFacility.statusClosed')}</option>
-              </select>
+              </Select>
               <hr className="section-divider" />
               <div>
                 <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{
@@ -308,7 +309,7 @@ export default function MyFacilityPage() {
               {hasInternet && (
                 <div className="pl-4 pb-2">
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('myFacility.internetType')}</label>
-                  <select
+                  <Select
                     value={internetType}
                     onChange={e => setInternetType(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg text-sm"
@@ -325,7 +326,7 @@ export default function MyFacilityPage() {
                     <option value="3g">{t('myFacility.internet3g')}</option>
                     <option value="satellite">{t('myFacility.internetSatellite')}</option>
                     <option value="dsl">{t('myFacility.internetDsl')}</option>
-                  </select>
+                  </Select>
                 </div>
               )}
               {toggle(t('myFacility.hasAmbulance'), hasAmbulance, setHasAmbulance)}

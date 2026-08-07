@@ -13,6 +13,7 @@ import {
 import RowActionsMenu from '@/components/RowActionsMenu';
 import EhrListHeader from '@/components/ehr/EhrListHeader';
 import { avatarTint } from '@/lib/patient-utils';
+import Select from '@/components/Select';
 
 // Column template for the user list header + rows:
 // User · Role · Organization · Facility · Status · Actions
@@ -241,16 +242,16 @@ export default function AdminUsersPage() {
             search={{ value: search, onChange: setSearch, placeholder: t('adminUsers.searchPlaceholder') }}
             actions={
               <>
-                <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '180px', height: 38 }}>
+                <Select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '180px', height: 38 }}>
                   <option value="all">{t('adminUsers.allRoles')}</option>
                   {Object.keys(ROLE_LABELS).map((value) => (
                     <option key={value} value={value}>{roleLabel(value)} ({roleCounts[value] || 0})</option>
                   ))}
-                </select>
-                <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '200px', height: 38 }}>
+                </Select>
+                <Select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '200px', height: 38 }}>
                   <option value="all">{t('adminUsers.allOrganizations')}</option>
                   {organizations.map(o => <option key={o._id} value={o._id}>{o.name}</option>)}
-                </select>
+                </Select>
                 <div className="flex items-center gap-1.5 px-3 rounded-lg text-xs flex-shrink-0" style={{ height: 38, color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>
                   <Filter className="w-3.5 h-3.5" />
                   {filteredUsers.length} of {users.length}
@@ -427,27 +428,27 @@ export default function AdminUsersPage() {
               </div>
               <div>
                 <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Role</label>
-                <select value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value as UserRole }))} style={selectStyle}>
+                <Select value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value as UserRole }))} style={selectStyle}>
                   {(Object.keys(ROLE_LABELS) as UserRole[]).filter(r => r !== 'super_admin').map(r => (
                     <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Organization</label>
-                <select value={addForm.orgId} onChange={e => setAddForm(f => ({ ...f, orgId: e.target.value, hospitalId: '' }))} style={selectStyle}>
+                <Select value={addForm.orgId} onChange={e => setAddForm(f => ({ ...f, orgId: e.target.value, hospitalId: '' }))} style={selectStyle}>
                   <option value="">— None (platform-level role) —</option>
                   {organizations.map(o => <option key={o._id} value={o._id}>{o.name}</option>)}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Facility</label>
-                <select value={addForm.hospitalId} onChange={e => setAddForm(f => ({ ...f, hospitalId: e.target.value }))} style={selectStyle}>
+                <Select value={addForm.hospitalId} onChange={e => setAddForm(f => ({ ...f, hospitalId: e.target.value }))} style={selectStyle}>
                   <option value="">— None —</option>
                   {hospitals.filter(h => !addForm.orgId || h.orgId === addForm.orgId).map(h => (
                     <option key={h._id} value={h._id}>{h.name}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               {addError && (
                 <p className="text-xs" style={{ color: 'var(--color-danger)' }}>{addError}</p>
@@ -473,7 +474,7 @@ export default function AdminUsersPage() {
             </div>
             <div className="px-5 py-4">
               <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>New Role</label>
-              <select
+              <Select
                 value={newRole}
                 onChange={e => setNewRole(e.target.value as UserRole)}
                 className="w-full px-3 py-2 rounded-lg text-sm"
@@ -482,7 +483,7 @@ export default function AdminUsersPage() {
                 {(Object.keys(ROLE_LABELS) as UserRole[]).filter(r => r !== 'super_admin').map(r => (
                   <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div className="px-5 py-3 border-t flex justify-end gap-2" style={{ borderColor: 'var(--border-light)' }}>
               <button onClick={() => setChangeRoleUser(null)} className="btn btn-secondary" disabled={changingRole}>Cancel</button>

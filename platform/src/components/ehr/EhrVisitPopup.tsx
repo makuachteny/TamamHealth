@@ -8,6 +8,7 @@ import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { STAGE_LABELS, type QueueEntry, type QueueStage } from '@/lib/services/patient-queue-service';
 import { formatClockTime } from '@/lib/format-utils';
 import { initials, stateTint } from '@/lib/patient-utils';
+import { PRIORITY_META } from '@/lib/clinical/triage-display';
 import type { AppointmentDoc, TriageDoc } from '@/lib/db-types';
 
 /* ─── Visit popup + move dialog (clinician worklist) ───
@@ -17,12 +18,6 @@ import type { AppointmentDoc, TriageDoc } from '@/lib/db-types';
    complaint and diagnoses so the patient doesn't have to re-explain. The
    actions live here too: start/resume the consultation, open the chart,
    and Move (re-route / re-prioritise with an audited comment). */
-
-export const PRIORITY_META: Record<'RED' | 'YELLOW' | 'GREEN', { label: string; tone: string }> = {
-  RED: { label: 'Emergency', tone: 'red' },
-  YELLOW: { label: 'Urgent', tone: 'yellow' },
-  GREEN: { label: 'Routine', tone: 'green' },
-};
 
 export function waitLabel(minutes: number): string {
   if (minutes < 1) return 'just now';

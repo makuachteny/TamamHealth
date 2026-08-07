@@ -57,6 +57,9 @@ export default function AppointmentStatusSelect({
   const shownValue = base.includes(status) ? status : base.includes(canonical) ? canonical : status;
   const options = shownValue === status && !base.includes(status) ? [status, ...base] : base;
 
+  // Deliberately the native control, not the searchable Select: the ladder is
+  // a short fixed list read at a glance, and a filter box in front of it is
+  // noise rather than help.
   const select = (
     <select
       value={shownValue}

@@ -1335,31 +1335,46 @@ seedAppointments.push(...walkInAppointments);
  * row per time, which leaves a collision nowhere to go: the two either overlap
  * or split the column into slivers.
  *
- * Colliding rows are pushed to the next free half-hour rather than dropped —
+ * Colliding rows are pushed to the next free quarter-hour rather than dropped —
  * the demo keeps its volume, and a nudged appointment is a truthful one, where
  * a deleted appointment silently changes the day's counts.
+ *
+ * Comparison is duration-aware, exactly like the service's `isTimeOverlap`.
+ * Matching on start time alone (which this pass used to do) let a curated
+ * 12:00×45min sit under a generated 12:30×30min: different keys, same column,
+ * two blocks drawn on top of each other. Five such pairs were surviving into
+ * every fresh demo.
  */
 (() => {
   const CLOSED = new Set(['completed', 'cancelled', 'no_show', 'rescheduled']);
-  const taken = new Set<string>();
-  const slotKey = (a: { facilityId?: string; appointmentDate: string; appointmentTime: string }) =>
-    `${a.facilityId || ''}|${a.appointmentDate}|${a.appointmentTime}`;
-  const addMinutes = (time: string, minutes: number) => {
+  // Scoped org + facility + day, the same three the booking guard scopes to.
+  const dayKey = (a: { orgId?: string; facilityId?: string; appointmentDate: string }) =>
+    `${a.orgId || ''}|${a.facilityId || ''}|${a.appointmentDate}`;
+  const booked = new Map<string, { start: number; end: number }[]>();
+  const toMinutes = (time: string) => {
     const [h, m] = time.split(':').map(Number);
-    const total = (h * 60 + m + minutes) % (24 * 60);
-    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+    return h * 60 + m;
+  };
+  const toTime = (mins: number) => {
+    const t = ((mins % 1440) + 1440) % 1440;
+    return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
   };
 
   for (const appointment of seedAppointments) {
     if (CLOSED.has(appointment.status)) continue;
-    let key = slotKey(appointment);
-    // 48 half-hours covers a whole day; the guard stops a pathological loop.
-    for (let attempt = 0; taken.has(key) && attempt < 48; attempt++) {
-      appointment.appointmentTime = addMinutes(appointment.appointmentTime, 30);
-      appointment.endTime = addMinutes(appointment.appointmentTime, appointment.duration || 30);
-      key = slotKey(appointment);
+    const key = dayKey(appointment);
+    const taken = booked.get(key) || [];
+    const duration = appointment.duration || 30;
+    let start = toMinutes(appointment.appointmentTime);
+    // 96 quarter-hours covers a whole day; the guard stops a pathological loop.
+    let attempt = 0;
+    while (attempt++ < 96 && taken.some(s => start < s.end && s.start < start + duration)) {
+      start += 15;
     }
-    taken.add(key);
+    appointment.appointmentTime = toTime(start);
+    appointment.endTime = toTime(start + duration);
+    taken.push({ start, end: start + duration });
+    booked.set(key, taken);
   }
 })();
 
@@ -1699,6 +1714,78 @@ async function migrateOrgBrandingColors(): Promise<void> {
   }
 }
 
+/**
+ * Delete appointments that double-book a slot.
+ *
+ * `assertNoBookingConflicts` keeps one live appointment per slot per facility,
+ * but only for bookings written through the service. Rows that predate the
+ * rule, seed rows (written straight to the database), and anything arriving
+ * over sync bypass it — so an already-seeded browser can still be holding
+ * overlapping bookings that make the day column draw two blocks on top of each
+ * other. This sweeps them out on boot.
+ *
+ * Which one survives: the earliest-created booking in each clash. That is the
+ * one the desk made first, and the later row is the accident. Note this uses
+ * duration-aware `isTimeOverlap`, matching the service — the seed's own
+ * de-collision pass only compares exact start times, so a 09:00×60min against a
+ * 09:30×30min is a clash the seed leaves behind and this removes.
+ *
+ * Closed rows (completed / cancelled / no-show / rescheduled) have released
+ * their slot and are never deleted or counted as blockers.
+ */
+async function migrateRemoveOverlappingAppointments(): Promise<void> {
+  try {
+    const { isTimeOverlap } = await import('./appointment-time');
+    const { APPOINTMENT_SLOT_RELEASED_STATUSES } = await import('./appointment-status');
+    const db = appointmentsDB();
+    const all = await db.allDocs({ include_docs: true });
+
+    type Row = {
+      _id: string; _rev?: string; type?: string; status?: string;
+      orgId?: string; facilityId?: string;
+      appointmentDate?: string; appointmentTime?: string; duration?: number;
+      createdAt?: string;
+    };
+
+    const live = all.rows
+      .map(r => r.doc as unknown as Row)
+      .filter((d): d is Row =>
+        Boolean(d && d.type === 'appointment' && d.appointmentDate && d.appointmentTime)
+        && !APPOINTMENT_SLOT_RELEASED_STATUSES.includes(d.status as never));
+
+    // Group by the same key the guard scopes to: org + facility + day.
+    const byDay = new Map<string, Row[]>();
+    for (const row of live) {
+      const key = `${row.orgId || ''}|${row.facilityId || ''}|${row.appointmentDate}`;
+      const bucket = byDay.get(key);
+      if (bucket) bucket.push(row);
+      else byDay.set(key, [row]);
+    }
+
+    let removed = 0;
+    for (const bucket of byDay.values()) {
+      if (bucket.length < 2) continue;
+      // Oldest booking first, so the keeper is deterministic.
+      bucket.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '') || a._id.localeCompare(b._id));
+      const kept: Row[] = [];
+      for (const row of bucket) {
+        const clash = kept.some(k => isTimeOverlap(
+          k.appointmentTime as string, k.duration || 30,
+          row.appointmentTime as string, row.duration || 30,
+        ));
+        if (!clash) { kept.push(row); continue; }
+        try {
+          await db.remove({ _id: row._id, _rev: row._rev as string });
+          removed++;
+        } catch { /* already gone or in conflict — the next boot re-checks */ }
+      }
+    }
+    if (removed > 0) console.info(`[db-seed] removed ${removed} overlapping appointment(s)`);
+  } catch (err) {
+    console.warn('[db-seed] overlapping-appointment cleanup failed', err);
+  }
+}
+
 async function seedDatabaseExclusive(): Promise<void> {
   if (await isSeeded()) {
     // Self-heal a corrupted "marked-seeded but empty" state. The seed marker is
@@ -1716,6 +1803,9 @@ async function seedDatabaseExclusive(): Promise<void> {
       await migratePatientPhotos();
       await migrateDemoAppointmentsAndWalkins();
       await migrateOrgBrandingColors();
+      // Runs last: the demo migration above re-puts appointment rows, so the
+      // overlap sweep must see the final state of the day.
+      await migrateRemoveOverlappingAppointments();
       return;
     }
   }
@@ -3905,6 +3995,12 @@ async function seedDatabaseExclusive(): Promise<void> {
   // boot — the migration is idempotent, and without this a first-run demo shows
   // monograms for every hand-authored patient until the app is restarted.
   await migratePatientPhotos();
+
+  // Same reasoning for the slot sweep: the de-collision pass over
+  // `seedAppointments` compares exact start times only, so a curated 09:00×60
+  // and a generated 09:30×30 still land on top of each other. Clear them here
+  // rather than leaving a first-run demo with a doubled column.
+  await migrateRemoveOverlappingAppointments();
 
   await markSeeded();
 }

@@ -23,6 +23,7 @@ import type {
   PaymentDoc, ChargeDoc, PaymentPlanDoc, InsurancePolicyDoc, RefundDoc, LedgerEntryDoc,
   AdjustmentType,
 } from '@/lib/db-types-payments';
+import Select from '@/components/Select';
 
 const ADJUSTMENT_TYPES: AdjustmentType[] = ['write_off', 'bad_debt', 'charity', 'denial', 'contractual', 'correction'];
 const BILLING_ROLES = ['cashier', 'biller', 'org_admin', 'medical_superintendent', 'super_admin'];
@@ -758,13 +759,13 @@ export default function BillingTab({
               <>
                 <div className="bl-field">
                   <label htmlFor="bl-refund-payment">{t('billing.payment')}</label>
-                  <select id="bl-refund-payment" value={refundPaymentId} onChange={e => handleRefundPaymentChange(e.target.value)}>
+                  <Select id="bl-refund-payment" value={refundPaymentId} onChange={e => handleRefundPaymentChange(e.target.value)}>
                     {refundablePayments.map(p => (
                       <option key={p._id} value={p._id}>
                         {formatMoney(p.amount)} · {getMethodConfig(p.method).label} · {new Date(p.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div className="bl-field">
                   <label htmlFor="bl-refund-amount">{t('billing.refundAmount')}</label>
@@ -805,9 +806,9 @@ export default function BillingTab({
             <h3 className="bl-modal-title" id="bl-adj-title">{t('billing.adjustmentWriteOff')}</h3>
             <div className="bl-field">
               <label htmlFor="bl-adj-type">{t('billing.adjustmentType')}</label>
-              <select id="bl-adj-type" value={adjForm.adjustmentType} onChange={e => setAdjForm({ ...adjForm, adjustmentType: e.target.value as AdjustmentType })}>
+              <Select id="bl-adj-type" value={adjForm.adjustmentType} onChange={e => setAdjForm({ ...adjForm, adjustmentType: e.target.value as AdjustmentType })}>
                 {ADJUSTMENT_TYPES.map(at => <option key={at} value={at}>{at.replace(/_/g, ' ')}</option>)}
-              </select>
+              </Select>
             </div>
             <div className="bl-field">
               <label htmlFor="bl-adj-amount">{t('billing.amount')}</label>

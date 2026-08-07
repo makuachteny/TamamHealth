@@ -11,6 +11,7 @@ import EhrListHeader, { EhrListFilters, LIST_STAT_COLORS } from '@/components/eh
 import {
   Edit3, Check, X,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 // Shared control styling inside the header's Filters popover.
 const filterFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
@@ -139,21 +140,21 @@ export default function AdminBillingPage() {
               >
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('adminBilling.colPlan')}</span>
-                  <select value={planFilter} onChange={e => setPlanFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
+                  <Select value={planFilter} onChange={e => setPlanFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
                     <option value="">{t('adminBilling.planAll')}</option>
                     <option value="enterprise">{t('adminBilling.planEnterprise')} ({planCounts.enterprise})</option>
                     <option value="professional">{t('adminBilling.planProfessional')} ({planCounts.professional})</option>
                     <option value="basic">{t('adminBilling.planBasic')} ({planCounts.basic})</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('adminBilling.colStatus')}</span>
-                  <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
+                  <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
                     <option value="">{t('adminBilling.statusAll')}</option>
                     <option value="active">{t('adminBilling.statusActive')} ({totalActive})</option>
                     <option value="trial">{t('adminBilling.statusTrial')} ({totalTrial})</option>
                     <option value="suspended">{t('adminBilling.statusSuspended')} ({totalSuspended})</option>
-                  </select>
+                  </Select>
                 </label>
               </EhrListFilters>
             }
@@ -198,11 +199,11 @@ export default function AdminBillingPage() {
                       </td>
                       <td className="px-4 py-3">
                         {isEditing ? (
-                          <select value={editPlan} onChange={e => setEditPlan(e.target.value as typeof editPlan)} style={selectStyle}>
+                          <Select value={editPlan} onChange={e => setEditPlan(e.target.value as typeof editPlan)} style={selectStyle}>
                             <option value="basic">{t('adminBilling.planBasic')}</option>
                             <option value="professional">{t('adminBilling.planProfessional')}</option>
                             <option value="enterprise">{t('adminBilling.planEnterprise')}</option>
-                          </select>
+                          </Select>
                         ) : (
                           <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
                             background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(107,114,128,0.12)',
@@ -212,12 +213,12 @@ export default function AdminBillingPage() {
                       </td>
                       <td className="px-4 py-3">
                         {isEditing ? (
-                          <select value={editStatus} onChange={e => setEditStatus(e.target.value as typeof editStatus)} style={selectStyle}>
+                          <Select value={editStatus} onChange={e => setEditStatus(e.target.value as typeof editStatus)} style={selectStyle}>
                             <option value="trial">{t('adminBilling.statusTrial')}</option>
                             <option value="active">{t('adminBilling.statusActive')}</option>
                             <option value="suspended">{t('adminBilling.statusSuspended')}</option>
                             <option value="cancelled">{t('adminBilling.statusCancelled')}</option>
-                          </select>
+                          </Select>
                         ) : (
                           <span className="flex items-center gap-1.5 text-xs font-semibold">
                             <span className="w-2 h-2 rounded-full" style={{

@@ -23,6 +23,7 @@ import LabOrderPatientPicker from './LabOrderPatientPicker';
 import { catalogFor, searchCatalog, toOrderedTest } from './lab-order-catalog';
 import type { LabOrderKind, LabOrderProcessing } from './lab-order-types';
 import type { LabOrderController } from './useLabOrderDraft';
+import Select from '@/components/Select';
 
 export default function LabOrderCreateDialog({
   controller,
@@ -144,14 +145,14 @@ export default function LabOrderCreateDialog({
           </div>
           <div>
             <label className="labord-q" htmlFor="labord-dialog-processing">{t('labOrder.processingQuestion')}</label>
-            <select
+            <Select
               id="labord-dialog-processing"
               value={draft.processing}
               onChange={e => patch({ processing: e.target.value as LabOrderProcessing })}
             >
               <option value="in_house">{t('labOrder.processingInHouse')}</option>
               <option value="send_out">{t('labOrder.processingSendOut')}</option>
-            </select>
+            </Select>
           </div>
           <div>
             <label className="labord-q" htmlFor="labord-dialog-notes">{t('labOrder.notesToLab')}</label>

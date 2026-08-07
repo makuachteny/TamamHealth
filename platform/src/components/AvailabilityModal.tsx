@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/context';
 import type { AvailabilityModality } from '@/lib/db-types';
 import { Calendar, Clock, X, Loader2, Check, AlertCircle } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const SLOT_OPTIONS = [15, 20, 30, 45, 60];
 const MODALITIES: { value: AvailabilityModality; label: string }[] = [
@@ -111,14 +112,14 @@ export default function AvailabilityModal({ onClose, onCreated }: { onClose: () 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Slot length">
-              <select value={slotMinutes} onChange={e => setSlotMinutes(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg text-sm" style={inputStyle}>
+              <Select value={slotMinutes} onChange={e => setSlotMinutes(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg text-sm" style={inputStyle}>
                 {SLOT_OPTIONS.map(s => <option key={s} value={s}>{s} min</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Modality">
-              <select value={modality} onChange={e => setModality(e.target.value as AvailabilityModality)} className="w-full px-3 py-2 rounded-lg text-sm" style={inputStyle}>
+              <Select value={modality} onChange={e => setModality(e.target.value as AvailabilityModality)} className="w-full px-3 py-2 rounded-lg text-sm" style={inputStyle}>
                 {MODALITIES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
+              </Select>
             </Field>
           </div>
           <Field label="Department (optional)">

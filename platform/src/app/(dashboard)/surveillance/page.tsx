@@ -28,6 +28,7 @@ import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, Legend
 } from 'recharts';
 import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
+import Select from '@/components/Select';
 
 // Chart colors
 const COLORS = {
@@ -989,18 +990,18 @@ export default function SurveillancePage() {
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelDisease')}</label>
-                    <select value={alertForm.disease} onChange={e => setAlertForm({ ...alertForm, disease: e.target.value })}>
+                    <Select value={alertForm.disease} onChange={e => setAlertForm({ ...alertForm, disease: e.target.value })}>
                       <option value="">{t('surveillance.selectDisease')}</option>
                       {REPORTABLE_DISEASES.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelState')}</label>
-                      <select value={alertForm.state} onChange={e => setAlertForm({ ...alertForm, state: e.target.value })}>
+                      <Select value={alertForm.state} onChange={e => setAlertForm({ ...alertForm, state: e.target.value })}>
                         <option value="">{t('surveillance.selectGeneric')}</option>
                         {states.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                      </Select>
                     </div>
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelCounty')}</label>
@@ -1020,20 +1021,20 @@ export default function SurveillancePage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelAlertLevel')}</label>
-                      <select value={alertForm.alertLevel} onChange={e => setAlertForm({ ...alertForm, alertLevel: e.target.value as typeof alertForm.alertLevel })}>
+                      <Select value={alertForm.alertLevel} onChange={e => setAlertForm({ ...alertForm, alertLevel: e.target.value as typeof alertForm.alertLevel })}>
                         <option value="watch">{t('surveillance.levelWatch')}</option>
                         <option value="warning">{t('surveillance.levelWarning')}</option>
                         <option value="emergency">{t('surveillance.levelEmergency')}</option>
                         <option value="normal">{t('surveillance.levelNormal')}</option>
-                      </select>
+                      </Select>
                     </div>
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelTrend')}</label>
-                      <select value={alertForm.trend} onChange={e => setAlertForm({ ...alertForm, trend: e.target.value as typeof alertForm.trend })}>
+                      <Select value={alertForm.trend} onChange={e => setAlertForm({ ...alertForm, trend: e.target.value as typeof alertForm.trend })}>
                         <option value="increasing">{t('surveillance.trendIncreasing')}</option>
                         <option value="stable">{t('surveillance.trendStable')}</option>
                         <option value="decreasing">{t('surveillance.trendDecreasing')}</option>
-                      </select>
+                      </Select>
                     </div>
                   </div>
                 </div>

@@ -23,6 +23,7 @@ import {
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import ListSearch from './ListSearch';
 import RowActionsMenu, { type RowAction } from '@/components/referrals/RowActionsMenu';
+import Select from '@/components/Select';
 
 // Mode-of-arrival → Source column label, using the same terms as the ETAT
 // form's own <select> options.
@@ -733,14 +734,14 @@ export default function TriageWorkflow({
             <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
               <div>
                 <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.modeOfArrival')}</label>
-                <select value={triageContext.modeOfArrival} onChange={e => setTriageContext({ ...triageContext, modeOfArrival: e.target.value as typeof triageContext.modeOfArrival })} style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
+                <Select value={triageContext.modeOfArrival} onChange={e => setTriageContext({ ...triageContext, modeOfArrival: e.target.value as typeof triageContext.modeOfArrival })} style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
                   <option value="">{t('nurse.modeSelectPlaceholder')}</option>
                   <option value="walk-in">{t('nurse.modeWalkIn')}</option>
                   <option value="ambulance">{t('nurse.modeAmbulance')}</option>
                   <option value="referral">{t('nurse.modeReferral')}</option>
                   <option value="police">{t('nurse.modePolice')}</option>
                   <option value="other">{t('nurse.modeOther')}</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.symptomDuration')}</label>

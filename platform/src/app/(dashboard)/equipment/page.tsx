@@ -10,6 +10,7 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AssetDoc, AssetCategory, AssetStatus } from '@/lib/db-types-asset';
 import EhrListHeader from '@/components/ehr/EhrListHeader';
+import Select from '@/components/Select';
 
 const CATEGORIES: { id: AssetCategory; labelKey: string }[] = [
   { id: 'medical_equipment', labelKey: 'equipment.categoryMedicalEquipment' },
@@ -250,15 +251,15 @@ export default function AssetsPage() {
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('equipment.labelCategory')}</label>
-                  <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value as AssetCategory })}>
+                  <Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value as AssetCategory })}>
                     {CATEGORIES.map(c => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('equipment.labelCondition')}</label>
-                  <select value={form.condition} onChange={e => setForm({ ...form, condition: e.target.value as AssetDoc['condition'] })}>
+                  <Select value={form.condition} onChange={e => setForm({ ...form, condition: e.target.value as AssetDoc['condition'] })}>
                     <option value="new">{t('equipment.conditionNew')}</option><option value="good">{t('equipment.conditionGood')}</option><option value="fair">{t('equipment.conditionFair')}</option><option value="poor">{t('equipment.conditionPoor')}</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('equipment.labelManufacturer')}</label>
@@ -326,12 +327,12 @@ export default function AssetsPage() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('equipment.labelType')}</label>
-                  <select value={serviceForm.type} onChange={e => setServiceForm({ ...serviceForm, type: e.target.value as typeof serviceForm.type })}>
+                  <Select value={serviceForm.type} onChange={e => setServiceForm({ ...serviceForm, type: e.target.value as typeof serviceForm.type })}>
                     <option value="inspection">{t('equipment.serviceTypeInspection')}</option>
                     <option value="service">{t('equipment.serviceTypeRoutine')}</option>
                     <option value="repair">{t('equipment.serviceTypeRepair')}</option>
                     <option value="calibration">{t('equipment.serviceTypeCalibration')}</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('equipment.labelServiceCost')}</label>

@@ -15,6 +15,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AdmissionDoc } from '@/lib/db-types-ward';
 import PageInstructionCard from '@/components/PageInstructionCard';
 import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import Select from '@/components/Select';
 
 // Shared column template for the admissions table header + rows:
 // Patient · Ward · Diagnosis · Severity · Discharge action
@@ -186,13 +187,13 @@ export default function WardsPage() {
                           )}
                         </div>
                         <div className="p-3">
-                          <select value={filterWard} onChange={e => { setFilterWard(e.target.value); setShowWardFilter(false); }}
+                          <Select value={filterWard} onChange={e => { setFilterWard(e.target.value); setShowWardFilter(false); }}
                             style={{ width: 'auto', minWidth: '100%', height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13 }}>
                             <option value="">All wards</option>
                             {facilityWards.map(w => (
                               <option key={w._id} value={w._id}>{w.name} ({w.occupiedBeds}/{w.totalBeds})</option>
                             ))}
-                          </select>
+                          </Select>
                         </div>
                       </div>
                     )}
@@ -281,12 +282,12 @@ export default function WardsPage() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.patientRequired')}</label>
-                  <select value={admitForm.patientId} onChange={e => setAdmitForm({ ...admitForm, patientId: e.target.value })}>
+                  <Select value={admitForm.patientId} onChange={e => setAdmitForm({ ...admitForm, patientId: e.target.value })}>
                     <option value="">{t('ward.selectPatient')}</option>
                     {patients.slice(0, 200).map(p => (
                       <option key={p._id} value={p._id}>{p.firstName} {p.surname} · {p.hospitalNumber}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.admittingDiagnosisRequired')}</label>
@@ -295,21 +296,21 @@ export default function WardsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.severity')}</label>
-                    <select value={admitForm.severity} onChange={e => setAdmitForm({ ...admitForm, severity: e.target.value as AdmissionDoc['severity'] })}>
+                    <Select value={admitForm.severity} onChange={e => setAdmitForm({ ...admitForm, severity: e.target.value as AdmissionDoc['severity'] })}>
                       <option value="mild">{t('ward.severityMild')}</option>
                       <option value="moderate">{t('ward.severityModerate')}</option>
                       <option value="severe">{t('ward.severitySevere')}</option>
                       <option value="critical">{t('ward.severityCritical')}</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.wardRequired')}</label>
-                    <select value={admitForm.wardId} onChange={e => setAdmitForm({ ...admitForm, wardId: e.target.value })}>
+                    <Select value={admitForm.wardId} onChange={e => setAdmitForm({ ...admitForm, wardId: e.target.value })}>
                       <option value="">{t('ward.selectWard')}</option>
                       {facilityWards.filter(w => w.availableBeds > 0).map(w => (
                         <option key={w._id} value={w._id}>{t('ward.wardFree', { name: w.name, count: w.availableBeds })}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 items-center">
@@ -348,13 +349,13 @@ export default function WardsPage() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.dischargeType')}</label>
-                  <select value={dischargeForm.dischargeType} onChange={e => setDischargeForm({ ...dischargeForm, dischargeType: e.target.value as NonNullable<AdmissionDoc['dischargeType']> })}>
+                  <Select value={dischargeForm.dischargeType} onChange={e => setDischargeForm({ ...dischargeForm, dischargeType: e.target.value as NonNullable<AdmissionDoc['dischargeType']> })}>
                     <option value="normal">{t('ward.dischargeTypeNormal')}</option>
                     <option value="against_medical_advice">{t('ward.dischargeTypeAma')}</option>
                     <option value="transfer">{t('ward.dischargeTypeTransfer')}</option>
                     <option value="death">{t('ward.dischargeTypeDeath')}</option>
                     <option value="absconded">{t('ward.dischargeTypeAbsconded')}</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.dischargeSummary')}</label>

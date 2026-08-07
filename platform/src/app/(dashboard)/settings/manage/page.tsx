@@ -29,6 +29,7 @@ import {
   groupDhis2DataValues, type Dhis2SyncLogDoc,
 } from '@/lib/services/dhis2-sync-log-service';
 import type { DHIS2ExportScope } from '@/lib/services/dhis2-export-service';
+import Select from '@/components/Select';
 
 const FACILITY_TYPES = [
   { value: 'national_referral', label: 'National Referral' },
@@ -507,14 +508,14 @@ export default function SettingsPage() {
           <div className="space-y-4">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-3">
-              <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={selectStyle}>
+              <Select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={selectStyle}>
                 <option value="all">All Roles</option>
                 {roleOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-              </select>
-              <select value={filterHospital} onChange={e => setFilterHospital(e.target.value)} style={{ ...selectStyle, maxWidth: '220px' }}>
+              </Select>
+              <Select value={filterHospital} onChange={e => setFilterHospital(e.target.value)} style={{ ...selectStyle, maxWidth: '220px' }}>
                 <option value="all">All Hospitals</option>
                 {hospitals.map(h => <option key={h._id} value={h._id}>{h.name}</option>)}
-              </select>
+              </Select>
               <div className="flex-1" />
               <button onClick={openCreateUser} style={btnPrimary}>
                 <Plus className="w-4 h-4" /> Add User
@@ -831,18 +832,18 @@ export default function SettingsPage() {
 
               <div>
                 <label style={labelStyle}>Role</label>
-                <select value={userForm.role} onChange={e => setUserForm(p => ({ ...p, role: e.target.value as UserRole }))} style={selectStyle}>
+                <Select value={userForm.role} onChange={e => setUserForm(p => ({ ...p, role: e.target.value as UserRole }))} style={selectStyle}>
                   {roleOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
+                </Select>
               </div>
 
               {userForm.role !== 'government' && (
                 <div>
                   <label style={labelStyle}>Hospital</label>
-                  <select value={userForm.hospitalId} onChange={e => handleHospitalSelect(e.target.value)} style={selectStyle}>
+                  <Select value={userForm.hospitalId} onChange={e => handleHospitalSelect(e.target.value)} style={selectStyle}>
                     <option value="">Select a hospital...</option>
                     {hospitals.map(h => <option key={h._id} value={h._id}>{h.name} — {h.state}</option>)}
-                  </select>
+                  </Select>
                 </div>
               )}
 
@@ -933,20 +934,20 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label style={labelStyle}>Facility Type</label>
-                    <select value={hospitalForm.facilityType}
+                    <Select value={hospitalForm.facilityType}
                       onChange={e => setHospitalForm(p => ({ ...p, facilityType: e.target.value as typeof p.facilityType }))}
                       style={selectStyle}>
                       {FACILITY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label style={labelStyle}>State</label>
-                    <select value={hospitalForm.state}
+                    <Select value={hospitalForm.state}
                       onChange={e => setHospitalForm(p => ({ ...p, state: e.target.value }))}
                       style={selectStyle}>
                       <option value="">Select state...</option>
                       {states.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label style={labelStyle}>Town</label>

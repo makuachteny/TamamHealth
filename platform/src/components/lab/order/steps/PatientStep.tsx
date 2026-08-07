@@ -10,6 +10,7 @@ import LabOrderPatientPicker from '../LabOrderPatientPicker';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { coverageLabel } from '../LabOrderPatientStrip';
 import type { LabOrderController } from '../useLabOrderDraft';
+import Select from '@/components/Select';
 
 export default function PatientStep({
   controller,
@@ -56,14 +57,14 @@ export default function PatientStep({
             </div>
             <div>
               <label htmlFor="labord-processing">{t('labOrder.processing')}</label>
-              <select
+              <Select
                 id="labord-processing"
                 value={draft.processing}
                 onChange={e => patch({ processing: e.target.value as typeof draft.processing })}
               >
                 <option value="in_house">{t('labOrder.processingInHouse')}</option>
                 <option value="send_out">{t('labOrder.processingSendOut')}</option>
-              </select>
+              </Select>
               <p className="labord-help">{t('labOrder.processingHelp')}</p>
             </div>
           </div>

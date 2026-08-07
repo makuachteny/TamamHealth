@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Filter, X } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import Select from '@/components/Select';
 
 export type ReferralFilterState = { patient: string; route: string; department: string; urgency: string; status: string };
 
@@ -97,17 +98,17 @@ export default function ReferralFilters({
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Urgency</span>
-              <select value={filters.urgency} onChange={e => setFilter('urgency', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
+              <Select value={filters.urgency} onChange={e => setFilter('urgency', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
                 <option value="">{t('patients.all')}</option>
                 {urgencyOptions.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-              </select>
+              </Select>
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Status</span>
-              <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
+              <Select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
                 <option value="">{t('patients.all')}</option>
                 {statusOptions.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-              </select>
+              </Select>
             </label>
           </div>
         </div>

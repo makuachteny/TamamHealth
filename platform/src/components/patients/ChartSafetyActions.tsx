@@ -8,6 +8,7 @@ import { AlertTriangle, ShieldCheck, Bell, Plus, X } from '@/components/icons/lu
 import Modal from '@/components/Modal';
 import AddAllergyModal from '@/components/patients/AddAllergyModal';
 import CareAlertFields from '@/components/patients/CareAlertFields';
+import Select from '@/components/Select';
 
 const DIRECTIVE_LABELS: Record<DirectiveType, string> = {
   informed_consent: 'Informed consent',
@@ -127,10 +128,10 @@ export default function ChartSafetyActions({ patient, iconOnly }: { patient: Pat
 
             {open === 'directive' && (
               <div className="space-y-2">
-                <select value={directive.type} onChange={(e) => setDirective({ ...directive, type: e.target.value as DirectiveType })}
+                <Select value={directive.type} onChange={(e) => setDirective({ ...directive, type: e.target.value as DirectiveType })}
                   className="w-full p-2 rounded-md text-[12px]" style={inputStyle}>
                   {DIRECTIVE_OPTIONS.map((t) => <option key={t} value={t}>{DIRECTIVE_LABELS[t]}</option>)}
-                </select>
+                </Select>
                 <input
                   value={directive.description}
                   onChange={(e) => setDirective({ ...directive, description: e.target.value })}

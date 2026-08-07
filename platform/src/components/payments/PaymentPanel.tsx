@@ -11,6 +11,7 @@ import { formatMoney } from '@/lib/format-utils';
 import type { PaymentDoc } from '@/lib/db-types-payments';
 import type { FeeScheduleDoc } from '@/lib/db-types-billing';
 import '@/components/billing/billing.css';
+import Select from '@/components/Select';
 
 interface PaymentPanelProps {
   patientId: string;
@@ -400,7 +401,7 @@ export default function PaymentPanel({
           {/* A select, not a grid of tiles: the five methods are one
               mutually-exclusive choice, and the tiles took a whole band of the
               panel to say what one line says. */}
-          <select
+          <Select
             className="pp-method-select"
             value={tab}
             onChange={e => setTab(e.target.value as TabType)}
@@ -409,7 +410,7 @@ export default function PaymentPanel({
             {tabs.map(tabItem => (
               <option key={tabItem.key} value={tabItem.key}>{tabItem.label}</option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Form */}
@@ -431,7 +432,7 @@ export default function PaymentPanel({
                   </button>
                 )}
               </div>
-              <select
+              <Select
                 value={selectedFeeId}
                 onChange={e => {
                   const id = e.target.value;
@@ -446,7 +447,7 @@ export default function PaymentPanel({
                 {fees.map(f => (
                   <option key={f._id} value={f._id}>{f.serviceName} — {formatMoney(f.unitPrice, { currency: f.currency, decimals: 2 })}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
 
@@ -566,7 +567,7 @@ export default function PaymentPanel({
                   {settings.payors.filter(p => p !== 'out_of_pocket').length > 0 && (
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.payor')}</label>
-                      <select
+                      <Select
                         value={payerName}
                         onChange={e => setPayerName(e.target.value)}
                         style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
@@ -575,7 +576,7 @@ export default function PaymentPanel({
                         {settings.payors.filter(p => p !== 'out_of_pocket').map(p => (
                           <option key={p} value={PAYOR_LABELS[p]}>{PAYOR_LABELS[p]}</option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                   )}
                   <div>

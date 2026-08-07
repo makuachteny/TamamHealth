@@ -21,6 +21,7 @@ import type { ClaimDoc, ClaimStatus, PayerType, InsurancePolicyDoc } from '@/lib
 import type { BillingDoc } from '@/lib/db-types-billing';
 import { formatMoney } from '@/lib/format-utils';
 import '@/components/billing/billing.css';
+import Select from '@/components/Select';
 
 // Payer mix labels — relocated from the old Billing cockpit so the payer
 // breakdown lives next to the claims it summarises. Colour is a single
@@ -682,7 +683,7 @@ export default function ClaimsPage() {
               ) : (
                 <div className="bl-field">
                   <label htmlFor="claim-policy">Insurance policy</label>
-                  <select
+                  <Select
                     id="claim-policy"
                     value={newClaim.policyId}
                     onChange={e => setNewClaim(f => ({ ...f, policyId: e.target.value }))}
@@ -693,7 +694,7 @@ export default function ClaimsPage() {
                         {pol.payerName}{pol.memberId ? ` · ${pol.memberId}` : ''}{pol.isPrimary ? ' (primary)' : ''}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )
             )}
@@ -703,7 +704,7 @@ export default function ClaimsPage() {
               <>
                 <div className="bl-field">
                   <label htmlFor="claim-bill">Bill to claim against</label>
-                  <select
+                  <Select
                     id="claim-bill"
                     value={newClaim.billingId}
                     onChange={e => setNewClaim(f => ({ ...f, billingId: e.target.value }))}
@@ -714,7 +715,7 @@ export default function ClaimsPage() {
                         {formatMoney(b.balanceDue ?? 0)} outstanding · {(b.encounterDate || b.createdAt || '').slice(0, 10)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 {!newClaim.billingId && (
                   <div className="bl-field">

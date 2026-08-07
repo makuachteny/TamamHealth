@@ -31,7 +31,7 @@ import { patientFullName, patientGenderAge, initials, stateTint } from '@/lib/pa
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { ArrowLeft, FileText } from '@/components/icons/lucide';
 import TriageWorkflow from '@/components/nurse/TriageWorkflow';
-import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
+import { PRIORITY_META } from '@/lib/clinical/triage-display';
 
 export default function PatientTriagePage() {
 

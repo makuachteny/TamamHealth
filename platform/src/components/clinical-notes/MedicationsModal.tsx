@@ -27,6 +27,7 @@ import { pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 import type { PatientDoc, PrescriptionDoc } from '@/lib/db-types';
 import './clinical-notes.css';
+import Select from '@/components/Select';
 
 /** Ordered but never given: held, stockout-referred, or recalled. */
 const NOT_ADMINISTERED_STAGES = new Set<PrescriptionStatus>([
@@ -299,7 +300,7 @@ export default function MedicationsModal({
 
             <label className="cn-meds-reconcile">
               <span>Medication reconciliation</span>
-              <select
+              <Select
                 className="cn-select"
                 value={patient?.medReconciliation || ''}
                 disabled={busy}
@@ -310,7 +311,7 @@ export default function MedicationsModal({
               >
                 <option value="" />
                 {RECONCILIATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
+              </Select>
               {patient?.medReconciliation && patient.medReconciliationAt && (
                 <span className="cn-meds-reconcile-at">recorded {shortDate(patient.medReconciliationAt)}</span>
               )}

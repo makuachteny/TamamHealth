@@ -20,6 +20,7 @@ import type {
 } from '@/lib/db-types';
 import Badge, { type BadgeTone } from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import Select from '@/components/Select';
 
 const EMERGENCY_TYPES: { value: EmergencyType; label: string }[] = [
   { value: 'disease_outbreak', label: 'Disease outbreak' },
@@ -309,21 +310,21 @@ export default function EmergencyPreparednessPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Emergency type</label>
-                    <select value={form.emergencyType} onChange={e => setForm({ ...form, emergencyType: e.target.value as EmergencyType })}>
+                    <Select value={form.emergencyType} onChange={e => setForm({ ...form, emergencyType: e.target.value as EmergencyType })}>
                       {EMERGENCY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Severity</label>
-                    <select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value as EmergencySeverity })}>
+                    <Select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value as EmergencySeverity })}>
                       {SEVERITIES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Phase</label>
-                    <select value={form.phase} onChange={e => setForm({ ...form, phase: e.target.value as EmergencyPhase })}>
+                    <Select value={form.phase} onChange={e => setForm({ ...form, phase: e.target.value as EmergencyPhase })}>
                       {PHASES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </select>
+                    </Select>
                   </div>
                 </div>
 

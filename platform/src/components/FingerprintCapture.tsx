@@ -22,6 +22,7 @@ import {
   type BridgeStatus,
 } from '@/lib/services/fingerprint-service';
 import type { FingerPosition, BiometricTemplateFormat } from '@/lib/db-types-biometrics';
+import Select from '@/components/Select';
 
 export interface CapturedFingerprint {
   finger: FingerPosition;
@@ -137,11 +138,11 @@ export default function FingerprintCapture({ value, onChange }: FingerprintCaptu
           <div className="flex gap-2 items-end flex-wrap">
             <div className="w-44">
               <label htmlFor="fp-finger" className="text-xs">{t('fingerprint.selectFinger')}</label>
-              <select id="fp-finger" value={finger} onChange={e => setFinger(e.target.value as FingerPosition)} disabled={!consented || capturing}>
+              <Select id="fp-finger" value={finger} onChange={e => setFinger(e.target.value as FingerPosition)} disabled={!consented || capturing}>
                 {FINGER_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <button
               type="button"

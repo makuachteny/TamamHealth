@@ -14,6 +14,7 @@ import { Star } from '@/components/icons/lucide';
 import { FORMULARY, type FormularyDrug } from '@/lib/data/formulary';
 import type { ProblemDoc } from '@/lib/db-types';
 import type { RxDraft } from './types';
+import Select from '@/components/Select';
 
 const RECOMMENDED_SIGS = [
   'Once daily',
@@ -101,14 +102,14 @@ export default function DrugInfoSection({
 
         <label className="cn-rx-field">
           <span>Refill</span>
-          <select
+          <Select
             className="cn-select"
             value={draft.refills}
             onChange={e => onChange({ refills: e.target.value })}
             aria-label="Refills"
           >
             {['0', '1', '2', '3', '4', '5', '6'].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+          </Select>
         </label>
 
         <label className="cn-rx-field">
@@ -157,14 +158,14 @@ export default function DrugInfoSection({
       <div className="cn-rx-grid">
         <label className="cn-rx-field cn-rx-field--wide">
           <span>Service Location</span>
-          <select
+          <Select
             className="cn-select"
             value={draft.serviceLocation}
             onChange={e => onChange({ serviceLocation: e.target.value })}
             aria-label="Service location"
           >
             {serviceLocations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-          </select>
+          </Select>
         </label>
 
         <div className="cn-rx-field cn-rx-field--wide">

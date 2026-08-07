@@ -27,6 +27,7 @@ import ReferralFormModal from '@/components/referrals/ReferralFormModal';
 import type { Attachment, TransferPackage, ReferralDisposition } from '@/data/mock';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 import PageInstructionCard from '@/components/PageInstructionCard';
+import Select from '@/components/Select';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -564,7 +565,7 @@ export default function ReferralsPage() {
             search={{ value: localSearch, onChange: setLocalSearch, placeholder: 'Search by patient, hospital, or department…', ariaLabel: 'Filter table' }}
             actions={
               <>
-                <select
+                <Select
                   value={activeTab}
                   onChange={e => setActiveTab(e.target.value as 'incoming' | 'outgoing')}
                   aria-label="Filter referrals by direction"
@@ -574,7 +575,7 @@ export default function ReferralsPage() {
                 >
                   <option value="incoming">{`Incoming referrals${newIncomingCount > 0 ? ` (${newIncomingCount} new)` : ''}`}</option>
                   <option value="outgoing">Outgoing referrals</option>
-                </select>
+                </Select>
                 <ReferralFilters
                   filters={colFilters}
                   setFilter={setColFilter}
@@ -907,7 +908,7 @@ export default function ReferralsPage() {
                 {t('referrals.completeHint')}
               </p>
               <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeDisposition')}</label>
-              <select
+              <Select
                 value={completeDisposition}
                 onChange={e => setCompleteDisposition(e.target.value as ReferralDisposition)}
                 className="w-full mb-3"
@@ -916,7 +917,7 @@ export default function ReferralsPage() {
                 {DISPOSITION_OPTIONS.map(d => (
                   <option key={d} value={d}>{t(`referrals.disposition_${d}`)}</option>
                 ))}
-              </select>
+              </Select>
               <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeSummary')}</label>
               <textarea
                 value={completeOutcome}

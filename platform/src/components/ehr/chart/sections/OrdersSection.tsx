@@ -14,6 +14,7 @@ import { Search, Pill, FlaskConical } from '@/components/icons/lucide';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { formatDate , formatRxSig , humanizeStatus } from '@/lib/format-utils';
+import Select from '@/components/Select';
 
 const PAGE_SIZE = 10;
 
@@ -97,11 +98,11 @@ export default function OrdersSection({ patientId, canPrescribe, canOrderLabs, o
   const filterSlot = (
     <label className="omrs-section-filter">
       Order type:
-      <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value as OrderTypeFilter); setPage(1); }}>
+      <Select value={typeFilter} onChange={e => { setTypeFilter(e.target.value as OrderTypeFilter); setPage(1); }}>
         <option value="all">All</option>
         <option value="drug">Drug</option>
         <option value="lab">Lab</option>
-      </select>
+      </Select>
     </label>
   );
 

@@ -24,6 +24,7 @@ import {
 } from '@/lib/clinical-notes/note-catalog';
 import type { ClinicalNoteDoc, NoteListFilters } from '@/lib/clinical-notes/types';
 import './clinical-notes.css';
+import Select from '@/components/Select';
 
 interface NotesListProps {
   /** Omit for the cross-patient queue. */
@@ -134,27 +135,27 @@ export default function NotesList({
       <div className="cn-list-toolbar">
         <label className="cn-field">
           <span className="cn-label">Sort by</span>
-          <select
+          <Select
             className="cn-select"
             value={sortBy}
             onChange={e => setSortBy(e.target.value as NoteListFilters['sortBy'])}
           >
             <option value="service_date">Date of Service</option>
             <option value="last_update">Last update</option>
-          </select>
+          </Select>
         </label>
 
         <label className="cn-field">
           <span className="cn-label">User</span>
-          <select className="cn-select" value={userId} onChange={e => setUserId(e.target.value)}>
+          <Select className="cn-select" value={userId} onChange={e => setUserId(e.target.value)}>
             <option value="all">All</option>
             {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-          </select>
+          </Select>
         </label>
 
         <label className="cn-field">
           <span className="cn-label">Display</span>
-          <select
+          <Select
             className="cn-select"
             value={display}
             onChange={e => setDisplay(e.target.value as NoteListFilters['display'])}
@@ -162,17 +163,17 @@ export default function NotesList({
             <option value="active">Active</option>
             <option value="unsigned">Unsigned</option>
             <option value="signed">Signed</option>
-          </select>
+          </Select>
         </label>
 
         <label className="cn-field">
           <span className="cn-label">Note type</span>
-          <select className="cn-select" value={noteType} onChange={e => setNoteType(e.target.value)}>
+          <Select className="cn-select" value={noteType} onChange={e => setNoteType(e.target.value)}>
             <option value="all">All</option>
             {NOTE_TYPE_ORDER.map(id => (
               <option key={id} value={id}>{NOTE_TYPES[id].label}</option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <div className="cn-footer-spacer" />

@@ -11,6 +11,7 @@ import { AlertTriangle, CheckCircle2 } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { aoeKey, timingLabelKey, type AoeQuestion, type CollectionTiming, type FastingState, type LabOrderPriority } from '../lab-order-types';
 import type { LabOrderController } from '../useLabOrderDraft';
+import Select from '@/components/Select';
 
 function AoeField({
   testName,
@@ -38,10 +39,10 @@ function AoeField({
         {question.label}{question.required && <span className="labord-required"> *</span>}
       </label>
       {question.type === 'select' ? (
-        <select {...common}>
+        <Select {...common}>
           <option value="">—</option>
           {(question.options || []).map(option => <option key={option} value={option}>{option}</option>)}
-        </select>
+        </Select>
       ) : (
         <input type={question.type === 'number' ? 'number' : question.type === 'date' ? 'date' : 'text'} {...common} />
       )}
@@ -66,22 +67,22 @@ export default function ClinicalStep({ controller }: { controller: LabOrderContr
           <div className="labord-grid-2">
             <div>
               <label htmlFor="labord-priority">{t('labOrder.priority')}</label>
-              <select id="labord-priority" value={draft.priority} onChange={e => patch({ priority: e.target.value as LabOrderPriority })}>
+              <Select id="labord-priority" value={draft.priority} onChange={e => patch({ priority: e.target.value as LabOrderPriority })}>
                 <option value="routine">{t('appointments.priorityRoutine')}</option>
                 <option value="urgent">{t('appointments.priorityUrgent')}</option>
                 <option value="stat">{t('lab.priorityStat')}</option>
-              </select>
+              </Select>
               {draft.priority === 'stat' && <p className="labord-help">{t('labOrder.statHelp')}</p>}
             </div>
             <div>
               <label htmlFor="labord-timing">
                 {draft.kind === 'imaging' ? t('labOrder.studyTiming') : t('labOrder.collectionTiming')}
               </label>
-              <select id="labord-timing" value={draft.collectionTiming} onChange={e => patch({ collectionTiming: e.target.value as CollectionTiming })}>
+              <Select id="labord-timing" value={draft.collectionTiming} onChange={e => patch({ collectionTiming: e.target.value as CollectionTiming })}>
                 {(['draw_now', 'lab_collect', 'future'] as CollectionTiming[]).map(timing => (
                   <option key={timing} value={timing}>{t(timingLabelKey(draft.kind, timing))}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             {draft.collectionTiming === 'future' && (
               <div>
@@ -96,11 +97,11 @@ export default function ClinicalStep({ controller }: { controller: LabOrderContr
             )}
             <div>
               <label htmlFor="labord-fasting">{t('labOrder.fastingState')}</label>
-              <select id="labord-fasting" value={draft.fasting} onChange={e => patch({ fasting: e.target.value as FastingState })}>
+              <Select id="labord-fasting" value={draft.fasting} onChange={e => patch({ fasting: e.target.value as FastingState })}>
                 <option value="unknown">{t('labOrder.fastingUnknown')}</option>
                 <option value="yes">{t('labOrder.fastingYes')}</option>
                 <option value="no">{t('labOrder.fastingNo')}</option>
-              </select>
+              </Select>
             </div>
           </div>
         </div>

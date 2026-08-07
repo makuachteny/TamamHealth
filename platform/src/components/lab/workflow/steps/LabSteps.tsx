@@ -13,6 +13,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { LabResultDoc } from '@/lib/db-types';
 import { containersFor, SPECIMEN_REJECTION_REASONS } from '../lab-workflow-types';
 import type { LabWorkflowController } from '../useLabWorkflow';
+import Select from '@/components/Select';
 
 const SPECIMEN_CONDITIONS: { value: NonNullable<LabResultDoc['specimenCondition']>; label: string }[] = [
   { value: 'acceptable', label: 'Acceptable' },
@@ -188,7 +189,7 @@ export function CollectStep({ order, ctrl }: { order: LabResultDoc; ctrl: LabWor
               <div className="labord-grid-2">
                 <div>
                   <label htmlFor="labflow-container">{t('labFlow.container')}</label>
-                  <select
+                  <Select
                     id="labflow-container"
                     value={ctrl.collectDraft.container}
                     onChange={e => ctrl.setCollectDraft({ ...ctrl.collectDraft, container: e.target.value })}
@@ -197,7 +198,7 @@ export function CollectStep({ order, ctrl }: { order: LabResultDoc; ctrl: LabWor
                     {containersFor(order.specimen).map(container => (
                       <option key={container} value={container}>{container}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label htmlFor="labflow-collected-by">{t('labFlow.collectedBy')}</label>
@@ -251,7 +252,7 @@ export function ReceiveStep({ order, ctrl }: { order: LabResultDoc; ctrl: LabWor
               </div>
               <div>
                 <label htmlFor="labflow-condition">{t('labFlow.condition')}</label>
-                <select
+                <Select
                   id="labflow-condition"
                   value={ctrl.receiveDraft.condition}
                   onChange={e => ctrl.setReceiveDraft({ ...ctrl.receiveDraft, condition: e.target.value as NonNullable<LabResultDoc['specimenCondition']> })}
@@ -259,7 +260,7 @@ export function ReceiveStep({ order, ctrl }: { order: LabResultDoc; ctrl: LabWor
                   {SPECIMEN_CONDITIONS.map(condition => (
                     <option key={condition.value} value={condition.value}>{condition.label}</option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
           )}
@@ -274,14 +275,14 @@ export function ReceiveStep({ order, ctrl }: { order: LabResultDoc; ctrl: LabWor
             <div className="labord-grid-2">
               <div>
                 <label htmlFor="labflow-reject-reason">{t('labFlow.rejectionReason')}</label>
-                <select
+                <Select
                   id="labflow-reject-reason"
                   value={ctrl.receiveDraft.rejectionReason}
                   onChange={e => ctrl.setReceiveDraft({ ...ctrl.receiveDraft, rejectionReason: e.target.value })}
                 >
                   <option value="">—</option>
                   {SPECIMEN_REJECTION_REASONS.map(reason => <option key={reason} value={reason}>{reason}</option>)}
-                </select>
+                </Select>
               </div>
               <div>
                 <label htmlFor="labflow-reject-notes">{t('labFlow.rejectionNotes')}</label>

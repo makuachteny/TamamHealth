@@ -9,6 +9,7 @@
  */
 
 import type { CareAlertCategory } from '@/data/mock';
+import Select from '@/components/Select';
 
 export const CARE_ALERT_CATEGORY_LABELS: Record<CareAlertCategory, string> = {
   clinical_risk: 'Clinical risk',
@@ -41,15 +42,15 @@ export default function CareAlertFields({
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        <select value={category} onChange={e => onCategoryChange(e.target.value as CareAlertCategory)}
+        <Select value={category} onChange={e => onCategoryChange(e.target.value as CareAlertCategory)}
           className="p-2 rounded-md text-[12px]" style={inputStyle}>
           {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{CARE_ALERT_CATEGORY_LABELS[c]}</option>)}
-        </select>
-        <select value={priority} onChange={e => onPriorityChange(e.target.value as 'high' | 'normal')}
+        </Select>
+        <Select value={priority} onChange={e => onPriorityChange(e.target.value as 'high' | 'normal')}
           className="p-2 rounded-md text-[12px]" style={inputStyle}>
           <option value="high">High priority</option>
           <option value="normal">Normal</option>
-        </select>
+        </Select>
       </div>
       <input
         value={message}

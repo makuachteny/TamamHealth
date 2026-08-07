@@ -17,6 +17,7 @@ import { useAuth } from '@/lib/context';
 import { usePrograms } from '@/lib/hooks/usePrograms';
 import { formatDate } from '@/lib/format-utils';
 import type { ProgramKey, ProgramEnrollmentStatus } from '@/lib/db-types';
+import Select from '@/components/Select';
 
 const PROGRAM_LABELS: Record<ProgramKey, string> = {
   art_hiv_care: 'ART / HIV care',
@@ -151,7 +152,7 @@ export default function ProgramsSection({ patientId, patientName, canConsult }: 
                   <td><span className={STATUS_BADGE[e.status]}>{STATUS_LABELS[e.status]}</span></td>
                   <td>
                     {canConsult && e.status === 'active' ? (
-                      <select
+                      <Select
                         className="omrs-section-filter"
                         disabled={statusBusy === e._id}
                         value=""
@@ -163,7 +164,7 @@ export default function ProgramsSection({ patientId, patientName, canConsult }: 
                         <option value="transferred_out">Transferred out</option>
                         <option value="lost_to_follow_up">Lost to follow-up</option>
                         <option value="discontinued">Discontinued</option>
-                      </select>
+                      </Select>
                     ) : '—'}
                   </td>
                 </tr>
@@ -182,7 +183,7 @@ export default function ProgramsSection({ patientId, patientName, canConsult }: 
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Program</label>
-              <select
+              <Select
                 value={programKey}
                 onChange={e => setProgramKey(e.target.value as ProgramKey)}
                 className="w-full p-2.5 rounded-md text-[13px]"
@@ -191,7 +192,7 @@ export default function ProgramsSection({ patientId, patientName, canConsult }: 
                 {(Object.keys(PROGRAM_LABELS) as ProgramKey[]).map(k => (
                   <option key={k} value={k}>{PROGRAM_LABELS[k]}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             {programKey === 'other' && (
               <div className="flex flex-col gap-1.5">

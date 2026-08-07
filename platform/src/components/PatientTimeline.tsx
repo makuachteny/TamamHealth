@@ -11,6 +11,7 @@ import type { ClinicalNoteDoc } from '@/lib/clinical-notes/types';
 import { getNoteType } from '@/lib/clinical-notes/note-catalog';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { formatRxSig, humanizeStatus } from '@/lib/format-utils';
+import { priorityBadge } from '@/lib/clinical/triage-display';
 import ChartSection, { OmrsEmptyState } from '@/components/ehr/chart/ChartSection';
 
 type TFunc = (key: string, vars?: Record<string, string | number>) => string;
@@ -93,11 +94,9 @@ function buildEvents(props: PatientTimelineProps, t: TFunc): TimelineEvent[] {
         ? t('timeline.triageNotAssessed')
         : `A: ${tr.airway} · B: ${tr.breathing} · C: ${tr.circulation} · AVPU-${tr.consciousness.toUpperCase()[0]}`,
       meta: `${tr.triagedByName}${vitals.length ? ' · ' + vitals.join(' · ') : ''}`,
-      badge: tr.priority === 'RED'
-        ? { dot: true, bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }
-        : tr.priority === 'YELLOW'
-        ? { dot: true, bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' }
-        : { dot: true, bg: 'rgba(31, 157, 111,0.12)', color: 'var(--color-success)' },
+      // Colours from the shared acuity table, not three hand-mixed rgba values
+      // that had drifted a shade off the tokens every other acuity badge uses.
+      badge: { dot: true, ...priorityBadge(tr.priority) },
     });
   }
 

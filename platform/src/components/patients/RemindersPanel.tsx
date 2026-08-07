@@ -12,6 +12,7 @@ import type { PatientDoc, ReminderChannel } from '@/lib/db-types';
 import { usePatientReminders } from '@/lib/hooks/usePatientReminders';
 import { patientFullName } from '@/lib/patient-utils';
 import { Bell, Plus, Check, X, Clock } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const CHANNELS: { v: ReminderChannel; label: string }[] = [
   { v: 'sms', label: 'SMS' },
@@ -95,10 +96,10 @@ export default function RemindersPanel({ patient }: { patient: PatientDoc }) {
             </label>
             <label className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
               Channel
-              <select value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value as ReminderChannel })}
+              <Select value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value as ReminderChannel })}
                 className="w-full p-2 rounded-md text-[12px] mt-0.5" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
                 {CHANNELS.map(c => <option key={c.v} value={c.v}>{c.label}</option>)}
-              </select>
+              </Select>
             </label>
           </div>
           <div className="flex items-center gap-2">

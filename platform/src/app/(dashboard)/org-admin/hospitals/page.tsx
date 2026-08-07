@@ -10,6 +10,7 @@ import type { HospitalDoc, UserRole } from '@/lib/db-types';
 import type { DataScope } from '@/lib/services/data-scope';
 import { SOUTH_SUDAN_STATES } from '@/lib/geographic-data';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import Select from '@/components/Select';
 
 const FACILITY_TYPES = [
   { value: 'national_referral', label: 'National Referral', labelKey: 'hospitals.typeNationalReferral' },
@@ -300,7 +301,7 @@ export default function OrgHospitalsPage() {
               <div>
                 <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgHospitals.labelState')}</label>
                 <div className="relative">
-                  <select
+                  <Select
                     value={formState}
                     onChange={e => setFormState(e.target.value)}
                     className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm"
@@ -310,7 +311,7 @@ export default function OrgHospitalsPage() {
                     {SOUTH_SUDAN_STATES.map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))}
-                  </select>
+                  </Select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                 </div>
               </div>
@@ -332,7 +333,7 @@ export default function OrgHospitalsPage() {
               <div>
                 <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgHospitals.labelFacilityType')}</label>
                 <div className="relative">
-                  <select
+                  <Select
                     value={formType}
                     onChange={e => setFormType(e.target.value)}
                     className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm"
@@ -341,7 +342,7 @@ export default function OrgHospitalsPage() {
                     {FACILITY_TYPES.map(ft => (
                       <option key={ft.value} value={ft.value}>{t(ft.labelKey)}</option>
                     ))}
-                  </select>
+                  </Select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                 </div>
               </div>

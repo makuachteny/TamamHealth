@@ -28,6 +28,7 @@ import ChartSection from '@/components/ehr/chart/ChartSection';
 import type { Attachment } from '@/data/mock';
 import type { PatientDoc, PatientDocumentCategory, PatientDocumentDoc, ReferralDoc, MessageDoc } from '@/lib/db-types';
 import { FileText, Image as ImageIcon, X, Eye, ArrowRightLeft, ChevronRight, Send, MessageSquare, AlertTriangle } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const CATEGORY_LABELS: Record<PatientDocumentCategory, string> = {
   radiology: 'Radiology',
@@ -284,10 +285,10 @@ export default function DocumentsPanel({
         {view === 'documents' ? (
           <label className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
             File under
-            <select value={category} onChange={e => setCategory(e.target.value as PatientDocumentCategory)}
+            <Select value={category} onChange={e => setCategory(e.target.value as PatientDocumentCategory)}
               className="w-full p-2 rounded-md text-[12px] mt-0.5" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
               {GENERAL_CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-            </select>
+            </Select>
           </label>
         ) : (
           <p className="text-[11px] self-end pb-2" style={{ color: 'var(--text-muted)' }}>

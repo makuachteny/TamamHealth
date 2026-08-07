@@ -7,6 +7,7 @@ import { useLabResults } from '@/lib/hooks/useLabResults';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import Modal from '@/components/Modal';
 import type { LabResultDoc } from '@/lib/db-types';
@@ -16,6 +17,7 @@ import {
   X, Save, Table,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
+import Select from '@/components/Select';
 
 const ACCENT = 'var(--accent-primary)';
 
@@ -214,6 +216,19 @@ export default function LabDashboardPage() {
   // feeds batch entry's test-type picker, which must offer every order on the
   // bench, not just the ones the current queue search happens to match.
   const allPendingOrders = useMemo(() => results.filter(r => r.status === 'pending' || r.status === 'in_progress'), [results]);
+  // Day-activity rail: the row list is one tab's lane, capped at
+  // LAB_QUEUE_ROW_CAP, so charting it showed a single day's slice of one lane.
+  // Built from every order on the bench instead — awaiting ones plotted when
+  // they were ordered, resulted ones when they were resulted.
+  const chartItems = useMemo<DayStatsItem[]>(() => results.map(order => {
+    const resulted = order.status === 'completed';
+    const at = (resulted && order.completedAt) || order.orderedAt || order.completedAt;
+    return {
+      date: at ? localDatePart(at) : undefined,
+      time: at ? new Date(at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined,
+      series: (resulted ? 1 : 0) as 0 | 1,
+    };
+  }), [results]);
   const completedDiseaseRows = useMemo<CompletedDiseaseRow[]>(() => {
     return results
       .flatMap(lab => diseasesForCompletedLab(lab).map((disease, index) => ({
@@ -399,6 +414,7 @@ export default function LabDashboardPage() {
           // explicitly from order.status rather than relying on the done→series1
           // default (which would otherwise misfile a flagged result as "awaiting").
           chartSeriesNames={['Awaiting', 'Resulted']}
+          chartItems={chartItems}
           rows={queueFilter === 'finished' ? visibleCompletedDiseaseRows.map((row): EhrCareDashboardRow => {
             const lab = row.lab;
             const time = lab.completedAt ? new Date(lab.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined;
@@ -514,7 +530,7 @@ export default function LabDashboardPage() {
                     <label className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>
                       {t('lab.selectTestType')}
                     </label>
-                    <select
+                    <Select
                       value={batchTestType}
                       onChange={e => setBatchTestType(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl text-[12px] outline-none transition-all"
@@ -531,7 +547,7 @@ export default function LabDashboardPage() {
                           <option key={tt} value={tt}>{t('lab.testTypePending', { test: tt, count })}</option>
                         );
                       })}
-                    </select>
+                    </Select>
                   </div>
 
                   {/* Reference range for selected test */}
@@ -583,7 +599,7 @@ export default function LabDashboardPage() {
                                 </td>
                                 <td className="px-3 py-2">
                                   {ref?.qualitative ? (
-                                    <select
+                                    <Select
                                       value={entry.resultValue}
                                       onChange={e => handleBatchEntryChange(entry.orderId, e.target.value)}
                                       className="w-full px-2 py-1 rounded-lg text-[11px] outline-none"
@@ -597,7 +613,7 @@ export default function LabDashboardPage() {
                                       {ref.qualitative.map(v => (
                                         <option key={v} value={v}>{v}</option>
                                       ))}
-                                    </select>
+                                    </Select>
                                   ) : (
                                     <input
                                       type="number"

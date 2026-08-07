@@ -23,6 +23,7 @@ import { isActivePharmacyStage, pharmacyStage, pharmacyStageLabel } from '@/lib/
 import { usePatientBalances } from '@/lib/hooks/usePatientBalances';
 import type { PrescriptionStatus } from '@/lib/clinical-flow/order-lifecycles';
 import { prescription as rxLifecycle } from '@/lib/clinical-flow/order-lifecycles';
+import Select from '@/components/Select';
 
 const UNITS = ['tablets', 'vials', 'bottles', 'sachets', 'tubes', 'ampoules', 'sachet', 'ml'];
 
@@ -835,7 +836,7 @@ export default function PharmacyPage() {
                   ~1400px wide and scrolled horizontally on anything narrower;
                   as a select it sits beside the search and the card title
                   already names the current view. Counts stay on the options. */}
-              <select
+              <Select
                 value={activeTab}
                 onChange={e => setActiveTab(e.target.value as PharmacyTab)}
                 aria-label="Choose which pharmacy view to display"
@@ -856,7 +857,7 @@ export default function PharmacyPage() {
                 {tabsConfig.map(tab => (
                   <option key={tab.key} value={tab.key}>{tab.label}</option>
                 ))}
-              </select>
+              </Select>
               <div className="relative" ref={headerFilterRef}>
                 <EhrListHeaderButton
                   onClick={() => setShowHeaderFilters(s => !s)}
@@ -890,21 +891,21 @@ export default function PharmacyPage() {
                     <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                       <label className="flex flex-col gap-1">
                         <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('pharmacy.category')}</span>
-                        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                        <Select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
                           <option value="all">{t('patients.all')}</option>
                           {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        </Select>
                       </label>
                       {statusFilterRelevant && (
                         <label className="flex flex-col gap-1">
                           <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('pharmacy.statusLabel')}</span>
-                          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                          <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
                             <option value="all">{t('patients.all')}</option>
                             <option value="adequate">{t('pharmacy.inStock')}</option>
                             <option value="low">{t('pharmacy.invStatus_low')}</option>
                             <option value="critical">{t('pharmacy.invStatus_critical')}</option>
                             <option value="expired">{t('pharmacy.invStatus_expired')}</option>
-                          </select>
+                          </Select>
                         </label>
                       )}
                     </div>
@@ -1369,9 +1370,9 @@ export default function PharmacyPage() {
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.unit')}</label>
-                  <select value={stockForm.unit} onChange={e => setStockForm({ ...stockForm, unit: e.target.value })}>
+                  <Select value={stockForm.unit} onChange={e => setStockForm({ ...stockForm, unit: e.target.value })}>
                     {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
+                  </Select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -1469,12 +1470,12 @@ export default function PharmacyPage() {
               Dispensing <strong>{dispenseTarget.qty} {dispenseTarget.inv.unit}</strong> of <strong>{dispenseTarget.inv.medicationName}</strong> (Schedule {dispenseTarget.inv.controlledSchedule}) to {dispenseTarget.rx.patientName}. A second staff member must witness this movement.
             </p>
             <label>Witnessing staff</label>
-            <select value={witnessId} onChange={e => setWitnessId(e.target.value)}>
+            <Select value={witnessId} onChange={e => setWitnessId(e.target.value)}>
               <option value="">Select witness…</option>
               {users.filter(u => u._id !== currentUser?._id).map(u => (
                 <option key={u._id} value={u._id}>{u.name} — {u.role}</option>
               ))}
-            </select>
+            </Select>
             <div className="flex gap-2 mt-5">
               <button className="btn btn-secondary flex-1" onClick={() => setDispenseTarget(null)}>Cancel</button>
               <button className="btn btn-primary flex-1" onClick={confirmControlledDispense} disabled={!witnessId}>Confirm &amp; dispense</button>

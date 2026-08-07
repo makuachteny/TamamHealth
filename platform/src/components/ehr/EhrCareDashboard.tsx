@@ -6,7 +6,7 @@ import { ClipboardList, Search, Stethoscope, Video, X, type LucideIcon } from '@
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
-import { PRIORITY_META } from '@/components/ehr/EhrVisitPopup';
+import { PRIORITY_META } from '@/lib/clinical/triage-display';
 import { initials, stateTint } from '@/lib/patient-utils';
 import { formatAppointmentTimeUntil } from '@/lib/format-utils';
 import { useAppointments } from '@/lib/hooks/useAppointments';
@@ -217,6 +217,7 @@ export default function EhrCareDashboard({
   chart,
   chartTitle = 'Day activity',
   chartSeriesNames = ['Open', 'Completed'],
+  chartItems,
   showChart = true,
   calendarEventDates,
   metricsTitle = 'Today',
@@ -287,6 +288,10 @@ export default function EhrCareDashboard({
    *  ['Dispensed', 'Pending'] for pharmacy. Keeps the widget identical across
    *  roles while the labels stay meaningful to each one. */
   chartSeriesNames?: [string, string];
+  /** Work plotted on the week chart. Defaults to the visible rows — right for a
+   *  station whose rows already span days. A dashboard whose list is scoped to
+   *  one day passes its whole week here instead. */
+  chartItems?: DayStatsItem[];
   showChart?: boolean;
   calendarEventDates?: string[];
   metricsTitle?: string;
@@ -371,11 +376,17 @@ export default function EhrCareDashboard({
   // work. Rows carry `time`/`date` (falling back to today) and `chartSeries`;
   // when a page doesn't classify its rows, finished work (statusTone 'done')
   // forms the second series and everything still open forms the first.
-  const chartItems = useMemo<DayStatsItem[]>(() => rows.map(row => ({
+  const rowChartItems = useMemo<DayStatsItem[]>(() => rows.map(row => ({
     date: row.date,
     time: row.time,
     series: inferredChartSeries(row),
   })), [rows]);
+  // A day-scoped station (the front desk's list is one day's schedule) has only
+  // that day in `rows`, so a week chart drawn from them is a single bar with six
+  // empty columns beside it — the widget looked broken while the mini-calendar
+  // right above it dotted the whole month. Those dashboards pass their own week
+  // of work here; everyone whose rows already span days keeps the default.
+  const weekChartItems = chartItems ?? rowChartItems;
   const visibleRows = useMemo(() => {
     // The mini-calendar remains active in dashboard mode. Selecting a day
     // must change the worklist itself, not only the calendar highlight — but
@@ -535,7 +546,7 @@ export default function EhrCareDashboard({
           )}
           {showChart && (chart ?? (
             <EhrWeekActivityChart
-              items={chartItems}
+              items={weekChartItems}
               seriesNames={chartSeriesNames}
               selectedDate={selectedDate}
               todayIso={todayIso}
@@ -782,6 +793,11 @@ export default function EhrCareDashboard({
                                 onKeyDown={event => event.stopPropagation()}
                               >
                                 {statusControl.text || statusText || '—'}
+                                {/* Deliberately the native control, not the
+                                    searchable Select: this is a short, fixed
+                                    ladder the user reads in one glance, and a
+                                    filter box over seven known rungs is noise
+                                    in front of the thing they came to click. */}
                                 <select
                                   value={statusControl.value ? canonicalAppointmentStatus(statusControl.value as AppointmentStatus) : ''}
                                   aria-label={`Status for ${row.title}`}

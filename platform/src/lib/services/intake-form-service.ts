@@ -98,9 +98,19 @@ export async function mergeIntakeFormToChart(
 ): Promise<PatientIntakeFormDoc> {
   const db = intakeFormsDB();
   const existing = await db.get(id) as PatientIntakeFormDoc;
-  if (existing.patientId && Object.keys(patientUpdates).length > 0) {
+  // A merge only ever ADDS what the patient answered. An unanswered field
+  // arrives as an empty string, and writing that through would erase whatever
+  // the desk had already recorded — a blank intake line silently deleting a
+  // phone number on file. Nothing here can clear a chart field; correcting one
+  // to empty stays a deliberate edit in the chart itself.
+  const additions = Object.fromEntries(
+    Object.entries(patientUpdates).filter(([, value]) => (
+      value !== undefined && value !== null && String(value).trim() !== ''
+    )),
+  );
+  if (existing.patientId && Object.keys(additions).length > 0) {
     const { updatePatient } = await import('./patient-service');
-    await updatePatient(existing.patientId, patientUpdates);
+    await updatePatient(existing.patientId, additions);
   }
   const updated: PatientIntakeFormDoc = {
     ...existing,

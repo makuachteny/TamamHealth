@@ -11,6 +11,7 @@ import {
 } from '@/lib/services/fee-schedule-service';
 import type { FeeScheduleDoc, ChargeCategory } from '@/lib/db-types-billing';
 import { formatMoney } from '@/lib/format-utils';
+import Select from '@/components/Select';
 
 const CATEGORIES: { value: ChargeCategory; label: string }[] = [
   { value: 'consultation', label: 'Consultation' },
@@ -196,9 +197,9 @@ export default function ServicePricingPage() {
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Category">
-                    <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value as ChargeCategory })} className="fee-input">
+                    <Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value as ChargeCategory })} className="fee-input">
                       {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Service code">
                     <input value={form.serviceCode} onChange={e => setForm({ ...form, serviceCode: e.target.value })} className="fee-input" placeholder="e.g. CONS-GEN" />

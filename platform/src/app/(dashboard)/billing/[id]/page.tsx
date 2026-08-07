@@ -26,6 +26,7 @@ import {
 import type { BillingDoc, BillLineItem, ChargeCategory, PaymentMethod, FeeScheduleDoc } from '@/lib/db-types-billing';
 import type { PatientDoc } from '@/lib/db-types';
 import '@/components/billing/billing.css';
+import Select from '@/components/Select';
 
 /** dd-MMM-yyyy — the OpenMRS DOB convention (matches ChartHeader). */
 function formatDobOmrs(iso?: string | null): string {
@@ -570,9 +571,9 @@ export default function BillDetailPage() {
                     <div className="bl-form-grid" style={{ marginTop: 14 }}>
                       <div className="bl-field">
                         <label htmlFor="bl-pay-method">Payment method</label>
-                        <select id="bl-pay-method" value={payMethod} onChange={e => setPayMethod(e.target.value as PaymentMethod)}>
+                        <Select id="bl-pay-method" value={payMethod} onChange={e => setPayMethod(e.target.value as PaymentMethod)}>
                           {PAYMENT_METHODS.map(m => <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>)}
-                        </select>
+                        </Select>
                       </div>
                       <div className="bl-field">
                         <label htmlFor="bl-pay-amount">Amount tendered</label>
@@ -720,9 +721,9 @@ export default function BillDetailPage() {
               </div>
               <div className="bl-field">
                 <label htmlFor="bl-custom-cat">Category</label>
-                <select id="bl-custom-cat" value={customCategory} onChange={e => setCustomCategory(e.target.value as ChargeCategory)}>
+                <Select id="bl-custom-cat" value={customCategory} onChange={e => setCustomCategory(e.target.value as ChargeCategory)}>
                   {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                </select>
+                </Select>
               </div>
               <div className="bl-field">
                 <label htmlFor="bl-custom-price">Unit price ({currency})</label>

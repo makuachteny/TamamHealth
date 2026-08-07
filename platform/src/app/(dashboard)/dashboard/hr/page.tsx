@@ -8,7 +8,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
-import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
+import { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 import type { StaffScheduleDoc } from '@/lib/db-types';
@@ -228,14 +228,8 @@ export default function HRDashboardPage() {
           { label: t('hr.manageStaff'), icon: Users, onClick: () => router.push('/hr') },
           { label: t('hr.newLeaveRequest'), icon: Plus, onClick: () => router.push('/hr?tab=leave'), tone: 'primary' },
         ]}
-        chart={(
-          <EhrWeekActivityChart
-            items={hrChartItems}
-            seriesNames={['Pending', 'Approved']}
-            selectedDate={todayIso}
-            todayIso={todayIso}
-          />
-        )}
+        chartSeriesNames={['Pending', 'Approved']}
+        chartItems={hrChartItems}
         rows={filteredPending.map((r): EhrCareDashboardRow => {
           const time = formatClockTimeOrUndefined(r.requestedAt);
           return {

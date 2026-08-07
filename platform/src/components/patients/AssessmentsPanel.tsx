@@ -9,6 +9,7 @@ import { isClinicalAuthorRole } from '@/lib/clinical-roles';
 import { ClipboardList, Plus, Lock } from '@/components/icons/lucide';
 import { formatDateTime } from '@/lib/format-utils';
 import { patientFullName } from '@/lib/patient-utils';
+import Select from '@/components/Select';
 
 const SEVERITY_COLOR: Record<string, string> = {
   minimal: 'var(--color-success)',
@@ -81,10 +82,10 @@ export default function AssessmentsPanel({ patient }: { patient: PatientDoc }) {
 
       {adding && (
         <div className="rounded-lg p-3 mb-3 space-y-3" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}>
-          <select value={instrumentId} onChange={(e) => { setInstrumentId(e.target.value); setAnswers({}); }}
+          <Select value={instrumentId} onChange={(e) => { setInstrumentId(e.target.value); setAnswers({}); }}
             className="w-full p-2 rounded-md text-[13px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
             {ASSESSMENT_INSTRUMENTS.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </select>
+          </Select>
           <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{instrument.description}</p>
           <ol className="space-y-2">
             {instrument.questions.map((q, idx) => (

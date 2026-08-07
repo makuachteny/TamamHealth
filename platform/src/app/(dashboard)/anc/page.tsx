@@ -17,6 +17,7 @@ import {
   HeartPulse, Plus, X, Users,
   Calendar, ChevronRight, ExternalLink, Edit3,
 } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const RISK_FACTOR_OPTIONS = [
   'hypertension', 'anemia', 'previous_csection', 'multiple_pregnancy',
@@ -592,21 +593,21 @@ export default function ANCPage() {
                     </div>
                     <div>
                       <label>Urine Protein</label>
-                      <select value={form.urineProtein} onChange={e => setForm({ ...form, urineProtein: e.target.value })}>
+                      <Select value={form.urineProtein} onChange={e => setForm({ ...form, urineProtein: e.target.value })}>
                         <option>Negative</option><option>Trace</option><option>+</option><option>++</option><option>+++</option>
-                      </select>
+                      </Select>
                     </div>
                     <div>
                       <label>Blood Group</label>
-                      <select value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })}>
+                      <Select value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })}>
                         <option>O</option><option>A</option><option>B</option><option>AB</option>
-                      </select>
+                      </Select>
                     </div>
                     <div>
                       <label>Rh Factor</label>
-                      <select value={form.rhFactor} onChange={e => setForm({ ...form, rhFactor: e.target.value })}>
+                      <Select value={form.rhFactor} onChange={e => setForm({ ...form, rhFactor: e.target.value })}>
                         <option>+</option><option>-</option>
-                      </select>
+                      </Select>
                     </div>
                   </div>
                 </div>
@@ -617,21 +618,21 @@ export default function ANCPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label>HIV Status</label>
-                      <select value={form.hivStatus} onChange={e => setForm({ ...form, hivStatus: e.target.value })}>
+                      <Select value={form.hivStatus} onChange={e => setForm({ ...form, hivStatus: e.target.value })}>
                         <option>Not tested</option><option>Negative</option><option>Positive</option><option>Positive (on ART)</option>
-                      </select>
+                      </Select>
                     </div>
                     <div>
                       <label>Malaria Test</label>
-                      <select value={form.malariaTest} onChange={e => setForm({ ...form, malariaTest: e.target.value })}>
+                      <Select value={form.malariaTest} onChange={e => setForm({ ...form, malariaTest: e.target.value })}>
                         <option>Negative</option><option>Positive</option><option>Not tested</option>
-                      </select>
+                      </Select>
                     </div>
                     <div>
                       <label>Syphilis Test</label>
-                      <select value={form.syphilisTest} onChange={e => setForm({ ...form, syphilisTest: e.target.value })}>
+                      <Select value={form.syphilisTest} onChange={e => setForm({ ...form, syphilisTest: e.target.value })}>
                         <option>Non-reactive</option><option>Reactive</option><option>Not tested</option>
-                      </select>
+                      </Select>
                     </div>
                   </div>
                   <div className="flex items-center gap-6 mt-3">
@@ -655,11 +656,11 @@ export default function ANCPage() {
                   <p className="text-xs font-semibold mb-3 uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>Risk Assessment</p>
                   <div className="mb-3">
                     <label>Risk Level</label>
-                    <select value={form.riskLevel} onChange={e => setForm({ ...form, riskLevel: e.target.value as 'low' | 'moderate' | 'high' })}>
+                    <Select value={form.riskLevel} onChange={e => setForm({ ...form, riskLevel: e.target.value as 'low' | 'moderate' | 'high' })}>
                       <option value="low">Low</option>
                       <option value="moderate">Moderate</option>
                       <option value="high">High</option>
-                    </select>
+                    </Select>
                   </div>
                   <div className="flex items-center justify-between mb-1">
                     <label style={{ marginBottom: 0 }}>Risk Factors</label>
@@ -769,11 +770,11 @@ export default function ANCPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label>Risk Level</label>
-                    <select value={editVisit.riskLevel} onChange={e => setEditVisit({ ...editVisit, riskLevel: e.target.value as 'low' | 'moderate' | 'high' })}>
+                    <Select value={editVisit.riskLevel} onChange={e => setEditVisit({ ...editVisit, riskLevel: e.target.value as 'low' | 'moderate' | 'high' })}>
                       <option value="low">Low</option>
                       <option value="moderate">Moderate</option>
                       <option value="high">High</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label>Next Visit Date</label>

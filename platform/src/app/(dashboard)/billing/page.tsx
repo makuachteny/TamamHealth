@@ -17,6 +17,7 @@ import { formatMoney } from '@/lib/format-utils';
 import { formatBillDate, STATUS_CHIP } from '@/components/billing/billing-utils';
 import type { BillingDoc } from '@/lib/db-types-billing';
 import '@/components/billing/billing.css';
+import Select from '@/components/Select';
 
 type FilterKey = 'open' | 'pending' | 'partial' | 'paid' | 'waived' | 'cancelled' | 'all';
 
@@ -96,13 +97,13 @@ export default function BillingHomePage() {
 
         <div className="bl-filter-row">
           <span>Filter by:</span>
-          <select
+          <Select
             value={filter}
             aria-label="Filter bills by status"
             onChange={e => { setFilter(e.target.value as FilterKey); setPage(1); }}
           >
             {FILTERS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-          </select>
+          </Select>
         </div>
 
         {error && <div className="bl-card" style={{ padding: '14px 18px', color: 'var(--color-danger)' }}>{error}</div>}
@@ -179,17 +180,17 @@ export default function BillingHomePage() {
             <div className="bl-pagination">
               <div className="bl-page-group">
                 <span>Items per page:</span>
-                <select
+                <Select
                   value={perPage}
                   aria-label="Items per page"
                   onChange={e => { setPerPage(Number(e.target.value)); setPage(1); }}
                 >
                   {PER_PAGE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
+                </Select>
               </div>
               <span>{rangeStart}–{rangeEnd} of {filtered.length} items</span>
               <div className="bl-page-group">
-                <select
+                <Select
                   value={safePage}
                   aria-label="Page"
                   onChange={e => setPage(Number(e.target.value))}
@@ -197,7 +198,7 @@ export default function BillingHomePage() {
                   {Array.from({ length: pageCount }, (_, i) => (
                     <option key={i + 1} value={i + 1}>{i + 1}</option>
                   ))}
-                </select>
+                </Select>
                 <span>of {pageCount} page{pageCount === 1 ? '' : 's'}</span>
                 <button
                   type="button"

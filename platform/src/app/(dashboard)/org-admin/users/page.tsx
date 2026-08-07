@@ -13,6 +13,7 @@ import { avatarTint } from '@/lib/patient-utils';
 import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { FilterSelect } from '@/components/filters';
 import EmptyState from '@/components/EmptyState';
+import Select from '@/components/Select';
 
 /**
  * Generate a strong, readable temporary password. Avoids look-alike
@@ -549,7 +550,7 @@ export default function OrgUsersPage() {
               <div>
                 <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgUsers.fieldRole')}</label>
                 <div className="relative">
-                  <select
+                  <Select
                     value={formRole}
                     onChange={e => setFormRole(e.target.value as UserRole)}
                     className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm"
@@ -558,7 +559,7 @@ export default function OrgUsersPage() {
                     {availableRoles.map(r => (
                       <option key={r} value={r}>{roleLabel(r)}</option>
                     ))}
-                  </select>
+                  </Select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                 </div>
               </div>
@@ -568,7 +569,7 @@ export default function OrgUsersPage() {
                 <div>
                   <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgUsers.fieldAssignedHospital')}</label>
                   <div className="relative">
-                    <select
+                    <Select
                       value={formHospitalId}
                       onChange={e => setFormHospitalId(e.target.value)}
                       className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm"
@@ -578,7 +579,7 @@ export default function OrgUsersPage() {
                       {hospitals.map(h => (
                         <option key={h._id} value={h._id}>{h.name}</option>
                       ))}
-                    </select>
+                    </Select>
                     <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                   </div>
                 </div>

@@ -9,6 +9,7 @@ import { Phone, Plus, X } from '@/components/icons/lucide';
 import { formatDateTime } from '@/lib/format-utils';
 import { patientFullName } from '@/lib/patient-utils';
 import { isClinicalAuthorRole } from '@/lib/clinical-roles';
+import Select from '@/components/Select';
 
 const STATUS_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
   open: { bg: 'rgba(217,119,6,0.12)', fg: '#B45309', label: 'Open' },
@@ -106,11 +107,11 @@ export default function PhoneNotes({ patient }: { patient: PatientDoc }) {
             className="w-full p-2 rounded-md text-[13px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
           <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} rows={2} placeholder="What did the caller need?"
             className="w-full p-2 rounded-md text-[13px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
-          <select value={form.routedToId} onChange={(e) => setForm({ ...form, routedToId: e.target.value })}
+          <Select value={form.routedToId} onChange={(e) => setForm({ ...form, routedToId: e.target.value })}
             className="w-full p-2 rounded-md text-[12px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
             <option value="">Route to provider…</option>
             {providers.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
-          </select>
+          </Select>
           <div className="flex items-center gap-2">
             <button className="btn btn-sm btn-primary" disabled={busy || form.subject.trim().length === 0 || form.message.trim().length === 0} onClick={() => run(doCreate)}>Save phone note</button>
             <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setAdding(false)}>Cancel</button>

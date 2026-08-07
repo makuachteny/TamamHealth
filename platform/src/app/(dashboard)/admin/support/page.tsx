@@ -16,6 +16,7 @@ import type { UserDoc, AuditLogDoc, AnnouncementDoc, AnnouncementPriority } from
 import { SaPage, SaCard, SaStatusDot, SaPill, SaTable, formatWhen } from '@/components/admin/sa-ui';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { Send, Building2, Users, ShieldCheck, Megaphone, ClipboardList } from '@/components/icons/lucide';
+import Select from '@/components/Select';
 
 const SUPPORT_ACTION_RE = /support|impersonat|emergency|break/i;
 
@@ -328,14 +329,14 @@ export default function AdminSupportPage() {
                     style={{ padding: '8px 10px', border: '1px solid var(--ehr-border)', borderRadius: 8, fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit' }}
                   />
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <select
+                    <Select
                       value={annOrgId}
                       onChange={e => setAnnOrgId(e.target.value)}
                       style={{ height: 32, padding: '0 8px', border: '1px solid var(--ehr-border)', borderRadius: 8, fontSize: 12, fontWeight: 700, background: '#fff' }}
                     >
                       {organizations.map(o => <option key={o._id} value={o._id}>{o.name}</option>)}
-                    </select>
-                    <select
+                    </Select>
+                    <Select
                       value={annPriority}
                       onChange={e => setAnnPriority(e.target.value as AnnouncementPriority)}
                       style={{ height: 32, padding: '0 8px', border: '1px solid var(--ehr-border)', borderRadius: 8, fontSize: 12, fontWeight: 700, background: '#fff' }}
@@ -343,7 +344,7 @@ export default function AdminSupportPage() {
                       <option value="normal">Normal</option>
                       <option value="important">Important</option>
                       <option value="urgent">Urgent</option>
-                    </select>
+                    </Select>
                     <button
                       type="button"
                       className="sa-btn primary"

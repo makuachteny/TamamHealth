@@ -21,6 +21,7 @@ import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import LabOrderPatientPicker from '@/components/lab/order/LabOrderPatientPicker';
 import '@/components/lab/order/lab-order.css';
 import { patientFullName } from '@/lib/patient-utils';
+import Select from '@/components/Select';
 
 // Use the platform accent token so this dashboard matches the reference
 // Clinical Officer design instead of a one-off hardcoded hex.
@@ -401,13 +402,13 @@ export default function NutritionDashboard() {
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formSex')}</label>
-                  <select value={form.isAnc ? 'F' : form.sex} disabled={form.isAnc}
+                  <Select value={form.isAnc ? 'F' : form.sex} disabled={form.isAnc}
                     onChange={e => setForm(f => ({ ...f, sex: e.target.value }))}
                     className="w-full px-3 py-2 rounded-md text-xs"
                     style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}>
                     <option value="F">F</option>
                     <option value="M">M</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formMuac')}</label>

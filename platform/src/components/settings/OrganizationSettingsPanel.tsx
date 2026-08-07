@@ -15,6 +15,7 @@ import type { HospitalDoc, OrganizationDoc, UserDoc } from '@/lib/db-types';
 import type { FeeScheduleDoc } from '@/lib/db-types-billing';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import Select from '@/components/Select';
 
 export type OrganizationSettingsSection =
   | 'profile'
@@ -215,14 +216,14 @@ export default function OrganizationSettingsPanel({ section, users = [], hospita
             <OrgInfoCard title={t('orgSettings.screenLockTimeout')} icon={<Timer />}>
               <p className="org-set-copy">{t('orgSettings.screenLockTimeoutDesc')}</p>
               <div className="org-set-control-row">
-                <select className="ehr-set-select" value={lockTimeout} onChange={event => setLockTimeout(Number(event.target.value))}>
+                <Select className="ehr-set-select" value={lockTimeout} onChange={event => setLockTimeout(Number(event.target.value))}>
                   <option value={1}>{t('orgSettings.minuteOne')}</option>
                   <option value={2}>{t('orgSettings.minutes', { count: 2 })}</option>
                   <option value={5}>{t('orgSettings.minutes', { count: 5 })}</option>
                   <option value={10}>{t('orgSettings.minutes', { count: 10 })}</option>
                   <option value={15}>{t('orgSettings.minutes', { count: 15 })}</option>
                   <option value={30}>{t('orgSettings.minutes', { count: 30 })}</option>
-                </select>
+                </Select>
                 <button
                   className="ehr-set-btn primary"
                   disabled={savingTimeout || lockTimeout === (org?.lockTimeoutMinutes ?? 1)}

@@ -10,6 +10,8 @@ import {
   Upload, CheckCircle2, FileText, BarChart3, TrendingUp, Play, RotateCcw,
 } from '@/components/icons/lucide';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
+import { appointmentPriorityLabel, appointmentTriage } from '@/lib/clinical/triage-display';
 import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 
 const ACCENT = 'var(--accent-primary)';
@@ -204,6 +206,21 @@ export default function RadiologyDashboard() {
       return [s.patientName, s.modality, s.bodyPart].some(v => (v || '').toLowerCase().includes(q));
     });
   }, [studies, filterStatus, queueSearch]);
+
+  // Day-activity rail: `filtered` is the active status tab plus the search box,
+  // so charting it redrew the week every time the reader changed lane. Built
+  // from the whole worklist instead — a scheduled study plotted when it was
+  // ordered, a reported one when it was read.
+  const chartItems = useMemo<DayStatsItem[]>(() => studies.map(study => {
+    const reported = study.status === 'completed';
+    const at = (reported && study.completedAt) || study.orderedAt;
+    return {
+      // Demo studies carry a date but no instant; they still belong to a day.
+      date: at ? at.slice(0, 10) : study.date,
+      time: at ? new Date(at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined,
+      series: (reported ? 1 : 0) as 0 | 1,
+    };
+  }), [studies]);
 
   const handleSubmitReport = async (studyId: string) => {
     if (!findings.trim()) return;
@@ -495,6 +512,7 @@ export default function RadiologyDashboard() {
         // do, so they surface as "without a recorded time" instead of guessing.
         // done→series1 lines up exactly with completed vs everything else.
         chartSeriesNames={['Scheduled', 'Reported']}
+        chartItems={chartItems}
         rows={filtered.map((study): EhrCareDashboardRow => {
           const time = study.status === 'completed'
             ? (study.completedAt ? new Date(study.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined)
@@ -514,15 +532,15 @@ export default function RadiologyDashboard() {
             locationSecondary: study.bodyPart,
             status: study.status,
             statusLabel: radiologyStatusLabel(study.status),
-            statusSecondary: study.priority === 'emergency' ? 'Emergency' : study.priority === 'urgent' ? 'Urgent' : 'Routine',
+            statusSecondary: appointmentPriorityLabel(study.priority),
             statusTone: study.status === 'completed' ? 'done'
               : study.status === 'in_progress' ? 'active'
               : study.priority === 'emergency' ? 'danger'
               : study.priority === 'urgent' ? 'warning'
               : 'scheduled',
-            // study.priority is a real urgency, not free text — emergency/urgent
-            // studies get the same RED/YELLOW acuity pill used everywhere else.
-            priority: study.priority === 'emergency' ? 'RED' : study.priority === 'urgent' ? 'YELLOW' : undefined,
+            // study.priority is a real urgency, not free text — it maps onto the
+            // same acuity codes, and the same words, every other worklist uses.
+            priority: appointmentTriage(study.priority),
             // Pending/In Progress/Complete IS the imaging worklist — a same-day
             // visit must not paint over it with the appointment ladder. The
             // shared shell still surfaces the visit status on the line under

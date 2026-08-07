@@ -20,6 +20,7 @@ import { useDataScope } from '@/lib/hooks/useDataScope';
 import type { BillingDoc } from '@/lib/db-types-billing';
 import { ESSENTIAL_MEDICINES } from '@/lib/services/supply-chain-service';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
+import Select from '@/components/Select';
 
 /* ── CSV helper ────────────────────────────────────────────────── */
 const downloadCSV = (data: Record<string, unknown>[], filename: string) => {
@@ -814,7 +815,7 @@ export default function ReportsPage() {
                   title={t('reports.filterByCategory')}
                 >
                   <Filter size={16} />
-                  <select
+                  <Select
                     value={categoryFilter}
                     onChange={e => setCategoryFilter(e.target.value)}
                     aria-label={t('reports.filterByCategory')}
@@ -825,7 +826,7 @@ export default function ReportsPage() {
                         {t(categoryKey[section.category] ?? section.category)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <FilterSelect
                   value={reportPeriod}

@@ -6,6 +6,7 @@ import { Shield, X } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useToast } from '@/components/Toast';
 import type { InsurancePolicyDoc, PayerType } from '@/lib/db-types-payments';
+import Select from '@/components/Select';
 
 interface InsurancePolicyModalProps {
   patientId: string;
@@ -140,9 +141,9 @@ export default function InsurancePolicyModal({
             <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>
               {t('billing.payerType') || 'Payer type'}
             </label>
-            <select value={form.payerType} onChange={e => set('payerType', e.target.value as PayerType)}>
+            <Select value={form.payerType} onChange={e => set('payerType', e.target.value as PayerType)}>
               {PAYER_TYPES.map(pt => <option key={pt.value} value={pt.value}>{pt.label}</option>)}
-            </select>
+            </Select>
           </div>
 
           <div>
@@ -222,13 +223,13 @@ export default function InsurancePolicyModal({
                 <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>
                   {t('billing.donorCoverageType') || 'Coverage type'}
                 </label>
-                <select
+                <Select
                   value={form.donorCoverageType ?? ''}
                   onChange={e => set('donorCoverageType', (e.target.value || undefined) as typeof form.donorCoverageType)}
                 >
                   <option value="">{t('common.select') || 'Select…'}</option>
                   {DONOR_COVERAGE_TYPES.map(dc => <option key={dc.value} value={dc.value}>{dc.label}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
           )}

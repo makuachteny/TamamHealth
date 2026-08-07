@@ -20,6 +20,7 @@ import { COMMON_ALLERGENS } from '@/data/allergens';
 import type { AllergyEntry } from '@/lib/types/patient-clinical';
 import type { PatientDoc } from '@/lib/db-types';
 import './clinical-notes.css';
+import Select from '@/components/Select';
 
 type AllergyTab = 'active' | 'inactive';
 
@@ -199,14 +200,14 @@ export default function AllergiesModal({ patientId, currentUser, onClose }: Alle
                     onChange={e => setDraft(d => ({ ...d, reaction: e.target.value }))}
                     aria-label="Reaction"
                   />
-                  <select
+                  <Select
                     className="cn-select"
                     value={draft.criticality || 'unknown'}
                     onChange={e => setDraft(d => ({ ...d, criticality: e.target.value as AllergyEntry['criticality'] }))}
                     aria-label="Severity"
                   >
                     {CRITICALITY_OPTIONS.map(c => <option key={c} value={c}>{c[0].toUpperCase() + c.slice(1)}</option>)}
-                  </select>
+                  </Select>
                   <input
                     type="date"
                     className="cn-input"

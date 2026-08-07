@@ -16,6 +16,8 @@ import { patientFullName, patientGenderAge, patientRegisteredAt } from '@/lib/pa
 import { getRoleConfig } from '@/lib/permissions';
 import { DEMO_WARD_PATIENTS, IS_DEMO } from '@/components/nurse/shared';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
+import { PRIORITY_META } from '@/lib/clinical/triage-display';
 import { tooltipStyle } from '@/components/ChartCard';
 import WardWorkflow from './WardWorkflow';
 import MarWorkflow from './MarWorkflow';
@@ -75,6 +77,19 @@ export default function NurseDashboard() {
     { name: 'Green', value: routineTriage, color: CHART_GREEN },
   ]), [criticalTriage, urgentTriage, routineTriage]);
   const acuityTotal = criticalTriage + urgentTriage + routineTriage;
+
+  // Day-activity rail: the rows behind it are the active station's board, and
+  // the triage board is today-only by definition — charting it drew one bar
+  // under a "This week" heading. Built from every triage on file instead, split
+  // the way the station reads acuity: RED/YELLOW need attention now, GREEN is
+  // routine.
+  const chartItems = useMemo<DayStatsItem[]>(() => triages
+    .filter(tr => !!tr.triagedAt)
+    .map(tr => ({
+      date: tr.triagedAt!.slice(0, 10),
+      time: rowTime(tr.triagedAt),
+      series: (tr.priority === 'RED' || tr.priority === 'YELLOW' ? 0 : 1) as 0 | 1,
+    })), [triages]);
 
   // The station is URL-addressable so notifications, redirects, bookmarks, and
   // the browser back button can return a nurse to the exact station they need.
@@ -189,7 +204,10 @@ export default function NurseDashboard() {
           timeSecondary: (triage.triagedAt || today).slice(0, 10),
           status: triage.status,
           statusLabel: triage.status === 'seen' ? 'Seen' : triage.status === 'pending' ? 'Waiting' : triage.status,
-          statusSecondary: triage.priority === 'RED' ? 'Critical' : triage.priority === 'YELLOW' ? 'Urgent' : 'Routine',
+          // Shared acuity vocabulary: RED reads "Emergency" here as it does on
+          // triage, the clinician queue and the front desk. This row used to
+          // call it "Critical", the one station that did.
+          statusSecondary: PRIORITY_META[triage.priority].label,
           statusTone: triage.priority === 'RED' ? 'danger' : triage.priority === 'YELLOW' ? 'warning' : 'ready',
           // RED/YELLOW need attention now (Urgent); GREEN is routine — a more
           // useful split for this station than the done-based default, which
@@ -320,6 +338,7 @@ export default function NurseDashboard() {
           // three stations' rows ever reach a 'done' statusTone.
           chartTitle="Triage activity"
           chartSeriesNames={['Acute', 'Routine']}
+          chartItems={chartItems}
           // Triage acuity donut — today's RED/YELLOW/GREEN split, rendered in
           // the left rail directly below the Triage activity chart.
           railContent={(

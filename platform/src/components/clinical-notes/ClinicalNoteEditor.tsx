@@ -53,6 +53,7 @@ import type {
   ClinicalNoteDoc, NoteSectionContent, NoteDiagnosis,
 } from '@/lib/clinical-notes/types';
 import './clinical-notes.css';
+import Select from '@/components/Select';
 
 const AUTOSAVE_MS = 900;
 
@@ -589,7 +590,7 @@ export default function ClinicalNoteEditor({
               Documents
               <label className="cn-card-head-filter">
                 Filter by Label:
-                <select
+                <Select
                   value={docLabel}
                   onChange={e => setDocLabel(e.target.value)}
                   aria-label="Filter documents by label"
@@ -598,7 +599,7 @@ export default function ClinicalNoteEditor({
                   {[...new Set((documents || []).map(d => d.category))].map(cat => (
                     <option key={cat} value={cat}>{docCategoryLabel(cat)}</option>
                   ))}
-                </select>
+                </Select>
               </label>
             </p>
             <div className="cn-card-body cn-card-body-roomy">
@@ -640,7 +641,7 @@ export default function ClinicalNoteEditor({
         <div className="cn-header-actions">
         <label className="cn-field">
           <span className="cn-label">Note type</span>
-          <select
+          <Select
             className="cn-select"
             value={note.noteType}
             onChange={e => handleTypeChange(e.target.value)}
@@ -650,7 +651,7 @@ export default function ClinicalNoteEditor({
             {NOTE_TYPE_ORDER.map(id => (
               <option key={id} value={id}>{NOTE_TYPES[id].label}</option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <button type="button" className="cn-btn" onClick={handleClear} disabled={locked}>

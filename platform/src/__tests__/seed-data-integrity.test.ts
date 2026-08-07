@@ -10,6 +10,7 @@
  */
 import { patients, hospitals, referrals, diseaseAlerts } from '@/data/mock';
 import { seedAppointments } from '@/lib/db-seed';
+import { isTimeOverlap } from '@/lib/appointment-time';
 
 describe('Seed Data Integrity', () => {
 
@@ -232,18 +233,39 @@ describe('Seed Data Integrity', () => {
      * — one row per time — so two bookings in the same slot have nowhere to go.
      * The service refuses them; this keeps the seed to the same rule, since
      * seed rows are written straight to the database.
+     *
+     * Duration-aware on purpose, matching the service's `isTimeOverlap`. This
+     * assertion used to compare start times only, which let a 12:00×45min and
+     * a 12:30×30min both pass while drawing on top of each other — five such
+     * pairs were reaching every fresh demo before the seed's de-collision pass
+     * was taught about duration.
      */
-    test('no two open appointments share a slot at one facility', () => {
+    test('no two open appointments overlap at one facility', () => {
       const CLOSED = new Set(['completed', 'cancelled', 'no_show', 'rescheduled']);
-      const seen = new Map<string, string>();
+      const byDay = new Map<string, typeof seedAppointments>();
       const collisions: string[] = [];
 
       for (const a of seedAppointments) {
         if (CLOSED.has(a.status)) continue;
-        const key = `${a.facilityId}|${a.appointmentDate}|${a.appointmentTime}`;
-        const first = seen.get(key);
-        if (first) collisions.push(`${key}: ${first} and ${a._id}`);
-        else seen.set(key, a._id);
+        const key = `${a.orgId || ''}|${a.facilityId || ''}|${a.appointmentDate}`;
+        const bucket = byDay.get(key);
+        if (bucket) bucket.push(a);
+        else byDay.set(key, [a]);
+      }
+
+      for (const [key, bucket] of byDay) {
+        for (let i = 0; i < bucket.length; i++) {
+          for (let j = i + 1; j < bucket.length; j++) {
+            const x = bucket[i];
+            const y = bucket[j];
+            if (isTimeOverlap(x.appointmentTime, x.duration || 30, y.appointmentTime, y.duration || 30)) {
+              collisions.push(
+                `${key}: ${x._id} @ ${x.appointmentTime}/${x.duration || 30}min ` +
+                `overlaps ${y._id} @ ${y.appointmentTime}/${y.duration || 30}min`,
+              );
+            }
+          }
+        }
       }
 
       expect(collisions).toEqual([]);
