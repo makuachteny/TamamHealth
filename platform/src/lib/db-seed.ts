@@ -2802,6 +2802,39 @@ async function seedDatabaseExclusive(): Promise<void> {
             status: VIS_TRI_STATUS[i % VIS_TRI_STATUS.length],
             orgId: fac.org, createdAt: minutesAgo(20 + i * 17), updatedAt: minutesAgo(20 + i * 17),
           } as unknown as Record<string, unknown>);
+
+          // …and the booking that walk-in check-in creates for them.
+          //
+          // Reception's check-in opens an appointment for every walk-in
+          // (check-in-service), so a triage record with no booking is a patient
+          // the rest of the app cannot describe: the front desk decides a row's
+          // drop-down by whether it HAS a booking, so these rows fell back to
+          // the legacy facts-and-assign panel while every other patient in the
+          // same list opened the appointment editor. The visit is real — the
+          // patient walked in and was triaged — so the missing document was the
+          // bug, not the row.
+          const walkSlot = takeTodaySlot(fac.fid, 20);
+          if (walkSlot) {
+            await safePut(visApptDB, {
+              _id: `appt-vis-${fac.fid}-walkin-${i}`,
+              type: 'appointment', patientId: p.id, patientName: name,
+              patientPhone: p.phone || undefined, hospitalNumber: p.hospitalNumber,
+              providerId: '', providerName: '',
+              facilityId: fac.fid, facilityName: fac.fname, facilityLevel: 'national',
+              appointmentDate: dateAgo(0), appointmentTime: walkSlot.t, endTime: walkSlot.e,
+              duration: 20, appointmentType: 'walk_in',
+              priority: pri === 'RED' ? 'emergency' : pri === 'YELLOW' ? 'urgent' : 'routine',
+              department: 'Outpatient',
+              reason: VIS_WALKIN[i % VIS_WALKIN.length],
+              // In the building and triaged — the rung walk-in check-in leaves
+              // them on.
+              status: 'checked_in', checkedInAt: minutesAgo(20 + i * 17),
+              reminderSent: false, isRecurring: false,
+              bookedBy: fac.triager.id, bookedByName: fac.triager.name,
+              state: p.state || '', county: p.county || '', orgId: fac.org,
+              createdAt: minutesAgo(20 + i * 17), updatedAt: minutesAgo(20 + i * 17),
+            } as unknown as Record<string, unknown>);
+          }
         }
       }
 

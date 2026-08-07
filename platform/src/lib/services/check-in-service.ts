@@ -20,8 +20,8 @@ export type AttendanceType = 'new' | 'repeat';
 /**
  * New case vs re-attendance, auto-derived once at arrival: a patient with any
  * prior medical record or any previously closed encounter is a repeat
- * attendance; otherwise it's a new case. The clerk may override the result
- * (see PatientCheckInForm.tsx's Visit toggle).
+ * attendance; otherwise it's a new case. Callers may override it — the front
+ * desk's arrival dialog asks when it matters.
  */
 export async function deriveAttendanceType(patientId: string): Promise<AttendanceType> {
   try {
@@ -36,6 +36,63 @@ export async function deriveAttendanceType(patientId: string): Promise<Attendanc
     // best-effort — default to 'new' below
   }
   return 'new';
+}
+
+/**
+ * Check a BOOKED patient in from the appointment itself — the only check-in
+ * path now that the standalone Check-In module is gone.
+ *
+ * Flipping the appointment status is not a check-in on its own: the visit
+ * thread every downstream station joins (triage, rooming, the clinician's
+ * note, the checkout gate) hangs off the arrival encounter. The appointments
+ * page used to write the status and nothing else, so a patient checked in from
+ * there had no visit; this is why the two callers share one function.
+ *
+ * The encounter is best-effort — an appointment marked checked-in with no
+ * encounter is recoverable, but refusing the check-in leaves the patient
+ * standing at the desk.
+ */
+export async function checkInAppointment(input: {
+  appointmentId: string;
+  patientId: string;
+  patientName: string;
+  hospitalNumber?: string;
+  facilityId?: string;
+  facilityName?: string;
+  orgId?: string;
+  /** New case vs re-attendance; auto-derived when omitted. */
+  attendanceType?: AttendanceType;
+  actorId?: string;
+  actorName?: string;
+  actorRole?: string;
+}): Promise<void> {
+  const { updateAppointmentStatus } = await import('./appointment-service');
+  await updateAppointmentStatus(input.appointmentId, 'checked_in', {
+    actorId: input.actorId,
+    actorName: input.actorName,
+    actorRole: input.actorRole as never,
+  });
+
+  try {
+    const existing = await findOpenEncounterForPatient(input.patientId, input.facilityId || '');
+    if (existing) return; // already threaded onto a live visit
+    const attendanceType = input.attendanceType ?? await deriveAttendanceType(input.patientId);
+    await createArrivalEncounter({
+      patientId: input.patientId,
+      patientName: input.patientName,
+      hospitalNumber: input.hospitalNumber,
+      hospitalId: input.facilityId || '',
+      hospitalName: input.facilityName,
+      orgId: input.orgId,
+      arrivalChannel: 'appointment',
+      appointmentId: input.appointmentId,
+      attendanceType,
+      actorId: input.actorId,
+    });
+  } catch {
+    // The appointment is checked in either way; the visit thread can be
+    // repaired, a patient left un-checked-in at the desk cannot.
+  }
 }
 
 export type CheckInAcuity = 'routine' | 'priority' | 'emergency';

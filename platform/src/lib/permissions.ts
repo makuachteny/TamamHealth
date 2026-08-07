@@ -304,7 +304,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.front_desk.allowed],
     navItems: [
       { href: '/dashboard/front-desk', label: 'Reception', icon: LayoutDashboard, section: 'RECEPTION' },
-      { href: '/check-in', label: 'Check-In', icon: ClipboardCheck, section: 'RECEPTION' },
+      // No Check-In module: a patient is checked in from their appointment
+      // row, so Appointments is the single front door for starting a visit.
       { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardPen, section: 'RECEPTION' },
       { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECEPTION' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'RECEPTION' },

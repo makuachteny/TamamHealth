@@ -16,7 +16,7 @@ const HEADER_SHORTCUT_DUPLICATE_ROUTES: Partial<Record<UserRole, string[]>> = {
   midwife: ['/patients', '/appointments', '/wards', '/anc', '/immunizations', '/referrals'],
   triage_nurse: ['/patients', '/wards', '/appointments', '/patient-intake', '/lab', '/immunizations', '/anc'],
   rooming_nurse: ['/patients', '/wards', '/appointments', '/patient-intake', '/lab', '/immunizations', '/anc'],
-  front_desk: ['/check-in', '/patient-intake', '/patients', '/referrals', '/appointments'],
+  front_desk: ['/patient-intake', '/patients', '/referrals', '/appointments'],
   central_registration_clerk: ['/patients', '/appointments', '/referrals'],
   clinic_clerk: ['/patients', '/appointments'],
   lab_tech: ['/lab'],

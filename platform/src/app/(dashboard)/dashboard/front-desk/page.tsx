@@ -11,7 +11,8 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, AppointmentStatus, EncounterDoc, PatientDoc, TriageDoc } from '@/lib/db-types';
 import { APPOINTMENT_STATUS_TONES, APPOINTMENT_CHECKED_IN_STATUSES,
-  APPOINTMENT_PENDING_STATUSES, appointmentStatusLabel, appointmentStatusGroup,
+  APPOINTMENT_PENDING_STATUSES, APPOINTMENT_STATUS_OPTIONS,
+  appointmentStatusLabel, appointmentStatusGroup,
   APPOINTMENT_STATUS_GROUP_LABELS, type AppointmentStatusGroup,
 } from '@/lib/appointment-status';
 import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
@@ -21,7 +22,6 @@ import { buildQueueFromTriage, STAGE_LABELS, type QueueStage } from '@/lib/servi
 import { waitLabel } from '@/components/ehr/EhrVisitPopup';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
-import PatientCheckInForm from '@/components/check-in/PatientCheckInForm';
 import AppointmentEditModal from '@/components/appointments/AppointmentEditModal';
 import { PatientRegistrationForm } from '@/app/(dashboard)/patients/new/page';
 import { useToast } from '@/components/Toast';
@@ -188,7 +188,6 @@ export default function FrontDeskDashboardPage() {
   // mirrored onto the triage record.
   const [cancelTarget, setCancelTarget] = useState<{ appt: AppointmentDoc; triage?: TriageDoc } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
-  const [checkInOpen, setCheckInOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   // "New appointments" — the same booking dialog the doctor module opens.
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -1010,11 +1009,13 @@ export default function FrontDeskDashboardPage() {
 
   // First entry is promoted to the header's primary pill — "New appointments",
   // matching the doctor module's CTA and opening the same booking dialog.
-  // Check in stays one slot over: it's still a core desk action, just not the
-  // headline one.
+  //
+  // There is no "Check in" action here any more: a patient is checked in from
+  // their appointment (the row's status picker, which opens the arrival
+  // dialog), so the booking is the one place a visit is started from rather
+  // than a second, parallel front door.
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
     { label: 'New appointments', icon: Plus, onClick: () => setBookingOpen(true), tone: 'primary' as const },
-    ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: LogIn, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patient-intake') ? [{ label: 'Send intake', icon: Send, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
   ]), [canUseRoute, router, t]);
@@ -1058,8 +1059,17 @@ export default function FrontDeskDashboardPage() {
         // desk's own work from it.
         status: appointment.status,
         statusLabel: appointmentStatusLabel(appointment.status),
-        // The row's pill is display-only; the booking is edited in the
-        // appointment editor's Status & billing tab.
+        // The pill IS the picker: reception moves a booking along the ladder
+        // from the row it is reading. Check-in, no-show and cancel route to
+        // their own dialogs (see handleAppointmentStatusChange) rather than
+        // being written straight from a dropdown.
+        statusValue: appointment.status,
+        statusOptions: canSetAppointmentStatus
+          ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))
+          : undefined,
+        onStatusChange: canSetAppointmentStatus
+          ? value => handleAppointmentStatusChange(appointment, value as AppointmentStatus)
+          : undefined,
         telehealth: appointment.appointmentMode === 'telehealth' || appointment.appointmentType === 'telehealth',
         statusSecondary: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
         statusTone: APPOINTMENT_STATUS_TONES[appointment.status],
@@ -1215,8 +1225,21 @@ export default function FrontDeskDashboardPage() {
         statusLabel: ladderStatus ? appointmentStatusLabel(ladderStatus) : statusLabel,
         statusSecondary: statusContext,
         statusTone: ladderStatus ? APPOINTMENT_STATUS_TONES[ladderStatus] : statusTone,
-        // Read-only here too: In Office and Finished rows report where the
-        // patient stands, and the booking is changed in the appointment editor.
+        // A queue row is movable too — advancing a checked-in patient to
+        // Roomed, or closing them out, is the desk's most common action. The
+        // walk-in's triage row is mirrored in the same write so the two
+        // records never disagree (see the handler).
+        statusValue: ladderStatus,
+        statusOptions: canSetAppointmentStatus
+          ? APPOINTMENT_STATUS_OPTIONS.map(option => ({ value: option, label: appointmentStatusLabel(option) }))
+          : undefined,
+        onStatusChange: canSetAppointmentStatus
+          ? async (value: string) => {
+              const next = value as AppointmentStatus;
+              if (queueAppointment) await handleAppointmentStatusChange(queueAppointment, next, queueTriage);
+              else if (queueTriage) await handleWalkInStatusChange(queueTriage, next);
+            }
+          : undefined,
         priority: acuity,
         room: entry.assignedRoom,
         careTeam: entry.assignedDoctorName || 'Doctor unassigned',
@@ -1417,7 +1440,7 @@ export default function FrontDeskDashboardPage() {
         title: 'Pending arrivals',
         subtitle: `${frontDeskRows.length} patient${frontDeskRows.length === 1 ? '' : 's'} waiting to check in`,
         emptyTitle: 'No pending arrivals',
-        emptyActionLabel: 'Open check-in',
+        emptyActionLabel: 'Open schedule',
       };
     }
     if (panelView === 'queue') {
@@ -1490,12 +1513,10 @@ export default function FrontDeskDashboardPage() {
           emptyTitle={centerCopy.emptyTitle}
           emptyActionLabel={centerCopy.emptyActionLabel}
           onEmptyAction={() => {
-            if (panelView === 'appointments') {
+            // "Pending arrivals" sends the clerk to the schedule, where a
+            // patient is checked in from their own appointment row.
+            if (panelView === 'appointments' || panelView === 'pending') {
               router.push('/appointments');
-              return;
-            }
-            if (panelView === 'pending') {
-              setCheckInOpen(true);
               return;
             }
             setRegisterOpen(true);
@@ -1562,38 +1583,6 @@ export default function FrontDeskDashboardPage() {
                     setRegisterOpen(false);
                     setPanelView('registered');
                     router.refresh();
-                  }}
-                />
-              </div>
-            </div>
-          </Modal>
-        )}
-
-        {checkInOpen && (
-          <Modal onClose={() => setCheckInOpen(false)} width={760} align="top" labelledBy="patient-check-in-dialog-title">
-            <div className="ehr-checkin-dialog">
-              <div className="ehr-checkin-dialog-header">
-                <div>
-                  <h2 id="patient-check-in-dialog-title">Patient check-in</h2>
-                  <p>Search the patient, record arrival details, and add them to the live queue.</p>
-                </div>
-                <button type="button" onClick={() => setCheckInOpen(false)} aria-label="Close check-in form">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="ehr-checkin-dialog-body">
-                <PatientCheckInForm
-                  mode="modal"
-                  onCancel={() => setCheckInOpen(false)}
-                  onComplete={() => {
-                    setCheckInOpen(false);
-                    // The patient just joined the live queue — land on their lane.
-                    setQueueFilter('in_office');
-                    setPanelView('queue');
-                  }}
-                  onRegisterPatient={() => {
-                    setCheckInOpen(false);
-                    setRegisterOpen(true);
                   }}
                 />
               </div>

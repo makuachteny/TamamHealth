@@ -158,7 +158,9 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // management is a nursing function. Insurance claims belong to the
     // medical biller.
     allowed: [
-      '/dashboard/front-desk', '/check-in', '/patients', '/referrals', '/messages',
+      // '/check-in' is retired: checking a patient in is an action on their
+      // appointment, not a module of its own.
+      '/dashboard/front-desk', '/patients', '/referrals', '/messages',
       '/settings',
       '/appointments', '/patient-intake',
 

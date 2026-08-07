@@ -18764,6 +18764,66 @@ textarea.ehr-handoff-input {
   white-space: nowrap;
 }
 
+/* The pill as a status PICKER — a caret after the label, with the real
+   <select> laid transparently over the whole pill as the hit target. Keeps the
+   pill's exact size and tint (a native select cannot be tinted per option), so
+   a row that can be moved along the ladder looks like the pill it already was,
+   plus a caret that says "this opens". */
+.appointment-status-pill--select {
+  position: relative;
+  gap: 5px;
+  padding-right: 9px;
+  cursor: pointer;
+}
+
+.appointment-status-pill--select::after {
+  content: '';
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.75;
+}
+
+.appointment-status-pill--select > select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.appointment-status-pill--select:hover {
+  filter: brightness(0.97);
+}
+
+/* Acuity line under the status pill, tinted by the row's priority. Same three
+   colours the triage pills and avatars use, so "Critical" means one colour
+   everywhere in the app. */
+.appointment-card-status[data-priority] > small {
+  font-weight: 800;
+}
+
+.appointment-card-status[data-priority='RED'] > small {
+  color: var(--color-danger);
+}
+
+.appointment-card-status[data-priority='YELLOW'] > small {
+  color: #B45309;
+}
+
+.appointment-card-status[data-priority='GREEN'] > small {
+  color: var(--color-success);
+}
+
 .appointment-status-pill.status-checked-in,
 .appointment-status-pill.status-in-progress {
   border-color: var(--semantic-active-border);

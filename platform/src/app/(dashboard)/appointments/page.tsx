@@ -499,8 +499,31 @@ export default function AppointmentsPage() {
     // Marking a slot Rescheduled takes it off the live day view — one
     // accidental pick shouldn't cost a hunt through the Finished rows, so the
     // toast itself carries the recovery: Undo restores the rung it was on.
-    const prevStatus = appointments.find(a => a._id === id)?.status;
+    const appointment = appointments.find(a => a._id === id);
+    const prevStatus = appointment?.status;
     try {
+      if (status === 'checked_in' && appointment) {
+        // Checking in is the one rung that is more than a status: it opens the
+        // visit every downstream station joins. Now that the standalone
+        // Check-In module is gone this page is a primary check-in surface, so
+        // it goes through the same service the reception desk uses instead of
+        // writing the status alone and leaving the patient with no encounter.
+        const { checkInAppointment } = await import('@/lib/services/check-in-service');
+        await checkInAppointment({
+          appointmentId: id,
+          patientId: appointment.patientId,
+          patientName: appointment.patientName,
+          hospitalNumber: patients.find(p => p._id === appointment.patientId)?.hospitalNumber,
+          facilityId: appointment.facilityId || currentUser?.hospitalId,
+          facilityName: appointment.facilityName || currentUser?.hospitalName,
+          orgId: appointment.orgId || currentUser?.orgId,
+          actorId: currentUser?._id,
+          actorName: currentUser?.name || currentUser?.username,
+          actorRole: currentUser?.role,
+        });
+        showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success');
+        return;
+      }
       await updateStatus(id, status);
       if (status === 'rescheduled' && prevStatus && prevStatus !== status) {
         showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success', {
@@ -517,7 +540,7 @@ export default function AppointmentsPage() {
       }
     }
     catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedUpdate'), 'error'); }
-  }, [appointments, updateStatus, showToast, t, statusLabelKey]);
+  }, [appointments, patients, currentUser, updateStatus, showToast, t, statusLabelKey]);
 
   // Reversing a step reuses the same updateAppointmentStatus path (which
   // accepts any target status), so an accidental remind / confirm / check-in

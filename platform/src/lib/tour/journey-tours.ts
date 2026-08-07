@@ -342,14 +342,14 @@ const FRONT_DESK_STEPS: TourStep[] = [
     route: '/patients/new',
     target: '',
     title: 'Register a patient — 6 steps',
-    body: 'Demographics → Contact & location (the household number derives the geocode) → Next of kin → Biometrics (take the patient’s photo with the camera popup — or upload — plus consent-gated fingerprints) → Payment coverage → Review. “Register & Check In” jumps straight to check-in.',
+    body: 'Demographics → Contact & location (the household number derives the geocode) → Next of kin → Biometrics (take the patient’s photo with the camera popup — or upload — plus consent-gated fingerprints) → Payment coverage → Review.',
   },
   {
     id: 'check-in',
-    route: '/check-in',
+    route: '/appointments',
     target: '',
     title: 'Check in an arrival',
-    body: 'Find the patient, record arrival mode and chief complaint, pick acuity (Routine / Priority / Emergency), optional quick vitals — submitting creates the pending triage token that puts them in the nurse’s queue.',
+    body: 'Checking in happens on the appointment itself: find the patient’s booking for today and move its status to Checked In. That opens their visit and puts them in the nurse’s queue — there is no separate check-in module.',
   },
   {
     id: 'assign',
