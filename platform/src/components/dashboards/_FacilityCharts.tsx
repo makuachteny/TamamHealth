@@ -120,7 +120,7 @@ export function WeeklyActivityChart({ data, chartType, series }: WeeklyActivityC
             maxBarSize={28}
             stroke="var(--bg-card-solid)"
             strokeWidth={1}
-            radius={i === series.length - 1 ? [4, 4, 0, 0] : 0}
+            radius={0}
           />
         ))}
       </BarChart>

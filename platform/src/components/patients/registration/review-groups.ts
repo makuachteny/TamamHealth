@@ -54,7 +54,7 @@ export function buildReviewGroups(
       section: 1,
       title: steps[1],
       rows: [
-        [t('patientNew.reviewFingerprints'), fingerprintCount > 0
+        [t('patientNew.stepBiometrics'), fingerprintCount > 0
           ? t('patientNew.reviewFingerprintsEnrolled', { count: fingerprintCount })
           : t('patientNew.reviewFingerprintsNotCaptured')],
       ] as [string, string][],
@@ -66,7 +66,7 @@ export function buildReviewGroups(
         [t('patientNew.phone'), form.phone],
         [t('patientNew.altPhone'), form.altPhone],
         [t('patientNew.whatsapp'), form.whatsapp],
-        [t('hospitals.fieldEmail'), form.email],
+        [t('patientNew.email'), form.email],
         [t('patientNew.state'), form.state],
         [t('patientNew.county'), form.county],
         [t('patientNew.payam'), form.payam],

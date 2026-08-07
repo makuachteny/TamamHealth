@@ -172,6 +172,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Initialize database and check session
   useEffect(() => {
     const init = async () => {
+      // Public booking is the one surface whose visitor is a patient, not a
+      // member of staff. It reads exclusively from `/api/booking/*` on the
+      // server and never touches the local database, so building one in a
+      // stranger's browser would be several megabytes of clinical demo data
+      // written to a device that has no business holding any of it.
+      const isPublicBooking = typeof window !== 'undefined'
+        && window.location.pathname.startsWith('/book');
+      if (isPublicBooking) return;
+
       // Seed database on first load (client-side only)
       // In production, seeding only runs if DB is empty (isSeeded check inside seedDatabase)
       try {

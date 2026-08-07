@@ -121,6 +121,16 @@ export async function createEncounter(
     ...data,
     status,
     stageKey: stageOf(status),
+    // Seed the trail with the creating transition. The spec models this as
+    // `from: null` — the visit came into existence at this status — and without
+    // it a trail read back later starts mid-journey, with no record of which
+    // door the patient came in through.
+    statusHistory: data.statusHistory ?? [{
+      from: null,
+      to: status,
+      at: now,
+      byUserId: data.createdBy ?? data.clinicianId,
+    }],
     snapshotVersion: CURRENT_SNAPSHOT_VERSION,
     createdAt: now,
     updatedAt: now,
@@ -164,7 +174,7 @@ export async function updateEncounter(id: string, patch: Partial<EncounterDoc>):
 export async function transitionEncounter(
   id: string,
   to: EncounterStatus,
-  opts?: { snapshot?: Record<string, unknown>; labOrderIds?: string[]; medicalRecordId?: string; actorId?: string },
+  opts?: { snapshot?: Record<string, unknown>; labOrderIds?: string[]; medicalRecordId?: string; actorId?: string; reason?: string },
 ): Promise<EncounterDoc> {
   const db = encountersDB();
   const existing = await db.get(id) as EncounterDoc;
@@ -194,6 +204,21 @@ export async function transitionEncounter(
     labOrderIds: opts?.labOrderIds ?? existing.labOrderIds,
     medicalRecordId: opts?.medicalRecordId ?? existing.medicalRecordId,
     closedAt: closed ? now : existing.closedAt,
+    // Append the hop to the visit's own trail. A no-op re-transition (status
+    // already `to`) is not appended: repeating a status is not a movement, and
+    // recording it would make an idempotent call look like a second visit leg.
+    statusHistory: existing.status === to
+      ? existing.statusHistory
+      : [
+        ...(existing.statusHistory ?? []),
+        {
+          from: existing.status,
+          to,
+          at: now,
+          byUserId: opts?.actorId ?? existing.clinicianId,
+          ...(opts?.reason ? { reason: opts.reason } : {}),
+        },
+      ],
     updatedAt: now,
     _id: existing._id,
     _rev: existing._rev,
@@ -298,6 +323,11 @@ export async function createArrivalEncounter(input: CreateArrivalEncounterInput)
     hospitalNumber: input.hospitalNumber,
     clinicianId: '',
     clinicianName: '',
+    // Who opened the visit. An arrival has no clinician yet, so without this
+    // the very first entry in the trail — the moment the patient was admitted
+    // at the front desk — was the one hop with nobody's name against it, while
+    // every later hop carried the actor this same call already knows.
+    createdBy: input.actorId,
     hospitalId: input.hospitalId,
     hospitalName: input.hospitalName,
     status: initialStatus,
@@ -567,7 +597,9 @@ export async function recordLeftWithoutBeingSeen(
   encounterId: string,
   opts?: { actorId?: string; reason?: string },
 ): Promise<EncounterDoc> {
-  const updated = await transitionEncounter(encounterId, 'lwbs', { actorId: opts?.actorId });
+  const updated = await transitionEncounter(encounterId, 'lwbs', {
+    actorId: opts?.actorId, reason: opts?.reason,
+  });
   await logAuditSafe(
     'ENCOUNTER_LWBS',
     opts?.actorId,
@@ -579,7 +611,15 @@ export async function recordLeftWithoutBeingSeen(
 }
 
 /**
- * Escalate a waiting or in-triage patient straight to emergency care (KAN-100).
+ * Escalate a patient who is being assessed, or already past triage, straight to
+ * emergency care (KAN-100).
+ *
+ * NOT callable on a patient who is only queueing (`awaiting_triage`): that move
+ * is deliberately absent from the state machine, because escalating someone
+ * nobody has looked at asserts an emergency on no assessment. Take them into
+ * triage first — one hop — and escalate from there. This call throws rather
+ * than silently walking that hop itself, so the record shows a real assessment
+ * rather than one the system invented.
  *
  * Unlike LWBS this is NOT terminal — `escalated_to_emergency` still leads on to
  * admitted / discharged / deceased / referred_out, so the visit continues under
@@ -590,7 +630,7 @@ export async function escalateEncounterToEmergency(
   opts?: { actorId?: string; reason?: string },
 ): Promise<EncounterDoc> {
   const updated = await transitionEncounter(encounterId, 'escalated_to_emergency', {
-    actorId: opts?.actorId,
+    actorId: opts?.actorId, reason: opts?.reason,
   });
   await logAuditSafe(
     'ENCOUNTER_ESCALATED_TO_EMERGENCY',

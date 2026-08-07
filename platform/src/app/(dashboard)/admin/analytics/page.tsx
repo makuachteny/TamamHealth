@@ -223,7 +223,7 @@ export default function AdminAnalyticsPage() {
                     <XAxis dataKey="name" tick={axisTick} />
                     <YAxis tick={axisTick} />
                     <Tooltip {...chartTooltipStyle} />
-                    <Bar dataKey="patients" fill="#2191D0" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="patients" fill="#2191D0" radius={0} />
                   </BarChart>
                 </ResponsiveContainer>
               );
@@ -349,7 +349,7 @@ export default function AdminAnalyticsPage() {
                       <YAxis tick={axisTick} />
                       <Tooltip {...chartTooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: '11px' }} />
-                      {lines.map(l => <Bar key={l.key} dataKey={l.key} fill={l.color} radius={[3, 3, 0, 0]} name={l.name} />)}
+                      {lines.map(l => <Bar key={l.key} dataKey={l.key} fill={l.color} radius={0} name={l.name} />)}
                     </BarChart>
                   </ResponsiveContainer>
                 );
@@ -416,7 +416,7 @@ export default function AdminAnalyticsPage() {
                     <XAxis dataKey="name" tick={axisTick} />
                     <YAxis tick={axisTick} />
                     <Tooltip {...chartTooltipStyle} />
-                    <Bar dataKey="users" fill="#D97706" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="users" fill="#D97706" radius={0} />
                   </BarChart>
                 </ResponsiveContainer>
               );

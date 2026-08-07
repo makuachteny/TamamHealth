@@ -51,6 +51,10 @@ export function useUsers() {
     role: UserRole;
     hospitalId?: string;
     hospitalName?: string;
+    photoUrl?: string;
+    department?: string;
+    specialty?: string;
+    phone?: string;
   }, actorId?: string, actorUsername?: string) => {
     const { createUser } = await import('../services/user-service');
     const user = await createUser(data, actorId, actorUsername);
@@ -65,6 +69,10 @@ export function useUsers() {
     hospitalId?: string;
     hospitalName?: string;
     isActive?: boolean;
+    /** `null` clears the photo back to initials. */
+    photoUrl?: string | null;
+    department?: string;
+    specialty?: string;
   }, actorId?: string, actorUsername?: string) => {
     const { updateUser } = await import('../services/user-service');
     const user = await updateUser(id, data, actorId, actorUsername);

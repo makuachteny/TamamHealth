@@ -82,6 +82,11 @@ function isCsrfExemptApiPath(pathname: string): boolean {
   // Patient portal has its own JWT scheme; it issues + checks its own
   // anti-forgery tokens internally. Skip the staff CSRF gate here.
   if (pathname.startsWith('/api/patient-portal/')) return true;
+  // Public booking. There is no session cookie here to protect, so the staff
+  // CSRF gate has nothing to check and would only reject every request from a
+  // practice's own website. The real guards are the per-IP/per-phone rate
+  // limits and the required slot hold — see the booking plan, §5.
+  if (pathname.startsWith('/api/booking/')) return true;
   // Read-only public reference data.
   if (pathname === '/api/fhir/metadata') return true;
   if (pathname === '/api/country/metadata') return true;
@@ -224,6 +229,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Public booking API. Unauthenticated by design — the caller is a patient on
+  // a practice's website, not a staff member. The Origin/Host check above still
+  // runs on the POSTs. These routes return free/busy only, and the write paths
+  // are rate-limited and require a slot hold.
+  if (pathname.startsWith('/api/booking/')) {
+    return NextResponse.next();
+  }
+
   // FHIR CapabilityStatement is intentionally public so external clients can
   // discover the API before authenticating. All other FHIR resource paths
   // still require a session token.
@@ -268,6 +281,14 @@ export async function proxy(request: NextRequest) {
     pathname === '/terms' ||
     pathname === '/privacy'
   ) {
+    return NextResponse.next();
+  }
+
+  // Public booking — a patient following a link from an SMS, a QR code or the
+  // practice's own website has no staff session and must not be bounced to
+  // /login. The routes underneath return free/busy only; nothing here reaches
+  // patient data without the unguessable booking reference.
+  if (pathname === '/book' || pathname.startsWith('/book/')) {
     return NextResponse.next();
   }
 

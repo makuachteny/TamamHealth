@@ -181,21 +181,23 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
           )}
 
           <div className="ehr-worklist-table">
-            {displayedPatients.length === 0 && (
-              <div className="ehr-worklist-empty">
-                {t('patients.patientsFound', { count: 0 })}
-              </div>
-            )}
-            {displayedPatients.length > 0 && (
               <div className="appointment-card-surface">
                 {/* Patient / Time / Care team / Context / Status, with every
                     data column using the same primary + secondary hierarchy. */}
                 <div className="appointment-card-flow">
+                {/* The column head is the board's frame, not a label for the
+                    rows that happen to be loaded: it stays put on an empty
+                    ward so the table never collapses into a bare message. */}
                 <div className="appointment-card-head" aria-hidden="true">
                   {['Patient', 'Time', 'Care team', 'Context', 'Status'].map(head => (
                     <span key={head}>{head}</span>
                   ))}
                 </div>
+                {displayedPatients.length === 0 && (
+                  <div className="ehr-worklist-empty">
+                    {t('patients.patientsFound', { count: 0 })}
+                  </div>
+                )}
                 {displayedPatients.map((patient) => {
                   // Identical column derivation to the doctor's worklist
                   // (EhrClinicalDashboard.rowQueueColumns): queue entry when
@@ -342,7 +344,6 @@ export default function WardWorkflow({ search, showHeader = true }: { search?: s
                 })}
                 </div>
               </div>
-            )}
           </div>
       </section>
 

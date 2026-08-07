@@ -672,7 +672,7 @@ export default function GovernmentNationalDashboard() {
                     <Tooltip {...tooltipStyle} />
                     <Legend {...legendProps} />
                     {shownDiseases.map(d => (
-                      <Bar key={d} dataKey={d} name={d} fill={diseaseColorMap.get(d)} radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} />
+                      <Bar key={d} dataKey={d} name={d} fill={diseaseColorMap.get(d)} radius={0} maxBarSize={22} isAnimationActive={false} />
                     ))}
                   </BarChart>
                 ) : chartType === 'area' ? (
@@ -728,8 +728,8 @@ export default function GovernmentNationalDashboard() {
                     <YAxis tick={axisTick} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip {...tooltipStyle} cursor={{ fill: 'var(--overlay-subtle)' }} />
                     <Legend {...legendProps} />
-                    <Bar dataKey="births" name="Births" fill={GREEN} radius={[4, 4, 0, 0]} maxBarSize={20} isAnimationActive={false} />
-                    <Bar dataKey="deaths" name="Deaths" fill={DEEP} radius={[4, 4, 0, 0]} maxBarSize={20} isAnimationActive={false} />
+                    <Bar dataKey="births" name="Births" fill={GREEN} radius={0} maxBarSize={20} isAnimationActive={false} />
+                    <Bar dataKey="deaths" name="Deaths" fill={DEEP} radius={0} maxBarSize={20} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

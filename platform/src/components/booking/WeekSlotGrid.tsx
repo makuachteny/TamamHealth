@@ -1,0 +1,318 @@
+'use client';
+
+/**
+ * WeekSlotGrid — one row per clinician, one column per day.
+ *
+ * This is how you choose a doctor and a time in a single glance: the rows are
+ * the people, the columns are the days, and the cells are what each of them has
+ * free. A flat list of times cannot do that — it repeats "9:00 AM" once per
+ * clinician and leaves the reader to work out whose is whose.
+ *
+ * A cell shows a few openings and then a "+N more" that expands in place, so a
+ * doctor with twenty free slots does not push the next doctor off the screen.
+ * A day with nothing shows an em dash: a clinician who is off on Wednesday is a
+ * fact worth stating, not a blank to squint at.
+ */
+
+import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Loader2, Video } from '@/components/icons/lucide';
+import StaffAvatar from '@/components/staff/StaffAvatar';
+import type { Slot } from '@/lib/booking/slot-engine';
+import { addDays, datesBetween } from '@/lib/booking/slot-engine';
+import { to12Hour, dayParts } from './SlotPicker';
+
+export interface GridProvider {
+  providerId: string;
+  providerName: string;
+  /** Shown under the name, e.g. "Internal Medicine". */
+  subtitle?: string;
+  photoUrl?: string;
+}
+
+export default function WeekSlotGrid({
+  slots,
+  providers,
+  startDate,
+  onStartDateChange,
+  onPick,
+  selected,
+  loading = false,
+  days = 5,
+  maxPerCell = 3,
+  minDate,
+}: {
+  slots: Slot[];
+  /** Rows to draw, in order. A provider with no slots still gets a row. */
+  providers: GridProvider[];
+  startDate: string;
+  onStartDateChange: (date: string) => void;
+  onPick: (slot: Slot) => void;
+  selected?: { providerId: string; date: string; startTime: string };
+  loading?: boolean;
+  days?: number;
+  maxPerCell?: number;
+  minDate?: string;
+}) {
+  const columns = useMemo(
+    () => datesBetween(startDate, addDays(startDate, days - 1)),
+    [startDate, days],
+  );
+
+  // providerId → date → slots
+  const byProvider = useMemo(() => {
+    const map = new Map<string, Map<string, Slot[]>>();
+    for (const slot of slots) {
+      let byDate = map.get(slot.providerId);
+      if (!byDate) { byDate = new Map(); map.set(slot.providerId, byDate); }
+      const list = byDate.get(slot.date);
+      if (list) list.push(slot);
+      else byDate.set(slot.date, [slot]);
+    }
+    return map;
+  }, [slots]);
+
+  // Only draw clinicians who have something in the loaded range — a row of
+  // five dashes teaches nothing and pushes the real options down.
+  const rows = useMemo(
+    () => providers.filter(p => byProvider.has(p.providerId)),
+    [providers, byProvider],
+  );
+
+  const canGoBack = !minDate || startDate > minDate;
+
+  return (
+    <div className="booking-week-grid">
+      {/* ── Day header ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${columns.length}, minmax(70px, 1fr))`,
+          alignItems: 'center',
+          gap: 8,
+          paddingBottom: 10,
+          borderBottom: '1px solid var(--border-light)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+          <NavButton
+            direction="back"
+            disabled={!canGoBack || loading}
+            onClick={() => onStartDateChange(addDays(startDate, -days))}
+            label="Previous days"
+          />
+        </div>
+        {columns.map((date, index) => {
+          const { weekday, label } = dayParts(date);
+          return (
+            <div key={date} style={{ textAlign: 'center', position: 'relative' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                {weekday}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</div>
+              {index === columns.length - 1 && (
+                <div style={{ position: 'absolute', right: -6, top: '50%', transform: 'translateY(-50%)' }}>
+                  <NavButton
+                    direction="forward"
+                    disabled={loading}
+                    onClick={() => onStartDateChange(addDays(startDate, days))}
+                    label="Next days"
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Rows ── */}
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '32px 0', color: 'var(--text-muted)' }}>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span style={{ fontSize: 13 }}>Checking availability…</span>
+        </div>
+      ) : rows.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '28px 8px' }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+            No clinician has openings in these days.
+          </p>
+          <button
+            type="button"
+            onClick={() => onStartDateChange(addDays(startDate, days))}
+            style={{
+              marginTop: 10, padding: '7px 14px', borderRadius: 999,
+              border: '1px solid var(--border-medium)', background: 'transparent',
+              color: 'var(--accent-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Look at the next {days} days
+          </button>
+        </div>
+      ) : (
+        rows.map(provider => (
+          <ProviderRow
+            key={provider.providerId}
+            provider={provider}
+            columns={columns}
+            slotsByDate={byProvider.get(provider.providerId) ?? new Map()}
+            onPick={onPick}
+            selected={selected}
+            maxPerCell={maxPerCell}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+function ProviderRow({
+  provider, columns, slotsByDate, onPick, selected, maxPerCell,
+}: {
+  provider: GridProvider;
+  columns: string[];
+  slotsByDate: Map<string, Slot[]>;
+  onPick: (slot: Slot) => void;
+  selected?: { providerId: string; date: string; startTime: string };
+  maxPerCell: number;
+}) {
+  // Expansion is per cell, not per row: opening Wednesday should not stretch
+  // every other day of the same doctor.
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const isTelehealth = [...slotsByDate.values()].flat().some(s => s.modality === 'telehealth');
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${columns.length}, minmax(70px, 1fr))`,
+        gap: 8,
+        alignItems: 'start',
+        padding: '14px 0',
+        borderBottom: '1px solid var(--border-light)',
+      }}
+    >
+      {/* Clinician */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0 }}>
+        <StaffAvatar name={provider.providerName} photoUrl={provider.photoUrl} size={38} />
+        <div style={{ minWidth: 0 }}>
+          {/* Wrapped, not truncated. "CO Deng Mabior K…" and "Dr. Achol Mayen
+              De…" are the same nine characters for two different people —
+              which is exactly the distinction this column exists to make. */}
+          <div style={{
+            fontSize: 13, fontWeight: 700, color: 'var(--text-primary)',
+            lineHeight: 1.3, overflowWrap: 'anywhere',
+          }}>
+            {provider.providerName}
+          </div>
+          {provider.subtitle && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+              {provider.subtitle}
+            </div>
+          )}
+          {isTelehealth && (
+            <span
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3,
+                padding: '2px 7px', borderRadius: 999, fontSize: 10, fontWeight: 600,
+                background: 'var(--accent-light)', color: 'var(--accent-primary)',
+              }}
+            >
+              <Video className="w-3 h-3" /> Virtual visit
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* One cell per day */}
+      {columns.map(date => {
+        const daySlots = slotsByDate.get(date) ?? [];
+        const isOpen = expanded === date;
+        const shown = isOpen ? daySlots : daySlots.slice(0, maxPerCell);
+        const hidden = daySlots.length - shown.length;
+
+        if (daySlots.length === 0) {
+          return (
+            <div key={date} style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 14, paddingTop: 8 }}>
+              —
+            </div>
+          );
+        }
+
+        return (
+          <div key={date} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {shown.map(slot => {
+              const isSelected = selected
+                && selected.providerId === slot.providerId
+                && selected.date === slot.date
+                && selected.startTime === slot.startTime;
+              return (
+                <button
+                  key={slot.startTime}
+                  type="button"
+                  onClick={() => onPick(slot)}
+                  style={{
+                    padding: '7px 2px',
+                    borderRadius: 999,
+                    border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-medium)'}`,
+                    background: isSelected ? 'var(--accent-primary)' : 'var(--bg-card-solid)',
+                    color: isSelected ? '#fff' : 'var(--accent-primary)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {to12Hour(slot.startTime)}
+                </button>
+              );
+            })}
+            {(hidden > 0 || isOpen) && (
+              <button
+                type="button"
+                onClick={() => setExpanded(isOpen ? null : date)}
+                style={{
+                  padding: '6px 2px', borderRadius: 999,
+                  border: '1px dashed var(--border-medium)', background: 'transparent',
+                  color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {isOpen ? 'less' : `+${hidden} more`}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function NavButton({
+  direction, disabled, onClick, label,
+}: {
+  direction: 'back' | 'forward';
+  disabled: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  const Icon = direction === 'back' ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      style={{
+        width: 30, height: 30, borderRadius: 999,
+        border: '1px solid var(--border-medium)',
+        background: 'var(--bg-card-solid)',
+        color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1,
+        flexShrink: 0,
+      }}
+    >
+      <Icon className="w-4 h-4" />
+    </button>
+  );
+}

@@ -8,7 +8,7 @@
  * module a dependency of another route — so this route now owns nothing but
  * the URL.
  */
-import PatientRegistrationForm from '@/components/patients/registration/PatientRegistrationForm';
+import { PatientRegistrationForm } from '@/components/patients/registration/PatientRegistrationForm';
 
 export default function NewPatientPage() {
   return <PatientRegistrationForm />;

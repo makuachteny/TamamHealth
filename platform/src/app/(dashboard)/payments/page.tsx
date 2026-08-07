@@ -568,7 +568,7 @@ export default function PaymentsPage() {
                   <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                   <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={compactAmount} width={44} />
                   <Tooltip {...tooltipStyle} formatter={(v: number | undefined) => [formatMoney(v ?? 0), 'Collected']} />
-                  <Bar dataKey="amount" fill="var(--bl-teal)" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="amount" fill="var(--bl-teal)" radius={0} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

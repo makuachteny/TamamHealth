@@ -771,12 +771,10 @@ export default function AppointmentsPage() {
               />
 
               <div className="appointment-card-list appointments-list-surface">
-                {tableRows.length === 0 ? (
-                  <div className="appointment-card-empty">
-                    No appointments for {dayLabel.toLowerCase()}.
-                  </div>
-                ) : (
-                  <>
+                    {/* The column head is the table's frame, not a label for
+                        the rows that happen to be loaded: it stays put on a
+                        day with no bookings, so the list never collapses into
+                        a bare message. */}
                     <div className="appointment-card-head" aria-hidden="true">
                       <span>Patient</span>
                       <span>Time</span>
@@ -784,6 +782,11 @@ export default function AppointmentsPage() {
                       <span>Department</span>
                       <span>Status</span>
                     </div>
+                    {tableRows.length === 0 && (
+                      <div className="appointment-card-empty">
+                        No appointments for {dayLabel.toLowerCase()}.
+                      </div>
+                    )}
                     {tableRows.map(apt => {
                   const svc = appointmentTypes.find(ti => ti.value === apt.appointmentType);
                   const patient = patientById.get(apt.patientId);
@@ -864,8 +867,6 @@ export default function AppointmentsPage() {
                     </div>
                   );
                     })}
-                  </>
-                )}
               </div>
             </div>
           </>

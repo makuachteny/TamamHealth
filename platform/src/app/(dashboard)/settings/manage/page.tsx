@@ -30,6 +30,7 @@ import {
 } from '@/lib/services/dhis2-sync-log-service';
 import type { DHIS2ExportScope } from '@/lib/services/dhis2-export-service';
 import Select from '@/components/Select';
+import StaffPhotoField from '@/components/staff/StaffPhotoField';
 
 const FACILITY_TYPES = [
   { value: 'national_referral', label: 'National Referral' },
@@ -135,7 +136,7 @@ export default function SettingsPage() {
   };
 
   // ── My account / preferences ──
-  const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
+  const [profileForm, setProfileForm] = useState<{ name: string; phone: string; photoUrl?: string }>({ name: '', phone: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwSaving, setPwSaving] = useState(false);
@@ -199,7 +200,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (currentUser) {
-      setProfileForm({ name: currentUser.name || '', phone: (currentUser as { phone?: string }).phone || '' });
+      setProfileForm({
+        name: currentUser.name || '',
+        phone: (currentUser as { phone?: string }).phone || '',
+        photoUrl: (currentUser as { photoUrl?: string }).photoUrl,
+      });
     }
   }, [currentUser]);
 
@@ -207,7 +212,16 @@ export default function SettingsPage() {
     if (!currentUser?._id || !profileForm.name.trim()) { showToast('Name is required', 'error'); return; }
     setProfileSaving(true);
     try {
-      await updateUser(currentUser._id, { name: profileForm.name.trim(), phone: profileForm.phone.trim() }, currentUser._id, currentUser.username);
+      await updateUser(
+        currentUser._id,
+        {
+          name: profileForm.name.trim(),
+          phone: profileForm.phone.trim(),
+          // `null` clears it; `undefined` would read as "leave unchanged".
+          photoUrl: profileForm.photoUrl ?? null,
+        },
+        currentUser._id, currentUser.username,
+      );
       showToast('Profile updated', 'success');
     } catch {
       showToast('Failed to update profile', 'error');
@@ -258,7 +272,10 @@ export default function SettingsPage() {
   // User form state
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<string | null>(null);
-  const [userForm, setUserForm] = useState({
+  const [userForm, setUserForm] = useState<{
+    name: string; username: string; password: string; role: UserRole;
+    hospitalId: string; hospitalName: string; photoUrl?: string;
+  }>({
     name: '', username: '', password: '', role: 'doctor' as UserRole,
     hospitalId: '', hospitalName: '',
   });
@@ -337,6 +354,7 @@ export default function SettingsPage() {
           role: userForm.role,
           hospitalId: userForm.role !== 'government' ? userForm.hospitalId : undefined,
           hospitalName: userForm.role !== 'government' ? userForm.hospitalName : undefined,
+          photoUrl: userForm.photoUrl ?? null,
         }, currentUser._id, currentUser.username);
         showToast('User updated successfully', 'success');
       } else {
@@ -347,6 +365,7 @@ export default function SettingsPage() {
           role: userForm.role,
           hospitalId: userForm.role !== 'government' ? userForm.hospitalId : undefined,
           hospitalName: userForm.role !== 'government' ? userForm.hospitalName : undefined,
+          photoUrl: userForm.photoUrl,
         }, currentUser._id, currentUser.username);
         showToast('User created successfully', 'success');
       }
@@ -785,6 +804,14 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-4">
+              {/* Captured at registration rather than left for later: a staff
+                  directory that starts empty tends to stay empty, and the
+                  worklists, schedule grid and booking pages all read this. */}
+              <StaffPhotoField
+                name={userForm.name}
+                value={userForm.photoUrl}
+                onChange={next => setUserForm(p => ({ ...p, photoUrl: next ?? undefined }))}
+              />
               <div>
                 <label style={labelStyle}>Full Name</label>
                 <input type="text" value={userForm.name} onChange={e => setUserForm(p => ({ ...p, name: e.target.value }))}

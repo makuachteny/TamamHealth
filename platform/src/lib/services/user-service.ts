@@ -74,6 +74,11 @@ interface CreateUserData {
   hospitalId?: string;
   hospitalName?: string;
   orgId?: string;
+  /** Downscaled data URL from `PhotoCaptureModal`. Optional at every step. */
+  photoUrl?: string;
+  department?: string;
+  specialty?: string;
+  phone?: string;
 }
 
 export async function createUser(
@@ -93,6 +98,10 @@ export async function createUser(
       hospitalId: data.hospitalId,
       hospitalName: data.hospitalName,
       orgId: data.orgId,
+      photoUrl: data.photoUrl,
+      department: data.department,
+      specialty: data.specialty,
+      phone: data.phone,
     });
     return body.user as UserDoc;
   }
@@ -145,6 +154,10 @@ export async function createUser(
     hospitalId: needsHospital ? data.hospitalId : undefined,
     hospitalName: needsHospital ? data.hospitalName : undefined,
     orgId: data.orgId,
+    photoUrl: data.photoUrl,
+    department: data.department,
+    specialty: data.specialty,
+    phone: data.phone,
     isActive: true,
     // The admin-set password is temporary — force a change at first login so
     // it never becomes the user's permanent credential.
@@ -169,6 +182,10 @@ interface UpdateUserData {
   hospitalId?: string;
   hospitalName?: string;
   isActive?: boolean;
+  /** Data URL, or null to clear the photo back to initials. */
+  photoUrl?: string | null;
+  department?: string;
+  specialty?: string;
 }
 
 export async function updateUser(
@@ -192,6 +209,10 @@ export async function updateUser(
   const updated: UserDoc = {
     ...existing,
     ...data,
+    // `null` is the caller asking to clear the photo. Spread as-is it would
+    // persist a null the readers all have to special-case, so it becomes an
+    // absent field — the same shape as an account that never had one.
+    photoUrl: data.photoUrl === null ? undefined : (data.photoUrl ?? existing.photoUrl),
     _id: existing._id,
     _rev: existing._rev,
     updatedAt: new Date().toISOString(),

@@ -14,7 +14,7 @@ import type { BookingPolicyDoc, SlotHoldDoc, VisitReasonDoc, PatientClass } from
 import { findByType } from './db-query';
 import { getEffectiveBookingPolicy } from './booking-policy-service';
 import {
-  computeSlots, slotIsStillOpen, addDays,
+  computeSlots, slotIsStillOpen, filterSlotsByStaffAvailability, addDays,
   type Slot, type SlotChannel, type SlotQuery,
 } from '../booking/slot-engine';
 import { jubaDate, jubaTime } from '../time-juba';
@@ -47,6 +47,12 @@ export interface AvailabilityRequest {
   /** Defaults to `from` + 30 days, then clamped by the policy for public use. */
   to?: string;
   providerIds?: string[];
+  /**
+   * A second person the visit needs — the rooming nurse, an interpreter, a
+   * scribe. Slots are narrowed to times they are free too, so the desk cannot
+   * book a doctor into an hour when the only nurse is in another room.
+   */
+  secondaryStaffId?: string;
 }
 
 export interface AvailabilityResult {
@@ -108,12 +114,17 @@ export async function getAvailableSlots(request: AvailabilityRequest): Promise<A
     providerIds: request.providerIds,
   };
 
-  return {
-    slots: computeSlots(windows, appointments, holds, policy, query, new Date().toISOString()),
-    policy,
-    from,
-    to,
-  };
+  const nowIso = new Date().toISOString();
+  let slots = computeSlots(windows, appointments, holds, policy, query, nowIso);
+
+  if (request.secondaryStaffId) {
+    // Note this runs on the FULL appointment list, not the provider's: the
+    // nurse's other commitments are mostly other clinicians' visits.
+    slots = filterSlotsByStaffAvailability(
+      slots, request.secondaryStaffId, windows, appointments, policy, nowIso);
+  }
+
+  return { slots, policy, from, to };
 }
 
 /** The first `limit` days that have at least one slot — for "next available". */

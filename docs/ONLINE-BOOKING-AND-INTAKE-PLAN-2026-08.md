@@ -2,7 +2,23 @@
 
 **Date:** 2026-08-07
 **Goal:** Replace the current "book from inside the app only" intake with a patient-facing booking system whose slots are derived from real provider availability, modelled on the Tebra Care Connect reference screenshots.
-**Status:** Plan. Nothing in here is built yet.
+**Status:** Phase 0 built and verified. Phases 1–6 planned.
+
+## Built so far (2026-08-07)
+
+| Delivered | Where |
+|---|---|
+| Booking document types | `platform/src/lib/db-types-booking.ts`; additive fields on `AvailabilityDoc` + `AppointmentDoc` |
+| Slot engine (pure, 57 tests) | `platform/src/lib/booking/slot-engine.ts`, `src/__tests__/slot-engine.test.ts` |
+| Data layer + holds | `booking-service.ts`, `booking-policy-service.ts`, `visit-reason-service.ts` |
+| Recurring availability | `AvailabilityDoc.recurrence`; `appliesOnDate` / `getAvailabilityOnDate` in `availability-service.ts` |
+| **Parallel clinicians** | Conflict guard now provider+room scoped; calendar draws concurrency clusters side by side; seed, sweep and integrity test all re-scoped |
+| Portal double-booking hole closed | `POST /api/patient-portal/appointments` runs the guard and returns 409 |
+| Slot picker in staff booking | `components/booking/SlotPicker.tsx` + `useBookingSlots` / `useVisitReasons`, wired into `BookAppointmentModal` |
+| Duplicate booking form removed | `/appointments` now opens the shared `BookAppointmentModal` instead of its own copy |
+| Demo data | SEED_VERSION 70: recurring weekday clinics, a bookable practice, 6 visit reasons, 3 published provider profiles |
+
+Verified in the running app: choosing "Established Patient Visit" on Mon 10 Aug returns 40 slots over 22 distinct times, with CO Deng, Dr. Achol and Dr. Wani all holding 9:00 AM.
 
 ---
 
@@ -564,9 +580,16 @@ Each anchor needs a `data-tour` attribute added to the corresponding element as 
 5. **Visit reasons are new; `AppointmentType` stays.** Reporting continuity beats a clean union.
 6. **The directory (S1/S2) is Phase 4, behind the practice page.** Phases 0–3 deliver the actual goal — intake wired to real availability — without needing a public directory to exist.
 
-## 13. Open questions
+## 13. Questions resolved
 
-- **Is the public surface internet-facing** (indexable profile pages, patients arriving cold) **or link-only** (shared by SMS/QR, `noindex`)? Changes SEO, abuse posture, and hosting. Plan assumes link-only through Phase 3, indexable at Phase 4.
-- **Who moderates reviews** — org admin, or a platform-level queue?
-- **Insurance list source** — free text, a per-org list, or a national payer list? S7 is a `select`, which implies a curated list.
-- **Does `$50 fee` style policy text need per-location variants**, or is per-facility enough? Plan assumes per-facility.
+Answered by judgement rather than left open, so the build is not blocked. Each is a default, not a one-way door.
+
+- **Public surface is link-only until Phase 4.** `/book/*` ships `noindex` and is reached by SMS, QR, or a link on the practice's own site. Indexable profile pages arrive with the directory, once there is a moderation owner and real profile content to index. Cold search traffic to a half-filled profile is worse than no profile.
+- **Reviews are moderated by the org admin,** in a queue on the booking settings screen, and only a patient with a `completed` appointment can be invited to leave one. No public write path. Still Phase 5, still gated.
+- **Insurance is a per-org curated list,** seeded empty. Free text produces "NHIF", "N.H.I.F", and "nhif" in one week, and none of them can be checked against `/api/eligibility`. Until an org configures its payers, the insurance step is skipped rather than shown blank.
+- **Policy text is per-facility** (`BookingPolicyDoc.policyText`). A per-location variant is a field away if a multi-site practice ever needs one; nothing today does.
+- **Facility-wide slot exclusivity defaults OFF.** Confirmed as the intended product behaviour: different clinicians may hold the same time. `singleSlotPerFacility` remains for any site that wants the older single-file day.
+
+## 14. Next up
+
+Phase 1, in order: the availability editor (weekly pattern, exceptions, copy-forward) so clinic hours can be entered without one row per day; `/org-admin/booking` for visit reasons + policy; then the provider self-service "my availability" panel. Phase 2 extends the slot picker to the patient portal, Phase 3 opens the public practice page and embeddable widget.

@@ -430,6 +430,33 @@ export async function signClinicalNote(
   });
   await logAuditSafe('CLINICAL_NOTE_SIGNED', input.signedBy, input.signedByName,
     `${getNoteType(existing.noteType).label} signed for ${existing.patientName} (${id})`);
+
+  // Signing the note is what ends the consultation, so it is what moves the
+  // visit on. Without this the encounter sat at `with_clinician` for good: the
+  // clinic-checkout queue stayed empty, `dischargeEncounter` had no legal walk,
+  // and the stale open visit absorbed the patient's next arrival.
+  //
+  // Deliberately narrow. Only a note that names its encounter, only when that
+  // encounter is still `with_clinician`, and only for a full sign — a note
+  // parked in `awaiting_cosign` is not finished documentation. A nurse note or
+  // an addendum written alongside the visit therefore cannot close it.
+  //
+  // Best-effort: the signature is the clinical act and must stand even if the
+  // visit thread cannot be advanced.
+  if (existing.encounterId && !input.awaitingCosign) {
+    try {
+      const { getEncounter, transitionEncounter } = await import('../services/encounter-service');
+      const encounter = await getEncounter(existing.encounterId);
+      if (encounter?.status === 'with_clinician') {
+        await transitionEncounter(existing.encounterId, 'ready_for_clinic_checkout', {
+          actorId: input.signedBy,
+        });
+      }
+    } catch {
+      // Leave the visit where it is; the desk can move it by hand.
+    }
+  }
+
   return { ...updated, _rev: resp.rev };
 }
 

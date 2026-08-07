@@ -922,6 +922,39 @@ export default function EhrClinicalDashboard({
     } catch {
       // Tracker updates must not block opening the clinical encounter.
     }
+
+    // Move the VISIT, not just the tracker.
+    //
+    // Calling a patient used to advance `ConsultationProgressDoc` alone and
+    // leave `EncounterDoc` wherever rooming had parked it. The encounter is
+    // what every queue, gate and discharge path reads, so a visit that reached
+    // the clinician still looked un-started to the rest of the building: the
+    // facility-checkout queue never filled, `dischargeEncounter` had nothing
+    // legal to walk, and the stale open encounter went on absorbing the same
+    // patient's next arrival for 24 hours.
+    //
+    // `advanceEncounterToClinician` picks the encounter up wherever it sits and
+    // walks the legal chain, so a patient called straight from the waiting room
+    // and one called after rooming both end at `with_clinician` with an honest
+    // history. An encounter already there, or clinically diverted (escalated,
+    // admitted), is returned untouched.
+    try {
+      const { findOpenEncounterForPatient, advanceEncounterToClinician } =
+        await import('@/lib/services/encounter-service');
+      const open = await findOpenEncounterForPatient(row.patientId, currentUser?.hospitalId || '');
+      if (open) {
+        await advanceEncounterToClinician(open._id, {
+          clinicianId: currentUser?._id,
+          clinicianName: currentUser?.name,
+          actorId: currentUser?._id,
+        });
+      }
+    } catch {
+      // A visit thread that cannot be advanced must not stop the clinician
+      // seeing the patient; the consultation opens either way and the desk can
+      // correct the queue.
+    }
+
     router.push(`/consultation?patientId=${row.patientId}`);
   };
 
@@ -1378,22 +1411,14 @@ export default function EhrClinicalDashboard({
 	          </div>
 
           <div className="ehr-appointment-list ehr-care-list ehr-care-list--no-actions">
-            {visiblePatientRows.length === 0 && (
-              <div className="ehr-empty-state">
-                <ClipboardList className="w-8 h-8" />
-                <strong>{appointmentQuery ? 'No assigned patients match your search' : 'No patients are assigned to you right now'}</strong>
-                <span>{appointmentQuery ? `Nothing matches “${appointmentSearch.trim()}”.` : 'Assigned patients will appear here with appointment times when scheduled.'}</span>
-                {appointmentQuery
-                  ? <button type="button" onClick={() => setAppointmentSearch('')}>Clear search</button>
-                  : <button type="button" onClick={() => router.push('/patients')}>Open patient registry</button>}
-              </div>
-            )}
-
-            {visiblePatientRows.length > 0 && (
               <div className="ehr-queue-scroll">
                 {/* Patient / Time / Care team / Context / Status, with every
                     column using a primary line plus a secondary line. */}
                 <div className="appointment-card-flow">
+                  {/* The column head is the list's frame, not a label for the
+                      rows that happen to be loaded: it stays put through an
+                      empty worklist or a lane with nothing in it, so the table
+                      never collapses into a bare message. */}
                   <div className="appointment-card-head" aria-hidden="true">
                     <span>Patient</span>
                     <span>Time</span>
@@ -1401,7 +1426,17 @@ export default function EhrClinicalDashboard({
                     <span>Context</span>
                     <span>Status</span>
                   </div>
-                  {filteredPatientRows.length === 0 && (
+                  {visiblePatientRows.length === 0 && (
+                    <div className="ehr-empty-state">
+                      <ClipboardList className="w-8 h-8" />
+                      <strong>{appointmentQuery ? 'No assigned patients match your search' : 'No patients are assigned to you right now'}</strong>
+                      <span>{appointmentQuery ? `Nothing matches “${appointmentSearch.trim()}”.` : 'Assigned patients will appear here with appointment times when scheduled.'}</span>
+                      {appointmentQuery
+                        ? <button type="button" onClick={() => setAppointmentSearch('')}>Clear search</button>
+                        : <button type="button" onClick={() => router.push('/patients')}>Open patient registry</button>}
+                    </div>
+                  )}
+                  {visiblePatientRows.length > 0 && filteredPatientRows.length === 0 && (
                     <div className="ehr-empty-state">
                       <strong>No {APPOINTMENT_STATUS_GROUP_LABELS[worklistFilter].toLowerCase()} patients</strong>
                       <span>Nothing is in the {APPOINTMENT_STATUS_GROUP_LABELS[worklistFilter].toLowerCase()} lane right now.</span>
@@ -1540,7 +1575,6 @@ export default function EhrClinicalDashboard({
                   })}
                 </div>
               </div>
-            )}
           </div>
             </>
           )}

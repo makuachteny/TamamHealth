@@ -603,20 +603,15 @@ export default function EhrCareDashboard({
 
           {!hideRowList && (
           <div className="ehr-appointment-list ehr-care-list ehr-care-list--no-actions">
-            {visibleRows.length === 0 ? (
-              <div className="ehr-empty-state">
-                <ClipboardList className="w-8 h-8" />
-                <strong>{emptyTitle}</strong>
-                {emptyActionLabel && onEmptyAction && (
-                  <button type="button" onClick={onEmptyAction}>{emptyActionLabel}</button>
-                )}
-              </div>
-            ) : (
               <div className="ehr-queue-scroll">
                 {/* Exactly the appointments-page table: PATIENT / TIME /
                     CARE TEAM / DEPARTMENT / STATUS, reusing its classes so
                     every user's patient list reads identically. */}
                 <div className="appointment-card-flow">
+                  {/* The column head is the list's frame, not a label for the
+                      rows that happen to be loaded: it stays put through an
+                      empty day or a filter that matches nothing, so the table
+                      never collapses into a bare message. */}
                   <div className="appointment-card-head" aria-hidden="true">
                     <span>Patient</span>
                     <span>Time</span>
@@ -624,6 +619,15 @@ export default function EhrCareDashboard({
                     <span>Context</span>
                     <span>Status</span>
                   </div>
+                  {visibleRows.length === 0 && (
+                    <div className="ehr-empty-state">
+                      <ClipboardList className="w-8 h-8" />
+                      <strong>{emptyTitle}</strong>
+                      {emptyActionLabel && onEmptyAction && (
+                        <button type="button" onClick={onEmptyAction}>{emptyActionLabel}</button>
+                      )}
+                    </div>
+                  )}
                   {visibleRows.map(row => {
                     // A real triage acuity code colors the avatar (the
                     // appointments table conveys priority the same way);
@@ -836,7 +840,6 @@ export default function EhrCareDashboard({
                   })}
                 </div>
               </div>
-            )}
           </div>
           )}
 

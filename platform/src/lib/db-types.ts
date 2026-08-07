@@ -60,6 +60,15 @@ export interface UserDoc extends BaseDoc {
   specialty?: string;
   /** Staff directory: contact phone for messaging. */
   phone?: string;
+  /**
+   * Staff photo, as a downscaled data URL (see `PhotoCaptureModal`, 640px max
+   * edge). Stored inline rather than as an attachment so it survives offline
+   * sync the same way every other field does — a worklist that shows faces on
+   * the ward but monograms in the field would be worse than monograms
+   * everywhere. Absent for every account created before photos existed, which
+   * is why every reader falls back to initials.
+   */
+  photoUrl?: string;
   /** Lightweight messaging presence/status (defaults to 'active' when unset). */
   presence?: StaffPresence;
   /**
@@ -1230,6 +1239,28 @@ export interface EncounterDoc extends BaseDoc {
   status: EncounterStatus;
   /** The journey stage the status belongs to. */
   stageKey: EncounterStageKey;
+  /**
+   * Append-only trail of every status change, with who moved it and why.
+   *
+   * The clinical-flow spec has always defined this (`EncounterTransitionRecord`
+   * in encounter-types.ts) and the persisted document never carried it, so the
+   * only record of a visit's path was a free-text line in the audit log. That
+   * loses the two things a reviewer actually needs: WHY a patient was escalated
+   * or left without being seen, and the ORDER of what happened — an audit log
+   * is shared by every document type and cannot be read back per visit.
+   *
+   * Optional because encounters written before it exists have none; readers
+   * must treat an absent trail as "unknown", never as "no transitions".
+   * Mirrors `AppointmentDoc.statusHistory`, which solves the same problem.
+   */
+  statusHistory?: Array<{
+    from: EncounterStatus | null;
+    to: EncounterStatus;
+    at: string;
+    byUserId?: string;
+    /** Required by the spec for escalations, aborts, refusals and overrides. */
+    reason?: string;
+  }>;
   /** Consultation form draft (chiefComplaint, vitals, diagnoses, labOrders, …). */
   snapshot: Record<string, unknown>;
   /**

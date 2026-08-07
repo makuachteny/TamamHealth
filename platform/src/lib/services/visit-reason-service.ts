@@ -26,6 +26,97 @@ export function slugify(name: string): string {
     .slice(0, 60);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Defaults
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * The service menu every facility starts with.
+ *
+ * A facility is bookable the moment it exists — nobody has to configure a list
+ * of visit types before the desk can book an appointment. These are the visits
+ * a general facility actually runs, with the durations they actually take, and
+ * a site that wants different ones edits them in Settings → Visit types.
+ *
+ * They are NOT written to the database on read. A read path that quietly
+ * creates documents races across tabs and devices and leaves rows nobody asked
+ * for; these are materialised in memory and only persisted the first time
+ * someone edits the list (see `ensureVisitReasonsPersisted`).
+ */
+export const DEFAULT_VISIT_REASONS: ReadonlyArray<
+  Pick<VisitReasonDoc,
+    | 'name' | 'slug' | 'description' | 'durationMinutes' | 'availableToNewPatients'
+    | 'availableToReturningPatients' | 'modality' | 'department' | 'appointmentType'>
+> = [
+  {
+    name: 'General Consultation', slug: 'general-consultation',
+    description: 'A standard outpatient consultation.',
+    durationMinutes: 30, availableToNewPatients: true, availableToReturningPatients: true,
+    modality: 'in_person', department: 'Outpatient', appointmentType: 'general',
+  },
+  {
+    name: 'New Patient Visit', slug: 'new-patient-visit',
+    description: 'First visit at this facility — allow extra time for history.',
+    durationMinutes: 40, availableToNewPatients: true, availableToReturningPatients: false,
+    modality: 'in_person', department: 'Outpatient', appointmentType: 'general',
+  },
+  {
+    name: 'Follow-up Review', slug: 'follow-up-review',
+    description: 'Review of an ongoing problem or recent results.',
+    durationMinutes: 20, availableToNewPatients: false, availableToReturningPatients: true,
+    modality: 'both', department: 'Outpatient', appointmentType: 'follow_up',
+  },
+  {
+    name: 'Antenatal Visit', slug: 'antenatal-visit',
+    description: 'Scheduled antenatal check during pregnancy.',
+    durationMinutes: 30, availableToNewPatients: true, availableToReturningPatients: true,
+    modality: 'in_person', department: 'Obstetrics & Gynecology', appointmentType: 'anc',
+  },
+  {
+    name: 'Child Immunization', slug: 'child-immunization',
+    description: 'Routine vaccination for a child under five.',
+    durationMinutes: 15, availableToNewPatients: true, availableToReturningPatients: true,
+    modality: 'in_person', department: 'Pediatrics', appointmentType: 'immunization',
+  },
+  {
+    name: 'Telehealth Consultation', slug: 'telehealth-consultation',
+    description: 'Speak to a clinician by video without travelling.',
+    durationMinutes: 20, availableToNewPatients: false, availableToReturningPatients: true,
+    modality: 'telehealth', department: 'Outpatient', appointmentType: 'telehealth',
+  },
+];
+
+/** Stable id so a default keeps its identity across reloads and devices. */
+export function defaultVisitReasonId(facilityId: string, slug: string): string {
+  return `visit-reason-default-${facilityId}-${slug}`;
+}
+
+/** The built-in menu as real documents, for a facility that has none of its own. */
+export function materialiseDefaults(facilityId: string, orgId: string): VisitReasonDoc[] {
+  // A fixed timestamp, not `new Date()`: these are the same documents on every
+  // read, and a moving `updatedAt` would make React treat them as new objects
+  // on every render.
+  const at = '1970-01-01T00:00:00.000Z';
+  return DEFAULT_VISIT_REASONS.map((template, index) => ({
+    _id: defaultVisitReasonId(facilityId, template.slug),
+    type: 'visit_reason' as const,
+    orgId,
+    facilityId,
+    ...template,
+    providerIds: [],
+    requiresInsurance: false,
+    sortOrder: index,
+    isActive: true,
+    createdAt: at,
+    updatedAt: at,
+  }));
+}
+
+/** Whether a reason is one of the built-ins rather than something authored. */
+export function isDefaultVisitReason(reason: VisitReasonDoc): boolean {
+  return reason._id.startsWith('visit-reason-default-');
+}
+
 export async function getAllVisitReasons(scope?: DataScope): Promise<VisitReasonDoc[]> {
   const db = visitReasonsDB();
   const all = await findByType<VisitReasonDoc>(db, 'visit_reason');
@@ -38,16 +129,57 @@ export async function getAllVisitReasons(scope?: DataScope): Promise<VisitReason
  *
  * A reason with no `facilityId` belongs to the whole organisation, which is how
  * a small practice configures its menu once instead of per site.
+ *
+ * A facility that has authored nothing gets `DEFAULT_VISIT_REASONS`, so every
+ * facility is bookable from the day it exists rather than after someone
+ * remembers to fill in a list. Once anything has been authored, that is the
+ * menu — the defaults do not reappear alongside it, or removing one would be
+ * impossible.
  */
 export async function getVisitReasonsForFacility(
   facilityId: string,
   orgId?: string,
 ): Promise<VisitReasonDoc[]> {
   const all = await getAllVisitReasons();
-  return all.filter(r =>
-    r.isActive &&
+  const owned = all.filter(r =>
     (!orgId || r.orgId === orgId) &&
     (!r.facilityId || r.facilityId === facilityId));
+
+  if (owned.length === 0) return materialiseDefaults(facilityId, orgId || '');
+  return owned.filter(r => r.isActive);
+}
+
+/**
+ * Write the built-in menu to the database, so it can be edited.
+ *
+ * Called by the settings screen the first time someone changes anything: until
+ * then the defaults are computed, and a computed document has no `_rev` to
+ * update. Returns the persisted rows. A no-op once the facility has authored
+ * anything of its own.
+ */
+export async function ensureVisitReasonsPersisted(
+  facilityId: string,
+  orgId: string,
+): Promise<VisitReasonDoc[]> {
+  const all = await getAllVisitReasons();
+  const owned = all.filter(r =>
+    r.orgId === orgId && (!r.facilityId || r.facilityId === facilityId));
+  if (owned.length > 0) return owned;
+
+  const db = visitReasonsDB();
+  const now = new Date().toISOString();
+  const written: VisitReasonDoc[] = [];
+  for (const doc of materialiseDefaults(facilityId, orgId)) {
+    const row = { ...doc, createdAt: now, updatedAt: now };
+    try {
+      const resp = await db.put(row);
+      written.push({ ...row, _rev: resp.rev });
+    } catch {
+      // Another tab got there first — its copy is equally valid.
+      try { written.push(await db.get(row._id) as VisitReasonDoc); } catch { /* skip */ }
+    }
+  }
+  return written;
 }
 
 /** The subset a given kind of booker may actually pick online. */

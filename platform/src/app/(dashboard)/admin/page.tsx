@@ -478,7 +478,7 @@ export default function AdminDashboardPage() {
                     <BarChart data={trend} margin={{ top: 5, right: 5, left: -10, bottom: 0 }} barCategoryGap="28%">
                       {axes}
                       {series.map(s => (
-                        <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} maxBarSize={18} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                        <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} maxBarSize={18} radius={0} isAnimationActive={false} />
                       ))}
                     </BarChart>
                   </ResponsiveContainer>

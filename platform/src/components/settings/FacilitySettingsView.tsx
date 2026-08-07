@@ -8,6 +8,7 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import {
   Settings, Building2, Stethoscope, FlaskConical, Wallet, ShieldCheck,
   Trash2, Plus, Save, X, Clock, ClipboardCheck, Database, Server, Video,
+  CalendarClock,
 } from '@/components/icons/lucide';
 import { useSettings, useSettingsContext } from '@/lib/settings/SettingsProvider';
 import { getFacilitySettings, saveFacilitySettings } from '@/lib/settings/settings-service';
@@ -24,6 +25,7 @@ import {
   ALL_PAYORS,
 } from '@/lib/settings/facility-settings';
 import Select from '@/components/Select';
+import VisitTypesSection from '@/components/settings/VisitTypesSection';
 
 const STATION_LABELS: Record<EncounterStationKey, string> = {
   registration: 'Registration',
@@ -243,6 +245,14 @@ export function FacilitySettingsView({ embedded = false }: { embedded?: boolean 
                 hospitalNumberPrefix: draft.hospitalNumberPrefix,
               }, 'general')}
             />
+          </SectionCard>
+
+          {/* ── Visit types ──────────────────────────────────────────────
+              Sits high on the page on purpose: it is the one setting the
+              booking screen reads on every appointment, and the durations here
+              decide what times that screen can even offer. */}
+          <SectionCard icon={CalendarClock} title="Visit types &amp; booking">
+            <VisitTypesSection facilityId={effectiveHospitalId} />
           </SectionCard>
 
           {/* ── Clinical ─────────────────────────────────────────────── */}

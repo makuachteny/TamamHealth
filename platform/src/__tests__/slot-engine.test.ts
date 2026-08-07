@@ -10,6 +10,7 @@
 import {
   computeSlots, expandWindows, windowIsEligible, reasonIsBookable,
   groupSlotsByDate, groupSlotsByProviderAndDate, slotIsStillOpen,
+  filterSlotsByStaffAvailability,
   toMinutes, toHHMM, addDays, datesBetween, dayOfWeek, daysBetween,
   type SlotQuery,
 } from '@/lib/booking/slot-engine';
@@ -589,6 +590,71 @@ describe('output shape', () => {
     const grouped = groupSlotsByProviderAndDate(slots);
     expect(grouped.get('doc-1')?.get('2026-08-10')).toHaveLength(2);
     expect(grouped.get('doc-2')?.get('2026-08-10')).toHaveLength(1);
+  });
+});
+
+describe('second staff member (nurse, interpreter, scribe)', () => {
+  const slots = () => run();   // 08:00–12:00, 30 min, doc-1
+
+  it('leaves the grid alone when no second person is named', () => {
+    expect(filterSlotsByStaffAvailability(slots(), '', [], [], policy(), NOW_ISO)).toHaveLength(slots().length);
+  });
+
+  it('does not empty the grid for staff who have no roster recorded', () => {
+    // No availability windows for nurse-1 — that is missing information about
+    // her hours, not evidence she is busy.
+    const filtered = filterSlotsByStaffAvailability(slots(), 'nurse-1', [], [], policy(), NOW_ISO);
+    expect(filtered).toHaveLength(slots().length);
+  });
+
+  it('restricts to the roster once that person has one', () => {
+    const nurseWindow = window({ _id: 'nw', providerId: 'nurse-1', startTime: '10:00', endTime: '12:00' });
+    const filtered = filterSlotsByStaffAvailability(slots(), 'nurse-1', [nurseWindow], [], policy(), NOW_ISO);
+    expect(times(filtered)).toEqual(['10:00', '10:30', '11:00', '11:30']);
+  });
+
+  it('drops a slot where that person is already the clinician elsewhere', () => {
+    const busy = [appointment({ providerId: 'nurse-1', appointmentTime: '09:00' })];
+    const filtered = filterSlotsByStaffAvailability(slots(), 'nurse-1', [], busy, policy(), NOW_ISO);
+    expect(times(filtered)).not.toContain('09:00');
+    expect(times(filtered)).toContain('09:30');
+  });
+
+  it('drops a slot where that person is already the SECOND staff elsewhere', () => {
+    // The case a provider-only check misses: the nurse is free as a clinician
+    // but already assigned to another doctor's visit.
+    const busy = [appointment({ providerId: 'doc-9', staffId: 'nurse-1', appointmentTime: '09:00' })];
+    const filtered = filterSlotsByStaffAvailability(slots(), 'nurse-1', [], busy, policy(), NOW_ISO);
+    expect(times(filtered)).not.toContain('09:00');
+  });
+
+  it('honours buffers around that person’s other commitments', () => {
+    const busy = [appointment({ providerId: 'nurse-1', appointmentTime: '09:00', duration: 30 })];
+    const filtered = filterSlotsByStaffAvailability(
+      slots(), 'nurse-1', [], busy, policy({ bufferAfterMinutes: 15 }), NOW_ISO);
+    expect(times(filtered)).not.toContain('09:30');
+    expect(times(filtered)).toContain('10:00');
+  });
+
+  it('expands a recurring roster like any other window', () => {
+    const weekly = window({
+      _id: 'nw', providerId: 'nurse-1', date: '2026-08-03',
+      recurrence: { daysOfWeek: [1], until: '2026-08-31' },     // Mondays only
+      startTime: '08:00', endTime: '12:00',
+    });
+    const monday = run({ query: { from: '2026-08-10', to: '2026-08-10' }, windows: [window({ date: '2026-08-10' })] });
+    const filtered = filterSlotsByStaffAvailability(monday, 'nurse-1', [weekly], [], policy(), NOW_ISO);
+    expect(filtered.length).toBe(monday.length);
+
+    const saturday = run();   // 2026-08-10 is Monday; base run is 2026-08-10 too
+    expect(filterSlotsByStaffAvailability(saturday, 'nurse-1', [weekly], [], policy(), NOW_ISO).length)
+      .toBe(saturday.length);
+  });
+
+  it('excludes a named appointment, so rescheduling does not block itself', () => {
+    const busy = [appointment({ _id: 'apt-self', providerId: 'nurse-1', appointmentTime: '09:00' })];
+    const filtered = filterSlotsByStaffAvailability(slots(), 'nurse-1', [], busy, policy(), NOW_ISO, 'apt-self');
+    expect(times(filtered)).toContain('09:00');
   });
 });
 

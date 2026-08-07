@@ -149,37 +149,37 @@ export default function ChartHeader({
           {pregnancyPill}
           {/* Top line, beside the name: allergies are the first thing read
               about a patient and the one item here that changes what is safe
-              to prescribe; the balance rides with them so the decision-changing
-              facts are one group. */}
+              to prescribe. */}
           <AllergyBanner allergens={allergens} onShow={onShowAllergies} />
-          <button
-            type="button"
-            className={patientBalance > 0 ? 'omrs-header-balance omrs-header-balance--due' : 'omrs-header-balance'}
-            onClick={onCollectPayment}
-          >
-            <DuotoneIcon name="dollarSign" size={13} />
-            <span className="omrs-allergy-label">Balance</span>
-            <span>${patientBalance.toFixed(2)} due</span>
-          </button>
         </div>
         <div className="omrs-header-meta">
           {patientAgeLabel(patient)} &middot; {formatDobOmrs(patient.dateOfBirth)} &middot; Facility ID: {patientIdDisplay}
         </div>
 
-        {showMore && (
-          <div className="omrs-header-details">
-            <span>Phone: <strong>{patient.phone || '—'}</strong></span>
-            <span>Location: <strong>{patient.state || '—'}{patient.county ? `, ${patient.county}` : ''}</strong></span>
-          </div>
-        )}
+        {/* Contact line. The row itself always renders because it carries the
+            toggle that expands it — collapsed, only the toggle is left. */}
+        <div className="omrs-header-details">
+          {showMore && (
+            <>
+              <span>Phone: <strong>{patient.phone || '—'}</strong></span>
+              <span>Location: <strong>{patient.state || '—'}{patient.county ? `, ${patient.county}` : ''}</strong></span>
+            </>
+          )}
+          <button type="button" className="omrs-header-showmore no-print" onClick={() => setShowMore(v => !v)}>
+            {showMore ? 'Show less' : 'Show more'}
+            <span className="omrs-header-showmore-caret" aria-hidden>{showMore ? '⌃' : '⌄'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Right column, stacked and right-aligned like the O3 banner: the
-          actions on the first line, the show-more toggle beneath them on its
-          own. It used to sit inline at the head of the button row, which put a
-          text link and five bordered buttons on one baseline. */}
-      <div className="omrs-header-aside no-print">
-      <div className="omrs-header-actions">
+          actions on the first line, the balance chip beneath them on its own —
+          it is a click target of the same kind (collect payment), so it belongs
+          with the actions rather than in the identity chips beside the name. */}
+      {/* `no-print` sits on the action cluster, not the column, so the balance
+          below still prints with the chart. */}
+      <div className="omrs-header-aside">
+      <div className="omrs-header-actions no-print">
 
         {/* Primary clinical actions — one clear verb each. */}
         {canViewClinical && (
@@ -246,9 +246,14 @@ export default function ChartHeader({
         </div>
       </div>
 
-        <button type="button" className="omrs-header-showmore" onClick={() => setShowMore(v => !v)}>
-          {showMore ? 'Show less' : 'Show more'}
-          <span className="omrs-header-showmore-caret" aria-hidden>{showMore ? '⌃' : '⌄'}</span>
+        <button
+          type="button"
+          className={patientBalance > 0 ? 'omrs-header-balance omrs-header-balance--due' : 'omrs-header-balance'}
+          onClick={onCollectPayment}
+        >
+          <DuotoneIcon name="dollarSign" size={13} />
+          <span className="omrs-allergy-label">Balance</span>
+          <span>${patientBalance.toFixed(2)} due</span>
         </button>
       </div>
     </div>

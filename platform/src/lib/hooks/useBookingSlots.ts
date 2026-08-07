@@ -25,6 +25,8 @@ export interface UseBookingSlotsOptions {
   /** How many days to load in one pass. */
   days?: number;
   providerIds?: string[];
+  /** A second person the visit needs — slots narrow to when they are free too. */
+  secondaryStaffId?: string;
   /** Skip loading entirely (e.g. while the form has no reason chosen yet). */
   enabled?: boolean;
 }
@@ -35,7 +37,7 @@ export function useBookingSlots(options: UseBookingSlotsOptions) {
     patientClass = 'returning',
     modality = 'in_person',
     channel = 'staff',
-    from, days = 30, providerIds,
+    from, days = 30, providerIds, secondaryStaffId,
     enabled = true,
   } = options;
 
@@ -73,6 +75,7 @@ export function useBookingSlots(options: UseBookingSlotsOptions) {
         from: start,
         to: addDays(start, days),
         providerIds: providerKey ? providerKey.split(',') : undefined,
+        secondaryStaffId,
       });
       if (seq !== requestSeq.current) return;   // superseded
       setSlots(result.slots);
@@ -85,7 +88,7 @@ export function useBookingSlots(options: UseBookingSlotsOptions) {
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, [enabled, facilityId, orgId, visitReason, patientClass, modality, channel, from, days, providerKey]);
+  }, [enabled, facilityId, orgId, visitReason, patientClass, modality, channel, from, days, providerKey, secondaryStaffId]);
 
   useEffect(() => { load(); }, [load]);
 

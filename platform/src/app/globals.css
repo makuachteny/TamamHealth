@@ -154,10 +154,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 12px 0 10px;
+  padding: 0 14px 0 12px;
   background: var(--color-white);
   border: 1px solid rgba(33, 145, 208, 0.45);
-  border-radius: 6px;
+  border-radius: var(--search-radius);
   box-shadow: none;
 }
 
@@ -569,9 +569,9 @@
   align-items: center;
   gap: 10px;
   min-height: 42px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--border-medium);
-  border-radius: 0;
+  border-radius: var(--search-radius);
   background: var(--bg-card-solid);
 }
 
@@ -919,9 +919,16 @@
   --section-spacing: 80px;
   --section-spacing-medium: 56px;
   --section-spacing-small: 40px;
-  --btn-radius: 10px;
-  --card-radius: 14px;
-  --input-radius: 10px;
+  /* Square corners everywhere — see the blanket rule at the end of this file.
+     These were a pill/rounded set: buttons and search fully rounded so a
+     control you PRESS read as a self-contained object, cards at 14px, fields
+     you TYPE INTO at 10px so a pill would not crowd the text. The flat
+     clinical direction drops the distinction entirely — shape no longer
+     separates press-me from read-me or object from text, weight and color do. */
+  --btn-radius: 0;
+  --card-radius: 0;
+  --input-radius: 0;
+  --search-radius: 0;
   --sidebar-width: 220px;
   --sidebar-collapsed: 72px;
   --font-platform: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
@@ -1017,10 +1024,12 @@
      independently — 3px on the vitals sub-tabs, 4px-top on the demographics
      tabs, 6/8px in the notes module — so navigation that sits inches apart
      did not look related. Controls take --radius-control, surfaces that hold
-     them take --radius-card. */
-  --radius-control: 6px;
-  --radius-card: 8px;
-  --radius-pill: 999px;
+     them take --radius-card. All three are 0 now — --radius-pill included, so
+     badges and severity chips square off with everything else and the name is
+     the only thing left of the pill. */
+  --radius-control: 0;
+  --radius-card: 0;
+  --radius-pill: 0;
 
   --bg-app:        var(--tb-blue-50);
   --bg-primary:    var(--tb-blue-50);
@@ -1825,13 +1834,22 @@ textarea {
   width: 100%;
 }
 
+/* Search used to be the one typed control that took a pill, so it could be
+   told apart from the form fields beside it. --search-radius is 0 now like
+   every other corner, and the icon inset below does that work instead. */
+input[type="search"] {
+  border-radius: var(--search-radius);
+}
+
 input[type="search"].search-icon-input {
-  padding-left: 2.75rem;
+  /* A touch more inset than a square field needs: on a curved left edge, 12px
+     puts the icon on the curve rather than beside the text. */
+  padding-left: 2.9rem;
 }
 
 .search-input-icon {
   position: absolute;
-  left: 12px;
+  left: 15px;
   top: 50%;
   width: 15px;
   height: 15px;
@@ -2022,8 +2040,9 @@ small,
   color: var(--accent-primary) !important;
 }
 
-.btn-sm { padding: 7px 16px; font-size: 0.78rem; border-radius: 6px; }
-.btn-lg { padding: 14px 32px; font-size: 0.95rem; border-radius: 10px; }
+/* Size variants keep the pill; only the padding and type scale change. */
+.btn-sm { padding: 7px 16px; font-size: 0.78rem; border-radius: var(--btn-radius); }
+.btn-lg { padding: 14px 32px; font-size: 0.95rem; border-radius: var(--btn-radius); }
 
 /* ============ Focus visible — keyboard accessibility ============ */
 :focus-visible {
@@ -2421,116 +2440,15 @@ thead th {
   background: var(--overlay-subtle);
 }
 
-.patient-registration-context {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  min-width: 0;
-}
-
-.patient-registration-context strong {
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
 /* Wizard-style stepper (matches the consultation flow): large numbered
    circles with labels beneath, joined by connector lines; the active step
    sits in an outlined ring, completed steps show a check. */
 /* Bare progress row — no card chrome behind the steps. */
-.patient-registration-stepper {
-  display: flex;
-  align-items: flex-start;
-  width: 100%;
-  margin: 0 auto 18px;
-  padding: 8px 0 4px;
-  border: 0;
-  background: transparent;
-}
-
-.patient-registration-step {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
 /* First and last steps hug the edges so the stepper spans the exact same
    width as the form card below it. */
-.patient-registration-step:first-child {
-  align-items: flex-start;
-}
-.patient-registration-step:first-child span {
-  text-align: left;
-}
-.patient-registration-step:last-child {
-  align-items: flex-end;
-}
-.patient-registration-step:last-child span {
-  text-align: right;
-}
-
 /* Connector line from this step's circle to the next one. */
-.patient-registration-step:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 19px;
-  left: calc(50% + 26px);
-  right: calc(-50% + 26px);
-  height: 2px;
-  border-radius: 1px;
-  background: var(--border-medium);
-}
-
 /* Edge steps aren't centered in their cells, so their connectors need
    offsets measured from the card edges (38px dot + 7px gap = 45px). */
-.patient-registration-step:first-child:not(:last-child)::after {
-  left: 45px;
-}
-.patient-registration-step:nth-last-child(2)::after {
-  right: calc(-100% + 45px);
-}
-
-.patient-registration-step.is-complete:not(:last-child)::after {
-  background: var(--accent-primary);
-}
-
-.patient-registration-step span {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  font-weight: 600;
-  line-height: 1.2;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.patient-registration-step.is-active span {
-  color: var(--text-primary);
-  font-weight: 700;
-}
-
-.patient-registration-step.is-complete span {
-  color: var(--text-primary);
-}
-
-.patient-registration-step .step-dot {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  border-width: 2px;
-  z-index: 1;
-}
-
 
 .patient-registration-shell {
   overflow: hidden;
@@ -2558,42 +2476,6 @@ thead th {
   justify-content: center;
 }
 
-.patient-registration-shell .patient-registration-actions {
-  padding-top: 18px;
-}
-
-.patient-registration-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--border-light);
-  background: var(--bg-card-solid);
-}
-
-.patient-registration-card-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.patient-registration-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  border-radius: 10px;
-  color: var(--accent-primary);
-  background: var(--accent-light);
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent);
-}
-
-.patient-registration-card-title p,
-.registration-section-header p,
 .registration-review-heading p {
   margin: 0 0 2px;
   color: var(--text-muted);
@@ -2604,8 +2486,6 @@ thead th {
   text-transform: uppercase;
 }
 
-.patient-registration-card-title h2,
-.registration-section-header h3,
 .registration-review-heading h3 {
   margin: 0;
   color: var(--text-primary);
@@ -2613,30 +2493,6 @@ thead th {
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.2;
-}
-
-.patient-registration-card-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  min-width: 0;
-}
-
-.patient-registration-card-description {
-  max-width: 460px;
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-  line-height: 1.45;
-  text-align: right;
-}
-
-.patient-registration-card-note {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-align: right;
 }
 
 .patient-registration-card-body {
@@ -2647,21 +2503,6 @@ thead th {
   display: flex;
   flex-direction: column;
   gap: 22px;
-}
-
-.registration-section-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.registration-section-header > span {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 700;
 }
 
 .registration-section-note {
@@ -2687,12 +2528,6 @@ thead th {
 .registration-subsection,
 .registration-contact-card,
 .registration-inline-panel,
-.registration-review-card {
-  border: 1px solid var(--border-light);
-  border-radius: 10px;
-  background: var(--overlay-subtle);
-}
-
 .registration-subsection {
   display: flex;
   flex-direction: column;
@@ -2829,52 +2664,12 @@ thead th {
   gap: 14px;
 }
 
-.registration-review-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.registration-review-card {
-  padding: 16px;
-}
-
-.patient-registration-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid var(--border-light);
-}
-
 @media (max-width: 1024px) {
   .registration-option-grid,
-  .registration-review-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .registration-field-grid--three {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .patient-registration-card-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .patient-registration-card-meta {
-    align-items: flex-start;
-  }
-
-  .patient-registration-card-description {
-    max-width: none;
-    text-align: left;
-  }
-
-  .patient-registration-card-note {
-    text-align: left;
-  }
 }
 
 @media (max-width: 640px) {
@@ -2884,35 +2679,13 @@ thead th {
   }
 
   .patient-registration-toolbar,
-  .registration-section-header,
-  .patient-registration-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .patient-registration-actions {
-    padding-right: 0;
-    padding-bottom: 76px;
-  }
-
-  .patient-registration-context {
-    justify-content: space-between;
-  }
-
-  .patient-registration-stepper,
   .registration-field-grid--three,
   .registration-field-grid--two,
   .registration-option-grid,
-  .registration-review-grid,
   .registration-media-row {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .patient-registration-stepper {
-    grid-template-columns: repeat(6, minmax(128px, 1fr));
-  }
-
-  .patient-registration-card-header,
   .patient-registration-card-body {
     padding: 16px;
   }
@@ -3515,8 +3288,8 @@ html:has(.ehr-top-rail) {
   gap: 8px;
   height: 40px;
   margin: 10px 14px;
-  padding: 0 14px;
-  border-radius: 12px;
+  padding: 0 16px;
+  border-radius: var(--search-radius);
   background: var(--bg-card);
   border: 1px solid var(--border-light);
   color: var(--text-muted);
@@ -4848,7 +4621,7 @@ html:has(.ehr-top-rail) {
 .tamam-ehr-app .card-elevated,
 .tamam-ehr-app .dash-card,
 .tamam-ehr-app .card {
-  border-radius: 6px !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
   border-color: var(--ehr-border) !important;
   background: var(--ehr-panel) !important;
@@ -4856,17 +4629,17 @@ html:has(.ehr-top-rail) {
 
 .tamam-ehr-app .rounded-2xl,
 .tamam-ehr-app .rounded-xl {
-  border-radius: 6px !important;
+  border-radius: 0 !important;
 }
 
 .tamam-ehr-app .hero-banner {
-  border-radius: 6px !important;
+  border-radius: 0 !important;
   background-color: var(--color-brand-700) !important;
   border: 1px solid var(--ehr-border);
 }
 
 .tamam-ehr-app .hero-banner button {
-  border-radius: 6px !important;
+  border-radius: 0 !important;
 }
 
 .tamam-ehr-app .card-elevated:hover,
@@ -4883,15 +4656,16 @@ html:has(.ehr-top-rail) {
 .tamam-ehr-app input,
 .tamam-ehr-app select,
 .tamam-ehr-app textarea {
-  border-radius: 4px !important;
+  border-radius: 0 !important;
 }
 
-/* Search fields are pills in the design — exempt them from the square-input
-   override above. */
+/* Search fields were the one pill exemption from the square-input override
+   above; they are square now like every other surface, and go to 0 rather
+   than inheriting that rule's 4px so they match the cards they sit against. */
 .tamam-ehr-app .ehr-rail-search input,
 .tamam-ehr-app .ehr-top-search input,
 .tamam-ehr-app .ehr-care-search input {
-  border-radius: 999px !important;
+  border-radius: 0 !important;
 }
 
 .tamam-ehr-app .page-container:has(> .ehr-schedule-shell) {
@@ -5645,7 +5419,7 @@ html:has(.ehr-top-rail) {
   width: 124px;
   height: 30px;
   border: 1px solid var(--ehr-border);
-  border-radius: 999px !important;
+  border-radius: 0 !important;
   background: white;
   color: var(--ehr-text);
   padding: 0 4px;
@@ -7040,7 +6814,21 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .modal-portal-backdrop > div > * {
-  border-radius: 6px !important;
+  border-radius: 0 !important;
+}
+
+/* A portal dialog's width belongs to `Modal`'s `width` prop, which caps the
+   dialog element itself. A `.modal-panel--*` class capping it AGAIN from the
+   inside leaves the dialog's own background showing beside the panel — a blank
+   column down the right of every dialog opened wider than its panel class
+   allows: the 940px booking dialog and the 1040px appointment editor both sat
+   in a 720px `--lg` panel, the 1180px registration dialog likewise.
+   Inside a portal the panel fills the dialog; the caps still do their job
+   wherever these classes are used with a hand-rolled backdrop. */
+.modal-portal-backdrop .modal-panel--sm,
+.modal-portal-backdrop .modal-panel--md,
+.modal-portal-backdrop .modal-panel--lg {
+  max-width: none;
 }
 
 .ehr-checkin-dialog {
@@ -7160,7 +6948,12 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 .ehr-registration-dialog .omrs-reg-rail {
   position: sticky;
-  top: 0;
+  /* Exactly the embedded wrapper's padding. A sticky element travels until it
+     reaches its offset and only then pins, so `top: 0` let the rail slide the
+     14px of that padding on the first scroll — a small movement, but the rail
+     is meant to be the one thing on screen that does not move. Matching the
+     padding means it is already at its stick point and never travels. */
+  top: 14px;
   /* Its own scrollport, so a rail taller than the dialog can still reach its
      buttons instead of overflowing behind the form. */
   max-height: min(880px, calc(100vh - 32px));
@@ -7174,10 +6967,6 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   min-width: 0;
   min-height: 0;
   padding: 14px;
-}
-
-.patient-registration-page--embedded .patient-registration-stepper {
-  margin-bottom: 12px;
 }
 
 .patient-registration-page--embedded .patient-registration-shell {
@@ -7730,7 +7519,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-consult-patient-picker {
-  border-radius: 6px !important;
+  border-radius: 0 !important;
   padding: 0 !important;
   margin-bottom: 8px !important;
   overflow: visible !important;
@@ -7861,7 +7650,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-soap-scroll .card-elevated {
   display: flex;
   flex-direction: column;
-  border-radius: var(--card-radius) !important;
+  border-radius: 0 !important;
   overflow: hidden;
 }
 
@@ -8018,7 +7807,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-consult-sidecar {
   background: var(--bg-card) !important;
   border: 1px solid var(--border-light) !important;
-  border-radius: var(--card-radius) !important;
+  border-radius: 0 !important;
   box-shadow: var(--card-shadow) !important;
   min-height: 0;
 }
@@ -8137,7 +7926,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  border-radius: 6px !important;
+  border-radius: 0 !important;
 }
 
 .ehr-consult-progress-list {
@@ -8190,7 +7979,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   flex-direction: column;
   gap: 12px;
   padding: 16px !important;
-  border-radius: 6px !important;
+  border-radius: 0 !important;
 }
 
 .ehr-chart-details {
@@ -8264,7 +8053,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   min-height: 132px;
   margin: 0 var(--ehr-chart-content-pad-x) 8px !important;
   padding: 18px var(--ehr-chart-content-pad-x) !important;
-  border-radius: var(--card-radius) !important;
+  border-radius: 0 !important;
   border: 1px solid var(--ehr-border) !important;
   background: var(--ehr-panel) !important;
   box-shadow: var(--card-shadow) !important;
@@ -8735,7 +8524,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-chart-page .badge {
-  border-radius: 999px !important;
+  border-radius: 0 !important;
   letter-spacing: 0 !important;
 }
 
@@ -8796,7 +8585,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 .ehr-vitals-header button {
   height: 28px;
-  border-radius: 999px !important;
+  border-radius: 0 !important;
   background: var(--ehr-panel) !important;
   border: 1px solid var(--ehr-border) !important;
   color: var(--ehr-blue) !important;
@@ -9536,7 +9325,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-chart-content > .grid > .card-elevated,
 .ehr-chart-content .chart-summary-panel {
   border: 1px solid var(--ehr-border) !important;
-  border-radius: var(--card-radius) !important;
+  border-radius: 0 !important;
   background: var(--ehr-panel) !important;
   box-shadow: var(--card-shadow) !important;
 }
@@ -9675,7 +9464,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .billing-card-action {
   min-height: 34px;
   padding: 0 12px;
-  border-radius: 6px !important;
+  border-radius: 0 !important;
   white-space: nowrap;
 }
 
@@ -9740,7 +9529,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   min-width: 0 !important;
   min-height: 26px !important;
   padding: 0 14px !important;
-  border-radius: 999px !important;
+  border-radius: 0 !important;
   font-size: 11px !important;
   line-height: 1 !important;
 }
@@ -9770,7 +9559,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-chart-page textarea {
   min-height: 36px;
   border: 1px solid var(--ehr-border) !important;
-  border-radius: 3px !important;
+  border-radius: 0 !important;
   background: #ffffff !important;
   color: var(--ehr-text) !important;
 }
@@ -9795,7 +9584,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 .ehr-encounter-card {
   border: 1px solid var(--ehr-border) !important;
-  border-radius: 4px !important;
+  border-radius: 0 !important;
   background: #ffffff !important;
   box-shadow: none !important;
 }
@@ -10294,7 +10083,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
    every chart card; the banner is the page's headline card and reads better
    rounded (higher specificity, so it wins over the blanket rule). */
 .ehr-chart-page .card-elevated.ehr-patient-banner {
-  border-radius: var(--card-radius) !important;
+  border-radius: 0 !important;
 }
 
 /* In the three-panel layout the banner already spans the centre column
@@ -10530,7 +10319,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-chart-content .tebra-demographics,
 .ehr-chart-content .tebra-panel {
   border: 1px solid var(--ehr-ledger-border) !important;
-  border-radius: var(--card-radius) !important;
+  border-radius: 0 !important;
   background: #ffffff !important;
   box-shadow: var(--card-shadow) !important;
 }
@@ -10614,7 +10403,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 .ehr-chart-content .ehr-encounter-card {
   border: 1px solid var(--ehr-ledger-border) !important;
-  border-radius: var(--card-radius) !important;
+  border-radius: 0 !important;
   box-shadow: var(--card-shadow) !important;
 }
 
@@ -10630,7 +10419,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-chart-content .record-signature-bar {
   border-color: var(--ehr-ledger-border) !important;
   background: var(--ehr-ledger-soft) !important;
-  border-radius: 4px !important;
+  border-radius: 0 !important;
 }
 
 .ehr-chart-content .tebra-demo-tabs {
@@ -11095,7 +10884,7 @@ svg circle {
   background: var(--bg-card) !important;
   color: var(--text-secondary) !important;
   border: 1px solid var(--border-panel) !important;
-  border-radius: 4px !important;
+  border-radius: 0 !important;
   padding: 3px 8px !important;
   font-size: 10px !important;
   font-family: var(--font-platform) !important;
@@ -11111,7 +10900,7 @@ svg circle {
   background: var(--bg-card) !important;
   color: var(--text-secondary) !important;
   border-color: var(--border-panel) !important;
-  border-radius: var(--btn-radius) !important;
+  border-radius: 0 !important;
 }
 
 .leaflet-control-zoom a:hover {
@@ -11121,7 +10910,7 @@ svg circle {
 .leaflet-control-attribution {
   background: var(--overlay-subtle) !important;
   font-size: 9px !important;
-  border-radius: 3px !important;
+  border-radius: 0 !important;
 }
 
 /* ============ Hide scrollbar ============ */
@@ -13108,7 +12897,7 @@ span:has(> svg:only-child) {
 /* ── Events: week / day slots ── */
 .rbc-tamam .rbc-day-slot .rbc-event {
   padding: 3px 7px 3px 9px;
-  border-radius: 6px !important;
+  border-radius: 0 !important;
   border: none !important;
   overflow: hidden;
   display: flex;
@@ -13231,7 +13020,7 @@ span:has(> svg:only-child) {
 
 /* ── Events: month view (compact pill) ── */
 .rbc-tamam .rbc-row-segment .rbc-event {
-  border-radius: 4px !important;
+  border-radius: 0 !important;
   border: none !important;
   padding: 1px 6px;
   margin: 1px 3px;
@@ -13873,7 +13662,7 @@ span:has(> svg:only-child) {
   .tamam-ehr-app .card,
   .tamam-ehr-app .dash-card,
   .tamam-ehr-app .card-elevated {
-    border-radius: 6px !important;
+    border-radius: 0 !important;
   }
 
   .tamam-ehr-app table,
@@ -14610,7 +14399,7 @@ span:has(> svg:only-child) {
 
 .tebra-panel {
   padding: 16px 18px !important;
-  border-radius: var(--card-radius) !important;
+  border-radius: 0 !important;
   box-shadow: var(--card-shadow) !important;
 }
 
@@ -15838,7 +15627,7 @@ textarea.ehr-handoff-input {
   min-height: 34px;
   padding: 6px 10px;
   border: 1px solid var(--ehr-border);
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   background: #fff;
   color: var(--ehr-text);
   font-size: 13px;
@@ -16371,7 +16160,7 @@ textarea.ehr-handoff-input {
   gap: 7px !important;
   padding: 0 10px !important;
   border: 0 !important;
-  border-radius: 6px !important;
+  border-radius: 0 !important;
   background: transparent !important;
   color: var(--nav-text, var(--ehr-muted)) !important;
   font-size: 12px !important;
@@ -21780,7 +21569,7 @@ textarea.ehr-handoff-input {
   max-width: 260px;
   padding: 6px 30px 6px 12px;
   border: 1px solid var(--ehr-border);
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   background: #fff;
   color: var(--ehr-text);
   font-size: 12.5px;
@@ -21804,7 +21593,7 @@ textarea.ehr-handoff-input {
   max-width: 100%;
   padding: 6px 12px;
   border: 1px solid var(--ehr-border);
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   background: #fff;
   color: var(--ehr-text);
   font-size: 12.5px;
@@ -22635,7 +22424,7 @@ textarea.ehr-handoff-input {
 .settings-manage-shell select,
 .settings-manage-shell textarea {
   border-color: var(--ehr-border) !important;
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   background-color: #fff !important;
 }
 
@@ -23711,7 +23500,7 @@ table.patient-data-table.patient-data-table {
   height: 30px;
   padding: 0 9px;
   border: 1px solid var(--ehr-border);
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   background: #fff;
   color: var(--text-primary);
   font-size: 12.5px;
@@ -23734,7 +23523,7 @@ table.patient-data-table.patient-data-table {
   height: 30px;
   padding: 0 10px;
   border: 1px solid var(--ehr-border);
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   font-size: 12.5px;
 }
 
@@ -23742,7 +23531,7 @@ table.patient-data-table.patient-data-table {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--ehr-border);
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   background: #fff;
   color: var(--text-secondary);
   font-size: 12px;
@@ -25368,25 +25157,25 @@ table.patient-data-table.patient-data-table {
      is filled from the Tamam ramp instead. The square edges, the field
      underline, the slab and the flush button stack are unchanged — the shape
      is what makes it read as OpenMRS, not the colours. */
-  --cds-ui-01: var(--tb-blue-50, #EFF8FD);        /* form slab */
-  --cds-ui-02: var(--tb-blue-100, #DDF2FB);       /* slab edge */
-  --cds-ui-03: var(--color-slate-150, #DDE6EE);   /* subtle divider */
-  --cds-ui-04: var(--color-slate-300, #CBD5E1);   /* field underline */
-  --cds-ui-05: var(--text-primary, #0F172A);      /* strong text */
-  --cds-text-02: var(--text-muted, #64748B);      /* labels, secondary text */
-  --cds-field-01: var(--color-white, #fff);       /* field surface on the slab */
+  --omrs-ui-01: var(--tb-blue-50, #EFF8FD);        /* form slab */
+  --omrs-ui-02: var(--tb-blue-100, #DDF2FB);       /* slab edge */
+  --omrs-ui-03: var(--color-slate-150, #DDE6EE);   /* subtle divider */
+  --omrs-ui-04: var(--color-slate-300, #CBD5E1);   /* field underline */
+  --omrs-ui-05: var(--text-primary, #0F172A);      /* strong text */
+  --omrs-text-02: var(--text-muted, #64748B);      /* labels, secondary text */
+  --omrs-field-01: var(--color-white, #fff);       /* field surface on the slab */
   /* Accents — Tamam blue in every slot Carbon fills with blue-60 / teal-60. */
-  --cds-interactive: var(--accent-primary, #2191D0);
-  --cds-interactive-soft: var(--tb-blue-100, #DDF2FB);
-  --cds-primary: var(--accent-primary, #2191D0);
-  --cds-primary-hover: var(--accent-hover, #015697);
+  --omrs-interactive: var(--accent-primary, #2191D0);
+  --omrs-interactive-soft: var(--tb-blue-100, #DDF2FB);
+  --omrs-primary: var(--accent-primary, #2191D0);
+  --omrs-primary-hover: var(--accent-hover, #015697);
   /* Secondary is white-with-a-blue-edge rather than Carbon's charcoal slab:
      a dark grey button is the one thing in the reference that has no place in
      a white-and-blue theme. */
-  --cds-secondary: var(--color-white, #fff);
-  --cds-secondary-hover: var(--tb-blue-50, #EFF8FD);
-  --cds-secondary-ink: var(--accent-primary, #2191D0);
-  --cds-danger: var(--color-danger, #DC2626);
+  --omrs-secondary: var(--color-white, #fff);
+  --omrs-secondary-hover: var(--tb-blue-50, #EFF8FD);
+  --omrs-secondary-ink: var(--accent-primary, #2191D0);
+  --omrs-danger: var(--color-danger, #DC2626);
 
   --reg-cols-three: 3;
   --reg-cols-two: 2;
@@ -25397,7 +25186,7 @@ table.patient-data-table.patient-data-table {
   align-items: start;
   max-width: 1240px;
   font-family: var(--font-omrs);
-  color: var(--cds-ui-05);
+  color: var(--omrs-ui-05);
 }
 
 /* Carbon's own typeface, loaded in layout.tsx.
@@ -25443,7 +25232,7 @@ table.patient-data-table.patient-data-table {
   font-size: 20px;
   font-weight: 400;          /* Carbon productive-heading-03 is regular */
   letter-spacing: 0;
-  color: var(--cds-ui-05);
+  color: var(--omrs-ui-05);
   margin: 0 0 6px;
   line-height: 1.4;
 }
@@ -25451,7 +25240,7 @@ table.patient-data-table.patient-data-table {
 .omrs-reg-railnote {
   font-size: 12px;
   line-height: 1.34;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
   margin: 0 0 20px;
 }
 
@@ -25460,7 +25249,7 @@ table.patient-data-table.patient-data-table {
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
   margin: 0 0 8px;
 }
 
@@ -25486,13 +25275,13 @@ table.patient-data-table.patient-data-table {
   font-weight: 600;
   line-height: 1.29;
   text-align: left;
-  color: var(--cds-ui-05);
+  color: var(--omrs-ui-05);
   text-decoration: none;
   cursor: pointer;
 }
-.omrs-reg-navitem:hover:not(:disabled) { color: var(--cds-interactive); }
+.omrs-reg-navitem:hover:not(:disabled) { color: var(--omrs-interactive); }
 .omrs-reg-navitem:focus-visible {
-  outline: 2px solid var(--cds-interactive);
+  outline: 2px solid var(--omrs-interactive);
   outline-offset: -2px;
 }
 
@@ -25501,7 +25290,7 @@ table.patient-data-table.patient-data-table {
   flex: none;
   font-size: 13px;
   font-weight: 400;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
 }
 
 /* Review stays out of reach until the form would actually submit — offering
@@ -25520,29 +25309,29 @@ table.patient-data-table.patient-data-table {
 /* Where you are — carried by the label's colour alone. The blue bar that
    used to sit in the left margin is gone: it read as a scrollbar or a stray
    rule rather than as a marker. */
-.omrs-reg-navitem.is-current { color: var(--cds-interactive); }
+.omrs-reg-navitem.is-current { color: var(--omrs-interactive); }
 
 /* Trailing mark — "optional", or the error flag. */
 .omrs-reg-navmeta {
   flex: none;
   font-size: 12px;
   font-weight: 400;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
 }
 .omrs-reg-navitem[data-state="optional"] .omrs-reg-navmeta { text-transform: lowercase; }
 
 /* A section the last submit couldn't accept. The rail is where the Register
    button lives, so the rail is where the answer to "why didn't it save?"
    belongs. */
-.omrs-reg-navitem.has-errors { color: var(--cds-danger); }
-.omrs-reg-navitem.has-errors .omrs-reg-navarrow { color: var(--cds-danger); }
+.omrs-reg-navitem.has-errors { color: var(--omrs-danger); }
+.omrs-reg-navitem.has-errors .omrs-reg-navarrow { color: var(--omrs-danger); }
 /* Scoped to the trailing badge only — as `.has-errors span` this also matched
    the arrow and the label, and rendered a section's own name as a red disc. */
 .omrs-reg-navitem.has-errors .omrs-reg-navmeta {
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
-  background: var(--cds-danger);
+  background: var(--omrs-danger);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
@@ -25559,7 +25348,7 @@ table.patient-data-table.patient-data-table {
   gap: 1px;                  /* Carbon button sets sit flush, hairline apart */
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid var(--cds-ui-03);
+  border-top: 1px solid var(--omrs-ui-03);
 }
 
 .omrs-reg-railactions .btn,
@@ -25582,25 +25371,25 @@ table.patient-data-table.patient-data-table {
 }
 .omrs-reg-railactions .btn:focus-visible,
 .omrs-reg-cancel:focus-visible {
-  outline: 2px solid var(--cds-interactive);
+  outline: 2px solid var(--omrs-interactive);
   outline-offset: -4px;
 }
 
 .omrs-reg-railactions .btn-primary {
-  background: var(--cds-primary);
+  background: var(--omrs-primary);
   color: #fff;
 }
-.omrs-reg-railactions .btn-primary:hover:not(:disabled) { background: var(--cds-primary-hover); }
+.omrs-reg-railactions .btn-primary:hover:not(:disabled) { background: var(--omrs-primary-hover); }
 
 .omrs-reg-railactions .btn-secondary {
-  background: var(--cds-secondary);
-  color: var(--cds-secondary-ink);
-  box-shadow: inset 0 0 0 1px var(--cds-interactive);
+  background: var(--omrs-secondary);
+  color: var(--omrs-secondary-ink);
+  box-shadow: inset 0 0 0 1px var(--omrs-interactive);
 }
-.omrs-reg-railactions .btn-secondary:hover:not(:disabled) { background: var(--cds-secondary-hover); }
+.omrs-reg-railactions .btn-secondary:hover:not(:disabled) { background: var(--omrs-secondary-hover); }
 
 .omrs-reg-railactions .btn:disabled {
-  background: var(--cds-ui-03);
+  background: var(--omrs-ui-03);
   color: var(--text-muted);
   box-shadow: none;
   cursor: not-allowed;
@@ -25609,14 +25398,14 @@ table.patient-data-table.patient-data-table {
 /* Cancel is the last action in the set, so it takes the same slab treatment
    rather than reading as a link floating under the buttons. */
 .omrs-reg-cancel {
-  background: var(--cds-secondary);
-  color: var(--cds-secondary-ink);
-  box-shadow: inset 0 0 0 1px var(--cds-interactive);
+  background: var(--omrs-secondary);
+  color: var(--omrs-secondary-ink);
+  box-shadow: inset 0 0 0 1px var(--omrs-interactive);
   font-family: var(--font-omrs);
 }
 .omrs-reg-cancel:hover {
-  background: var(--cds-secondary-hover);
-  color: var(--cds-secondary-ink);
+  background: var(--omrs-secondary-hover);
+  color: var(--omrs-secondary-ink);
   text-decoration: none;
 }
 
@@ -25645,13 +25434,13 @@ table.patient-data-table.patient-data-table {
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.4;
-  color: var(--cds-ui-05);
+  color: var(--omrs-ui-05);
 }
 .omrs-reg-sectionhead p {
   margin: 2px 0 0;
   font-size: 12px;
   line-height: 1.34;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
 }
 
 /* The gray-10 slab every field sits on. Square, no border, no shadow — the
@@ -25660,8 +25449,8 @@ table.patient-data-table.patient-data-table {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  background: var(--cds-ui-01);
-  border: 1px solid var(--cds-ui-02);
+  background: var(--omrs-ui-01);
+  border: 1px solid var(--omrs-ui-02);
   padding: 24px 20px 28px;
 }
 
@@ -25693,7 +25482,7 @@ table.patient-data-table.patient-data-table {
   font-size: 12px;
   font-weight: 400;
   line-height: 1.34;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
   margin-bottom: 6px;
 }
 
@@ -25706,16 +25495,16 @@ table.patient-data-table.patient-data-table {
   /* `background-color`, never the `background` shorthand: the shorthand also
      clears `background-image`, and that is where globals.css paints the
      <select> chevron. */
-  background-color: var(--cds-field-01);
+  background-color: var(--omrs-field-01);
   border: none;
-  border-bottom: 1px solid var(--cds-ui-04);
-  /* `.tamam-ehr-app input { border-radius: 4px !important }` also matches
+  border-bottom: 1px solid var(--omrs-ui-04);
+  /* `.tamam-ehr-app input { border-radius: 0 !important }` also matches
      here; Carbon fields are square, so this has to out-shout it. */
   border-radius: 0 !important;
   font-size: 14px;
   font-weight: 400;
   letter-spacing: 0.16px;
-  color: var(--cds-ui-05);
+  color: var(--omrs-ui-05);
   transition: background 0.11s, outline 0.11s;
 }
 .omrs-reg textarea {
@@ -25733,18 +25522,18 @@ table.patient-data-table.patient-data-table {
 .omrs-reg input:focus,
 .omrs-reg select:focus,
 .omrs-reg textarea:focus {
-  outline: 2px solid var(--cds-interactive);
+  outline: 2px solid var(--omrs-interactive);
   outline-offset: -2px;
   border-bottom-color: transparent;
   box-shadow: none !important;
-  background-color: var(--cds-field-01);
+  background-color: var(--omrs-field-01);
 }
 
 .omrs-reg input:disabled,
 .omrs-reg select:disabled,
 .omrs-reg textarea:disabled {
-  background-color: var(--cds-field-01);
-  border-bottom-color: var(--cds-ui-03);
+  background-color: var(--omrs-field-01);
+  border-bottom-color: var(--omrs-ui-03);
   color: var(--color-slate-300, #CBD5E1);
   cursor: not-allowed;
 }
@@ -25755,17 +25544,33 @@ table.patient-data-table.patient-data-table {
 .omrs-reg input[aria-invalid="true"],
 .omrs-reg select[aria-invalid="true"],
 .omrs-reg textarea[aria-invalid="true"] {
-  outline: 2px solid var(--cds-danger);
+  outline: 2px solid var(--omrs-danger);
   outline-offset: -2px;
   border-bottom-color: transparent;
 }
-.omrs-reg [role="alert"] { color: var(--cds-danger) !important; font-size: 12px; }
+.omrs-reg [role="alert"] { color: var(--omrs-danger) !important; font-size: 12px; }
 
 /* A read-only computed value (the geocode ID) — Carbon greys the surface. */
 .omrs-reg input[readonly] {
-  background-color: var(--cds-ui-01) !important;
-  color: var(--cds-text-02);
-  border-bottom-color: var(--cds-ui-04);
+  background-color: var(--omrs-ui-01) !important;
+  color: var(--omrs-text-02);
+  border-bottom-color: var(--omrs-ui-04);
+}
+
+/* ══════════════════ One field ══════════════════
+   Rendered by RegistrationField, which owns the label, the control's id and
+   the message — see the note in that file for why. */
+.registration-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.omrs-reg .registration-field-error {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.34;
+  color: var(--omrs-danger);
 }
 
 /* ══════════════════ Grids and groupings ══════════════════ */
@@ -25794,7 +25599,7 @@ table.patient-data-table.patient-data-table {
 .omrs-reg .registration-contact-card + .registration-contact-card,
 .omrs-reg .registration-inline-panel {
   padding-top: 20px;
-  border-top: 1px solid var(--cds-ui-03);
+  border-top: 1px solid var(--omrs-ui-03);
 }
 
 /* Carbon productive-heading-02: the subsection titles ("Geographic
@@ -25805,7 +25610,7 @@ table.patient-data-table.patient-data-table {
   font-size: 16px;
   font-weight: 600;
   line-height: 1.4;
-  color: var(--cds-ui-05);
+  color: var(--omrs-ui-05);
   text-transform: none;
   letter-spacing: 0;
 }
@@ -25815,7 +25620,7 @@ table.patient-data-table.patient-data-table {
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
 }
 
 .omrs-reg .registration-subsection > p,
@@ -25824,7 +25629,7 @@ table.patient-data-table.patient-data-table {
 .omrs-reg .fingerprint-capture-description {
   font-size: 12px;
   line-height: 1.34;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
 }
 /* The caption belongs to the heading above it, not to the block below. */
 .omrs-reg .registration-subsection > h4 + p { margin-top: -12px; }
@@ -25832,17 +25637,57 @@ table.patient-data-table.patient-data-table {
 .omrs-reg .registration-info-note {
   padding: 12px 16px;
   border: none;
-  border-left: 3px solid var(--cds-interactive);
+  border-left: 3px solid var(--omrs-interactive);
   border-radius: 0;
-  background: var(--cds-interactive-soft);
+  background: var(--omrs-interactive-soft);
 }
-.omrs-reg .registration-info-note p { font-size: 12px; color: var(--cds-ui-05); }
+.omrs-reg .registration-info-note p { font-size: 12px; color: var(--omrs-ui-05); }
 
-/* The primary next-of-kin badge — Carbon tag, square-ish, blue-10 on blue-70. */
-.omrs-reg .registration-contact-card > .flex > span:first-child {
+/* Next-of-kin contact badges. These carried their colours as inline styles on
+   the span, which no stylesheet could reach. */
+.registration-contact-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--overlay-light);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.registration-contact-badge.is-primary {
+  background: var(--accent-light);
+  color: var(--accent-primary);
+}
+.omrs-reg .registration-contact-badge {
   border-radius: 0;
-  background: var(--cds-interactive-soft);
+  background: var(--omrs-interactive-soft);
   color: var(--accent-hover, #015697);
+}
+
+.registration-contact-remove {
+  padding: 6px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-danger);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.registration-contact-remove:hover { background: var(--color-danger-bg); }
+.omrs-reg .registration-contact-remove { border-radius: 0; }
+
+/* The coverage tiles are a group of choices, so they get a real fieldset and
+   legend — a <label> cannot point at four buttons. */
+.registration-option-fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
+.omrs-reg .registration-option-fieldset > legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.34;
+  color: var(--omrs-text-02);
 }
 
 /* ══════════════════ Coverage tiles ══════════════════
@@ -25853,29 +25698,29 @@ table.patient-data-table.patient-data-table {
   min-height: 88px;
   padding: 16px;
   border-radius: 0;
-  background-color: var(--cds-field-01) !important;
-  border: 1px solid var(--cds-ui-03) !important;
+  background-color: var(--omrs-field-01) !important;
+  border: 1px solid var(--omrs-ui-03) !important;
   transition: border-color 0.11s, background-color 0.11s;
 }
-.omrs-reg .registration-option-button:hover { transform: none; background-color: var(--cds-ui-01) !important; }
+.omrs-reg .registration-option-button:hover { transform: none; background-color: var(--omrs-ui-01) !important; }
 .omrs-reg .registration-option-button[data-selected="true"] {
-  border: 2px solid var(--cds-interactive) !important;
-  background-color: var(--cds-field-01) !important;
+  border: 2px solid var(--omrs-interactive) !important;
+  background-color: var(--omrs-field-01) !important;
 }
 .omrs-reg .registration-option-label {
   font-size: 14px;
   font-weight: 600;
   line-height: 1.29;
-  color: var(--cds-ui-05);
+  color: var(--omrs-ui-05);
 }
 .omrs-reg .registration-option-button[data-selected="true"] .registration-option-label {
-  color: var(--cds-interactive);
+  color: var(--omrs-interactive);
 }
 .omrs-reg .registration-option-desc {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.34;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
 }
 
 /* ══════════════════ Buttons inside the form ══════════════════
@@ -25889,11 +25734,11 @@ table.patient-data-table.patient-data-table {
 }
 .omrs-reg .omrs-reg-fields .btn-secondary {
   background: transparent;
-  border: 1px solid var(--cds-interactive);
-  color: var(--cds-interactive);
+  border: 1px solid var(--omrs-interactive);
+  color: var(--omrs-interactive);
 }
 .omrs-reg .omrs-reg-fields .btn-secondary:hover {
-  background: var(--cds-interactive);
+  background: var(--omrs-interactive);
   color: #fff;
 }
 
@@ -25911,8 +25756,8 @@ table.patient-data-table.patient-data-table {
 
 .omrs-reg-photo {
   width: 168px;
-  border: 1px solid var(--cds-ui-04);
-  background: var(--cds-field-01);
+  border: 1px solid var(--omrs-ui-04);
+  background: var(--omrs-field-01);
 }
 
 .omrs-reg-photo-frame {
@@ -25921,7 +25766,7 @@ table.patient-data-table.patient-data-table {
   justify-content: center;
   height: 168px;
   overflow: hidden;
-  background: var(--cds-field-01);
+  background: var(--omrs-field-01);
 }
 .omrs-reg-photo-frame img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -25932,7 +25777,7 @@ table.patient-data-table.patient-data-table {
   text-align: center;
   font-size: 14px;
   line-height: 1.43;
-  color: var(--cds-text-02);
+  color: var(--omrs-text-02);
 }
 
 .omrs-reg-photo-edit {
@@ -25955,8 +25800,8 @@ table.patient-data-table.patient-data-table {
   cursor: pointer;
   transition: background 0.11s;
 }
-.omrs-reg-photo-edit:hover { background: var(--cds-primary); }
-.omrs-reg-photo-edit:focus-visible { outline: 2px solid var(--cds-interactive); outline-offset: -3px; }
+.omrs-reg-photo-edit:hover { background: var(--omrs-primary); }
+.omrs-reg-photo-edit:focus-visible { outline: 2px solid var(--omrs-interactive); outline-offset: -3px; }
 /* The pencil is drawn by the shared Icon renderer, which hardcodes its own
    stroke unless told otherwise — see the icon trap in globals. */
 .omrs-reg-photo-edit svg.lucide { color: inherit; stroke: currentColor; }
@@ -25973,7 +25818,7 @@ table.patient-data-table.patient-data-table {
   background: none;
   font-family: var(--font-omrs);
   font-size: 12px;
-  color: var(--cds-danger);
+  color: var(--omrs-danger);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -26502,4 +26347,96 @@ table.patient-data-table.patient-data-table {
   margin: 0;
   font-size: 13px;
   color: var(--color-danger, #dc2626);
+}
+
+/* ── Square corners, everywhere ───────────────────────────────────────────
+   Nothing in the UI is rounded: cards, worklist rows, buttons, tabs, search
+   bars, status pills, patient avatars, chart bars, badges — all 0.
+
+   One blanket rule rather than a list of selectors. This file sets a corner
+   radius in ~700 places across a dozen partly-overlapping namespaces, several
+   with !important (.tamam-ehr-app, the shared-daybar tab rule, the status
+   select), so an enumerated override turns into a specificity chase that
+   silently misses whatever is added next. `*` cannot be out-specified, and
+   the radius tokens above are 0 too so the intent is readable from the top of
+   the file, not just enforced at the bottom.
+
+   SVG corners are NOT covered here — border-radius does not apply to SVG
+   shapes. Recharts `radius` props and `rx` attributes are set to 0 at their
+   call sites instead. */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+/* Exemptions — things whose roundness is the shape itself, not decoration on
+   a rectangle. Each needs !important to clear the blanket rule above; the
+   declarations at their own definitions are left intact so those rules still
+   read true on their own.
+
+   1. Spinners: a rotating ring squared is a square spinning in place — a
+      glitch, not a flat aesthetic.
+   2. The account avatar and its initials mark: a portrait slot. Squared, the
+      white ring reads as a second nested card in the top bar.
+   3. The messaging launcher and its unread count: a draggable object floating
+      over the page rather than a surface docked into the layout. */
+.animate-spin,
+.animate-spin::before,
+.animate-spin::after,
+.ehr-avatar,
+.ehr-avatar-mark,
+[data-tour="messaging-dock"],
+[data-tour="messaging-dock"] > span {
+  border-radius: 9999px !important;
+}
+
+/* ── Side-card header rule ────────────────────────────────────────────────
+   Every right-rail card (Reception / Clinic today / Today's triage, Patient
+   flow, Outstanding items, the mission card, …) closes its header with a
+   hairline, so the title reads as a card header instead of as the first row
+   of the list beneath it. The rule is pulled out to the card edge with a
+   negative inline margin — the card clips with `overflow: hidden`, so it
+   meets the card border on both sides — and reuses the #E7EEF5 the metric
+   and outstanding rows already divide on, which keeps one line language per
+   card. On the solid blue mission card the same rule is drawn in translucent
+   white, since a light-blue hairline would disappear into the fill.
+   Placed last so it wins over the per-role card layers above. */
+.ehr-side-card .ehr-side-card-head {
+  margin-inline: -14px;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid #E7EEF5;
+}
+
+/* Right-rail cards pad to 22px/24px, so the header gets matching breathing
+   room on both sides of the rule rather than a 12/22 split. */
+.ehr-right-rail .ehr-side-card .ehr-side-card-head {
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+}
+
+.ehr-side-card.ehr-mission-card .ehr-side-card-head {
+  border-bottom-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Cards drop to 12px padding on phones — the full-bleed pull has to follow. */
+@media (max-width: 767px) {
+  .ehr-side-card .ehr-side-card-head {
+    margin-inline: -12px;
+    padding-inline: 12px;
+  }
+}
+
+/* Same header rule on the day/week activity chart card. It pads to 18px, so
+   the pull-out matches that instead of the side card's 14px; the bar row
+   below drops its 22px lead-in to 12px so the rule sits centred in the gap
+   rather than hugging the title. */
+.ehr-day-stats .ehr-day-stats-head {
+  margin-inline: -18px;
+  padding: 0 18px 14px;
+  border-bottom: 1px solid #E7EEF5;
+}
+
+.ehr-day-stats .ehr-week-activity-bars {
+  margin-top: 12px;
 }

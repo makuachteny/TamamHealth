@@ -1074,11 +1074,11 @@ export default function PharmacyDashboardPage() {
                               name={med}
                               stackId="dispensed"
                               fill={DISPENSE_SERIES_COLORS[i % DISPENSE_SERIES_COLORS.length]}
-                              radius={!dispensedTrend.hasOther && i === dispensedTrend.medNames.length - 1 ? [3, 3, 0, 0] : undefined}
+                              radius={0}
                             />
                           ))}
                           {dispensedTrend.hasOther && (
-                            <Bar dataKey="Other" name="Other" stackId="dispensed" fill={CHART_NEUTRAL} radius={[3, 3, 0, 0]} />
+                            <Bar dataKey="Other" name="Other" stackId="dispensed" fill={CHART_NEUTRAL} radius={0} />
                           )}
                         </BarChart>
                       </ResponsiveContainer>
@@ -1108,7 +1108,7 @@ export default function PharmacyDashboardPage() {
                             const days = v ?? 0;
                             return [`${days} day${days === 1 ? '' : 's'}`, 'Est. remaining'];
                           }} />
-                          <Bar dataKey="days" radius={[0, 3, 3, 0]}>
+                          <Bar dataKey="days" radius={0}>
                             {atRiskChartItems.map((r, i) => (
                               <Cell key={i} fill={r.rag === 'red' ? CHART_RED : r.rag === 'amber' ? CHART_AMBER : CHART_GREEN} />
                             ))}

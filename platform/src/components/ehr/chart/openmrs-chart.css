@@ -583,9 +583,10 @@
   border-color: var(--tb-blue-900);
 }
 
-/* Balance sits on the name row beside allergies, in the same chip shape so the
-   top line reads as one row of facts rather than a chip next to a stray link.
-   Neutral when settled; only an outstanding balance takes the danger colour. */
+/* Balance sits under the action buttons in the right column — it opens the
+   collect-payment flow, so it reads with the actions rather than with the
+   identity chips. Neutral when settled; only an outstanding balance takes the
+   danger colour. */
 .omrs-header-balance {
   display: inline-flex;
   align-items: center;
@@ -624,9 +625,10 @@
   color: var(--color-danger, #C22B2B);
 }
 
-/* The expandable contact line. Its labels are muted to match the age/DOB/ID
-   line directly above it — in body ink they read heavier than the identity
-   they sit under, which inverts the hierarchy. Only the values carry weight. */
+/* The expandable contact line, which also carries the show-more toggle at its
+   end. Its labels are muted to match the age/DOB/ID line directly above it —
+   in body ink they read heavier than the identity they sit under, which
+   inverts the hierarchy. Only the values carry weight. */
 .omrs-header-details {
   margin-top: 4px;
   display: flex;
@@ -642,8 +644,8 @@
   color: var(--ehr-text-body, #39536B);
 }
 
-/* The banner's right column: actions on the first line, the show-more toggle
-   on its own beneath them, both flush right. */
+/* The banner's right column: actions on the first line, the balance chip on
+   its own beneath them, both flush right. */
 .omrs-header-aside {
   flex-shrink: 0;
   display: flex;

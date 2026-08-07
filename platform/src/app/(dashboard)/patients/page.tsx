@@ -373,12 +373,10 @@ export default function PatientsPage() {
                 Patient / Registered / Care team / Location / Status. */}
             <div className="appointment-card-surface patients-list-surface">
               <div className="appointment-card-flow">
-                {visible.length === 0 ? (
-                  <div className="appointment-card-empty">
-                    {t('patients.patientsFound', { count: 0 })}
-                  </div>
-                ) : (
-                  <>
+                    {/* The column head is the registry's frame, not a label
+                        for the rows that happen to be loaded: it stays put
+                        when a search matches nothing, so the list never
+                        collapses into a bare message. */}
                     <div className="appointment-card-head" aria-hidden="true">
                     <span>Patient</span>
                     <span>Registered</span>
@@ -386,6 +384,11 @@ export default function PatientsPage() {
                     <span>Location</span>
                     <span>Status</span>
                     </div>
+                    {visible.length === 0 && (
+                      <div className="appointment-card-empty">
+                        {t('patients.patientsFound', { count: 0 })}
+                      </div>
+                    )}
                     {visible.map(patient => (
                     <div
                       key={patient._id}
@@ -430,8 +433,6 @@ export default function PatientsPage() {
                       </div>
                     </div>
                     ))}
-                  </>
-                )}
               </div>
             </div>
             {hasMore && (

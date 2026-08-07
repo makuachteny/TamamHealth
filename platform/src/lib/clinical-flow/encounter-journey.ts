@@ -99,6 +99,12 @@ export const ENCOUNTER_TRANSITIONS: Readonly<Record<EncounterStatus, readonly En
   awaiting_next_station: ['awaiting_triage', 'routed_to_clinic', 'escalated_to_emergency', 'lwbs'],
 
   // Stage 3 — Triage
+  // Deliberately NO `escalated_to_emergency` here, unlike every other status
+  // where the patient is present and unfinished. A patient deteriorating in the
+  // waiting room is taken into triage first — `in_triage` is one hop and costs
+  // nothing, and it records that somebody actually laid eyes on them before the
+  // escalation was called. Escalating straight from the queue would let the
+  // system assert an emergency nobody had assessed.
   awaiting_triage: ['in_triage', 'lwbs'],
   in_triage: ['triaged_awaiting_destination', 'escalated_to_emergency', 'lwbs'],
   triaged_awaiting_destination: ['routed_to_clinic', 'escalated_to_emergency', 'lwbs'],

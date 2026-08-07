@@ -65,6 +65,21 @@ export default function ConsultationRedirectPage() {
           ? [patient.firstName, patient.middleName, patient.surname].filter(Boolean).join(' ')
           : 'Patient';
 
+        // Link the note to the VISIT it documents.
+        //
+        // `ClinicalNoteDoc.encounterId` has always existed and nothing ever
+        // filled it, so a signed note and the encounter it belonged to were two
+        // unrelated records: the visit could not tell whether it had been
+        // documented, and signing could not close it. Best-effort — a note is
+        // still worth writing for a patient with no open visit thread (a phone
+        // note, a back-dated entry), so an absent encounter is not an error.
+        let encounterId: string | undefined;
+        try {
+          const { findOpenEncounterForPatient } = await import('@/lib/services/encounter-service');
+          const open = await findOpenEncounterForPatient(patientId, currentUser.hospitalId || '');
+          encounterId = open?._id;
+        } catch { /* unlinked note — see above */ }
+
         const note = await createClinicalNote({
           patientId,
           patientName,
@@ -73,6 +88,7 @@ export default function ConsultationRedirectPage() {
           noteType: defaultNoteTypeFor({ role: currentUser.role }),
           serviceDate: today,
           serviceTime: new Date().toTimeString().slice(0, 5),
+          encounterId,
           assignedToId: currentUser._id,
           assignedToName: currentUser.name || currentUser.username,
           authorId: currentUser._id,

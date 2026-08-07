@@ -599,12 +599,12 @@ export default function SurveillancePage() {
                           {isHovered && (
                             <g>
                               <rect x={pos.x - 80} y={pos.y - 58} width="160" height="48"
-                                rx="6" ry="6" fill="#0F1A2E" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                                fill="#0F1A2E" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
                               <polygon
                                 points={`${pos.x - 5},${pos.y - 10} ${pos.x + 5},${pos.y - 10} ${pos.x},${pos.y - 3}`}
                                 fill="#0F1A2E" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
                               <rect x={pos.x - 80} y={pos.y - 58} width="160" height="48"
-                                rx="6" ry="6" fill="#0F1A2E" />
+                                fill="#0F1A2E" />
                               <text x={pos.x} y={pos.y - 40} textAnchor="middle" fontSize="10.5"
                                 fontWeight="600" fill="#D4CFC5">{h.name}</text>
                               <text x={pos.x} y={pos.y - 27} textAnchor="middle" fontSize="9"
@@ -674,7 +674,7 @@ export default function SurveillancePage() {
                           <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
                           <Tooltip {...chartTooltipStyle} />
                           <Legend {...{ ...legendProps, iconType: 'square' as const }} />
-                          {diseaseLines.map(d => <Bar key={d.key} dataKey={d.key} name={d.name} fill={d.color} radius={[2, 2, 0, 0]} />)}
+                          {diseaseLines.map(d => <Bar key={d.key} dataKey={d.key} name={d.name} fill={d.color} radius={0} />)}
                         </BarChart>
                       </ResponsiveContainer>
                     );

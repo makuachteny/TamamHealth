@@ -25,6 +25,33 @@ const WRITE_ROLES: UserRole[] = [
 const PRIVILEGED_ASSIGNABLE_ROLES: UserRole[] = ['super_admin', 'government', 'county_health_director'];
 
 /**
+ * Roughly 1.4 MB of base64 — a 640px JPEG from `PhotoCaptureModal` is well
+ * under 200 KB, so this is generous for a real photo and still small enough
+ * that a user document stays syncable over a field connection.
+ */
+const MAX_PHOTO_CHARS = 1_400_000;
+
+/**
+ * Accept only a bona-fide raster image data URL.
+ *
+ * This value is stored on the user document and rendered by surfaces that
+ * include the PUBLIC booking pages, so it must not be free-form. Raster types
+ * only: SVG is a document, and an `<img>` is not the only place a URL like
+ * this can end up. Returns the value to store, or an Error to return to the
+ * caller.
+ */
+function normalisePhoto(raw: unknown): { value?: string | null } | { error: string } {
+  if (raw === undefined) return { value: undefined };
+  if (raw === null || raw === '') return { value: null };
+  if (typeof raw !== 'string') return { error: 'photoUrl must be a string' };
+  if (raw.length > MAX_PHOTO_CHARS) return { error: 'Photo is too large' };
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(raw)) {
+    return { error: 'Photo must be a PNG, JPEG or WebP image' };
+  }
+  return { value: raw };
+}
+
+/**
  * Return a 403 if `actorRole` is not allowed to assign `targetRole`.
  * super_admin may assign anything; everyone else (i.e. org_admin) is confined
  * to non-privileged roles within their own tenant.
@@ -113,11 +140,20 @@ async function postHandler(request: NextRequest) {
     // /api/auth/change-password (which verifies the current password), never here.
     if (action === 'update' && body.userId === auth.sub && !hasRole(auth, WRITE_ROLES)) {
       const { updateUser } = await import('@/lib/services/user-service');
+      // A staff member's own photo is as benign as their own phone number, and
+      // "edit it yourself" is the only way a directory of faces stays current.
+      const selfPhoto = normalisePhoto(body.photoUrl);
+      if ('error' in selfPhoto) {
+        return NextResponse.json({ error: selfPhoto.error }, { status: 400 });
+      }
       const updated = await updateUser(
         auth.sub,
         {
           name: body.name as string | undefined,
           phone: body.phone as string | undefined,
+          photoUrl: selfPhoto.value,
+          department: body.department as string | undefined,
+          specialty: body.specialty as string | undefined,
         },
         auth.sub,
         auth.username
@@ -219,6 +255,10 @@ async function postHandler(request: NextRequest) {
         }
       }
       const { updateUser } = await import('@/lib/services/user-service');
+      const adminPhoto = normalisePhoto(body.photoUrl);
+      if ('error' in adminPhoto) {
+        return NextResponse.json({ error: adminPhoto.error }, { status: 400 });
+      }
       const updated = await updateUser(
         body.userId as string,
         {
@@ -228,6 +268,9 @@ async function postHandler(request: NextRequest) {
           hospitalId: body.hospitalId as string | undefined,
           hospitalName: body.hospitalName as string | undefined,
           isActive: body.isActive as boolean | undefined,
+          photoUrl: adminPhoto.value,
+          department: body.department as string | undefined,
+          specialty: body.specialty as string | undefined,
         },
         auth.sub,
         auth.username
@@ -257,6 +300,10 @@ async function postHandler(request: NextRequest) {
         }
       }
     }
+    const newPhoto = normalisePhoto(body.photoUrl);
+    if ('error' in newPhoto) {
+      return NextResponse.json({ error: newPhoto.error }, { status: 400 });
+    }
     const { createUser } = await import('@/lib/services/user-service');
     const user = await createUser(
       {
@@ -267,6 +314,10 @@ async function postHandler(request: NextRequest) {
         hospitalId: body.hospitalId as string | undefined,
         hospitalName: body.hospitalName as string | undefined,
         orgId: body.orgId as string | undefined,
+        photoUrl: newPhoto.value ?? undefined,
+        department: body.department as string | undefined,
+        specialty: body.specialty as string | undefined,
+        phone: body.phone as string | undefined,
       },
       auth.sub,
       auth.username

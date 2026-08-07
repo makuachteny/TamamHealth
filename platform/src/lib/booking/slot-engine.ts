@@ -438,6 +438,87 @@ export function computeSlots(
   });
 }
 
+/**
+ * Narrow slots to times a SECOND staff member is also free.
+ *
+ * A visit is rarely one person. A consultation needs the clinician, but it may
+ * also need the nurse who rooms the patient, an interpreter, or a scribe —
+ * and booking a doctor into a slot where the only nurse is already in another
+ * room produces an appointment nobody can actually run.
+ *
+ * Two rules, and the difference between them matters:
+ *
+ *  - BOOKED is always binding. If that person already holds an appointment at
+ *    the time (as clinician or as second staff), the slot goes.
+ *  - ROSTERED is only binding if they have a roster. Staff with availability
+ *    windows are offered only inside them. Staff with none are not thereby
+ *    "always busy" — nobody has recorded their hours, which is an absence of
+ *    information, not an absence of the person. Treating it as busy would make
+ *    choosing a nurse empty the grid, and teach everyone to leave the field
+ *    blank.
+ */
+export function filterSlotsByStaffAvailability(
+  slots: Slot[],
+  staffId: string,
+  windows: AvailabilityDoc[],
+  appointments: AppointmentDoc[],
+  policy: BookingPolicyDoc,
+  nowIso: string,
+  excludeAppointmentId?: string,
+): Slot[] {
+  if (!staffId) return slots;
+
+  const staffWindows = windows.filter(w => w.providerId === staffId && w.status !== 'cancelled');
+  const rostered = staffWindows.length > 0;
+
+  // Every booking this person is committed to, in either role.
+  const commitments = appointments.filter(a =>
+    a._id !== excludeAppointmentId &&
+    !APPOINTMENT_SLOT_RELEASED_STATUSES.includes(a.status) &&
+    (a.providerId === staffId || a.staffId === staffId));
+
+  const busyByDate = new Map<string, { start: number; end: number }[]>();
+  for (const appointment of commitments) {
+    const start = toMinutes(appointment.appointmentTime);
+    if (Number.isNaN(start)) continue;
+    const duration = appointment.duration > 0 ? appointment.duration : 30;
+    const list = busyByDate.get(appointment.appointmentDate) ?? [];
+    list.push({
+      start: start - policy.bufferBeforeMinutes,
+      end: start + duration + policy.bufferAfterMinutes,
+    });
+    busyByDate.set(appointment.appointmentDate, list);
+  }
+
+  // Roster coverage, expanded per date, so recurrence is honoured here too.
+  const coverByDate = new Map<string, { start: number; end: number }[]>();
+  if (rostered) {
+    const dates = [...new Set(slots.map(s => s.date))];
+    for (const { window, date } of expandWindows(staffWindows, dates[0] ?? '', dates[dates.length - 1] ?? '')) {
+      const start = toMinutes(window.startTime);
+      const end = toMinutes(window.endTime);
+      if (Number.isNaN(start) || Number.isNaN(end)) continue;
+      const list = coverByDate.get(date) ?? [];
+      list.push({ start, end });
+      coverByDate.set(date, list);
+    }
+  }
+
+  void nowIso;   // reserved: holds are provider-scoped, so they do not apply here
+
+  return slots.filter(slot => {
+    const start = toMinutes(slot.startTime);
+    const end = start + slot.durationMinutes;
+
+    const busy = busyByDate.get(slot.date) ?? [];
+    if (busy.some(b => overlaps(start, end, b.start, b.end))) return false;
+
+    if (!rostered) return true;
+    const cover = coverByDate.get(slot.date) ?? [];
+    return cover.some(c => start >= c.start && end <= c.end);
+  });
+}
+
 /** Group slots by date — the shape the day-by-day pickers want. */
 export function groupSlotsByDate(slots: Slot[]): Map<string, Slot[]> {
   const byDate = new Map<string, Slot[]>();

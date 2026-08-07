@@ -64,6 +64,13 @@ const MENU_MAX_HEIGHT = 320;
 const ROW_HEIGHT = 36;
 /** `.tsel-list` padding, top + bottom. */
 const LIST_PADDING = 12;
+/**
+ * How far past the trigger the popup may grow to fit a long option. A staff
+ * label like "Dr. James Wani Igga · Physician, Internal Medicine · Busy 09:00"
+ * is half again the width of the box it hangs off; clipping it to the trigger
+ * hides the part that distinguishes one clinician from the next.
+ */
+const MENU_MAX_WIDTH = 520;
 
 /**
  * Where the popup sits. `top` and `bottom` are exclusive: whichever edge is
@@ -169,6 +176,16 @@ export default function Select({
   /** The trigger's value as of the moment the popup opened (uncontrolled use). */
   const [openValue, setOpenValue] = useState('');
   const [pos, setPos] = useState<MenuPosition | null>(null);
+  /**
+   * Width the popup settled on after being measured against its longest
+   * option. Null until that measurement runs, which is one frame after the
+   * rows exist — the popup opens at the trigger's width and widens only if
+   * something in it is actually being clipped. Held in a ref as well as state
+   * because `place` has to read it on every scroll and resize; the state copy
+   * only exists to re-run `place` once the measurement lands.
+   */
+  const grownWidthRef = useRef<number | null>(null);
+  const [grownWidth, setGrownWidth] = useState<number | null>(null);
 
   const options = useMemo(() => {
     const out: SelectOptionItem[] = [];
@@ -212,16 +229,28 @@ export default function Select({
     // over the box being typed into.
     const rows = Math.min(options.length, 8);
     const listHeight = Math.min(MENU_MAX_HEIGHT, rows * ROW_HEIGHT + 8);
-    const spaceBelow = window.innerHeight - r.bottom;
-    const spaceAbove = r.top;
-    const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - r.width - 8));
+    // Both measured with the 12px breathing gap already subtracted, so `room`
+    // below is space the popup may actually occupy rather than space it has to
+    // remember to give back.
+    const spaceBelow = window.innerHeight - r.bottom - 12;
+    const spaceAbove = r.top - 12;
+    // Once measured, the popup keeps its widened size; the left edge is
+    // re-derived from the trigger on every call so it still tracks the box
+    // when the page behind it scrolls.
+    const width = Math.max(r.width, grownWidthRef.current ?? 0);
+    const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - width - 8));
     // Flip up only when below genuinely cannot hold the list — matching
     // AssignPicker, where an unnecessary jump upward reads as a glitch.
-    const flip = spaceBelow < listHeight + 12 && spaceAbove > spaceBelow;
+    const flip = spaceBelow < listHeight && spaceAbove > spaceBelow;
+    // Never taller than the side it opens on. This used to carry a 140px floor,
+    // which meant a trigger near the bottom of the window got a popup longer
+    // than the gap it had to live in — the overhanging rows were painted past
+    // the viewport edge, unreachable, and the list reported itself as fully
+    // visible so nothing scrolled to bring them back.
+    const room = Math.min(MENU_MAX_HEIGHT, Math.max(ROW_HEIGHT + LIST_PADDING, flip ? spaceAbove : spaceBelow));
     // Round the list down to whole rows, so a scrolling menu ends on a clean
     // edge instead of slicing a name in half.
-    const room = Math.max(140, Math.min(MENU_MAX_HEIGHT, (flip ? spaceAbove : spaceBelow) - 12));
-    const listMax = Math.max(3, Math.floor((room - LIST_PADDING) / ROW_HEIGHT)) * ROW_HEIGHT
+    const listMax = Math.max(1, Math.floor((room - LIST_PADDING) / ROW_HEIGHT)) * ROW_HEIGHT
       + LIST_PADDING;
     setPos({
       // With the filter box in place of the trigger, the popup starts at the
@@ -232,7 +261,7 @@ export default function Select({
         ? (showSearch ? window.innerHeight - r.bottom : window.innerHeight - r.top + 6)
         : null,
       left,
-      width: r.width,
+      width,
       maxHeight: (showSearch ? r.height : 0) + listMax,
       triggerHeight: r.height,
       triggerFontSize: window.getComputedStyle(trigger).fontSize,
@@ -240,6 +269,37 @@ export default function Select({
   }, [options.length, showSearch]);
 
   useLayoutEffect(() => { if (open) place(); }, [open, place]);
+
+  // Measured once per opening, not per keystroke: a popup that resized itself
+  // as the query narrowed would jump under the cursor mid-read.
+  useLayoutEffect(() => {
+    if (!open) {
+      grownWidthRef.current = null;
+      setGrownWidth(null);
+      return;
+    }
+    if (!pos || grownWidth !== null) return;
+    const list = listRef.current;
+    if (!list) return;
+    let clipped = 0;
+    list.querySelectorAll<HTMLElement>('.tsel-row-label').forEach(el => {
+      clipped = Math.max(clipped, el.scrollWidth - el.clientWidth);
+    });
+    // `pos.width` even when nothing is clipped, so the guard above stops this
+    // from re-measuring on every reposition.
+    const width = clipped <= 0 ? pos.width : Math.min(
+      Math.max(pos.width, MENU_MAX_WIDTH),
+      window.innerWidth - 16,
+      pos.width + clipped + 2,
+    );
+    grownWidthRef.current = width;
+    setGrownWidth(width);
+  }, [open, pos, grownWidth]);
+
+  // Re-place with the measured width so the left edge is re-clamped against it.
+  useLayoutEffect(() => {
+    if (open && grownWidth !== null) place();
+  }, [open, grownWidth, place]);
 
   // Opening lands on the row already selected, so Enter without touching
   // anything is a no-op rather than a silent jump to the top of the list.
@@ -282,10 +342,23 @@ export default function Select({
       close(false);
     };
     const reposition = () => place();
+    // Escape belongs to the popup, not to whatever is behind it. The menu is
+    // portaled to <body>, so an unhandled Escape carried on up to the dialog
+    // that owns the trigger and closed that too — dismissing a dropdown threw
+    // away the half-filled form underneath it. Captured on `document`, this
+    // runs before the dialog's own window-level listener and stops it there.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    };
+    document.addEventListener('keydown', onKey, true);
     document.addEventListener('mousedown', onDown);
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
     return () => {
+      document.removeEventListener('keydown', onKey, true);
       document.removeEventListener('mousedown', onDown);
       window.removeEventListener('resize', reposition);
       window.removeEventListener('scroll', reposition, true);
@@ -334,8 +407,10 @@ export default function Select({
     }
   };
 
+  // Escape is not handled here — the document-level capture listener installed
+  // while the popup is open takes it first, so that the dialog behind never
+  // sees the key at all.
   const onMenuKeyDown = (e: ReactKeyboardEvent<HTMLElement>) => {
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
     if (e.key === 'Tab') { close(false); return; }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
