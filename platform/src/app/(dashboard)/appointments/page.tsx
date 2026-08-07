@@ -38,7 +38,6 @@ import dynamic from 'next/dynamic';
 import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import { jubaDate, jubaTime } from '@/lib/time-juba';
-import PageInstructionCard from '@/components/PageInstructionCard';
 import Select from '@/components/Select';
 
 // react-big-calendar (and its CSS) is a heavy client-only library. Split it out
@@ -738,8 +737,6 @@ export default function AppointmentsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <PageInstructionCard />
-
         {/* ═══ LIST VIEW ═══ */}
         {viewMode === 'list' && (
           <>

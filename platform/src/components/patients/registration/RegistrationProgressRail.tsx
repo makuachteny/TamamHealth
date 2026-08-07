@@ -13,13 +13,19 @@
  *    ring and not a fill: "I am looking at this" must never read as "this is
  *    finished".
  *
+ * Both are carried by the markers alone. The rail used to print a running
+ * count beside every section as well ("0/5", "0/2", "0/10" at the top), which
+ * said the same thing twice and turned a five-line table of contents into a
+ * scoreboard the clerk had to read. The counts survive in `aria-label`, where
+ * a screen reader still hears them.
+ *
  * Presentational. It owns no state — the counts come from
  * `sectionRequirementProgress` and the active section from the form's
  * scroll-spy, so the same rail can be driven by a page or by a dialog.
  *
- * Adds no translation strings: counts are numerals and the only word is
- * `patientNew.optionalLabel`, which exists in all eleven locales. A new key
- * would print raw as "patientNew.foo" in the ten that lag `en.ts`.
+ * Adds no translation strings: the only word is `patientNew.optionalLabel`,
+ * which exists in all eleven locales. A new key would print raw as
+ * "patientNew.foo" in the ten that lag `en.ts`.
  */
 
 import type { CSSProperties } from 'react';
@@ -74,6 +80,10 @@ export default function RegistrationProgressRail({
         // the form would actually submit.
         const isReviewStep = i === steps.length - 1;
         const reviewLocked = isReviewStep && requiredDone < requiredTotal;
+        // The only trailing marks left: a flag on a section the last submit
+        // couldn't accept, and the word "Optional" on one that asks for
+        // nothing. Everything else the node already says.
+        const meta = hasErrors ? '!' : (!isReviewStep && total === 0) ? optionalLabel : null;
         return (
           <button
             key={label}
@@ -95,12 +105,7 @@ export default function RegistrationProgressRail({
               style={{ '--omrs-reg-node-pct': `${total ? (done / total) * 100 : 0}%` } as CSSProperties}
             />
             <span className="omrs-reg-navlabel">{label}</span>
-            <span className="omrs-reg-navmeta" aria-hidden>
-              {hasErrors ? '!'
-                : isReviewStep ? `${requiredDone}/${requiredTotal}`
-                  : total === 0 ? optionalLabel
-                    : done === total ? '✓' : `${done}/${total}`}
-            </span>
+            {meta && <span className="omrs-reg-navmeta" aria-hidden>{meta}</span>}
           </button>
         );
       })}

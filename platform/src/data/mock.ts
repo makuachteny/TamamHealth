@@ -1692,6 +1692,13 @@ export interface Patient {
   phone: string;
   altPhone?: string;
   whatsapp?: string;
+  /**
+   * Patient's own email address, for things addressed TO the patient — the
+   * intake-form request being the first. Optional: most patients at these
+   * facilities are reachable by phone only, so every surface that uses it has
+   * to handle its absence rather than assume it.
+   */
+  email?: string;
   /** Patient's preferred pharmacy for prescription pickup / e-prescribing. */
   preferredPharmacy?: {
     name: string;

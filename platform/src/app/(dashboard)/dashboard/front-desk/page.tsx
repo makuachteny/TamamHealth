@@ -1048,8 +1048,8 @@ export default function FrontDeskDashboardPage() {
   // dialog), so the booking is the one place a visit is started from rather
   // than a second, parallel front door.
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
-    { label: 'New appointments', icon: Plus, onClick: () => setBookingOpen(true), tone: 'primary' as const },
-    ...(canUseRoute('/patient-intake') ? [{ label: 'Intake form', icon: Send, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
+    { label: 'New Appointments', icon: Plus, onClick: () => setBookingOpen(true), tone: 'primary' as const },
+    ...(canUseRoute('/patient-intake') ? [{ label: 'Intake Form', icon: Send, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
   ]), [canUseRoute, router, t]);
 
@@ -1059,7 +1059,7 @@ export default function FrontDeskDashboardPage() {
   // Quick-navigation strip mirroring the Clinical Officer dashboard's clinical
   // strip. Route-guarded so a clinic clerk never sees a shortcut they can't open.
   const actionStrip = useMemo<EhrCareDashboardAction[]>(() => ([
-    ...(canUseRoute('/patients') ? [{ label: 'Patient registry', icon: ClipboardList, onClick: () => router.push('/patients') }] : []),
+    ...(canUseRoute('/patients') ? [{ label: 'Patient Registry', icon: ClipboardList, onClick: () => router.push('/patients') }] : []),
     ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
     ...(canUseRoute('/referrals') ? [{ label: 'Referrals', icon: ArrowRightLeft, onClick: () => router.push('/referrals') }] : []),
   ]), [canUseRoute, router]);
@@ -1201,7 +1201,7 @@ export default function FrontDeskDashboardPage() {
       // popup's buttons used — a plain "Record" fallback isn't needed here
       // since Open chart already covers it.
       const popupActions: { icon: LucideIcon; label: string; onClick: () => void; primary?: boolean }[] = [
-        { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${entry.patientId}`) },
+        { icon: FileText, label: 'Open Chart', onClick: () => router.push(`/patients/${entry.patientId}`) },
       ];
       if (checkoutReady) {
         popupActions.push({
@@ -1395,7 +1395,7 @@ export default function FrontDeskDashboardPage() {
         popupDetail: (
           <>
             <FrontDeskDetailActions actions={[
-              { icon: FileText, label: 'Open chart', onClick: () => router.push(`/patients/${patient._id}`), primary: true },
+              { icon: FileText, label: 'Open Chart', onClick: () => router.push(`/patients/${patient._id}`), primary: true },
               {
                 icon: Stethoscope,
                 label: patient.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign'),

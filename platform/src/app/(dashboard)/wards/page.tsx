@@ -13,7 +13,6 @@ import { useWards } from '@/lib/hooks/useWards';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AdmissionDoc } from '@/lib/db-types-ward';
-import PageInstructionCard from '@/components/PageInstructionCard';
 import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import Select from '@/components/Select';
 
@@ -154,7 +153,6 @@ export default function WardsPage() {
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageInstructionCard />
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <EhrListHeader
             title={t('ward.currentAdmissions')}

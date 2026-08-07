@@ -26,7 +26,6 @@ import RowActionsMenu, { type RowAction } from '@/components/referrals/RowAction
 import ReferralFormModal from '@/components/referrals/ReferralFormModal';
 import type { Attachment, TransferPackage, ReferralDisposition } from '@/data/mock';
 import { formatPhoneDisplay } from '@/lib/field-formats';
-import PageInstructionCard from '@/components/PageInstructionCard';
 import Select from '@/components/Select';
 
 function formatFileSize(bytes: number): string {
@@ -549,8 +548,6 @@ export default function ReferralsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <PageInstructionCard />
-
         {/* ═══ Table card ═══ */}
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <EhrListHeader

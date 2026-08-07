@@ -22,7 +22,6 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { LabOrderStatus } from '@/lib/clinical-flow/order-lifecycles';
 import { useSettings } from '@/lib/settings/SettingsProvider';
-import PageInstructionCard from '@/components/PageInstructionCard';
 import type { LabResultDoc } from '@/lib/db-types';
 import Select from '@/components/Select';
 
@@ -271,8 +270,6 @@ export default function LabPage() {
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-          <PageInstructionCard />
-
           {labLoading && (
             <div className="card-elevated p-4 mb-4 flex items-center gap-3" style={{ background: 'var(--overlay-subtle)' }}>
               <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />

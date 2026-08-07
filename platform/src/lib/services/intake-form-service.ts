@@ -133,6 +133,61 @@ export async function mergeIntakeFormToChart(
   return updated;
 }
 
+/**
+ * Record the patient's answers against a requested form and move it into the
+ * review queue. This is the step that was missing: a request could be sent, but
+ * nothing in the app could ever mark it submitted, so every form sent from the
+ * desk sat on "Awaiting patient" forever and the only reviewable forms were the
+ * seeded ones.
+ *
+ * Answers are merged onto the existing field list rather than replacing it: a
+ * label already carrying a value keeps it unless this call supplies a new one,
+ * so saving a partly-completed form twice cannot wipe the first sitting's work.
+ * Re-saving a form still awaiting review is how a wrong answer gets corrected.
+ */
+export async function submitIntakeFormAnswers(
+  id: string,
+  answers: Record<string, string>,
+  submittedBy?: string,
+): Promise<PatientIntakeFormDoc> {
+  const db = intakeFormsDB();
+  const existing = await db.get(id) as PatientIntakeFormDoc;
+  const now = new Date().toISOString();
+  const fields: IntakeFormField[] = existing.fields.map(field => {
+    const answer = answers[field.label];
+    if (answer === undefined) return field;
+    const trimmed = answer.trim();
+    // An answer cleared back to blank is a real correction and is kept as one;
+    // what it must never do is reach the chart, which mergeIntakeFormToChart
+    // guarantees by dropping empty values there.
+    return { ...field, value: trimmed };
+  });
+  const updated: PatientIntakeFormDoc = {
+    ...existing,
+    fields,
+    status: 'pending_review',
+    receivedAt: existing.receivedAt || now,
+    updatedAt: now,
+  };
+  const resp = await db.put(updated);
+  updated._rev = resp.rev;
+  await logAuditSafe(
+    'SUBMIT_INTAKE_FORM',
+    existing.patientId,
+    submittedBy || 'Patient',
+    `Intake form ${id} answers recorded`,
+  );
+  emitSyncEvent({
+    resourceType: 'patient_intake_form',
+    resourceId: updated._id,
+    operation: 'update',
+    resourceVersion: updated._rev,
+    orgId: updated.orgId,
+    hospitalId: updated.hospitalId,
+  });
+  return updated;
+}
+
 export async function sendIntakeFormRequest(
   patientId: string | undefined,
   patientName: string,

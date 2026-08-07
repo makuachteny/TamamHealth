@@ -73,17 +73,46 @@ const PROVIDER_ROLES: UserRole[] = [
   'radiologist',
 ];
 
-// The intake packets a patient can be asked to complete before their visit.
-const INTAKE_FORM_OPTIONS = [
-  'Basic Information',
-  'Demographics',
-  'Emergency Contact',
-  'Financial Information',
-  'Additional Information',
-  'GAD-7',
-  'PHQ-9',
-  'PCL-5',
-];
+/**
+ * The intake packets a patient can be asked to complete, and the lines each one
+ * actually collects.
+ *
+ * A request used to store the PACKET NAMES as its fields — a form came back
+ * with one line reading "Basic Information", which matches no chart key, so
+ * nothing sent from this page could ever be merged into a patient record. Only
+ * the seeded demo forms, written with real field labels, worked. Expanding a
+ * packet into its lines here is what puts a sent form on the same footing: the
+ * labels are the ones MERGEABLE_FIELDS knows, so what the patient answers lands
+ * in the chart column it belongs to.
+ */
+const INTAKE_PACKETS: Record<string, string[]> = {
+  'Basic Information': ['Date of birth', 'Phone', 'Address'],
+  'Demographics': ['Primary Language', 'County', 'State', 'Tribe'],
+  'Emergency Contact': ['Emergency contact'],
+  'Financial Information': ['Payment method', 'Insurance provider'],
+  'Additional Information': ['Known allergies', 'Reason for visit'],
+  // Screening instruments are scored, not merged — they stay one line each and
+  // are read during review rather than written to a chart column.
+  'GAD-7': ['GAD-7 score'],
+  'PHQ-9': ['PHQ-9 score'],
+  'PCL-5': ['PCL-5 score'],
+};
+
+const INTAKE_FORM_OPTIONS = Object.keys(INTAKE_PACKETS);
+
+/** The field lines a set of requested packets asks for, in order, deduped. */
+function fieldsForPackets(packets: string[]): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const packet of packets) {
+    for (const label of INTAKE_PACKETS[packet] || [packet]) {
+      if (seen.has(label)) continue;
+      seen.add(label);
+      labels.push(label);
+    }
+  }
+  return labels;
+}
 
 // Labels the reviewer can confidently merge straight into the chart, mapped to
 // the patient-chart key they write to. Multiple form labels can point at the
@@ -122,6 +151,18 @@ function formatDate(iso?: string): string {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
+/**
+ * The chart's value for a mergeable field, exactly as stored. Used to seed the
+ * form — `currentChartValue` formats for reading (dd/mm/yyyy, spaced phone
+ * numbers) and seeding with that would write the display text back to the
+ * chart on merge.
+ */
+function rawChartValue(patient: PatientDoc | undefined, label: string): string {
+  const key = patient ? MERGEABLE_FIELDS[label] : undefined;
+  const raw = key ? patient?.[key] : undefined;
+  return raw == null ? '' : String(raw);
+}
+
 /** Read the current chart value for a mergeable field, as a display string. */
 function currentChartValue(patient: PatientDoc | undefined, label: string): string {
   if (!patient) return '';
@@ -149,7 +190,7 @@ export default function PatientIntakePage() {
   const router = useRouter();
   const { currentUser } = useAuth();
   const { showToast } = useToast();
-  const { forms, loading, merge, reject, sendRequest } = useIntakeForms();
+  const { forms, loading, merge, reject, submitAnswers, sendRequest } = useIntakeForms();
   const { patients } = usePatients();
   const { users } = useUsers();
 
@@ -159,6 +200,10 @@ export default function PatientIntakePage() {
   const [merging, setMerging] = useState(false);
   // Which mergeable field labels the reviewer has selected to write to the chart.
   const [checkedFields, setCheckedFields] = useState<Record<string, boolean>>({});
+  // --- Fill-in state: the form itself, answered at the desk or on a tablet ---
+  const [filling, setFilling] = useState<PatientIntakeFormDoc | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [savingAnswers, setSavingAnswers] = useState(false);
 
   // --- Send-forms modal state ---
   const [sendOpen, setSendOpen] = useState(false);
@@ -220,10 +265,43 @@ export default function PatientIntakePage() {
     setReviewing(form);
   }
 
+  /**
+   * Open the form itself. Answers already recorded are what you see and edit —
+   * nothing is reset — and any line still unanswered starts from what the chart
+   * already knows, so the patient is confirming their details rather than
+   * dictating them again.
+   */
+  function openFill(form: PatientIntakeFormDoc) {
+    const patient = form.patientId ? patients.find(p => p._id === form.patientId) : undefined;
+    const seeded: Record<string, string> = {};
+    for (const field of form.fields) {
+      seeded[field.label] = isAnswered(field.value)
+        ? field.value
+        : rawChartValue(patient, field.label);
+    }
+    setAnswers(seeded);
+    setFilling(form);
+  }
+
+  async function handleSaveAnswers() {
+    if (!filling) return;
+    setSavingAnswers(true);
+    try {
+      await submitAnswers(filling._id, answers, currentUser?.name || currentUser?.username);
+      showToast(`${filling.patientName}'s form is ready for review.`, 'success');
+      setFilling(null);
+      setActiveTab('pending_review');
+    } catch {
+      showToast('Could not save the answers. Try again.', 'error');
+    } finally {
+      setSavingAnswers(false);
+    }
+  }
+
   function selectSendPatient(p: PatientDoc) {
     setSendPatient(p);
     setSendPatientQuery(patientFullName(p));
-    setSendEmail(false); // patients have no email field yet — stays disabled
+    setSendEmail(false);
     setSendSms(!!p.phone);
   }
 
@@ -241,10 +319,11 @@ export default function PatientIntakePage() {
     setSending(true);
     try {
       const willSendSms = sendSms && !!sendPatient.phone;
-      const smsResult = await sendRequest(
+      const willSendEmail = sendEmail && !!sendPatient.email;
+      const result = await sendRequest(
         sendPatient._id,
         patientFullName(sendPatient),
-        sendForms.map(f => ({ label: f, value: 'Requested' })),
+        fieldsForPackets(sendForms).map(label => ({ label, value: '' })),
         {
           providerId: sendProviderUser?._id,
           providerName: sendProviderUser?.name,
@@ -257,15 +336,27 @@ export default function PatientIntakePage() {
           phone: sendPatient.phone,
           facilityName: currentUser?.hospitalName,
         },
+        {
+          send: willSendEmail,
+          email: sendPatient.email,
+          facilityName: currentUser?.hospitalName,
+        },
       );
-      if (willSendSms) {
-        if (smsResult?.ok) {
-          showToast(`Intake forms sent to ${patientFullName(sendPatient)} and an SMS was delivered.`, 'success');
-        } else {
-          showToast(`Intake request saved, but the SMS to ${patientFullName(sendPatient)} failed to send.`, 'error');
-        }
+
+      // The request is saved either way; the toast reports per channel so the
+      // clerk knows whether the patient was actually reached, and by what.
+      const name = patientFullName(sendPatient);
+      const delivered: string[] = [];
+      const failed: string[] = [];
+      if (willSendSms) (result.sms?.ok ? delivered : failed).push('SMS');
+      if (willSendEmail) (result.email?.ok ? delivered : failed).push('email');
+
+      if (failed.length > 0) {
+        showToast(`Intake request saved, but the ${failed.join(' and ')} to ${name} failed to send.`, 'error');
+      } else if (delivered.length > 0) {
+        showToast(`Intake forms sent to ${name} by ${delivered.join(' and ')}.`, 'success');
       } else {
-        showToast(`Intake forms sent to ${patientFullName(sendPatient)}.`, 'success');
+        showToast(`Intake forms sent to ${name}.`, 'success');
       }
       resetSend();
       setSendOpen(false);
@@ -397,7 +488,7 @@ export default function PatientIntakePage() {
                   style={{ background: 'var(--color-warning-600)', borderColor: 'var(--color-warning-600)', color: '#fff' }}
                   onClick={() => setSendOpen(true)}
                 >
-                  Send forms
+                  Send Forms
                 </button>
               }
             />
@@ -443,13 +534,30 @@ export default function PatientIntakePage() {
                         </td>
                         <td className="text-right">
                           {form.status === 'pending_review' ? (
-                            <button type="button" className="btn btn-sm btn-secondary" onClick={() => openReview(form)}>
-                              Review
-                            </button>
+                            <span className="inline-flex gap-2">
+                              {/* Answers stay editable right up to the merge —
+                                  a wrong phone number is corrected here, not by
+                                  sending the patient a second form. */}
+                              <button type="button" className="btn btn-sm btn-secondary" onClick={() => openFill(form)}>
+                                Edit Answers
+                              </button>
+                              <button type="button" className="btn btn-sm btn-secondary" onClick={() => openReview(form)}>
+                                Review
+                              </button>
+                            </span>
                           ) : form.status === 'merged' ? (
                             <span className="text-[12px]" style={{ color: 'var(--color-success)' }}>Merged {formatDate(form.mergedAt)}</span>
+                          ) : form.status === 'not_submitted' ? (
+                            // The step that closes the loop: a form waiting on
+                            // the patient can be answered at the desk or handed
+                            // over on a tablet, which puts it in the review
+                            // queue. Without this a sent request could never
+                            // reach review at all.
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={() => openFill(form)}>
+                              Fill in Form
+                            </button>
                           ) : (
-                            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Awaiting patient</span>
+                            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Rejected</span>
                           )}
                         </td>
                       </tr>
@@ -469,7 +577,7 @@ export default function PatientIntakePage() {
         <Modal onClose={() => { resetSend(); setSendOpen(false); }} width={520}>
           <div className="modal-panel" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Send forms to patient</h3>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Send Forms to Patient</h3>
               <button
                 onClick={() => { resetSend(); setSendOpen(false); }}
                 className="p-1.5 rounded-lg"
@@ -593,6 +701,49 @@ export default function PatientIntakePage() {
               <button onClick={() => { resetSend(); setSendOpen(false); }} className="btn btn-secondary flex-1">Cancel</button>
               <button onClick={handleSend} disabled={!canSend || sending} className="btn btn-primary flex-1">
                 {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Fill in the form (desk or tablet)                                 */}
+      {/* ---------------------------------------------------------------- */}
+      {filling && (
+        <Modal onClose={() => setFilling(null)} width={560}>
+          <div className="modal-panel" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{filling.patientName}</h3>
+              <button onClick={() => setFilling(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              {filling.status === 'pending_review'
+                ? 'Correct any answer before it is reviewed. Nothing already recorded is cleared by saving.'
+                : 'Record the answers with the patient. Details already on their chart are filled in to confirm, not retype.'}
+            </p>
+
+            <div className="flex flex-col gap-3 mb-5">
+              {filling.fields.map(field => (
+                <label key={field.label} className="flex flex-col gap-1" style={{ textTransform: 'none', letterSpacing: 0 }}>
+                  <span className="text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{field.label}</span>
+                  <input
+                    type="text"
+                    style={inputStyle}
+                    value={answers[field.label] ?? ''}
+                    placeholder={`${field.label}…`}
+                    onChange={e => setAnswers(prev => ({ ...prev, [field.label]: e.target.value }))}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setFilling(null)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleSaveAnswers} className="btn btn-primary" disabled={savingAnswers}>
+                {savingAnswers ? 'Saving…' : filling.status === 'pending_review' ? 'Save Answers' : 'Submit for Review'}
               </button>
             </div>
           </div>

@@ -1140,10 +1140,10 @@ export default function EhrClinicalDashboard({
           <button
             type="button"
             className="primary"
-            aria-label="Intake form"
+            aria-label="Intake Form"
             onClick={() => router.push('/patient-intake')}
           >
-            <Send className="w-4 h-4" /> Intake form
+            <Send className="w-4 h-4" /> Intake Form
           </button>
         </div>
       </section>

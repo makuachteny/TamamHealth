@@ -17,7 +17,6 @@ import { medications } from '@/data/mock';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
 import { medicationMatches } from '@/lib/services/dispensing-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import PageInstructionCard from '@/components/PageInstructionCard';
 import { formatMoney } from '@/lib/format-utils';
 import { isActivePharmacyStage, pharmacyStage, pharmacyStageLabel } from '@/lib/pharmacy-workflow';
 import { usePatientBalances } from '@/lib/hooks/usePatientBalances';
@@ -815,8 +814,6 @@ export default function PharmacyPage() {
 
   return (
     <main className="page-container page-enter">
-      <PageInstructionCard />
-
       {/* ═══ Table card ═══ */}
       <div className="card-elevated overflow-hidden">
         <EhrListHeader

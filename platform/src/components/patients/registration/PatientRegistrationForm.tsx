@@ -449,16 +449,12 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             the rail jumps between them rather than gating them. */}
         <aside className="omrs-reg-rail" aria-label={t('patientNew.registrationProgressAriaLabel')}>
           <h1 className="omrs-reg-title">{t('patientNew.topBarTitle')}</h1>
-          <div className="omrs-reg-jumphead">
-            <p className="omrs-reg-jump">{t('patientNew.jumpTo')}</p>
-            {/* Numerals only, so this reads the same in all eleven locales. */}
-            <span
-              className={`omrs-reg-tally${requiredDone === requiredTotal ? ' is-complete' : ''}`}
-              aria-hidden
-            >
-              {requiredDone}/{requiredTotal}
-            </span>
-          </div>
+          {/* Said once, here, instead of under all five section headings —
+              where it repeated a sentence the clerk had already read and
+              claimed "all fields required" of Biometrics and Coverage, which
+              require nothing. */}
+          <p className="omrs-reg-railnote">{t('patientNew.requiredFieldsNote')}</p>
+          <p className="omrs-reg-jump">{t('patientNew.jumpTo')}</p>
           <RegistrationProgressRail
             steps={steps}
             sectionProgress={sectionProgress}
@@ -534,25 +530,22 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {(
               <section className="registration-section omrs-reg-section" id="reg-demographics">
                 <header className="omrs-reg-sectionhead">
-                  <h2>1. {steps[0]}</h2>
-                  <p>{t('patientNew.allFieldsRequiredNote')}</p>
+                  <h2>{steps[0]}</h2>
                 </header>
-                <div className="flex gap-3 items-start">
-                  <div className="registration-field-grid registration-field-grid--three flex-1">
-                    <div>
-                      <label htmlFor="pt-firstName">{t('patientNew.firstName')}</label>
-                      <input id="pt-firstName" type="text" value={form.firstName} onChange={e => update('firstName', e.target.value)} placeholder={t('patientNew.firstNamePlaceholder')} aria-required="true" aria-invalid={!!errors.firstName} style={errors.firstName ? { borderColor: 'var(--color-danger)' } : {}} />
-                      {errors.firstName && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.firstName}</p>}
-                    </div>
-                    <div>
-                      <label htmlFor="pt-middleName">{t('patientNew.middleName')}</label>
-                      <input id="pt-middleName" type="text" value={form.middleName} onChange={e => update('middleName', e.target.value)} placeholder={t('patientNew.middleNamePlaceholder')} />
-                    </div>
-                    <div>
-                      <label htmlFor="pt-surname">{t('patientNew.surname')}</label>
-                      <input id="pt-surname" type="text" value={form.surname} onChange={e => update('surname', e.target.value)} placeholder={t('patientNew.surnamePlaceholder')} aria-required="true" aria-invalid={!!errors.surname} style={errors.surname ? { borderColor: 'var(--color-danger)' } : {}} />
-                      {errors.surname && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.surname}</p>}
-                    </div>
+                <div className="registration-field-grid registration-field-grid--three">
+                  <div>
+                    <label htmlFor="pt-firstName">{t('patientNew.firstName')}</label>
+                    <input id="pt-firstName" type="text" value={form.firstName} onChange={e => update('firstName', e.target.value)} placeholder={t('patientNew.firstNamePlaceholder')} aria-required="true" aria-invalid={!!errors.firstName} style={errors.firstName ? { borderColor: 'var(--color-danger)' } : {}} />
+                    {errors.firstName && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.firstName}</p>}
+                  </div>
+                  <div>
+                    <label htmlFor="pt-middleName">{t('patientNew.middleName')}</label>
+                    <input id="pt-middleName" type="text" value={form.middleName} onChange={e => update('middleName', e.target.value)} placeholder={t('patientNew.middleNamePlaceholder')} />
+                  </div>
+                  <div>
+                    <label htmlFor="pt-surname">{t('patientNew.surname')}</label>
+                    <input id="pt-surname" type="text" value={form.surname} onChange={e => update('surname', e.target.value)} placeholder={t('patientNew.surnamePlaceholder')} aria-required="true" aria-invalid={!!errors.surname} style={errors.surname ? { borderColor: 'var(--color-danger)' } : {}} />
+                    {errors.surname && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.surname}</p>}
                   </div>
                 </div>
                 <div className="registration-field-grid registration-field-grid--three">
@@ -673,11 +666,13 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     </div>
                     <div>
                       <label htmlFor="pt-payam">{t('patientNew.payam')}</label>
-                      <input id="pt-payam" type="text" value={form.payam} onChange={e => update('payam', e.target.value)} placeholder={t('patientNew.payamPlaceholder')} />
+                      {/* No placeholder: "Enter payam" under a label reading
+                          "Payam" is a line of text that carries nothing. */}
+                      <input id="pt-payam" type="text" value={form.payam} onChange={e => update('payam', e.target.value)} />
                     </div>
                     <div>
                       <label htmlFor="pt-boma">{t('patientNew.boma')}</label>
-                      <input id="pt-boma" type="text" value={form.boma} onChange={e => update('boma', e.target.value)} placeholder={t('patientNew.bomaPlaceholder')} />
+                      <input id="pt-boma" type="text" value={form.boma} onChange={e => update('boma', e.target.value)} />
                     </div>
                   </div>
                   <div className="mt-4">

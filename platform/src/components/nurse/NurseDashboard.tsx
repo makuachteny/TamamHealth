@@ -164,9 +164,9 @@ export default function NurseDashboard() {
   // Header actions per the nurse-station design: "+ New triage" as the rail
   // CTA, then Print and the primary "Start handoff" on the right.
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
-    { label: 'New triage', icon: Plus, onClick: () => selectStation('triage'), tone: 'primary' },
+    { label: 'New Triage', icon: Plus, onClick: () => selectStation('triage'), tone: 'primary' },
     { label: 'Print', icon: Printer, onClick: () => window.print(), tone: 'neutral' },
-    { label: 'Start handoff', icon: ArrowRightLeft, onClick: () => setHandoffOpen(true), tone: 'primary' },
+    { label: 'Start Handoff', icon: ArrowRightLeft, onClick: () => setHandoffOpen(true), tone: 'primary' },
   ]), [selectStation]);
 
   // Patient portraits by id, so triage and ward rows show the same face as the
