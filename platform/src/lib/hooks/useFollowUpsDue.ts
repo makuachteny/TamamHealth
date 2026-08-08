@@ -5,6 +5,7 @@ import { makeCoalescer } from './live-reload';
 import type { FollowUpDoc } from '../db-types';
 import { followUpsDB } from '../db';
 import { useDataScope } from './useDataScope';
+import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 
 // A follow-up counts as "due" here when it's scheduled today or within this
 // many days out — mirrors the window the doctor worklist rail (dashboard
@@ -37,9 +38,11 @@ export function useFollowUpsDue() {
       // getPendingFollowUps also returns 'missed' follow-ups; only 'active'
       // ones belong on this rail, so that's filtered out here too.
       const pending = await getPendingFollowUps(undefined, scope);
+      // Local calendar, not UTC — `scheduledDate` is a local date string, and
+      // a UTC slice shifts the window boundary by a day east of UTC.
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() + DUE_WINDOW_DAYS);
-      const cutoffIso = cutoff.toISOString().slice(0, 10);
+      const cutoffIso = toIsoDate(cutoff);
       setFollowUpsDue(
         pending.filter(f => f.status === 'active' && (f.scheduledDate || '') <= cutoffIso)
       );

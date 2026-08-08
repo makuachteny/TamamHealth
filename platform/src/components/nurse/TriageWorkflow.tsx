@@ -242,7 +242,19 @@ export default function TriageWorkflow({
 
   const escalateToEmergency = async (ti: typeof triageHistory[number]) => {
     try {
-      const { escalateEncounterToEmergency } = await import('@/lib/services/encounter-service');
+      const { getEncounter, transitionEncounter, escalateEncounterToEmergency } =
+        await import('@/lib/services/encounter-service');
+      // A clerical check-in leaves the encounter at awaiting_triage, which has
+      // no escalation edge by design (an escalation asserts an assessment).
+      // The nurse escalating IS the assessment — take the visit into triage
+      // first, then escalate, instead of throwing on the deteriorating
+      // patient this button exists for.
+      const enc = await getEncounter(ti.encounterId!);
+      if (enc?.status === 'awaiting_triage') {
+        await transitionEncounter(ti.encounterId!, 'in_triage', {
+          actorId: currentUser?._id, actorRole: currentUser?.role,
+        });
+      }
       await escalateEncounterToEmergency(ti.encounterId!, { actorId: currentUser?._id });
       // Mirror onto the triage doc like LWBS above does — the waiting queues
       // are triage-derived, so without this the escalated patient stayed at

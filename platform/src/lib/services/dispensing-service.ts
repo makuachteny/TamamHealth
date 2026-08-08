@@ -715,12 +715,17 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
  * name itself: invisible to the task list, but at least traceable in the
  * dispense note and audit log.
  */
-async function resolvePrescriberId(prescribedBy: string): Promise<string> {
+async function resolvePrescriberId(prescribedBy: string, orgId?: string): Promise<string> {
   const wanted = (prescribedBy || '').trim().toLowerCase();
   if (!wanted) return prescribedBy;
   try {
     const users = await findByType<UserDoc>(usersDB(), 'user', {});
-    const matches = users.filter(u => (u.name || '').trim().toLowerCase() === wanted);
+    // Constrained to the prescription's own org: the local directory holds
+    // every tenant's users, and an unconstrained unique-name match could
+    // deliver this PHI-bearing task to a same-named clinician elsewhere.
+    const matches = users.filter(u =>
+      (u.name || '').trim().toLowerCase() === wanted &&
+      (!orgId || !u.orgId || u.orgId === orgId));
     if (matches.length === 1) return matches[0]._id;
   } catch {
     // Directory unavailable — fall through to the name.
@@ -752,7 +757,7 @@ async function raisePharmacyTask(
       ? `Pharmacy needs clarification: ${rx.medication}`
       : `Rx unavailable (stock-out): ${rx.medication}`;
     await createTask({
-      userId: await resolvePrescriberId(rx.prescribedBy),
+      userId: await resolvePrescriberId(rx.prescribedBy, rx.orgId),
       userName: rx.prescribedBy,
       title,
       description: `${rx.patientName} — ${note}`,

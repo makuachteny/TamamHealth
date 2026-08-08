@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import Modal from '@/components/Modal';
 import { CalendarClock, X } from '@/components/icons/lucide';
+import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import './clinical-notes.css';
 
 export interface FollowUpModalResult {
@@ -33,11 +34,15 @@ interface FollowUpModalProps {
   onClose: () => void;
 }
 
-/** Today + 7 days, as YYYY-MM-DD — the default follow-up window. */
+/**
+ * Today + 7 days, as YYYY-MM-DD — the default follow-up window. Local
+ * calendar, not UTC: in Juba (UTC+3) a `toISOString()` slice taken before
+ * 03:00 local names yesterday, dating the follow-up a day early.
+ */
 function defaultScheduledDate(): string {
   const d = new Date();
   d.setDate(d.getDate() + 7);
-  return d.toISOString().slice(0, 10);
+  return toIsoDate(d);
 }
 
 export default function FollowUpModal({

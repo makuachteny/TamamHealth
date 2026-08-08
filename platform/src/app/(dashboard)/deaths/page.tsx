@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PatientName from '@/components/PatientName';
 import { useDeaths } from '@/lib/hooks/useDeaths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -17,10 +17,11 @@ import EhrListHeader, { EhrListFilters, LIST_STAT_COLORS } from '@/components/eh
 
 // Shared control styling inside the header's Filters popover.
 const filterFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
-import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
+import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck, ExternalLink } from '@/components/icons/lucide';
 import Select from '@/components/Select';
 
 export default function DeathsPage() {
+  const router = useRouter();
   const { t } = useTranslation();
   const { deaths, register } = useDeaths();
   const { hospitals } = useHospitals();
@@ -138,11 +139,26 @@ export default function DeathsPage() {
   const handleSubmit = async () => {
     if (!form.deceasedFirstName || !form.immediateCause) return;
     const fac = hospitals.find(h => h._id === (form.facilityId || currentUser?.hospitalId));
+    // An encounter id is a URL-borne claim, not a fact: verify it belongs to
+    // the patient this death is being registered FOR (and to this org/
+    // facility) before it is stamped on the certificate or driven to a
+    // terminal status. A stale param surviving an unlink/patient-swap used to
+    // close a different — living — patient's visit as deceased.
+    let verifiedEncounterId: string | undefined;
+    if (encounterId && linkedPatientId) {
+      try {
+        const { resolvePatientEncounter } = await import('@/lib/services/encounter-service');
+        const enc = await resolvePatientEncounter(encounterId, linkedPatientId, currentUser
+          ? { orgId: currentUser.orgId, hospitalId: currentUser.hospitalId, role: currentUser.role }
+          : undefined);
+        verifiedEncounterId = enc?._id;
+      } catch { /* unverifiable → treated as absent */ }
+    }
     try {
       await register({
         ...form,
         patientId: linkedPatientId,
-        encounterId,
+        encounterId: verifiedEncounterId,
         facilityId: fac?._id || currentUser?.hospitalId || '',
         facilityName: fac?.name || currentUser?.hospitalName || '',
         state: fac?.state || form.state,
@@ -155,10 +171,10 @@ export default function DeathsPage() {
       // Death closes the visit (best-effort — the death record above is
       // already the CRVS source of truth; neither of these can be allowed
       // to make registration itself look like it failed).
-      if (encounterId) {
+      if (verifiedEncounterId) {
         try {
           const { transitionEncounter } = await import('@/lib/services/encounter-service');
-          await transitionEncounter(encounterId, 'deceased', {
+          await transitionEncounter(verifiedEncounterId, 'deceased', {
             actorId: currentUser?._id,
             actorRole: currentUser?.role,
           });
@@ -196,6 +212,10 @@ export default function DeathsPage() {
     const p = patients.find(x => x._id === patientId);
     if (!p) return;
     setLinkedPatientId(p._id);
+    // A visit link belongs to the patient it arrived with — never carry it
+    // onto a manually-picked one. (The deep-link effect re-sets it right
+    // after this call for the patient it named.)
+    setEncounterId(undefined);
     setPatientLookup('');
     // Pre-fill the form with the patient's known data
     const dob = p.dateOfBirth || '';
@@ -303,6 +323,20 @@ export default function DeathsPage() {
                         {d.deathRegistered ? t('deaths.yes') : t('deaths.no')}
                       </span>
                       {expandedDeath === d._id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      {d.patientId && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-lg hover:bg-[var(--overlay-subtle)]"
+                          title={`Open ${d.deceasedFirstName} ${d.deceasedSurname}'s chart`}
+                          aria-label={`Open ${d.deceasedFirstName} ${d.deceasedSurname}'s chart`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/patients/${d.patientId}?tab=history`);
+                          }}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -372,7 +406,7 @@ export default function DeathsPage() {
                             <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{lp?.firstName} {lp?.surname}</p>
                             <p style={{ color: 'var(--text-muted)' }}>{lp?.hospitalNumber} · {lp?.gender}{lp?.estimatedAge ? ` · ${lp.estimatedAge}y` : ''}</p>
                           </div>
-                          <button onClick={() => { setLinkedPatientId(undefined); }} className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('deaths.unlink')}</button>
+                          <button onClick={() => { setLinkedPatientId(undefined); setEncounterId(undefined); }} className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('deaths.unlink')}</button>
                         </div>
                       );
                     })()

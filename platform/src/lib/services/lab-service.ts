@@ -210,7 +210,13 @@ async function resolveOrderingClinicianId(result: LabResultDoc): Promise<string>
   try {
     const users = await findByType<UserDoc>(usersDB(), 'user', {});
     const wanted = result.orderedBy.trim().toLowerCase();
-    const matches = users.filter(u => (u.name || '').trim().toLowerCase() === wanted);
+    // Candidates are constrained to the ORDER's own org: the local directory
+    // holds every tenant's users, and an unconstrained unique-name match
+    // could deliver this PHI-bearing task to a same-named clinician in a
+    // different organisation.
+    const matches = users.filter(u =>
+      (u.name || '').trim().toLowerCase() === wanted &&
+      (!result.orgId || !u.orgId || u.orgId === result.orgId));
     if (matches.length === 1) return matches[0]._id;
   } catch {
     // Directory unavailable — fall through to the name.

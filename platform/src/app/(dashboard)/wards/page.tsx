@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
-import { BedDouble, ChevronRight, Plus, X, AlertTriangle, CheckCircle2, Filter } from '@/components/icons/lucide';
+import { BedDouble, ChevronRight, Plus, X, AlertTriangle, CheckCircle2, Filter, ExternalLink } from '@/components/icons/lucide';
 import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useWards } from '@/lib/hooks/useWards';
@@ -21,6 +21,7 @@ import Select from '@/components/Select';
 const ADMISSION_GRID = 'minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 2fr) 96px 132px';
 
 export default function WardsPage() {
+  const router = useRouter();
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const { patients } = usePatients();
@@ -261,7 +262,21 @@ export default function WardsPage() {
                   >
                     {/* Patient */}
                     <div className="min-w-0">
-                      <PatientName patientId={a.patientId} name={a.patientName} nameClassName="!font-normal text-[12.5px]" />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <PatientName patientId={a.patientId} name={a.patientName} nameClassName="!font-normal text-[12.5px]" />
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-lg hover:bg-[var(--overlay-subtle)] flex-shrink-0"
+                          title={`Open ${a.patientName}'s chart`}
+                          aria-label={`Open ${a.patientName}'s chart`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/patients/${a.patientId}?tab=overview`);
+                          }}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     {/* Ward */}
                     <div className="text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{a.wardName}</div>
@@ -298,7 +313,9 @@ export default function WardsPage() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.patientRequired')}</label>
-                  <Select value={admitForm.patientId} onChange={e => setAdmitForm({ ...admitForm, patientId: e.target.value })}>
+                  {/* Changing the patient drops the deep-linked visit — an
+                      encounterId belongs to the patient it arrived with. */}
+                  <Select value={admitForm.patientId} onChange={e => setAdmitForm({ ...admitForm, patientId: e.target.value, encounterId: '' })}>
                     <option value="">{t('ward.selectPatient')}</option>
                     {patients.slice(0, 200).map(p => (
                       <option key={p._id} value={p._id}>{p.firstName} {p.surname} · {p.hospitalNumber}</option>

@@ -171,10 +171,28 @@ export async function admitPatient(
   const db = wardDB();
   const now = new Date().toISOString();
 
+  // Verify the visit link BEFORE anything is written: `encounterId` arrives
+  // from a URL param via the admit form, and a stale one surviving a patient
+  // swap must neither be stamped as this admission's lineage nor close a
+  // different patient's visit.
+  let encounterId = data.encounterId;
+  if (encounterId) {
+    try {
+      const { resolvePatientEncounter } = await import('./encounter-service');
+      encounterId = (await resolvePatientEncounter(encounterId, data.patientId))?._id;
+    } catch {
+      encounterId = undefined;
+    }
+    if (!encounterId) {
+      console.warn('[ward] admission encounterId does not belong to the admitted patient — link dropped');
+    }
+  }
+
   const doc: AdmissionDoc = withPendingOfflineSync({
     _id: `adm-${uuidv4().slice(0, 8)}`,
     type: 'admission',
     ...data,
+    encounterId,
     admissionDate: now,
     isolationRequired: data.isolationRequired || false,
     status: 'admitted',
@@ -214,10 +232,12 @@ export async function admitPatient(
   // and `escalated_to_emergency`. If the encounter sits somewhere else the
   // transition throws — caught here so a workflow quirk never undoes a real
   // admission that has already been written and the bed already assigned.
-  if (data.encounterId) {
+  //
+  // (Already verified against the admitted patient above.)
+  if (encounterId) {
     try {
       const { transitionEncounter } = await import('./encounter-service');
-      await transitionEncounter(data.encounterId, 'admitted', {
+      await transitionEncounter(encounterId, 'admitted', {
         actorId: actor?.id ?? data.admittedBy,
         actorRole: actor?.role,
       });

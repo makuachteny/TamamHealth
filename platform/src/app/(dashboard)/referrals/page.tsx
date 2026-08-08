@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import EmptyState from '@/components/EmptyState';
@@ -13,6 +13,7 @@ import {
   User, Activity, FlaskConical, Paperclip, XCircle, MessageSquarePlus,
   ClipboardCheck, RotateCcw,
   Download,
+  ExternalLink,
 } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useReferrals } from '@/lib/hooks/useReferrals';
@@ -39,6 +40,7 @@ const DISPOSITION_OPTIONS: ReferralDisposition[] = [
 ];
 
 export default function ReferralsPage() {
+  const router = useRouter();
   const { t } = useTranslation();
   const { referrals, accept, updateStatus, updateNotes, completeWithOutcome } = useReferrals();
   const { showToast } = useToast();
@@ -640,8 +642,16 @@ export default function ReferralsPage() {
               <tbody>
                 {filteredReferrals.map(ref => {
                 const tp = ref.transferPackage as TransferPackage | undefined;
+                const hasPatientChart = isRealPatient(ref.patientId);
                 // Status-driven actions, collapsed into a single kebab menu.
                 const rowActions: RowAction[] = [
+                  {
+                    key: 'view-details',
+                    label: 'View referral details',
+                    tone: 'default' as const,
+                    icon: <FileText className="w-4 h-4" />,
+                    onClick: () => setExpandedReferral(ref._id),
+                  },
                   ...(canManageReferrals && activeTab === 'incoming' && (ref.status === 'sent' || ref.status === 'received') ? [
                     { key: 'accept', label: t('referrals.accept'), tone: 'success' as const, icon: <CheckCircle2 className="w-4 h-4" />, onClick: async () => {
                       try { await accept(ref._id); showToast(t('referrals.toastAccepted', { name: ref.patientName }), 'success'); }
@@ -664,7 +674,13 @@ export default function ReferralsPage() {
                   <Fragment key={ref._id}>
                     <tr
                       className="cursor-pointer hover:bg-[var(--table-row-hover)]"
-                      onClick={() => setExpandedReferral(ref._id)}
+                      onClick={() => {
+                        if (hasPatientChart) {
+                          router.push(`/patients/${ref.patientId}?tab=referrals`);
+                        } else {
+                          setExpandedReferral(ref._id);
+                        }
+                      }}
                     >
                       {/* Same identity cell the lab queue and the registry use:
                           avatar, name, facility ID beneath — which is what the
@@ -679,6 +695,9 @@ export default function ReferralsPage() {
                           secondaryText={hospitalNoFor(ref.patientId)}
                           nameClassName="font-medium text-sm"
                         />
+                        {hasPatientChart && (
+                          <ExternalLink className="w-3 h-3 ml-1 opacity-50" aria-hidden="true" />
+                        )}
                       </td>
                       {/* Destination on top, origin beneath — the same
                           primary/secondary stack the rest of the row uses. As

@@ -275,7 +275,7 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
     title: r.patientName,
     subtitle: `${r.reason || 'Referral'} → ${r.toHospital || 'receiving facility'}`,
     meta: r.status ? String(r.status).replace(/_/g, ' ') : '',
-    href: '/referrals',
+    href: `/patients/${r.patientId}?tab=referrals`,
   }));
 
   // Today's telehealth visits for this clinician — each row opens the visit room.
@@ -297,7 +297,7 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
       : `${e.resultsReady} of ${e.resultsTotal} results back`,
     meta: shortDate(e.createdAt),
     tone: e.allResultsBack ? ('danger' as const) : ('neutral' as const),
-    href: e.allResultsBack ? `/consultation?encounter=${e._id}` : '/lab',
+    href: e.allResultsBack ? `/consultation?encounter=${e._id}` : `/patients/${e.patientId}?tab=labs`,
   }));
 
   // Community-health follow-ups due (or nearly due) for this clinician's org/
@@ -342,15 +342,17 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
       tone: incomingTransfers.some(t => isTransferOverdue(t, now))
         ? ('danger' as const)
         : incomingTransfers.length > 0 ? ('warning' as const) : ('neutral' as const),
-      href: '/patients',
       entries: transferEntries,
     },
-    { label: 'Documents to sign', count: signCount, tone: signCount > 0 ? 'warning' as const : 'neutral' as const, href: '/patients', entries: documentEntries },
-    { label: 'Phone notes', count: phoneNotesInbox.length, tone: phoneNotesInbox.length > 0 ? 'warning' as const : 'neutral' as const, href: '/patients', entries: phoneNoteEntries },
+    // Each document/phone-note entry already opens its patient chart. There is
+    // no meaningful cross-patient queue page anymore, so omit the group-level
+    // link instead of sending clinicians to the generic patient registry.
+    { label: 'Documents to sign', count: signCount, tone: signCount > 0 ? 'warning' as const : 'neutral' as const, entries: documentEntries },
+    { label: 'Phone notes', count: phoneNotesInbox.length, tone: phoneNotesInbox.length > 0 ? 'warning' as const : 'neutral' as const, entries: phoneNoteEntries },
     { label: 'Open referrals', count: myOpenReferrals.length, href: '/referrals', entries: referralEntries },
     { label: 'Awaiting labs', count: resumableEncounters.length, tone: resumableEncounters.length > 0 ? 'danger' as const : 'neutral' as const, href: '/lab', entries: labEntries },
     { label: 'Telehealth visits', count: telehealthToday.length, tone: telehealthToday.length > 0 ? 'warning' as const : 'neutral' as const, href: '/appointments', entries: telehealthEntries },
-    { label: 'Follow-ups due', count: dueFollowUps.length, tone: dueFollowUps.length > 0 ? 'warning' as const : 'neutral' as const, href: '/patients', entries: followUpEntries },
+    { label: 'Follow-ups due', count: dueFollowUps.length, tone: dueFollowUps.length > 0 ? 'warning' as const : 'neutral' as const, entries: followUpEntries },
   ];
 
   return {

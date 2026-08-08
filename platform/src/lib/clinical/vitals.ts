@@ -177,7 +177,6 @@ export function mergeVitalsTimeline(records: MedicalRecordDoc[], triages: Triage
     .filter(hasAnyVital);
 
   const fromTriage: VitalsTimelineEntry[] = triages
-    .filter(t => t.temperature || t.pulse || t.respiratoryRate || t.systolic || t.diastolic || t.oxygenSaturation || t.weight)
     .map((t): VitalsTimelineEntry => ({
       id: t._id,
       at: t.triagedAt || t.createdAt || '',
@@ -192,7 +191,11 @@ export function mergeVitalsTimeline(records: MedicalRecordDoc[], triages: Triage
       muac: numOrUndef(t.muac),
       bloodGlucose: numOrUndef(t.bloodGlucose),
       facility: t.facilityName,
-    }));
+    }))
+    // Same completeness test the record side uses — filtering on a hand-listed
+    // subset dropped triage stops whose ONLY observation was MUAC (nutrition
+    // screening) or blood glucose.
+    .filter(hasAnyVital);
 
   // Array#sort is stable (guaranteed since ES2019), so entries with an equal
   // `at` keep their relative order — records were concatenated first, so a

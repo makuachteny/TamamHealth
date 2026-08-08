@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
-import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, ChevronRight, AlertOctagon, Filter, Download, Check } from '@/components/icons/lucide';
+import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, ChevronRight, AlertOctagon, Filter, Download, Check, ExternalLink } from '@/components/icons/lucide';
 import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
@@ -463,6 +463,17 @@ export default function PharmacyPage() {
             <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Payment</span><strong style={{ color: paymentClear ? 'var(--color-success)' : 'var(--color-warning)' }}>{paymentClear ? 'Clear' : balanceKnown ? formatMoney(balance) : 'Unknown'}</strong></div>
             <div><span className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Stage</span><strong>{pharmacyStageLabel(stage)}</strong></div>
           </div>
+          {rx.patientId && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm mt-3"
+              onClick={() => router.push(`/patients/${rx.patientId}?tab=prescriptions`)}
+              title={`Open ${rx.patientName}'s chart`}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Open patient chart
+            </button>
+          )}
         </div>
         <div className="space-y-2">
           {steps.map((step, index) => {

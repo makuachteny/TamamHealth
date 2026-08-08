@@ -251,6 +251,34 @@ export async function transitionEncounter(
   return updated;
 }
 
+/**
+ * Resolve an externally-supplied encounter id (URL param, form state) into an
+ * encounter ONLY when it provably belongs to the named patient — and, when a
+ * scope is given, to the caller's org/facility. Everything else resolves to
+ * null so the caller drops the link instead of acting on it.
+ *
+ * Exists because two flows (death registration, ward admission) took
+ * `?encounterId=` at face value and drove TERMINAL transitions with it: a
+ * stale param surviving a patient swap closed a different — living, mid-visit
+ * — patient's encounter as deceased/admitted. An encounter id is a claim, not
+ * a fact; this is where the claim gets checked.
+ */
+export async function resolvePatientEncounter(
+  encounterId: string,
+  patientId: string,
+  scope?: { orgId?: string; hospitalId?: string; role: string },
+): Promise<EncounterDoc | null> {
+  if (!encounterId || !patientId) return null;
+  const enc = await getEncounter(encounterId);
+  if (!enc) return null;
+  if (enc.patientId !== patientId) return null;
+  if (scope) {
+    const { filterByScope } = await import('./data-scope');
+    if (filterByScope([enc], scope as DataScope).length === 0) return null;
+  }
+  return enc;
+}
+
 /** The most recent still-open (non-terminal) encounter for a patient, or null. */
 export async function getOpenEncounterForPatient(patientId: string): Promise<EncounterDoc | null> {
   const rows = await findByType<EncounterDoc>(
@@ -672,8 +700,19 @@ export async function dischargeEncounter(
   // disposition so existing callers keep their behavior. Before dispositions
   // existed, "discharged with referral" and "walked out mid-checkout" were
   // unrepresentable — every discharge reported as routine.
-  const finalStatus: EncounterStatus = opts.disposition
+  let finalStatus: EncounterStatus = opts.disposition
     ?? (opts.pendingItems ? 'discharged_with_pending_items' : 'discharged');
+
+  // A dismissal is only legal FROM `awaiting_facility_checkout`. An encounter
+  // already IN facility checkout has passed that door — the machine offers no
+  // dismissal edge there, and attempting one used to throw, get swallowed by
+  // the desk's best-effort wrapper, and let the appointment bridge re-close
+  // the visit as a routine `discharged` — the opposite of what the clerk
+  // documented. Walking out mid-facility-checkout maps to the closest honest
+  // terminal: discharged with pending items.
+  if (finalStatus === 'dismissed_without_formal_checkout' && enc.status === 'in_facility_checkout') {
+    finalStatus = 'discharged_with_pending_items';
+  }
 
   // A dismissal is legal only FROM `awaiting_facility_checkout` — the patient
   // left before facility checkout began — so that walk stops one hop short.

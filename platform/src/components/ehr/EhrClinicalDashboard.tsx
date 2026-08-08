@@ -917,7 +917,18 @@ export default function EhrClinicalDashboard({
     if (!triage.encounterId) return;
     if (!window.confirm(`Escalate ${triage.patientName} to emergency care?`)) return;
     try {
-      const { escalateEncounterToEmergency } = await import('@/lib/services/encounter-service');
+      const { getEncounter, transitionEncounter, escalateEncounterToEmergency } =
+        await import('@/lib/services/encounter-service');
+      // The machine deliberately has no awaiting_triage → escalated edge: an
+      // escalation asserts an assessment. The clinician pressing this button
+      // IS assessing the patient, so a still-queued visit is taken into
+      // triage first — the one legal hop — under that clinician's name.
+      const enc = await getEncounter(triage.encounterId);
+      if (enc?.status === 'awaiting_triage') {
+        await transitionEncounter(triage.encounterId, 'in_triage', {
+          actorId: currentUser?._id, actorRole: currentUser?.role,
+        });
+      }
       await escalateEncounterToEmergency(triage.encounterId, { actorId: currentUser?._id });
       await updateTriageDoc(triage._id, { status: 'referred' });
       showToast(`${triage.patientName} escalated to emergency care.`, 'success');

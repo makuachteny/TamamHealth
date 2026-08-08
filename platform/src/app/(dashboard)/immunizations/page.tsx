@@ -166,16 +166,27 @@ export default function ImmunizationsPage() {
       gender: (p.gender as 'Male' | 'Female') || f.gender,
       dateOfBirth: p.dateOfBirth || f.dateOfBirth,
     }));
+    // Bind the ordering visit/note to THIS patient, once.
+    setLinkedOrder({
+      patientId: p._id,
+      encounterId: searchParams.get('encounterId') || undefined,
+      noteId: searchParams.get('noteId') || undefined,
+    });
     setShowModal(true);
   }, [searchParams, patients]);
 
   // The visit/note that ordered the dose, when this page was opened from a
   // consultation plan (e.g. `/immunizations?patientId=...&encounterId=...`).
-  // Read once alongside the patientId prefill above, then stamped onto the
-  // dose on save so the immunization traces back to the encounter/note that
-  // called for it.
-  const encounterId = searchParams.get('encounterId') || undefined;
-  const noteId = searchParams.get('noteId') || undefined;
+  //
+  // Held in state, bound to the patient the link named, rather than read from
+  // the URL on every render: an immunization session records several children
+  // back-to-back from one deep link, and a param that outlives its patient
+  // stamps child B's dose with child A's visit and note. `linkedOrder` is
+  // cleared whenever the form's patient changes (see `setLinkedPatient`
+  // below and the unlink button).
+  const [linkedOrder, setLinkedOrder] = useState<{ patientId: string; encounterId?: string; noteId?: string } | null>(null);
+  const encounterId = linkedOrder && linkedOrder.patientId === form.patientId ? linkedOrder.encounterId : undefined;
+  const noteId = linkedOrder && linkedOrder.patientId === form.patientId ? linkedOrder.noteId : undefined;
 
   // Best phone number available for a defaulter's caregiver: the patient's
   // own phone first (in practice the reachable number for young children),
@@ -899,7 +910,7 @@ export default function ImmunizationsPage() {
                         <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{form.patientName}</p>
                         <p style={{ color: 'var(--text-muted)' }}>{form.gender}{form.dateOfBirth ? ` · DOB ${form.dateOfBirth}` : ''}</p>
                       </div>
-                      <button type="button" onClick={() => setForm(f => ({ ...f, patientId: '', patientName: '', dateOfBirth: '' }))} className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('immun.unlink')}</button>
+                      <button type="button" onClick={() => { setLinkedOrder(null); setForm(f => ({ ...f, patientId: '', patientName: '', dateOfBirth: '' })); }} className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('immun.unlink')}</button>
                     </div>
                   ) : (
                     <>
