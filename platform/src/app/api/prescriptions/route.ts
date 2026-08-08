@@ -64,7 +64,14 @@ async function postHandler(request: NextRequest) {
     const { sanitizePayload } = await import('@/lib/validation');
     body = sanitizePayload(body);
     if (!body.prescribedBy) body.prescribedBy = auth.name;
-    if (!body.orgId && auth.orgId) body.orgId = auth.orgId;
+    // Tenancy is stamped from the verified auth claim, never trusted from the
+    // client — see the matching comment in /api/referrals for the rationale.
+    if (auth.orgId) {
+      body.orgId = auth.orgId;
+    } else if (!(auth.role === 'super_admin' || auth.role === 'government')) {
+      delete body.orgId;
+    }
+    if (!body.hospitalId && auth.hospitalId) body.hospitalId = auth.hospitalId;
     const { createPrescription } = await import('@/lib/services/prescription-service');
     const result = await createPrescription(body as Parameters<typeof createPrescription>[0]);
     return NextResponse.json({

@@ -73,7 +73,17 @@ async function postHandler(request: NextRequest) {
       if (!body.referralId) {
         return NextResponse.json({ error: 'referralId is required' }, { status: 400 });
       }
-      const { acceptReferral } = await import('@/lib/services/referral-service');
+      const { acceptReferral, getReferralById } = await import('@/lib/services/referral-service');
+      const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+      // Tenant guard: without this any CREATE_ROLES caller could accept an
+      // arbitrary referralId regardless of org/facility. 404 (not 403) so an
+      // out-of-scope id reads identically to a missing one. filterByScope's
+      // toOrgId exception (KAN-101) is what still lets the RECEIVING org
+      // accept a legitimate inbound cross-org referral here.
+      const existingForAccept = await getReferralById(body.referralId as string);
+      if (!existingForAccept || filterByScope([existingForAccept], buildScopeFromAuth(auth)).length === 0) {
+        return NextResponse.json({ error: 'Referral not found' }, { status: 404 });
+      }
       const result = await acceptReferral(body.referralId as string);
       if (!result) return NextResponse.json({ error: 'Referral not found' }, { status: 404 });
       return NextResponse.json({ referral: result });
@@ -86,7 +96,13 @@ async function postHandler(request: NextRequest) {
           { status: 400 }
         );
       }
-      const { updateReferralStatus } = await import('@/lib/services/referral-service');
+      const { updateReferralStatus, getReferralById } = await import('@/lib/services/referral-service');
+      const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+      // Same tenant guard as accept above.
+      const existingForStatus = await getReferralById(body.referralId as string);
+      if (!existingForStatus || filterByScope([existingForStatus], buildScopeFromAuth(auth)).length === 0) {
+        return NextResponse.json({ error: 'Referral not found' }, { status: 404 });
+      }
       const result = await updateReferralStatus(
         body.referralId as string,
         body.status as Parameters<typeof updateReferralStatus>[1],
@@ -104,7 +120,16 @@ async function postHandler(request: NextRequest) {
     body.referredBy = body.referredBy || auth.sub;
     body.referredByName = body.referredByName || auth.name;
     if (!body.fromHospitalId && auth.hospitalId) body.fromHospitalId = auth.hospitalId;
-    if (!body.orgId && auth.orgId) body.orgId = auth.orgId;
+    // Tenancy is stamped from the verified auth claim, never trusted from the
+    // client — a caller who belongs to an org always gets that org on the
+    // referral, no matter what body.orgId said. A body-supplied orgId is only
+    // honoured for a national-role caller (super_admin/government) with no
+    // org of their own to stamp.
+    if (auth.orgId) {
+      body.orgId = auth.orgId;
+    } else if (!(auth.role === 'super_admin' || auth.role === 'government')) {
+      delete body.orgId;
+    }
     const { createReferral } = await import('@/lib/services/referral-service');
     const referral = await createReferral(body as Parameters<typeof createReferral>[0]);
     return NextResponse.json({ referral }, { status: 201 });

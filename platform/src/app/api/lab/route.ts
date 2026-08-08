@@ -77,7 +77,14 @@ async function postHandler(request: NextRequest) {
       );
     }
     if (!body.orderedBy) body.orderedBy = auth.name;
-    if (!body.orgId && auth.orgId) body.orgId = auth.orgId;
+    // Tenancy is stamped from the verified auth claim, never trusted from the
+    // client — see the matching comment in /api/referrals for the rationale.
+    if (auth.orgId) {
+      body.orgId = auth.orgId;
+    } else if (!(auth.role === 'super_admin' || auth.role === 'government')) {
+      delete body.orgId;
+    }
+    if (!body.hospitalId && auth.hospitalId) body.hospitalId = auth.hospitalId;
     const { createLabResult } = await import('@/lib/services/lab-service');
     const result = await createLabResult(body as Parameters<typeof createLabResult>[0]);
     return NextResponse.json({ labResult: result }, { status: 201 });

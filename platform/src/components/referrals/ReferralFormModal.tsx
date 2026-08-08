@@ -84,6 +84,9 @@ export default function ReferralFormModal({ onClose, onSent }: { onClose: () => 
           reason: formReason,
           notes: formNotes,
           referringDoctor: currentUser?.name || '',
+          // The dashboard's "Open referrals" rail filters on createdBy — a
+          // referral without it is invisible to the clinician who sent it.
+          createdBy: currentUser?._id,
           referralDate: new Date().toISOString().split('T')[0],
           status: 'sent',
         },

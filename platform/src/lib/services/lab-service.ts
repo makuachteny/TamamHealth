@@ -1,6 +1,6 @@
-import { labResultsDB, hospitalsDB } from '../db';
+import { labResultsDB, hospitalsDB, usersDB } from '../db';
 import { findByType } from './db-query';
-import type { LabResultDoc, HospitalDoc } from '../db-types';
+import type { LabResultDoc, HospitalDoc, UserDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
@@ -196,16 +196,35 @@ export async function updateLabResult(id: string, data: Partial<LabResultDoc>): 
  * because a notification could not be created would be a worse outcome than a
  * missing task.
  */
+/**
+ * The task list joins on user `_id` (`getTasks(userId)` → `{ userId }`
+ * selector), so the task must be keyed by the ordering clinician's id. New
+ * orders carry `orderedById`; legacy orders carry only the free-text name in
+ * `orderedBy`, which is resolved against the user directory here. An ambiguous
+ * or unknown name falls back to the name itself — invisible to the task list,
+ * but the notifications feed still matches it by name, and the overdue panel
+ * catches the result either way.
+ */
+async function resolveOrderingClinicianId(result: LabResultDoc): Promise<string> {
+  if (result.orderedById) return result.orderedById;
+  try {
+    const users = await findByType<UserDoc>(usersDB(), 'user', {});
+    const wanted = result.orderedBy.trim().toLowerCase();
+    const matches = users.filter(u => (u.name || '').trim().toLowerCase() === wanted);
+    if (matches.length === 1) return matches[0]._id;
+  } catch {
+    // Directory unavailable — fall through to the name.
+  }
+  return result.orderedBy;
+}
+
 async function raiseCriticalResultTask(result: LabResultDoc): Promise<void> {
   try {
-    if (!result.orderedBy) return; // No one to notify — the panel still catches it.
+    if (!result.orderedBy && !result.orderedById) return; // No one to notify — the panel still catches it.
     const { createTask } = await import('./clinician-task-service');
     const sla = getResultReviewSLA();
     await createTask({
-      // LabResultDoc.orderedBy is a free-text clinician NAME, not an id — the
-      // same join the dashboard uses. Passing it as userId keeps this
-      // consistent with how tasks are already matched to a clinician here.
-      userId: result.orderedBy,
+      userId: await resolveOrderingClinicianId(result),
       userName: result.orderedBy,
       title: `Critical result: ${result.testName}`,
       description:

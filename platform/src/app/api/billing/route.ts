@@ -64,6 +64,18 @@ async function postHandler(request: NextRequest) {
     }
     const { sanitizePayload } = await import('@/lib/validation');
     body = sanitizePayload(body);
+    // Both by-id actions must prove the target bill is inside the caller's
+    // tenant scope before mutating it — same guard as /api/referrals and
+    // /api/appointments. Out-of-scope resolves to 404, not 403, so the
+    // response does not confirm the bill exists.
+    if (body.action === 'record_payment' || body.action === 'waive') {
+      const { getBillById } = await import('@/lib/services/billing-service');
+      const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+      const existing = await getBillById(body.billId as string);
+      if (!existing || filterByScope([existing], buildScopeFromAuth(auth)).length === 0) {
+        return NextResponse.json({ error: 'Bill not found' }, { status: 404 });
+      }
+    }
     // Check if this is a payment recording action
     if (body.action === 'record_payment') {
       const { recordPayment } = await import('@/lib/services/billing-service');
@@ -100,7 +112,13 @@ async function postHandler(request: NextRequest) {
     }
     body.generatedBy = auth.sub;
     body.generatedByName = auth.name;
-    if (!body.orgId && auth.orgId) body.orgId = auth.orgId;
+    // Tenancy is stamped from the verified auth claim, never trusted from the
+    // client — see the matching comment in /api/referrals for the rationale.
+    if (auth.orgId) {
+      body.orgId = auth.orgId;
+    } else if (!(auth.role === 'super_admin' || auth.role === 'government')) {
+      delete body.orgId;
+    }
     const { createBill } = await import('@/lib/services/billing-service');
     const bill = await createBill(body as unknown as Parameters<typeof createBill>[0]);
     return NextResponse.json({ bill }, { status: 201 });

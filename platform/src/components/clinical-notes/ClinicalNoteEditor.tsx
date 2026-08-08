@@ -373,6 +373,10 @@ export default function ClinicalNoteEditor({
     const updated = await persist(() => signClinicalNote(noteId, {
       signedBy: currentUser?._id || '',
       signedByName: userName,
+      // Without the role, a provider picking up an unassigned (or a
+      // colleague's) draft is refused by the attestation check even though
+      // provider roles hold standing signing authority.
+      signerRole: currentUser?.role,
     }));
     if (updated) showToast('Note signed.', 'success');
   };
@@ -407,6 +411,9 @@ export default function ClinicalNoteEditor({
       toHospitalId: '',
       referralDate: new Date().toISOString(),
       urgency: 'routine',
+      // The dashboard's "Open referrals" rail filters on createdBy — a
+      // referral without it is invisible to the clinician who sent it.
+      createdBy: currentUser?._id,
       reason: `Referral from ${getNoteType(note.noteType).label} of ${note.serviceDate}`,
       department: '',
       status: 'sent',
@@ -915,6 +922,7 @@ export default function ClinicalNoteEditor({
           patientId={note.patientId}
           patientName={note.patientName}
           currentUser={currentUser}
+          encounterId={note.encounterId}
           onClose={() => {
             setShowMedications(false);
             // The popup may have renewed or stopped something — bring the
@@ -950,6 +958,7 @@ export default function ClinicalNoteEditor({
           patientId={note.patientId}
           patientName={note.patientName}
           currentUser={currentUser}
+          encounterId={note.encounterId}
           onClose={() => {
             setShowPrescribe(false);
             // A prescription written from the note belongs in its medication

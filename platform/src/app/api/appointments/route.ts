@@ -120,7 +120,15 @@ async function postHandler(request: NextRequest) {
           { status: 400 }
         );
       }
-      const { updateAppointmentStatus } = await import('@/lib/services/appointment-service');
+      const { updateAppointmentStatus, getAppointmentById } = await import('@/lib/services/appointment-service');
+      const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+      // Tenant guard: without this any CREATE_ROLES caller could drive the
+      // status of an arbitrary appointmentId regardless of org/facility. 404
+      // (not 403) so an out-of-scope id reads identically to a missing one.
+      const existingForStatus = await getAppointmentById(body.appointmentId as string);
+      if (!existingForStatus || filterByScope([existingForStatus], buildScopeFromAuth(auth)).length === 0) {
+        return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
+      }
       const result = await updateAppointmentStatus(
         body.appointmentId as string,
         body.status as Parameters<typeof updateAppointmentStatus>[1],
@@ -136,6 +144,13 @@ async function postHandler(request: NextRequest) {
           { error: 'appointmentId, newDate, and newTime are required' },
           { status: 400 }
         );
+      }
+      const { getAppointmentById } = await import('@/lib/services/appointment-service');
+      const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+      // Same tenant guard as update_status above.
+      const existingForReschedule = await getAppointmentById(body.appointmentId as string);
+      if (!existingForReschedule || filterByScope([existingForReschedule], buildScopeFromAuth(auth)).length === 0) {
+        return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
       }
       const newDateErr = validateFutureDate(body.newDate as string, body.newTime as string);
       if (newDateErr) return NextResponse.json({ error: newDateErr }, { status: 400 });
@@ -162,7 +177,13 @@ async function postHandler(request: NextRequest) {
     if (dateErr) return NextResponse.json({ error: dateErr }, { status: 400 });
     body.bookedBy = body.bookedBy || auth.sub;
     body.bookedByName = body.bookedByName || auth.name;
-    if (!body.orgId && auth.orgId) body.orgId = auth.orgId;
+    // Tenancy is stamped from the verified auth claim, never trusted from the
+    // client — see the matching comment in /api/referrals for the rationale.
+    if (auth.orgId) {
+      body.orgId = auth.orgId;
+    } else if (!(auth.role === 'super_admin' || auth.role === 'government')) {
+      delete body.orgId;
+    }
     if (!body.facilityId && auth.hospitalId) body.facilityId = auth.hospitalId;
     const { createAppointment } = await import('@/lib/services/appointment-service');
     const appointment = await createAppointment(body as Parameters<typeof createAppointment>[0]);

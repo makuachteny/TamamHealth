@@ -41,13 +41,15 @@ interface PrescribeModalProps {
     _id: string; name?: string; username?: string;
     orgId?: string; hospitalId?: string; hospitalName?: string;
   } | null;
+  /** The visit this prescription belongs to, when prescribing from a note/consult. */
+  encounterId?: string;
   onClose: () => void;
   /** Fired after each write so the host list can refresh. */
   onPrescribed?: () => void;
 }
 
 export default function PrescribeModal({
-  patientId, patientName, currentUser, onClose, onPrescribed,
+  patientId, patientName, currentUser, encounterId, onClose, onPrescribed,
 }: PrescribeModalProps) {
   const { showToast } = useToast();
   const scope = useDataScope();
@@ -209,6 +211,9 @@ export default function PrescribeModal({
       const result = await createPrescription({
         patientId,
         patientName,
+        // Ties the prescription to the visit it was written in — without it
+        // the Rx is orphaned from the encounter and the checkout gate.
+        encounterId,
         medication: drug.name,
         dose: doseFrom(drug.name),
         route: drug.form || '',
@@ -228,9 +233,26 @@ export default function PrescribeModal({
         orgId: currentUser?.orgId,
       } as Omit<PrescriptionDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
 
+      if (result.allergyWarnings?.length) {
+        // The loudest of the three checks: a recorded allergy matched the drug
+        // just written. Surfaced after the write (the service is advisory),
+        // so the prescriber can discontinue immediately.
+        showToast(
+          `ALLERGY ALERT — patient has a recorded allergy: ${result.allergyWarnings
+            .map(a => `${a.allergy} → ${a.medication}${a.reaction ? ` (${a.reaction})` : ''}`)
+            .join(', ')}. Review before sending.`,
+          'error',
+        );
+      }
       if (result.interactionWarnings?.hasInteractions) {
         showToast(
           `Written with an interaction warning: ${result.interactionWarnings.interactions.map(i => `${i.drug1} ↔ ${i.drug2}`).join(', ')}`,
+          'error',
+        );
+      }
+      if (result.duplicateWarnings?.length) {
+        showToast(
+          `Possible duplicate: ${result.duplicateWarnings.join(', ')} is already active for this patient.`,
           'error',
         );
       }
@@ -242,7 +264,7 @@ export default function PrescribeModal({
     } finally {
       setBusy(false);
     }
-  }, [draft, patientId, patientName, userName, currentUser, onPrescribed, showToast]);
+  }, [draft, patientId, patientName, encounterId, userName, currentUser, onPrescribed, showToast]);
 
   const handleAddRx = async () => {
     const rx = await write(false);

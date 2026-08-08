@@ -264,16 +264,22 @@ export default function EhrTopRail() {
         </div>
       )}
 
-      <button
-        type="button"
-        className="ehr-top-calendar-button"
-        onClick={() => router.push('/dashboard?view=calendar')}
-        aria-label="Open calendar"
-        title="Calendar"
-        data-track="nav.calendar"
-      >
-        <Calendar className="w-4 h-4" />
-      </button>
+      {/* The calendar lives on the appointments board. Rendered only for
+          roles that can open it — the old hardcoded '/dashboard?view=calendar'
+          target sent every role without /dashboard access to RoleGuard's
+          "Access Restricted" screen, and ?view=calendar was a dead param. */}
+      {isHrefAllowed('/appointments', allowedRoutes) && (
+        <button
+          type="button"
+          className="ehr-top-calendar-button"
+          onClick={() => router.push('/appointments')}
+          aria-label="Open calendar"
+          title="Calendar"
+          data-track="nav.calendar"
+        >
+          <Calendar className="w-4 h-4" />
+        </button>
+      )}
 
       {(canSearchPatients || isNationalRole) ? (
         <div className={`ehr-top-search ${mobileSearchOpen ? 'is-mobile-open' : ''}`} ref={boxRef} data-track="patient.search">

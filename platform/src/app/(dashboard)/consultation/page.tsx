@@ -41,6 +41,9 @@ export default function ConsultationRedirectPage() {
   const started = useRef(false);
 
   const patientId = params?.get('patientId') || '';
+  // Both spellings are live: the dashboard's resume link sends ?encounter=,
+  // the checkout gate's "visit still open" link sends ?encounterId=.
+  const encounterParam = params?.get('encounter') || params?.get('encounterId') || '';
 
   useEffect(() => {
     if (started.current) return;
@@ -48,14 +51,47 @@ export default function ConsultationRedirectPage() {
     started.current = true;
 
     (async () => {
+      const scope = {
+        orgId: currentUser.orgId,
+        hospitalId: currentUser.hospitalId,
+        role: currentUser.role,
+      };
+
+      // Resume a paused visit ("all results back — resume the visit" on the
+      // dashboard links here with ?encounter=). The encounter names the
+      // patient, and reopening it walks the visit back to `with_clinician` —
+      // without this, the link landed on the patient registry and the paused
+      // encounter stayed at `awaiting_labs` forever.
+      let resolvedPatientId = patientId;
+      let resumedEncounterId: string | undefined;
+      if (encounterParam) {
+        try {
+          const { getEncounter, transitionEncounter, RESUMABLE_STATUSES } =
+            await import('@/lib/services/encounter-service');
+          const { filterByScope } = await import('@/lib/services/data-scope');
+          const enc = await getEncounter(encounterParam);
+          // Out-of-scope (another org/facility) resolves to "not found".
+          const visible = enc && filterByScope([enc], scope).length > 0 ? enc : null;
+          if (visible) {
+            resolvedPatientId = resolvedPatientId || visible.patientId;
+            resumedEncounterId = visible._id;
+            if (RESUMABLE_STATUSES.includes(visible.status)) {
+              try {
+                await transitionEncounter(visible._id, 'with_clinician', { actorId: currentUser._id });
+              } catch { /* the note still opens; the desk can move the visit */ }
+            }
+          }
+        } catch { /* fall through to the patientId path */ }
+      }
+
       // No patient in the link: the notes queue used to catch this, but
       // documentation is per-patient now, so the registry is where you pick
       // one.
-      if (!patientId) { router.replace('/patients'); return; }
+      if (!resolvedPatientId) { router.replace('/patients'); return; }
 
       try {
         const today = new Date().toISOString().slice(0, 10);
-        const existing = await listClinicalNotes({ patientId });
+        const existing = await listClinicalNotes({ patientId: resolvedPatientId }, scope);
 
         // Resume rather than duplicate: pressing "Start consultation" twice in
         // one clinic session must not split the encounter across two records.
@@ -64,7 +100,7 @@ export default function ConsultationRedirectPage() {
         if (draft) { router.replace(`/notes/${draft._id}`); return; }
 
         const { getPatientById } = await import('@/lib/services/patient-service');
-        const patient = await getPatientById(patientId).catch(() => null);
+        const patient = await getPatientById(resolvedPatientId).catch(() => null);
         const patientName = patient
           ? [patient.firstName, patient.middleName, patient.surname].filter(Boolean).join(' ')
           : 'Patient';
@@ -77,15 +113,17 @@ export default function ConsultationRedirectPage() {
         // documented, and signing could not close it. Best-effort — a note is
         // still worth writing for a patient with no open visit thread (a phone
         // note, a back-dated entry), so an absent encounter is not an error.
-        let encounterId: string | undefined;
-        try {
-          const { findOpenEncounterForPatient } = await import('@/lib/services/encounter-service');
-          const open = await findOpenEncounterForPatient(patientId, currentUser.hospitalId || '');
-          encounterId = open?._id;
-        } catch { /* unlinked note — see above */ }
+        let encounterId: string | undefined = resumedEncounterId;
+        if (!encounterId) {
+          try {
+            const { findOpenEncounterForPatient } = await import('@/lib/services/encounter-service');
+            const open = await findOpenEncounterForPatient(resolvedPatientId, currentUser.hospitalId || '');
+            encounterId = open?._id;
+          } catch { /* unlinked note — see above */ }
+        }
 
         const note = await createClinicalNote({
-          patientId,
+          patientId: resolvedPatientId,
           patientName,
           mrn: patient?.hospitalNumber,
           patientDob: patient?.dateOfBirth,
@@ -106,7 +144,7 @@ export default function ConsultationRedirectPage() {
         setError(err instanceof Error ? err.message : 'Could not open a clinical note.');
       }
     })();
-  }, [currentUser, patientId, router]);
+  }, [currentUser, patientId, encounterParam, router]);
 
   if (error) {
     return (

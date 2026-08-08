@@ -134,27 +134,28 @@ export function useLabOrderDraft(options: { presetPatientId?: string } = {}) {
       const orderGroupId = `req-${uuidv4().slice(0, 8)}`;
       const placedAt = new Date().toISOString();
 
-      // A walk-in order has no consultation behind it, so nothing anchors it:
-      // no encounter to attribute it to and no bill to charge it against
-      // (KAN-72). Open a minimal encounter first so both have something to
-      // hang off. Best-effort — an unbilled test still beats a clinician who
-      // cannot order one.
+      // Anchor the order to the patient's CURRENT visit at this facility —
+      // reusing an open encounter (and pausing it at `awaiting_labs` when
+      // that's a legal move) instead of spawning a parallel desk encounter for
+      // a patient who is mid-consultation. A true walk-in with no open visit
+      // still gets a minimal desk encounter so the tests are billable and
+      // attributable (KAN-72). Best-effort — an unbilled test still beats a
+      // clinician who cannot order one.
       let deskEncounterId: string | undefined;
       try {
-        const { createEncounter } = await import('@/lib/services/encounter-service');
-        const encounter = await createEncounter({
+        const { ensureLabOrderEncounter } = await import('@/lib/services/encounter-service');
+        const encounter = await ensureLabOrderEncounter({
           patientId: patient._id,
           patientName,
           hospitalNumber: patient.hospitalNumber,
-          // The patient is at the lab and nowhere else in the journey.
-          status: 'awaiting_labs',
-          startedAt: placedAt,
-          hospitalId,
+          hospitalId: hospitalId || '',
           hospitalName: currentUser?.hospitalName,
           orgId: currentUser?.orgId,
           clinicianId: currentUser?._id,
           clinicianName: draft.orderedByName || currentUser?.name,
-        } as never);
+          actorId: currentUser?._id,
+          placedAt,
+        });
         deskEncounterId = encounter._id;
       } catch (err) {
         console.warn('[lab-order] could not open a desk encounter for this order:', err);
@@ -193,6 +194,13 @@ export function useLabOrderDraft(options: { presetPatientId?: string } = {}) {
           // nothing has come back yet, so it cannot be critical (KAN-75).
           critical: false,
           orderedBy: draft.orderedByName || currentUser?.name || 'Lab',
+          // The id is what the critical-result task keys on — the name above
+          // is display-only. Stamped only when the order is placed as oneself;
+          // an order entered on another clinician's behalf keeps just the name
+          // and is resolved against the directory at task-raise time.
+          orderedById: !draft.orderedByName || draft.orderedByName === currentUser?.name
+            ? currentUser?._id
+            : undefined,
           orderedAt: orderedAtLabel,
           completedAt: '',
           hospitalId,

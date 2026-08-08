@@ -148,15 +148,28 @@ export async function evaluateCheckoutGate(
     'Not evaluated: ProcedureDoc has no in-flight state — recorded procedures are already complete.');
 
   // ── Required documentation generated ──────────────────────────────────
+  // Documentation lives in TWO stores: legacy consultation MedicalRecordDocs
+  // and the notes module's ClinicalNoteDocs (the current consultation flow
+  // writes only the latter). Counting just medical records blocked discharge
+  // for every visit documented as a clinical note.
   try {
     const { getRecordsByPatient } = await import('./medical-record-service');
-    const records = await getRecordsByPatient(patientId);
+    const { getNotesByPatient } = await import('../clinical-notes/note-service');
     const encId = encounter?._id;
-    const forVisit = encId ? records.filter((r) => r.encounterId === encId) : records;
+
+    const records = await getRecordsByPatient(patientId);
+    const recordsForVisit = encId ? records.filter((r) => r.encounterId === encId) : records;
+    const signedRecords = recordsForVisit.filter((r) => !!(r as { signedAt?: string }).signedAt);
+
+    const notes = await getNotesByPatient(patientId).catch(() => []);
+    const notesForVisit = encId ? notes.filter((n) => n.encounterId === encId) : notes;
     // A visit with a clinician must leave a record behind. An unsigned draft
     // is not documentation — it is an intention.
-    const signed = forVisit.filter((r) => !!(r as { signedAt?: string }).signedAt);
-    const ok = encId ? signed.length > 0 : forVisit.length > 0;
+    const signedNotes = notesForVisit.filter((n) => n.status === 'signed' || n.status === 'amended');
+
+    const ok = encId
+      ? signedRecords.length > 0 || signedNotes.length > 0
+      : recordsForVisit.length > 0 || signedNotes.length > 0;
     push('required_documentation_generated', ok,
       ok ? undefined : 'No signed clinical record for this visit.',
       ok ? undefined : `/patients/${patientId}`);

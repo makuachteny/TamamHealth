@@ -1,13 +1,19 @@
-import { prescriptionsDB } from '../db';
+import { prescriptionsDB, hospitalsDB } from '../db';
 import { findByType } from './db-query';
-import type { PrescriptionDoc, MedicationAdministration, UserRole } from '../db-types';
+import type { PrescriptionDoc, MedicationAdministration, UserRole, HospitalDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { validatePrescription, ValidationError } from '../validation';
-import { checkNewPrescription, type InteractionCheckResult } from './drug-interaction-service';
+import {
+  checkNewPrescription,
+  checkAllergiesStructured,
+  findDuplicateMedications,
+  type InteractionCheckResult,
+  type StructuredAllergyAlert,
+} from './drug-interaction-service';
 import { prescription as rxLifecycle, type PrescriptionStatus } from '../clinical-flow/order-lifecycles';
 import { withPendingOfflineSync } from '../sync/offline-metadata';
 import { getUserById } from './user-service';
@@ -92,6 +98,26 @@ export async function getPrescriptionsByPatient(patientId: string, scope?: DataS
 export interface PrescriptionCreateResult {
   prescription: PrescriptionDoc;
   interactionWarnings: InteractionCheckResult | null;
+  /**
+   * Class-aware matches of the new medication against the patient's recorded
+   * ACTIVE allergies (penicillin allergy flags amoxicillin, etc.). Severe and
+   * unknown-criticality matches carry `requiresOverride: true`. Advisory:
+   * the prescription is written either way — the caller's UI is responsible
+   * for confronting the prescriber with these.
+   */
+  allergyWarnings: StructuredAllergyAlert[] | null;
+  /** Same-drug (dose/form-insensitive) matches against the patient's active prescriptions. */
+  duplicateWarnings: string[] | null;
+}
+
+async function inferOrgIdFromHospital(hospitalId?: string): Promise<string | undefined> {
+  if (!hospitalId) return undefined;
+  try {
+    const hosp = await hospitalsDB().get(hospitalId) as HospitalDoc;
+    return hosp.orgId;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -119,6 +145,7 @@ export async function createPrescription(
 
   // Check for drug interactions with patient's active prescriptions
   let interactionWarnings: InteractionCheckResult | null = null;
+  let duplicateWarnings: string[] | null = null;
   try {
     interactionWarnings = await checkPrescriptionInteractions(
       data.patientId,
@@ -141,12 +168,48 @@ export async function createPrescription(
     // Drug interaction check is advisory — don't block prescription on failure
   }
 
+  // Same-drug duplicate check against the patient's still-active orders.
+  try {
+    const activeRx = (await getPrescriptionsByPatient(data.patientId))
+      .filter(rx => rx.status === 'pending')
+      .map(rx => rx.medication);
+    const dupes = findDuplicateMedications([...activeRx, data.medication]);
+    duplicateWarnings = dupes.length ? dupes : null;
+  } catch {
+    // Advisory only.
+  }
+
+  // Drug–allergy check against the patient's recorded active allergies. This
+  // checker existed but was never wired in, so a recorded severe penicillin
+  // allergy raised nothing when amoxicillin was prescribed. Advisory like the
+  // interaction check — but severe matches are audit-logged.
+  let allergyWarnings: StructuredAllergyAlert[] | null = null;
+  try {
+    const { getActiveAllergies } = await import('./allergy-service');
+    const active = await getActiveAllergies(data.patientId);
+    const alerts = checkAllergiesStructured([data.medication], active);
+    allergyWarnings = alerts.length ? alerts : null;
+    if (alerts.some(a => a.requiresOverride)) {
+      await logAuditSafe(
+        'DRUG_ALLERGY_WARNING',
+        undefined,
+        data.prescribedBy,
+        `Allergy alert: ${data.medication} for patient ${data.patientName} — ` +
+        alerts.map(a => `${a.allergy} (${a.criticality})`).join(', ')
+      );
+    }
+  } catch {
+    // Advisory — a failed lookup must not block the prescription.
+  }
+
   const db = prescriptionsDB();
   const now = new Date().toISOString();
+  const orgId = data.orgId || await inferOrgIdFromHospital(data.hospitalId);
   const doc: PrescriptionDoc = withPendingOfflineSync({
     _id: `rx-${uuidv4().slice(0, 8)}`,
     type: 'prescription',
     ...data,
+    orgId,
     createdAt: now,
     updatedAt: now,
   } as PrescriptionDoc, now);
@@ -163,7 +226,7 @@ export async function createPrescription(
     username: doc.prescribedBy,
     hospitalId: doc.hospitalId,
   });
-  return { prescription: doc, interactionWarnings };
+  return { prescription: doc, interactionWarnings, allergyWarnings, duplicateWarnings };
 }
 
 /**

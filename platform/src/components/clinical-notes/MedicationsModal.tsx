@@ -66,11 +66,13 @@ interface MedicationsModalProps {
     _id: string; name?: string; username?: string;
     orgId?: string; hospitalId?: string; hospitalName?: string;
   } | null;
+  /** The visit a renewal/entry written here belongs to, when opened from a note. */
+  encounterId?: string;
   onClose: () => void;
 }
 
 export default function MedicationsModal({
-  patientId, patientName, currentUser, onClose,
+  patientId, patientName, currentUser, encounterId, onClose,
 }: MedicationsModalProps) {
   const { showToast } = useToast();
   const scope = useDataScope();
@@ -157,6 +159,7 @@ export default function MedicationsModal({
     const result = await createPrescription({
       patientId,
       patientName,
+      encounterId,
       medication: selected.medication,
       dose: selected.dose,
       route: selected.route,
@@ -169,7 +172,14 @@ export default function MedicationsModal({
       hospitalId: currentUser?.hospitalId,
       hospitalName: currentUser?.hospitalName,
     } as Omit<PrescriptionDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
-    if (result.interactionWarnings?.hasInteractions) {
+    if (result.allergyWarnings?.length) {
+      showToast(
+        `ALLERGY ALERT — renewed against a recorded allergy: ${result.allergyWarnings
+          .map(a => `${a.allergy} → ${a.medication}`)
+          .join(', ')}. Review before sending.`,
+        'error',
+      );
+    } else if (result.interactionWarnings?.hasInteractions) {
       showToast(`Renewed with interaction warning: ${result.interactionWarnings.interactions.map(i => `${i.drug1} ↔ ${i.drug2}`).join(', ')}`, 'error');
     } else {
       showToast(`${selected.medication} renewed.`, 'success');
@@ -212,6 +222,7 @@ export default function MedicationsModal({
     await createPrescription({
       patientId,
       patientName,
+      encounterId,
       medication: addMed.medication.trim(),
       dose: addMed.dose.trim(),
       route: '',

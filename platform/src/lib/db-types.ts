@@ -322,6 +322,12 @@ export interface LabResultDoc extends BaseDoc {
   abnormal: boolean;
   critical: boolean;
   orderedBy: string;
+  /**
+   * User `_id` of the ordering clinician. `orderedBy` is a free-text display
+   * name; anything that must land on a specific user's worklist (e.g. the
+   * critical-result task) needs this id, not the name.
+   */
+  orderedById?: string;
   orderedAt: string;
   completedAt: string;
   hospitalId?: string;

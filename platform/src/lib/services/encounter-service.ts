@@ -487,6 +487,77 @@ export async function advanceEncounterAfterTriage(
   return enc;
 }
 
+export interface EnsureLabOrderEncounterInput {
+  patientId: string;
+  patientName: string;
+  hospitalNumber?: string;
+  hospitalId: string;
+  hospitalName?: string;
+  orgId?: string;
+  clinicianId?: string;
+  clinicianName?: string;
+  actorId?: string;
+  placedAt?: string;
+}
+
+/**
+ * Anchor a lab/imaging order to the patient's CURRENT visit at this facility,
+ * creating a minimal desk encounter only when no open visit exists.
+ *
+ * Placing an order used to open a brand-new `awaiting_labs` encounter
+ * unconditionally, so ordering labs mid-consultation split the visit across
+ * two encounter records: the consult stayed parked at `with_clinician` forever
+ * while a parallel desk encounter carried the billing — and the duplicate
+ * open encounter was itself a candidate for absorbing the patient's next
+ * arrival. Reuse rules:
+ *   - An open (non-terminal, <24h, same-facility) encounter is reused.
+ *   - If it can legally move to `awaiting_labs` (e.g. `with_clinician`), it is
+ *     walked there through the state machine so the pause is on the trail.
+ *   - If it cannot (e.g. still `in_triage`), it is returned untouched — the
+ *     order anchors to it via `encounterId` and runs as a parallel order
+ *     lifecycle, exactly as the architecture document allows.
+ *   - A different facility's open visit is never absorbed
+ *     (`findOpenEncounterForPatient` already enforces this).
+ */
+export async function ensureLabOrderEncounter(input: EnsureLabOrderEncounterInput): Promise<EncounterDoc> {
+  const open = await findOpenEncounterForPatient(input.patientId, input.hospitalId);
+  if (open) {
+    if (open.status !== 'awaiting_labs' && canTransition(open.status, 'awaiting_labs')) {
+      return transitionEncounter(open._id, 'awaiting_labs', { actorId: input.actorId ?? input.clinicianId });
+    }
+    return open;
+  }
+  return createEncounter({
+    patientId: input.patientId,
+    patientName: input.patientName,
+    hospitalNumber: input.hospitalNumber,
+    clinicianId: input.clinicianId ?? '',
+    clinicianName: input.clinicianName ?? '',
+    createdBy: input.actorId ?? input.clinicianId,
+    hospitalId: input.hospitalId,
+    hospitalName: input.hospitalName,
+    orgId: input.orgId,
+    // The patient is at the lab and nowhere else in the journey.
+    status: 'awaiting_labs',
+    snapshot: {},
+    labOrderIds: [],
+    startedAt: input.placedAt ?? new Date().toISOString(),
+    arrivalChannel: 'walk_in',
+  });
+}
+
+/**
+ * Record ordered test ids on the visit. `labOrderIds` is what
+ * `useResumableEncounters` counts to tell the clinician how many results are
+ * back — an order that never lands here reads as "0 of 0 results" forever.
+ */
+export async function appendLabOrderIds(encounterId: string, orderIds: string[]): Promise<EncounterDoc | null> {
+  const existing = await getEncounter(encounterId);
+  if (!existing) return null;
+  const merged = Array.from(new Set([...(existing.labOrderIds ?? []), ...orderIds]));
+  return updateEncounter(encounterId, { labOrderIds: merged });
+}
+
 export interface CreateDirectConsultationEncounterInput {
   patientId: string;
   patientName: string;
