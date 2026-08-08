@@ -180,6 +180,17 @@ export class SyncManager {
   private startReplications(): void {
     const couchdbUrl = getCouchDBUrl();
 
+    // A single client runs ~76 databases. Left as continuous longpolls, their
+    // pull feeds saturate the browser's per-host connection limit and starve
+    // push, so new local writes never reach the server. 'poll' pulls release
+    // their connection between cycles; push stays live. Overridable for
+    // debugging via NEXT_PUBLIC_SYNC_PULL_MODE / NEXT_PUBLIC_SYNC_PULL_INTERVAL_MS.
+    const pullMode = process.env.NEXT_PUBLIC_SYNC_PULL_MODE === 'live' ? 'live' : 'poll';
+    const parsedInterval = Number(process.env.NEXT_PUBLIC_SYNC_PULL_INTERVAL_MS);
+    const pullIntervalMs = Number.isFinite(parsedInterval) && parsedInterval >= 2000
+      ? parsedInterval
+      : 15000;
+
     for (const config of DATABASE_SYNC_CONFIGS) {
       const localDB = getDB(config.localName);
       const remoteUrl = getRemoteUrl(config.localName, couchdbUrl);
@@ -197,6 +208,8 @@ export class SyncManager {
         // Drives the push filter so this device never tries to replicate docs
         // its role may not write (which would wedge the push checkpoint).
         writableRole: this.user?.role,
+        pullMode,
+        pullIntervalMs,
         onChange: (status) => {
           this.statuses.set(config.localName, status);
           this.notifyChange();

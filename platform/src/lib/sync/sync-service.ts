@@ -104,6 +104,22 @@ export interface SyncServiceOptions {
    * after the rejected one — including new patients — silently stops syncing.
    */
   writableRole?: string;
+  /**
+   * How the PULL direction runs.
+   *  - 'poll'  (default): periodic one-shot pulls that release their HTTP
+   *    connection between cycles. This is the fix for push starvation — a
+   *    single client runs ~76 databases, and if every pull holds a live
+   *    longpoll open, they saturate the browser's ~6-connections-per-host
+   *    limit and push never gets a slot to send new local writes.
+   *  - 'live': the previous continuous longpoll behaviour (kept as an escape
+   *    hatch; do not use with many databases on one client).
+   * PUSH always stays live: an idle live push holds no remote connection and
+   * only connects to POST when there is a local change, so write-through stays
+   * immediate.
+   */
+  pullMode?: 'poll' | 'live';
+  /** Poll interval for pullMode 'poll', in ms (default 15000). */
+  pullIntervalMs?: number;
   /** Callback when status changes */
   onChange?: (status: SyncStatus) => void;
 }
@@ -145,6 +161,11 @@ export class SyncService {
   private pullRep: PouchDB.Replication.Replication<object> | null = null;
   private readonly selector: Record<string, unknown> | undefined;
   private readonly pushFilter: (doc: { _id?: string; type?: string }) => boolean;
+  private readonly pullMode: 'poll' | 'live';
+  private readonly pullIntervalMs: number;
+  private pullTimer: ReturnType<typeof setTimeout> | null = null;
+  private pullCycleRep: PouchDB.Replication.Replication<object> | null = null;
+  private stopped = true;
   private retryCount = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private _status: SyncStatus = {
@@ -180,15 +201,18 @@ export class SyncService {
       opts.entitlement ?? { orgId: opts.orgId, facilityIds: [], allFacilities: true },
     );
     this.pushFilter = buildPushFilter(opts.writableRole);
+    this.pullMode = opts.pullMode ?? 'poll';
+    this.pullIntervalMs = opts.pullIntervalMs ?? 15000;
   }
 
   get status(): SyncStatus {
     return { ...this._status };
   }
 
-  /** Start live replication */
+  /** Start replication (live push + live-or-polled pull). */
   startSync(): void {
     this.cancelReplication();
+    this.stopped = false;
     this.updateStatus({ state: 'connecting', error: null });
 
     // `live` and `retry` MUST sit at the top level of the sync options — PouchDB
@@ -203,12 +227,6 @@ export class SyncService {
       batches_limit: 5,
     } as const;
 
-    // PULL scoping is a CouchDB selector evaluated SERVER-SIDE (KAN-95), so
-    // non-entitled documents never reach the device.
-    const pullDir: PouchDB.Replication.ReplicateOptions = {
-      ...(this.selector ? { selector: this.selector } : {}),
-    };
-
     // PUSH scoping is a CLIENT-SIDE filter: it drops docs the server would
     // reject (design indexes, non-writable clinical types) before they enter
     // the stream, so a permanently-rejected doc can never wedge the push
@@ -217,30 +235,88 @@ export class SyncService {
       filter: this.pushFilter as unknown as (doc: object) => boolean,
     };
 
-    if (this.direction === 'both') {
-      // Two independent live replications instead of db.sync(). db.sync() merges
-      // the top-level options with its `push`/`pull` sub-objects in a way that
-      // did NOT carry `live` onto the push side here — the push drained once and
-      // then stopped watching for new local changes, so newly created documents
-      // (new patients included) never pushed. Running replicate.to and
-      // replicate.from separately makes each direction's liveness explicit.
+    const startLivePush = () => {
+      // Push always stays live: an idle live push holds no remote connection
+      // and only connects to POST when there's a local change, so writes reach
+      // the server immediately without contributing to connection pressure.
       this.pushRep = this.localDB.replicate.to(this.remoteDB, { ...liveBase, ...pushDir });
-      this.pullRep = this.localDB.replicate.from(this.remoteDB, { ...liveBase, ...pullDir });
       this.attachListeners(this.pushRep);
-      this.attachListeners(this.pullRep);
+    };
+
+    const startPull = () => {
+      if (this.pullMode === 'poll') {
+        // Periodic one-shot pulls that RELEASE their connection between cycles.
+        this.scheduleNextPull(Math.floor(Math.random() * this.pullIntervalMs));
+      } else {
+        this.pullRep = this.localDB.replicate.from(this.remoteDB, {
+          ...liveBase,
+          ...(this.selector ? { selector: this.selector } : {}),
+        });
+        this.attachListeners(this.pullRep);
+      }
+    };
+
+    if (this.direction === 'both') {
+      startLivePush();
+      startPull();
     } else if (this.direction === 'push') {
       const rep = this.localDB.replicate.to(this.remoteDB, { ...liveBase, ...pushDir });
       this.attachListeners(rep);
       this.replication = rep;
     } else {
-      const rep = this.localDB.replicate.from(this.remoteDB, { ...liveBase, ...pullDir });
-      this.attachListeners(rep);
-      this.replication = rep;
+      startPull();
+    }
+  }
+
+  /** Run one non-live pull, then schedule the next. Connection is released
+   * as soon as the cycle completes, so pulls don't starve push. */
+  private runPullCycle(): void {
+    if (this.stopped) return;
+    this.updateStatus({ state: 'active', error: null });
+    const rep = this.localDB.replicate.from(this.remoteDB, {
+      retry: false,
+      batch_size: 100,
+      batches_limit: 5,
+      ...(this.selector ? { selector: this.selector } : {}),
+    });
+    this.pullCycleRep = rep;
+    // Reuse the change handler for status + conflict surfacing, but NOT the
+    // error→scheduleRetry path (a one-shot's error just schedules the next poll).
+    (rep as unknown as { on: (ev: string, cb: (info: unknown) => void) => void })
+      .on('change', (info: unknown) => this.handleReplicationChange(info));
+    const done = () => {
+      if (this.pullCycleRep === rep) this.pullCycleRep = null;
+      if (!this.stopped) {
+        this.updateStatus({ state: 'paused', lastSync: new Date().toISOString() });
+        this.scheduleNextPull(this.pullIntervalMs);
+      }
+    };
+    Promise.resolve(rep as unknown as Promise<unknown>).then(done, (err: unknown) => {
+      // Network blip or transient CouchDB error: don't surface as fatal, just
+      // retry on the next cycle. Persistent auth failures are handled by the
+      // session heartbeat / refresh path elsewhere.
+      const msg = err instanceof Error ? err.message : 'pull error';
+      if (!this.stopped) this.updateStatus({ state: 'error', error: msg });
+      done();
+    });
+  }
+
+  private scheduleNextPull(delayMs: number): void {
+    if (this.stopped) return;
+    this.clearPullTimer();
+    this.pullTimer = setTimeout(() => this.runPullCycle(), delayMs);
+  }
+
+  private clearPullTimer(): void {
+    if (this.pullTimer) {
+      clearTimeout(this.pullTimer);
+      this.pullTimer = null;
     }
   }
 
   /** Stop replication */
   stopSync(): void {
+    this.stopped = true;
     this.cancelReplication();
     this.clearRetryTimer();
     this.updateStatus({ state: 'idle' });
@@ -336,57 +412,61 @@ export class SyncService {
 
   // --- Private helpers ---
 
+  // Status + conflict-surfacing for a replication 'change' event. Shared by
+  // the live replications and the periodic pull cycle.
+  private handleReplicationChange(info: unknown): void {
+    this.retryCount = 0;
+    const changeInfo = info as {
+      docs_written?: number;
+      docs_read?: number;
+      direction?: 'push' | 'pull';
+      docs?: Array<{ _id?: string; _rev?: string }>;
+      change?: { docs_read?: number; docs_written?: number; docs?: Array<{ _id?: string; _rev?: string }> };
+    };
+    const docsWritten = changeInfo.docs_written || changeInfo.change?.docs_written || 0;
+    const docsRead = changeInfo.docs_read || changeInfo.change?.docs_read || 0;
+    const changedDocs = changeInfo.change?.docs ?? changeInfo.docs ?? [];
+    this.updateStatus({
+      state: 'active',
+      lastSync: new Date().toISOString(),
+      docsWritten: this._status.docsWritten + docsWritten,
+      docsRead: this._status.docsRead + docsRead,
+    });
+
+    if ((changeInfo.direction === 'push' || this.direction === 'push') && changedDocs.length > 0) {
+      void markDocsSynced(this.localDB, changedDocs).catch(err =>
+        captureException(err, { tag: 'sync.markDocsSynced' })
+      );
+    }
+
+    // Conflict-queue wiring: when sync replication writes a doc into the
+    // local DB, PouchDB may have created sibling revisions (a `_conflicts`
+    // array on the live head). For high-risk clinical types — allergies,
+    // referrals, discharge status, adverse events — silently letting
+    // most-recent-rev wins erases real edits that a clinician needs to see.
+    // Surface those to the conflict queue so an admin reconciles them.
+    // Pull-direction changes carry the docs; ignore push-direction.
+    const docsLanded =
+      changeInfo.change?.docs ??
+      (changeInfo.direction === 'pull' || changeInfo.direction === undefined
+        ? changeInfo.docs
+        : undefined);
+    if (docsLanded && docsLanded.length > 0) {
+      // Fire-and-forget; never block replication on conflict-queue writes.
+      // Per-doc errors are reported inside surfaceHighRiskConflicts; this
+      // outer catch handles any failure of the call as a whole.
+      void surfaceHighRiskConflicts(this.localDB, docsLanded).catch(err =>
+        captureException(err, { tag: 'sync.surfaceHighRiskConflicts.outer' })
+      );
+      void markDocsConflicted(this.localDB, docsLanded).catch(err =>
+        captureException(err, { tag: 'sync.markDocsConflicted' })
+      );
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private attachListeners(rep: any): void {
-    rep.on('change', (info: unknown) => {
-      this.retryCount = 0;
-      const changeInfo = info as {
-        docs_written?: number;
-        docs_read?: number;
-        direction?: 'push' | 'pull';
-        docs?: Array<{ _id?: string; _rev?: string }>;
-        change?: { docs_read?: number; docs_written?: number; docs?: Array<{ _id?: string; _rev?: string }> };
-      };
-      const docsWritten = changeInfo.docs_written || changeInfo.change?.docs_written || 0;
-      const docsRead = changeInfo.docs_read || changeInfo.change?.docs_read || 0;
-      const changedDocs = changeInfo.change?.docs ?? changeInfo.docs ?? [];
-      this.updateStatus({
-        state: 'active',
-        lastSync: new Date().toISOString(),
-        docsWritten: this._status.docsWritten + docsWritten,
-        docsRead: this._status.docsRead + docsRead,
-      });
-
-      if ((changeInfo.direction === 'push' || this.direction === 'push') && changedDocs.length > 0) {
-        void markDocsSynced(this.localDB, changedDocs).catch(err =>
-          captureException(err, { tag: 'sync.markDocsSynced' })
-        );
-      }
-
-      // Conflict-queue wiring: when sync replication writes a doc into the
-      // local DB, PouchDB may have created sibling revisions (a `_conflicts`
-      // array on the live head). For high-risk clinical types — allergies,
-      // referrals, discharge status, adverse events — silently letting
-      // most-recent-rev wins erases real edits that a clinician needs to see.
-      // Surface those to the conflict queue so an admin reconciles them.
-      // Pull-direction changes carry the docs; ignore push-direction.
-      const docsLanded =
-        changeInfo.change?.docs ??
-        (changeInfo.direction === 'pull' || changeInfo.direction === undefined
-          ? changeInfo.docs
-          : undefined);
-      if (docsLanded && docsLanded.length > 0) {
-        // Fire-and-forget; never block replication on conflict-queue writes.
-        // Per-doc errors are reported inside surfaceHighRiskConflicts; this
-        // outer catch handles any failure of the call as a whole.
-        void surfaceHighRiskConflicts(this.localDB, docsLanded).catch(err =>
-          captureException(err, { tag: 'sync.surfaceHighRiskConflicts.outer' })
-        );
-        void markDocsConflicted(this.localDB, docsLanded).catch(err =>
-          captureException(err, { tag: 'sync.markDocsConflicted' })
-        );
-      }
-    });
+    rep.on('change', (info: unknown) => this.handleReplicationChange(info));
 
     rep.on('paused', () => {
       // Paused means replication is up to date (or went offline)
@@ -429,12 +509,14 @@ export class SyncService {
   }
 
   private cancelReplication(): void {
-    for (const rep of [this.replication, this.pushRep, this.pullRep]) {
+    this.clearPullTimer();
+    for (const rep of [this.replication, this.pushRep, this.pullRep, this.pullCycleRep]) {
       (rep as { cancel?: () => void } | null)?.cancel?.();
     }
     this.replication = null;
     this.pushRep = null;
     this.pullRep = null;
+    this.pullCycleRep = null;
   }
 
   private clearRetryTimer(): void {
