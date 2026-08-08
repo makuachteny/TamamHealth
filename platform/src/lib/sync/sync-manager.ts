@@ -194,6 +194,9 @@ export class SyncManager {
         entitlement: config.orgScoped
           ? entitlementFor({ ...this.user, orgId: this.orgId })
           : undefined,
+        // Drives the push filter so this device never tries to replicate docs
+        // its role may not write (which would wedge the push checkpoint).
+        writableRole: this.user?.role,
         onChange: (status) => {
           this.statuses.set(config.localName, status);
           this.notifyChange();

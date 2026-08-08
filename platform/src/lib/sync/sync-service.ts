@@ -94,8 +94,37 @@ export interface SyncServiceOptions {
    * which only decided what to keep after the server had already sent it.
    */
   entitlement?: FacilityEntitlement;
+  /**
+   * The signed-in user's platform role. Used to filter the PUSH stream so the
+   * device never tries to replicate documents the CouchDB validator will
+   * reject (design-index docs, or clinical types this role may not write —
+   * both of which the demo seed plants in every browser). A permanently
+   * rejected doc otherwise wedges the push checkpoint: PouchDB will not
+   * advance past a batch containing a write failure, so every document created
+   * after the rejected one — including new patients — silently stops syncing.
+   */
+  writableRole?: string;
   /** Callback when status changes */
   onChange?: (status: SyncStatus) => void;
+}
+
+import { DOC_WRITE_ROLES } from './write-permissions';
+
+/**
+ * Build a PouchDB push filter that drops documents the server would reject:
+ *  - every `_design/*` doc (members can't write design docs to CouchDB), and
+ *  - any typed doc whose write matrix excludes this role.
+ * Untyped docs and types absent from the matrix pass through (the validator
+ * fails open on unknown types, so they will not wedge the checkpoint).
+ */
+function buildPushFilter(role: string | undefined) {
+  return (doc: { _id?: string; type?: string }) => {
+    if (typeof doc._id === 'string' && doc._id.indexOf('_design/') === 0) return false;
+    if (!role) return true;
+    const allowed = doc.type ? DOC_WRITE_ROLES[doc.type] : undefined;
+    if (!allowed) return true;
+    return (allowed as readonly string[]).includes(role);
+  };
 }
 
 const RETRY_DELAYS = [1000, 2000, 5000, 10000, 30000]; // escalating backoff
@@ -108,7 +137,14 @@ export class SyncService {
   private onChange?: (status: SyncStatus) => void;
 
   private replication: PouchDB.Replication.Sync<object> | PouchDB.Replication.Replication<object> | null = null;
+  // For the bidirectional case we run push and pull as two independent live
+  // replications rather than db.sync(), so each direction gets its own
+  // top-level live/retry and its own scoping (push filter vs pull selector)
+  // with no ambiguity about which nested option wins.
+  private pushRep: PouchDB.Replication.Replication<object> | null = null;
+  private pullRep: PouchDB.Replication.Replication<object> | null = null;
   private readonly selector: Record<string, unknown> | undefined;
+  private readonly pushFilter: (doc: { _id?: string; type?: string }) => boolean;
   private retryCount = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private _status: SyncStatus = {
@@ -143,6 +179,7 @@ export class SyncService {
     this.selector = replicationSelector(
       opts.entitlement ?? { orgId: opts.orgId, facilityIds: [], allFacilities: true },
     );
+    this.pushFilter = buildPushFilter(opts.writableRole);
   }
 
   get status(): SyncStatus {
@@ -154,30 +191,51 @@ export class SyncService {
     this.cancelReplication();
     this.updateStatus({ state: 'connecting', error: null });
 
-    const opts: PouchDB.Replication.ReplicateOptions = {
+    // `live` and `retry` MUST sit at the top level of the sync options — PouchDB
+    // reads them there, not inside the per-direction `push`/`pull` sub-objects.
+    // Nesting them made the sync one-shot: it drained the initial backlog and
+    // then stopped, so documents created afterwards never pushed. The
+    // per-direction sub-objects carry ONLY their scoping (selector / filter).
+    const liveBase = {
       live: true,
       retry: true,
       batch_size: 100,
       batches_limit: 5,
-      // Org AND facility scoping, as a server-evaluated selector (KAN-95).
-      //
-      // This replaced a client-side `filter` function that (a) ran in the
-      // browser, so the server sent every document regardless, and (b)
-      // constrained `orgId` only — there was no facility condition at all, so
-      // every user in an org replicated every facility's PHI onto their device.
+    } as const;
+
+    // PULL scoping is a CouchDB selector evaluated SERVER-SIDE (KAN-95), so
+    // non-entitled documents never reach the device.
+    const pullDir: PouchDB.Replication.ReplicateOptions = {
       ...(this.selector ? { selector: this.selector } : {}),
     };
 
+    // PUSH scoping is a CLIENT-SIDE filter: it drops docs the server would
+    // reject (design indexes, non-writable clinical types) before they enter
+    // the stream, so a permanently-rejected doc can never wedge the push
+    // checkpoint and stall every later document — new patients included.
+    const pushDir: PouchDB.Replication.ReplicateOptions = {
+      ...(process.env.NEXT_PUBLIC_DISABLE_PUSH_FILTER === 'true'
+        ? {}
+        : { filter: this.pushFilter as unknown as (doc: object) => boolean }),
+    };
+
     if (this.direction === 'both') {
-      const rep = this.localDB.sync(this.remoteDB, opts);
-      this.attachListeners(rep);
-      this.replication = rep;
+      // Two independent live replications instead of db.sync(). db.sync() merges
+      // the top-level options with its `push`/`pull` sub-objects in a way that
+      // did NOT carry `live` onto the push side here — the push drained once and
+      // then stopped watching for new local changes, so newly created documents
+      // (new patients included) never pushed. Running replicate.to and
+      // replicate.from separately makes each direction's liveness explicit.
+      this.pushRep = this.localDB.replicate.to(this.remoteDB, { ...liveBase, ...pushDir });
+      this.pullRep = this.localDB.replicate.from(this.remoteDB, { ...liveBase, ...pullDir });
+      this.attachListeners(this.pushRep);
+      this.attachListeners(this.pullRep);
     } else if (this.direction === 'push') {
-      const rep = this.localDB.replicate.to(this.remoteDB, opts);
+      const rep = this.localDB.replicate.to(this.remoteDB, { ...liveBase, ...pushDir });
       this.attachListeners(rep);
       this.replication = rep;
     } else {
-      const rep = this.localDB.replicate.from(this.remoteDB, opts);
+      const rep = this.localDB.replicate.from(this.remoteDB, { ...liveBase, ...pullDir });
       this.attachListeners(rep);
       this.replication = rep;
     }
@@ -373,10 +431,12 @@ export class SyncService {
   }
 
   private cancelReplication(): void {
-    if (this.replication) {
-      (this.replication as { cancel?: () => void }).cancel?.();
-      this.replication = null;
+    for (const rep of [this.replication, this.pushRep, this.pullRep]) {
+      (rep as { cancel?: () => void } | null)?.cancel?.();
     }
+    this.replication = null;
+    this.pushRep = null;
+    this.pullRep = null;
   }
 
   private clearRetryTimer(): void {
