@@ -10,10 +10,13 @@
  */
 import { v4 as uuidv4 } from 'uuid';
 import { encountersDB } from '../db';
-import type { EncounterDoc } from '../db-types';
+import type { EncounterDoc, UserRole } from '../db-types';
 import {
   canTransition, stageOf, isTerminal, TERMINAL_STATUSES, type EncounterStatus,
 } from '../clinical-flow/encounter-journey';
+import {
+  ACTION_CAPABILITY, capabilitiesForUserRole, satisfiesRequirement,
+} from '../clinical-flow/capabilities';
 import { findByType } from './db-query';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
@@ -174,12 +177,29 @@ export async function updateEncounter(id: string, patch: Partial<EncounterDoc>):
 export async function transitionEncounter(
   id: string,
   to: EncounterStatus,
-  opts?: { snapshot?: Record<string, unknown>; labOrderIds?: string[]; medicalRecordId?: string; actorId?: string; reason?: string },
+  opts?: { snapshot?: Record<string, unknown>; labOrderIds?: string[]; medicalRecordId?: string; actorId?: string; actorRole?: UserRole; reason?: string },
 ): Promise<EncounterDoc> {
   const db = encountersDB();
   const existing = await db.get(id) as EncounterDoc;
   if (existing.status !== to && !canTransition(existing.status, to)) {
     throw new Error(`Illegal encounter transition: ${existing.status} → ${to}`);
+  }
+  // Capability check — WARN-ONLY for now (step 1 of the engine migration):
+  // callers that pass `actorRole` get a recorded governance signal when the
+  // move needs a capability the role does not hold, without breaking the
+  // legitimate catch-up chains (advanceEncounterToClinician etc.) that walk
+  // stations on the system's behalf. Once call sites pass roles and the audit
+  // trail shows no legitimate violations, this flips to a hard refusal.
+  if (opts?.actorRole && existing.status !== to) {
+    const required = ACTION_CAPABILITY[to];
+    if (!satisfiesRequirement(capabilitiesForUserRole(opts.actorRole), required)) {
+      await logAuditSafe(
+        'ENCOUNTER_CAPABILITY_WARN',
+        opts.actorId,
+        undefined,
+        `Encounter ${id}: ${existing.status} → ${to} performed by role '${opts.actorRole}' lacking capability ${JSON.stringify(required)}`,
+      );
+    }
   }
   const now = new Date().toISOString();
   // Derived from TERMINAL_STATUSES rather than hand-listed (KAN-100 audit).
@@ -498,6 +518,12 @@ export interface EnsureLabOrderEncounterInput {
   clinicianName?: string;
   actorId?: string;
   placedAt?: string;
+  /**
+   * Where the order parks the visit. Imaging studies pause at
+   * `awaiting_imaging` so the radiology queue and the visit state agree;
+   * defaults to `awaiting_labs`.
+   */
+  to?: 'awaiting_labs' | 'awaiting_imaging';
 }
 
 /**
@@ -520,10 +546,11 @@ export interface EnsureLabOrderEncounterInput {
  *     (`findOpenEncounterForPatient` already enforces this).
  */
 export async function ensureLabOrderEncounter(input: EnsureLabOrderEncounterInput): Promise<EncounterDoc> {
+  const to = input.to ?? 'awaiting_labs';
   const open = await findOpenEncounterForPatient(input.patientId, input.hospitalId);
   if (open) {
-    if (open.status !== 'awaiting_labs' && canTransition(open.status, 'awaiting_labs')) {
-      return transitionEncounter(open._id, 'awaiting_labs', { actorId: input.actorId ?? input.clinicianId });
+    if (open.status !== to && canTransition(open.status, to)) {
+      return transitionEncounter(open._id, to, { actorId: input.actorId ?? input.clinicianId });
     }
     return open;
   }
@@ -537,8 +564,8 @@ export async function ensureLabOrderEncounter(input: EnsureLabOrderEncounterInpu
     hospitalId: input.hospitalId,
     hospitalName: input.hospitalName,
     orgId: input.orgId,
-    // The patient is at the lab and nowhere else in the journey.
-    status: 'awaiting_labs',
+    // The patient is at the lab/imaging desk and nowhere else in the journey.
+    status: to,
     snapshot: {},
     labOrderIds: [],
     startedAt: input.placedAt ?? new Date().toISOString(),
@@ -624,9 +651,16 @@ const FACILITY_DISCHARGE_CHAIN: EncounterStatus[] = [
   'in_facility_checkout',
 ];
 
+/** The four documented discharge dispositions (Stage 10 terminal statuses). */
+export type DischargeDisposition =
+  | 'discharged'
+  | 'discharged_with_referral'
+  | 'discharged_with_pending_items'
+  | 'dismissed_without_formal_checkout';
+
 export async function dischargeEncounter(
   id: string,
-  opts: { actorId?: string; pendingItems?: boolean } = {},
+  opts: { actorId?: string; pendingItems?: boolean; disposition?: DischargeDisposition } = {},
 ): Promise<EncounterDoc | null> {
   const enc = await getEncounter(id);
   if (!enc) return null;
@@ -634,16 +668,45 @@ export async function dischargeEncounter(
   const startIdx = FACILITY_DISCHARGE_CHAIN.indexOf(enc.status);
   if (startIdx === -1) return enc; // not in a checkout-eligible state — leave as-is
 
-  const finalStatus: EncounterStatus = opts.pendingItems
-    ? 'discharged_with_pending_items'
-    : 'discharged';
+  // Explicit disposition wins; the legacy pendingItems flag maps onto its
+  // disposition so existing callers keep their behavior. Before dispositions
+  // existed, "discharged with referral" and "walked out mid-checkout" were
+  // unrepresentable — every discharge reported as routine.
+  const finalStatus: EncounterStatus = opts.disposition
+    ?? (opts.pendingItems ? 'discharged_with_pending_items' : 'discharged');
+
+  // A dismissal is legal only FROM `awaiting_facility_checkout` — the patient
+  // left before facility checkout began — so that walk stops one hop short.
+  const chainEnd = finalStatus === 'dismissed_without_formal_checkout'
+    ? FACILITY_DISCHARGE_CHAIN.indexOf('awaiting_facility_checkout') + 1
+    : FACILITY_DISCHARGE_CHAIN.length;
 
   let current = enc;
   // Step through the remaining chain hops, then the terminal discharge.
-  for (let i = startIdx + 1; i < FACILITY_DISCHARGE_CHAIN.length; i++) {
+  for (let i = startIdx + 1; i < chainEnd; i++) {
     current = await transitionEncounter(id, FACILITY_DISCHARGE_CHAIN[i], { actorId: opts.actorId });
   }
   current = await transitionEncounter(id, finalStatus, { actorId: opts.actorId });
+
+  // Close the booking with the visit — the other half of the bridge
+  // appointment-service runs in the opposite direction. Without it a
+  // discharged visit could leave its appointment open on the board, and the
+  // two records told different truths. Best-effort; dynamic import because
+  // appointment-service imports this module. The opposite bridge cannot
+  // recurse: it calls back into dischargeEncounter, which returns at the
+  // isTerminal guard above.
+  if (current.appointmentId) {
+    try {
+      const { getAppointmentById, updateAppointmentStatus } = await import('./appointment-service');
+      const { APPOINTMENT_CLOSED_STATUSES } = await import('../appointment-status');
+      const appt = await getAppointmentById(current.appointmentId);
+      if (appt && !APPOINTMENT_CLOSED_STATUSES.includes(appt.status)) {
+        await updateAppointmentStatus(appt._id, 'completed', { actorId: opts.actorId });
+      }
+    } catch {
+      // The visit is closed either way; the desk can complete the booking.
+    }
+  }
   return current;
 }
 

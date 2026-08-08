@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, ArrowRightLeft, Clock, FileText, X } from '@/components/icons/lucide';
+import { AlertTriangle, ArrowRight, ArrowRightLeft, Clock, FileText, LogOut, X } from '@/components/icons/lucide';
 import CreateNoteButton, { defaultNoteTypeFor } from '@/components/clinical-notes/CreateNoteButton';
 import Modal from '@/components/Modal';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
@@ -68,6 +68,8 @@ export default function EhrVisitPopup({
   onCall,
   onMove,
   onOpenChart,
+  onEscalate,
+  onLwbs,
   onCreateNote,
   creatingNote = false,
   inline = false,
@@ -87,6 +89,12 @@ export default function EhrVisitPopup({
   /** Opens the Move dialog (only offered while a queue entry exists). */
   onMove?: () => void;
   onOpenChart?: () => void;
+  /**
+   * Clinical dispositions — offered only while the visit is still waiting
+   * (active triage with an encounter). The parent owns the confirm + writes.
+   */
+  onEscalate?: () => void;
+  onLwbs?: () => void;
   /**
    * Start a clinical note for this visit. Offered here because the appointment
    * card already carries the patient, provider, date and telehealth mode the
@@ -167,6 +175,26 @@ export default function EhrVisitPopup({
             {onMove && entry && (
               <button type="button" className="ehr-visit-pop-icon" onClick={onMove} aria-label="Move to another queue" title="Move…">
                 <ArrowRightLeft className="w-4 h-4" aria-hidden />
+              </button>
+            )}
+            {onEscalate && (
+              <button
+                type="button"
+                className="ehr-visit-pop-icon ehr-visit-pop-labelled"
+                onClick={onEscalate}
+                title="Escalate this visit to emergency care"
+              >
+                <AlertTriangle className="w-4 h-4" aria-hidden /> Escalate
+              </button>
+            )}
+            {onLwbs && (
+              <button
+                type="button"
+                className="ehr-visit-pop-icon ehr-visit-pop-labelled"
+                onClick={onLwbs}
+                title="Record that the patient left without being seen"
+              >
+                <LogOut className="w-4 h-4" aria-hidden /> LWBS
               </button>
             )}
             {/* A plain split button now: the label creates the note the visit

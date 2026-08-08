@@ -10,6 +10,7 @@
  */
 import { assembleDoctorWorklist, type DoctorWorklistInput } from '@/app/(dashboard)/dashboard/page';
 import { computeSignCount } from '@/lib/hooks/signing-inbox-math';
+import type { FollowUpDoc } from '@/lib/db-types';
 import {
   makePatient,
   makeTriage,
@@ -22,7 +23,32 @@ import {
   makeTransfer,
   makeResumableEncounter,
   resetFixtureSeq,
+  nextId,
 } from './fixtures';
+
+// Local to this suite (not in fixtures.ts): a follow-up fixture for the
+// "Follow-ups due" outstanding-items rail. Shares fixtures.ts's `nextId`
+// counter so IDs stay deterministic alongside every other builder here.
+function makeFollowUp(overrides: Partial<FollowUpDoc> = {}): FollowUpDoc {
+  const _id = overrides._id || nextId('followup');
+  return {
+    _id,
+    type: 'follow_up',
+    createdAt: '2026-08-04T08:00:00.000Z',
+    updatedAt: '2026-08-04T08:00:00.000Z',
+    patientId: 'patient-1',
+    patientName: 'Test Patient',
+    assignedWorker: 'worker-1',
+    assignedWorkerName: 'CHV Test',
+    status: 'active',
+    condition: 'Malaria follow-up',
+    facilityLevel: 'county',
+    scheduledDate: '2026-08-04',
+    state: 'Central Equatoria',
+    county: 'Juba',
+    ...overrides,
+  } as FollowUpDoc;
+}
 
 // Fixed reference instant for every test: 2026-08-04T12:00:00.000Z.
 // todayIso = '2026-08-04'; the 24h "active triage" cutoff = 2026-08-03T12:00:00.000Z.
@@ -44,6 +70,7 @@ function baseInput(overrides: Partial<DoctorWorklistInput> = {}): DoctorWorklist
     referrals: [],
     resumableEncounters: [],
     incomingTransfers: [],
+    followUpsDue: [],
     now: NOW,
     ...overrides,
   };
@@ -312,10 +339,10 @@ describe('assembleDoctorWorklist — outstanding: documents to sign', () => {
 });
 
 describe('assembleDoctorWorklist — outstanding: phone notes', () => {
-  test('phone note count and entries reflect the inbox, routed to /messages', () => {
+  test('phone note entries route to the patient\'s own notes tab, not /messages', () => {
     const notes = [
-      makePhoneNote({ _id: 'pn-1', patientName: 'Akol Deng' }),
-      makePhoneNote({ _id: 'pn-2', patientName: undefined, callerName: 'A relative' }),
+      makePhoneNote({ _id: 'pn-1', patientId: 'patient-akol', patientName: 'Akol Deng' }),
+      makePhoneNote({ _id: 'pn-2', patientId: 'patient-relative', patientName: undefined, callerName: 'A relative' }),
     ];
 
     const result = assembleDoctorWorklist(baseInput({ phoneNotesInbox: notes }));
@@ -323,8 +350,20 @@ describe('assembleDoctorWorklist — outstanding: phone notes', () => {
     const item = result.outstanding.find(o => o.label === 'Phone notes');
     expect(item?.count).toBe(2);
     expect(item?.tone).toBe('warning');
-    expect(item?.entries?.every(e => e.href === '/messages')).toBe(true);
+    expect(item?.entries?.map(e => e.href)).toEqual([
+      '/patients/patient-akol?tab=notes',
+      '/patients/patient-relative?tab=notes',
+    ]);
     expect(item?.entries?.map(e => e.title)).toEqual(['Akol Deng', 'A relative']);
+  });
+
+  test('a phone note with no patientId falls back to the patient registry', () => {
+    const notes = [makePhoneNote({ _id: 'pn-no-patient', patientId: '', patientName: 'Unknown Caller' })];
+
+    const result = assembleDoctorWorklist(baseInput({ phoneNotesInbox: notes }));
+
+    const item = result.outstanding.find(o => o.label === 'Phone notes');
+    expect(item?.entries?.[0].href).toBe('/patients');
   });
 
   test('an empty phone note inbox is neutral-toned with zero count', () => {
@@ -439,5 +478,58 @@ describe('assembleDoctorWorklist — outstanding: transfers', () => {
     const result = assembleDoctorWorklist(baseInput({ incomingTransfers: [onTime] }));
     const item = result.outstanding.find(o => o.label === 'Transfers to accept');
     expect(item?.tone).toBe('warning');
+  });
+});
+
+describe('assembleDoctorWorklist — outstanding: follow-ups due', () => {
+  test('an active follow-up due within the window appears, warning-toned, linked to the care checklist tab', () => {
+    const followUp = makeFollowUp({
+      _id: 'fu-due', patientId: 'patient-fu', patientName: 'Nyandeng Akec',
+      condition: 'Malaria follow-up', status: 'active', scheduledDate: '2026-08-05', // 1 day after NOW
+    });
+
+    const result = assembleDoctorWorklist(baseInput({ followUpsDue: [followUp] }));
+
+    const item = result.outstanding.find(o => o.label === 'Follow-ups due');
+    expect(item?.count).toBe(1);
+    expect(item?.tone).toBe('warning');
+    const entry = item?.entries?.[0];
+    expect(entry?.title).toBe('Nyandeng Akec');
+    expect(entry?.subtitle).toBe('Malaria follow-up');
+    expect(entry?.href).toBe('/patients/patient-fu?tab=careChecklist');
+  });
+
+  test('an overdue active follow-up (scheduled before today) still counts as due', () => {
+    const overdue = makeFollowUp({ _id: 'fu-overdue', status: 'active', scheduledDate: '2026-08-01' });
+    const result = assembleDoctorWorklist(baseInput({ followUpsDue: [overdue] }));
+    const item = result.outstanding.find(o => o.label === 'Follow-ups due');
+    expect(item?.count).toBe(1);
+  });
+
+  test('an active follow-up scheduled beyond the due window is excluded', () => {
+    const farOut = makeFollowUp({ _id: 'fu-far', status: 'active', scheduledDate: '2026-08-20' }); // 16 days after NOW
+    const result = assembleDoctorWorklist(baseInput({ followUpsDue: [farOut] }));
+    const item = result.outstanding.find(o => o.label === 'Follow-ups due');
+    expect(item?.count).toBe(0);
+  });
+
+  test('only active follow-ups are counted — completed/missed/lost_to_followup are excluded', () => {
+    const active = makeFollowUp({ _id: 'fu-active', status: 'active', scheduledDate: '2026-08-04' });
+    const completed = makeFollowUp({ _id: 'fu-completed', status: 'completed', scheduledDate: '2026-08-04' });
+    const missed = makeFollowUp({ _id: 'fu-missed', status: 'missed', scheduledDate: '2026-08-04' });
+    const lost = makeFollowUp({ _id: 'fu-lost', status: 'lost_to_followup', scheduledDate: '2026-08-04' });
+
+    const result = assembleDoctorWorklist(baseInput({ followUpsDue: [active, completed, missed, lost] }));
+
+    const item = result.outstanding.find(o => o.label === 'Follow-ups due');
+    expect(item?.count).toBe(1);
+    expect(item?.entries?.map(e => e.id)).toEqual(['fu-active']);
+  });
+
+  test('no follow-ups due is neutral-toned with zero count', () => {
+    const result = assembleDoctorWorklist(baseInput());
+    const item = result.outstanding.find(o => o.label === 'Follow-ups due');
+    expect(item?.count).toBe(0);
+    expect(item?.tone).toBe('neutral');
   });
 });

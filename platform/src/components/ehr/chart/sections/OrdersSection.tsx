@@ -8,12 +8,13 @@
  * the Order Basket drawer panel — no new order-creation flow.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import { Search, Pill, FlaskConical } from '@/components/icons/lucide';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { formatDate , formatRxSig , humanizeStatus } from '@/lib/format-utils';
+import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import Select from '@/components/Select';
 
 const PAGE_SIZE = 10;
@@ -24,12 +25,19 @@ interface UnifiedOrderRow {
   id: string;
   orderNumber: string;
   date: string;
-  orderType: 'Drug order' | 'Lab order';
+  orderType: 'Drug order' | 'Lab order' | 'Imaging order';
   description: string;
   priority: 'STAT' | 'Routine';
   orderedBy: string;
   status: string;
 }
+
+/** Defensive sort key: an invalid/missing date sorts as oldest (0) rather
+ *  than winning a lexicographic string comparison it has no business in. */
+const ts = (x?: string): number => {
+  const t = new Date(x || '').getTime();
+  return Number.isFinite(t) ? t : 0;
+};
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'omrs-panel-badge omrs-panel-badge--pending',
@@ -45,11 +53,14 @@ interface OrdersSectionProps {
   canOrderLabs: boolean;
   onAddDrug: () => void;
   onAddLab: () => void;
+  /** When set (e.g. deep-linked from elsewhere in the chart), the row with
+   *  this order `_id` is paged-to, scrolled into view and highlighted. */
+  focusId?: string;
 }
 
-export default function OrdersSection({ patientId, canPrescribe, canOrderLabs, onAddDrug, onAddLab }: OrdersSectionProps) {
-  const { prescriptions } = usePrescriptions();
-  const { results } = useLabResults();
+export default function OrdersSection({ patientId, canPrescribe, canOrderLabs, onAddDrug, onAddLab, focusId }: OrdersSectionProps) {
+  const { prescriptions } = usePrescriptions(patientId);
+  const { results } = useLabResults(patientId);
   const [typeFilter, setTypeFilter] = useState<OrderTypeFilter>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -57,7 +68,6 @@ export default function OrdersSection({ patientId, canPrescribe, canOrderLabs, o
 
   const rows = useMemo<UnifiedOrderRow[]>(() => {
     const drugRows: UnifiedOrderRow[] = (prescriptions || [])
-      .filter(rx => rx.patientId === patientId)
       .map(rx => ({
         id: rx._id,
         orderNumber: `ORD-${rx._id.slice(-6).toUpperCase()}`,
@@ -69,28 +79,44 @@ export default function OrdersSection({ patientId, canPrescribe, canOrderLabs, o
         status: rx.status,
       }));
     const labRows: UnifiedOrderRow[] = (results || [])
-      .filter(l => l.patientId === patientId)
       .map(l => ({
         id: l._id,
         orderNumber: `ORD-${l._id.slice(-6).toUpperCase()}`,
         date: l.orderedAt || l.createdAt,
-        orderType: 'Lab order',
+        // orderKind is the authoritative discriminator; isImagingStudy is a
+        // specimen/testName heuristic for legacy docs written before it existed.
+        orderType: l.orderKind === 'imaging' || (!l.orderKind && isImagingStudy(l)) ? 'Imaging order' : 'Lab order',
         description: l.testName,
         priority: 'Routine',
         orderedBy: l.orderedBy || '—',
         status: l.status,
       }));
-    return [...drugRows, ...labRows].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }, [prescriptions, results, patientId]);
+    return [...drugRows, ...labRows].sort((a, b) => ts(b.date) - ts(a.date));
+  }, [prescriptions, results]);
 
   const filtered = useMemo(() => {
     let list = rows;
     if (typeFilter === 'drug') list = list.filter(r => r.orderType === 'Drug order');
-    if (typeFilter === 'lab') list = list.filter(r => r.orderType === 'Lab order');
+    if (typeFilter === 'lab') list = list.filter(r => r.orderType === 'Lab order' || r.orderType === 'Imaging order');
     const q = search.trim().toLowerCase();
     if (q) list = list.filter(r => r.description.toLowerCase().includes(q) || r.orderNumber.toLowerCase().includes(q));
     return list;
   }, [rows, typeFilter, search]);
+
+  // Deep-link focus: jump to the page holding the focused order once the
+  // data loads, then scroll it into view and let the highlight draw attention.
+  useEffect(() => {
+    if (!focusId) return;
+    const idx = filtered.findIndex(r => r.id === focusId);
+    if (idx < 0) return;
+    setPage(Math.floor(idx / PAGE_SIZE) + 1);
+  }, [focusId, filtered]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const el = document.getElementById(`order-row-${focusId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusId, page]);
 
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const canAdd = canPrescribe || canOrderLabs;
@@ -162,7 +188,11 @@ export default function OrdersSection({ patientId, canPrescribe, canOrderLabs, o
           </thead>
           <tbody>
             {pageRows.map(r => (
-              <tr key={r.id}>
+              <tr
+                key={r.id}
+                id={`order-row-${r.id}`}
+                style={r.id === focusId ? { background: 'var(--accent-light)', boxShadow: 'inset 3px 0 0 var(--accent-primary)' } : undefined}
+              >
                 <td className="font-mono" style={{ fontSize: 11 }}>{r.orderNumber}</td>
                 <td>{formatDate(r.date)}</td>
                 <td>{r.orderType}</td>

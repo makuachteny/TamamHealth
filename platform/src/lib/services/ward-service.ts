@@ -6,6 +6,7 @@
  */
 import { getDB } from '../db';
 import type { WardDoc, BedDoc, AdmissionDoc, BedStatus } from '../db-types-ward';
+import type { UserRole } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { findByType } from './db-query';
@@ -153,9 +154,20 @@ export interface AdmitPatientInput {
   state: string;
   county?: string;
   orgId?: string;
+  /**
+   * The outpatient encounter this admission grew out of, when admitting
+   * directly from an open visit (e.g. the consultation's "Admit" action).
+   * Stamped onto the AdmissionDoc, and used to close the OPD encounter
+   * (status `admitted`) so it stops being reusable as "the patient's open
+   * visit" by a later same-day arrival.
+   */
+  encounterId?: string;
 }
 
-export async function admitPatient(data: AdmitPatientInput): Promise<AdmissionDoc> {
+export async function admitPatient(
+  data: AdmitPatientInput,
+  actor?: { id?: string; role?: UserRole },
+): Promise<AdmissionDoc> {
   const db = wardDB();
   const now = new Date().toISOString();
 
@@ -195,6 +207,24 @@ export async function admitPatient(data: AdmitPatientInput): Promise<AdmissionDo
     orgId: doc.orgId,
     hospitalId: doc.facilityId,
   });
+
+  // Close the OPD encounter this admission grew out of (best-effort). Admit
+  // closes the visit: `admitted` is a TERMINAL_STATUS, legal from
+  // `with_clinician`, `awaiting_facility_checkout`, `in_facility_checkout`
+  // and `escalated_to_emergency`. If the encounter sits somewhere else the
+  // transition throws — caught here so a workflow quirk never undoes a real
+  // admission that has already been written and the bed already assigned.
+  if (data.encounterId) {
+    try {
+      const { transitionEncounter } = await import('./encounter-service');
+      await transitionEncounter(data.encounterId, 'admitted', {
+        actorId: actor?.id ?? data.admittedBy,
+        actorRole: actor?.role,
+      });
+    } catch (err) {
+      console.warn('[ward] could not close the encounter on admission (admission was saved):', err);
+    }
+  }
 
   return doc;
 }

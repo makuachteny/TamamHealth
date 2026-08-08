@@ -328,6 +328,11 @@ export interface LabResultDoc extends BaseDoc {
    * critical-result task) needs this id, not the name.
    */
   orderedById?: string;
+  /**
+   * Modality discriminator: imaging studies share this doc type with lab
+   * tests, and without it every CT scan renders as "Lab order".
+   */
+  orderKind?: 'lab' | 'imaging';
   orderedAt: string;
   completedAt: string;
   hospitalId?: string;
@@ -1296,7 +1301,7 @@ export interface EncounterDoc extends BaseDoc {
    */
   attendanceType?: 'new' | 'repeat';
   /** How the patient arrived — the encounter's front door. */
-  arrivalChannel?: 'appointment' | 'walk_in' | 'referral';
+  arrivalChannel?: 'appointment' | 'walk_in' | 'referral' | 'telehealth';
   /**
    * The scheduled appointment this visit matched at check-in, when one
    * existed. Previously computed and discarded by check-in-service.ts.
@@ -1454,6 +1459,8 @@ export interface BirthRegistrationDoc extends BaseDoc {
 
 export interface DeathRegistrationDoc extends BaseDoc {
   type: 'death';
+  /** The visit during which the death occurred, when registered from one. */
+  encounterId?: string;
   deceasedFirstName: string;
   deceasedSurname: string;
   deceasedGender: 'Male' | 'Female';
@@ -1537,6 +1544,9 @@ export interface ImmunizationDoc extends BaseDoc {
   type: 'immunization';
   patientId: string;
   patientName: string;
+  /** Visit/note that ordered the dose, when given from a consultation plan. */
+  encounterId?: string;
+  noteId?: string;
   gender: 'Male' | 'Female';
   dateOfBirth: string;
   vaccine: string; // BCG, OPV0-3, Penta1-3, PCV1-3, Rota1-2, Measles1-2, Yellow Fever, Vitamin A
@@ -1736,6 +1746,10 @@ export interface FollowUpDoc extends BaseDoc {
   type: 'follow_up';
   patientId: string;
   patientName: string;
+  /** The visit that asked for this follow-up. */
+  encounterId?: string;
+  /** Facility that owns the follow-up — without it filterByScope can only narrow to org. */
+  hospitalId?: string;
   geocodeId?: string;
   assignedWorker: string;        // Health worker responsible
   assignedWorkerName: string;

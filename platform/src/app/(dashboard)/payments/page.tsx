@@ -827,7 +827,7 @@ export default function PaymentsPage() {
                             {isRealPatient ? (
                               <button
                                 type="button"
-                                onClick={e => { e.stopPropagation(); router.push(`/patients/${line.patientId}`); }}
+                                onClick={e => { e.stopPropagation(); router.push(`/patients/${line.patientId}?tab=billing`); }}
                                 className="bl-link"
                                 style={{ fontWeight: 600 }}
                               >
@@ -841,7 +841,7 @@ export default function PaymentsPage() {
                             {isRealPatient && line.hospitalNumber ? (
                               <button
                                 type="button"
-                                onClick={e => { e.stopPropagation(); router.push(`/patients/${line.patientId}`); }}
+                                onClick={e => { e.stopPropagation(); router.push(`/patients/${line.patientId}?tab=billing`); }}
                                 className="bl-link"
                               >
                                 {line.hospitalNumber}
@@ -1134,7 +1134,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
         <div className="px-5 py-4 border-b flex items-start justify-between gap-3" style={{ borderColor: 'var(--ehr-border, #D8E3EC)' }}>
           <div>
             <button
-              onClick={() => router.push(`/patients/${line.patientId}`)}
+              onClick={() => router.push(`/patients/${line.patientId}?tab=billing`)}
               className="bl-link"
               style={{ fontSize: 16 }}
               title={t('payments.openPatientRecord')}
@@ -1371,7 +1371,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
 
         {/* Footer actions */}
         <div className="px-5 py-3 border-t flex items-center gap-2" style={{ borderColor: 'var(--ehr-border, #D8E3EC)' }}>
-          <button onClick={() => router.push(`/patients/${line.patientId}`)} className="bl-btn bl-btn--outline" style={{ flex: 1 }}>
+          <button onClick={() => router.push(`/patients/${line.patientId}?tab=billing`)} className="bl-btn bl-btn--outline" style={{ flex: 1 }}>
             {t('payments.openPatientRecord')} <ExternalLink className="w-3.5 h-3.5" />
           </button>
           <button

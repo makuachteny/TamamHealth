@@ -15,6 +15,7 @@ import ChartSection, { OmrsEmptyState } from '../ChartSection';
 import AddAllergyModal from '@/components/patients/AddAllergyModal';
 import { isNoAllergySentinel } from '@/lib/clinical-roles';
 import { useAuth } from '@/lib/context';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { PatientDoc } from '@/lib/db-types';
 import type { AllergyEntry } from '@/data/mock';
 
@@ -32,6 +33,11 @@ interface AllergiesSectionProps {
 
 export default function AllergiesSection({ patient, autoOpenAdd, onAutoOpenHandled }: AllergiesSectionProps) {
   const { currentUser } = useAuth();
+  // Recording an allergy is a clinical write like Conditions/Problems — gate
+  // it the same way rather than leaving the Add button open to every viewer
+  // who can reach this tab (e.g. a lab technician on the labs+overview set
+  // never sees this tab at all, but a front-desk role deep-linked here would).
+  const { canEditClinical } = usePermissions();
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
@@ -53,7 +59,7 @@ export default function AllergiesSection({ patient, autoOpenAdd, onAutoOpenHandl
 
   return (
     <>
-      <ChartSection title="Allergies" addLabel="Add" onAdd={() => setAdding(true)}>
+      <ChartSection title="Allergies" addLabel="Add" onAdd={canEditClinical ? () => setAdding(true) : undefined}>
         {active.length === 0 && patient.noKnownDrugAllergies ? (
           // An empty list and a recorded "none" are not the same fact. Empty
           // means nobody has asked; NKDA means someone asked and the answer
@@ -63,7 +69,12 @@ export default function AllergiesSection({ patient, autoOpenAdd, onAutoOpenHandl
             <strong>No known drug allergies.</strong> Recorded at a medication review.
           </p>
         ) : active.length === 0 ? (
-          <OmrsEmptyState itemLabel="allergies" actionLabel="Record allergies" onAction={() => setAdding(true)} />
+          <OmrsEmptyState
+            itemLabel="allergies"
+            actionLabel="Record allergies"
+            onAction={canEditClinical ? () => setAdding(true) : undefined}
+            disabledReason={canEditClinical ? undefined : 'Requires clinical-editing permission'}
+          />
         ) : (
           <table className="omrs-table">
             <thead>

@@ -244,6 +244,15 @@ export default function TriageWorkflow({
     try {
       const { escalateEncounterToEmergency } = await import('@/lib/services/encounter-service');
       await escalateEncounterToEmergency(ti.encounterId!, { actorId: currentUser?._id });
+      // Mirror onto the triage doc like LWBS above does — the waiting queues
+      // are triage-derived, so without this the escalated patient stayed at
+      // the top of the triage queue as the most urgent person in the building.
+      // 'referred' is the existing "handed onward" terminal the queue drops.
+      const updated = await updateTriageRecord(ti._id, { status: 'referred' });
+      if (!updated) {
+        showToast(t('nurse.triageStatusFailed'), 'error');
+        return;
+      }
       showToast(t('nurse.triageStatusUpdated', { name: ti.patientName, status: t('nurse.triageActionEscalate') }), 'success');
     } catch {
       showToast(t('nurse.triageStatusFailed'), 'error');
@@ -837,7 +846,7 @@ export default function TriageWorkflow({
               {filteredHistory.slice(0, 12).map(ti => {
                 const minutesAgo = Math.max(0, Math.floor((nowMs - new Date(ti.triagedAt).getTime()) / 60000));
                 const actions: RowAction[] = [
-                  { key: 'view', label: t('nurse.triageActionView'), icon: <Eye />, onClick: () => router.push(`/patients/${ti.patientId}`) },
+                  { key: 'view', label: t('nurse.triageActionView'), icon: <Eye />, onClick: () => router.push(`/patients/${ti.patientId}?tab=vitals`) },
                   { key: 'edit', label: t('action.edit'), icon: <ClipboardList />, onClick: () => loadTriageForEdit(ti) },
                 ];
                 if (ti.status !== 'seen' && ti.status !== 'discharged' && ti.status !== 'admitted') {

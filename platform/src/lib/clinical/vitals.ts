@@ -5,7 +5,16 @@
  * `components/nurse/shared.tsx` (getVitalFlags) and the inline range table in
  * TriageWorkflow's submit guard. One source of truth for "what counts as
  * abnormal / out-of-range".
+ *
+ * Also carries `mergeVitalsTimeline` — the merge/normalize logic for a
+ * patient's vitals history across the two places they get captured
+ * (MedicalRecordDoc.vitalSigns and TriageDoc's own vitals fields). Pure and
+ * DB-free so both `chart-snapshot.ts` (picks the single newest entry for a
+ * note) and the patient chart (needs the whole history for the vitals band/
+ * table/trends) share one implementation instead of drifting.
  */
+
+import type { MedicalRecordDoc, TriageDoc } from '../db-types';
 
 /** Free-text (string) vitals as captured by the nurse/triage forms. */
 export interface VitalsInput {
@@ -86,4 +95,107 @@ export function isVitalInRange(field: keyof typeof VITAL_RANGES, raw?: string): 
   const n = parseFloat(raw);
   const [min, max] = VITAL_RANGES[field];
   return !isNaN(n) && n >= min && n <= max;
+}
+
+/**
+ * One row in a patient's merged vitals timeline — either a MedicalRecordDoc
+ * observation (a consultation's vitals, or a standalone nursing check) or a
+ * TriageDoc's captured vitals, normalized to the same numeric shape and
+ * tagged with where it came from so the UI can label it.
+ */
+export interface VitalsTimelineEntry {
+  /** The source document's `_id` — stable React key and deep-link target. */
+  id: string;
+  /** ISO-ish timestamp used to sort and to display "when". */
+  at: string;
+  source: 'Triage' | 'Consult' | 'Nursing';
+  temperature?: number;
+  systolic?: number;
+  diastolic?: number;
+  pulse?: number;
+  respiratoryRate?: number;
+  oxygenSaturation?: number;
+  weight?: number;
+  height?: number;
+  bmi?: number;
+  muac?: number;
+  bloodGlucose?: number;
+  facility?: string;
+}
+
+/** Parses to a finite number, or `undefined` for empty/garbage input — never
+ *  `0`, which the rest of the app treats as a real (if implausible) reading
+ *  rather than "not taken". */
+function numOrUndef(raw?: string | number): number | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const n = typeof raw === 'number' ? raw : parseFloat(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** True once at least one measurement is present — filters out a record or
+ *  triage stop that carries the vitals *shape* but no actual observation. */
+function hasAnyVital(e: Pick<VitalsTimelineEntry,
+  'temperature' | 'systolic' | 'diastolic' | 'pulse' | 'respiratoryRate' | 'oxygenSaturation' | 'weight' | 'muac' | 'bloodGlucose'
+>): boolean {
+  return [e.temperature, e.systolic, e.diastolic, e.pulse, e.respiratoryRate, e.oxygenSaturation, e.weight, e.muac, e.bloodGlucose]
+    .some(v => v !== undefined);
+}
+
+/**
+ * Merge a patient's medical-record vitals and triage vitals into one
+ * normalized, newest-first timeline.
+ *
+ * `MedicalRecordDoc.vitalSigns` is already numeric; `TriageDoc`'s vitals
+ * fields are free-text strings captured at triage and are parsed here.
+ * Ties (same timestamp) keep record-sourced entries ahead of triage-sourced
+ * ones, matching the long-standing tie-break in `chart-snapshot.ts`'s note
+ * vitals lookup: a real record wins over a triage stop from the same moment.
+ */
+export function mergeVitalsTimeline(records: MedicalRecordDoc[], triages: TriageDoc[] = []): VitalsTimelineEntry[] {
+  const fromRecords: VitalsTimelineEntry[] = records
+    .filter(r => r.vitalSigns)
+    .map((r): VitalsTimelineEntry => {
+      const v = r.vitalSigns;
+      return {
+        id: r._id,
+        at: r.consultedAt || r.visitDate || r.createdAt || '',
+        source: r.recordKind === 'nursing_vitals' ? 'Nursing' : 'Consult',
+        temperature: numOrUndef(v.temperature),
+        systolic: numOrUndef(v.systolic),
+        diastolic: numOrUndef(v.diastolic),
+        pulse: numOrUndef(v.pulse),
+        respiratoryRate: numOrUndef(v.respiratoryRate),
+        oxygenSaturation: numOrUndef(v.oxygenSaturation),
+        weight: numOrUndef(v.weight),
+        height: numOrUndef(v.height),
+        bmi: numOrUndef(v.bmi),
+        muac: numOrUndef(v.muac),
+        bloodGlucose: numOrUndef(v.bloodGlucose),
+        facility: r.hospitalName,
+      };
+    })
+    .filter(hasAnyVital);
+
+  const fromTriage: VitalsTimelineEntry[] = triages
+    .filter(t => t.temperature || t.pulse || t.respiratoryRate || t.systolic || t.diastolic || t.oxygenSaturation || t.weight)
+    .map((t): VitalsTimelineEntry => ({
+      id: t._id,
+      at: t.triagedAt || t.createdAt || '',
+      source: 'Triage',
+      temperature: numOrUndef(t.temperature),
+      systolic: numOrUndef(t.systolic),
+      diastolic: numOrUndef(t.diastolic),
+      pulse: numOrUndef(t.pulse),
+      respiratoryRate: numOrUndef(t.respiratoryRate),
+      oxygenSaturation: numOrUndef(t.oxygenSaturation),
+      weight: numOrUndef(t.weight),
+      muac: numOrUndef(t.muac),
+      bloodGlucose: numOrUndef(t.bloodGlucose),
+      facility: t.facilityName,
+    }));
+
+  // Array#sort is stable (guaranteed since ES2019), so entries with an equal
+  // `at` keep their relative order — records were concatenated first, so a
+  // same-instant tie resolves to the record, not the triage stop.
+  return [...fromRecords, ...fromTriage].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
 }

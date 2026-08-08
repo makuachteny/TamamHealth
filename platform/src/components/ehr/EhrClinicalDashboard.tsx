@@ -909,6 +909,38 @@ export default function EhrClinicalDashboard({
   const [moveEntry, setMoveEntry] = useState<QueueEntry | null>(null);
   const [moveSaving, setMoveSaving] = useState(false);
 
+  // Doctor-side clinical dispositions (KAN-100 follow-through). Escalation and
+  // LWBS were nurse-only — a doctor watching a patient deteriorate in their
+  // own worklist had no way to record either. Both mirror the triage doc the
+  // way the triage station does, so the (triage-derived) queues stay honest.
+  const escalateVisit = async (triage: TriageDoc) => {
+    if (!triage.encounterId) return;
+    if (!window.confirm(`Escalate ${triage.patientName} to emergency care?`)) return;
+    try {
+      const { escalateEncounterToEmergency } = await import('@/lib/services/encounter-service');
+      await escalateEncounterToEmergency(triage.encounterId, { actorId: currentUser?._id });
+      await updateTriageDoc(triage._id, { status: 'referred' });
+      showToast(`${triage.patientName} escalated to emergency care.`, 'success');
+      setVisitRow(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not escalate this visit.', 'error');
+    }
+  };
+
+  const markVisitLwbs = async (triage: TriageDoc) => {
+    if (!triage.encounterId) return;
+    if (!window.confirm(`Record that ${triage.patientName} left without being seen?`)) return;
+    try {
+      const { recordLeftWithoutBeingSeen } = await import('@/lib/services/encounter-service');
+      await recordLeftWithoutBeingSeen(triage.encounterId, { actorId: currentUser?._id });
+      await updateTriageDoc(triage._id, { status: 'lwbs' });
+      showToast(`${triage.patientName} recorded as left without being seen.`, 'success');
+      setVisitRow(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not record the departure.', 'error');
+    }
+  };
+
   // Call = take the patient now: record the handoff on the triage doc (the
   // row flips to "In service" for every station) and open the consultation.
   const callPatient = async (row: UnifiedPatientRow) => {
@@ -927,6 +959,10 @@ export default function EhrClinicalDashboard({
         handoffTo: currentUser._id,
         handoffToName: currentUser.name,
         handoffAt: new Date().toISOString(),
+        // A clinician has laid eyes on the patient — same convention the
+        // triage station uses. Without it, pending-gated actions (escalate,
+        // LWBS) stayed offered on a patient already in consultation.
+        status: 'seen',
       });
     }
     try {
@@ -1586,6 +1622,12 @@ export default function EhrClinicalDashboard({
                             onCall={() => { setVisitRow(null); void callPatient(row); }}
                             onMove={columns.entry ? () => { setVisitRow(null); setMoveEntry(columns.entry); } : undefined}
                             onOpenChart={row.patientId ? () => router.push(`/patients/${row.patientId}`) : undefined}
+                            onEscalate={columns.triage?.encounterId && (columns.triage.status === 'pending' || columns.triage.status === 'seen')
+                              ? () => void escalateVisit(columns.triage!)
+                              : undefined}
+                            onLwbs={columns.triage?.encounterId && (columns.triage.status === 'pending' || columns.triage.status === 'seen')
+                              ? () => void markVisitLwbs(columns.triage!)
+                              : undefined}
                             creatingNote={creatingNote}
                             onCreateNote={row.patientId ? (noteType) => {
                               void createNote({

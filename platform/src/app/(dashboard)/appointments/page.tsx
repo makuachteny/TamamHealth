@@ -821,7 +821,7 @@ export default function AppointmentsPage() {
                         </div>
                         <div className="ehr-appointment-main appointment-card-patient">
                           {apt.patientId ? (
-                            <Link href={`/patients/${apt.patientId}`} onClick={e => e.stopPropagation()}>{apt.patientName}</Link>
+                            <Link href={`/patients/${apt.patientId}?tab=appointments`} onClick={e => e.stopPropagation()}>{apt.patientName}</Link>
                           ) : (
                             <button type="button" onClick={e => { e.stopPropagation(); toggle(); }}>{apt.patientName}</button>
                           )}
@@ -1109,7 +1109,7 @@ export default function AppointmentsPage() {
                           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
                             {apt.patientId ? (
                               <Link
-                                href={`/patients/${apt.patientId}`}
+                                href={`/patients/${apt.patientId}?tab=appointments`}
                                 onClick={(e) => { e.stopPropagation(); setShowDayPopup(false); }}
                                 style={{ color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: 3 }}
                                 className="hover:underline"

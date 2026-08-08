@@ -26413,7 +26413,7 @@ table.patient-data-table.patient-data-table {
    applies, this matches the header STRUCTURALLY — the panel's first block, the
    one carrying the dialog's heading — and paints that.
 
-   Three guards keep it off the wrong element:
+   Four guards keep it off the wrong element:
      1. Anchored to `[role="dialog"]`, at most two levels in, so it can only
         ever hit a panel's own first child.
      2. `:has(h2, h3)` requires the dialog's heading somewhere inside it.
@@ -26423,6 +26423,11 @@ table.patient-data-table.patient-data-table {
         list — a title row never does, a body wrapper almost always does. That
         is what stops a modal whose first child wraps everything from turning
         blue end to end.
+     4. `:not(.modal-content):not(.card-elevated)` excludes the panel-surface
+        classes outright. Guard 3 alone is not enough for a dialog whose body
+        holds only buttons — the front-desk check-in modal (choice buttons, no
+        inputs) matched as one giant "header" and rendered blue end to end. A
+        surface class marks a panel by definition, never a title row.
 
    `!important` on the colours is not decoration: every one of those headers
    sets `color: var(--text-primary)` inline on its own `<h2>`, and inline wins
@@ -26430,8 +26435,8 @@ table.patient-data-table.patient-data-table {
    overridden here.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)),
-.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) {
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)),
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) {
   /* Full-bleed to the panel edges. The panels pad themselves (14–20px), so the
      bar is pulled back out to meet the border and the radius is matched to the
      dialog's own 6px so the two corners sit flush. */
@@ -26442,34 +26447,34 @@ table.patient-data-table.patient-data-table {
   color: #fff !important;
 }
 
-.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) :is(h2, h3, p, span, small, b),
-.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) :is(h2, h3, p, span, small, b) {
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) :is(h2, h3, p, span, small, b),
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) :is(h2, h3, p, span, small, b) {
   color: #fff !important;
 }
 
 /* The subtitle line ("Step 1 of 4 · Visit") is muted grey inline — on blue it
    needs to stay secondary without disappearing. */
-.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) p,
-.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) p {
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) p,
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) p {
   color: rgba(255, 255, 255, 0.82) !important;
 }
 
 /* Close and back buttons: the tinted grey disc they carry inline is invisible
    on blue, so they become a translucent white one. */
-.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button,
-.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button {
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button,
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button {
   background: rgba(255, 255, 255, 0.16) !important;
   color: #fff !important;
   border-color: transparent !important;
 }
 
-.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button:hover,
-.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button:hover {
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button:hover,
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) button:hover {
   background: rgba(255, 255, 255, 0.28) !important;
 }
 
-.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) svg,
-.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) svg {
+.modal-portal-backdrop [role="dialog"] > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) svg,
+.modal-portal-backdrop [role="dialog"] > * > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) svg {
   color: #fff !important;
   stroke: currentColor !important;
 }
@@ -26479,9 +26484,20 @@ table.patient-data-table.patient-data-table {
    `.modal-panel` (overflow: auto), buys a scrollbar rather than a wider bar.
    So the generic rule above stays conservative and the two panel classes that
    carry a known padding get an exact match here. */
-.modal-portal-backdrop [role="dialog"] > .modal-panel > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) {
+.modal-portal-backdrop [role="dialog"] > .modal-panel > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) {
   margin: -24px -24px 20px !important;
   padding: 16px 22px !important;
+}
+
+/* Sectioned panels — a `.modal-content`/`.card-elevated` surface with NO
+   padding utility of its own (front-desk check-in, dispense, queue-move…)
+   pads per section instead, so its header row is already flush with the
+   panel edges. The pull-back above would shove that header past the panel's
+   `overflow: hidden` box and clip the title; here it keeps its own padding
+   and stays put. Surfaces that DO pad themselves (`p-5`/`p-6` wrappers)
+   fall through to the generic pull-back. */
+.modal-portal-backdrop [role="dialog"] > :is(.modal-content, .card-elevated):not([class~="p-4"]):not([class~="p-5"]):not([class~="p-6"]) > div:first-child:not(.modal-panel):not(.modal-content):not(.card-elevated):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) {
+  margin: 0 !important;
 }
 
 /* ============ Booking week grid (bwg-) ============

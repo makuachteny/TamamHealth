@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import PatientName from '@/components/PatientName';
 import { useDeaths } from '@/lib/hooks/useDeaths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -11,6 +12,7 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
+import { toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import EhrListHeader, { EhrListFilters, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 
 // Shared control styling inside the header's Filters popover.
@@ -26,6 +28,8 @@ export default function DeathsPage() {
   const { currentUser } = useAuth();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
+  const deathFromQueryRef = useRef(false);
   // Per-column filters (replace the old search + gender top bar).
   const [colFilters, setColFilters] = useState({ certificate: '', name: '', sex: '', age: '', cause: '', manner: '', facility: '', registered: '' });
   const setColFilter = (k: string, v: string) => setColFilters(f => ({ ...f, [k]: v }));
@@ -34,6 +38,9 @@ export default function DeathsPage() {
   const [expandedDeath, setExpandedDeath] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
   const [linkedPatientId, setLinkedPatientId] = useState<string | undefined>(undefined);
+  // The visit this death closes, when registering from an open encounter
+  // (?patientId=&encounterId=) — e.g. the ward or consultation flow.
+  const [encounterId, setEncounterId] = useState<string | undefined>(undefined);
   const [form, setForm] = useState({
     deceasedFirstName: '', deceasedSurname: '', deceasedGender: 'Male' as 'Male' | 'Female',
     dateOfBirth: '', dateOfDeath: new Date().toISOString().slice(0, 10), ageAtDeath: 0,
@@ -70,6 +77,21 @@ export default function DeathsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientLookup, patients]);
+
+  // Deep link (?patientId=&encounterId=): open the registration form
+  // pre-filled with the patient this death closes out — e.g. from the ward
+  // or a consultation — and carry the open visit through so a successful
+  // registration can close it (see handleSubmit).
+  useEffect(() => {
+    const qPatientId = searchParams?.get('patientId');
+    if (!qPatientId || deathFromQueryRef.current) return;
+    if (!(patients || []).some(p => p._id === qPatientId)) return;
+    deathFromQueryRef.current = true;
+    selectLinkedPatient(qPatientId);
+    setEncounterId(searchParams?.get('encounterId') || undefined);
+    setShowForm(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, patients]);
 
   const filtered = (deaths || []).filter(d => {
     const f = colFilters;
@@ -120,6 +142,7 @@ export default function DeathsPage() {
       await register({
         ...form,
         patientId: linkedPatientId,
+        encounterId,
         facilityId: fac?._id || currentUser?.hospitalId || '',
         facilityName: fac?.name || currentUser?.hospitalName || '',
         state: fac?.state || form.state,
@@ -128,7 +151,41 @@ export default function DeathsPage() {
       });
       showToast(t('deaths.registeredSuccess'), 'success');
       setShowForm(false);
+
+      // Death closes the visit (best-effort — the death record above is
+      // already the CRVS source of truth; neither of these can be allowed
+      // to make registration itself look like it failed).
+      if (encounterId) {
+        try {
+          const { transitionEncounter } = await import('@/lib/services/encounter-service');
+          await transitionEncounter(encounterId, 'deceased', {
+            actorId: currentUser?._id,
+            actorRole: currentUser?.role,
+          });
+        } catch (err) {
+          console.warn('[deaths] could not close the encounter (death was registered):', err);
+        }
+      }
+      if (linkedPatientId) {
+        try {
+          const { getAppointmentsByPatient, updateAppointmentStatus } = await import('@/lib/services/appointment-service');
+          const today = toIsoDate(new Date());
+          const upcoming = (await getAppointmentsByPatient(linkedPatientId))
+            .filter(a => (a.status === 'scheduled' || a.status === 'confirmed') && a.appointmentDate >= today);
+          for (const appt of upcoming) {
+            await updateAppointmentStatus(appt._id, 'cancelled', {
+              cancelledReason: 'Patient deceased',
+              actorId: currentUser?._id,
+              actorName: currentUser?.name,
+            });
+          }
+        } catch (err) {
+          console.warn('[deaths] could not cancel future appointments (death was registered):', err);
+        }
+      }
+
       setLinkedPatientId(undefined);
+      setEncounterId(undefined);
       setPatientLookup('');
     } catch {
       showToast(t('deaths.registerFailed'), 'error');

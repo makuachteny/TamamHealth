@@ -26,9 +26,9 @@
  * never by deletion). The invariant the ticket asks for holds either way:
  * you never end up with stock movement and no dispense record, or the reverse.
  */
-import { pharmacyInventoryDB } from '../db';
+import { pharmacyInventoryDB, usersDB } from '../db';
 import type {
-  PharmacyInventoryDoc, PrescriptionDoc, DispenseAllocation, UserRole,
+  PharmacyInventoryDoc, PrescriptionDoc, DispenseAllocation, UserRole, UserDoc,
 } from '../db-types';
 import { findByType } from './db-query';
 import { recordMovement } from './controlled-substance-service';
@@ -706,9 +706,72 @@ export async function dispenseMedication(input: DispenseInput): Promise<Dispense
 }
 
 /**
+ * Resolve a prescriber's directory id from the free-text `prescribedBy` name
+ * on the order, so a clarification/stock-out task lands in THEIR task list
+ * (`getTasks(userId)` joins on the user's `_id`). PrescriptionDoc carries no
+ * prescriber id, only the display name typed at order time — mirrors
+ * lab-service's `resolveOrderingClinicianId`, which solves the identical
+ * problem for lab orders. An ambiguous or unmatched name falls back to the
+ * name itself: invisible to the task list, but at least traceable in the
+ * dispense note and audit log.
+ */
+async function resolvePrescriberId(prescribedBy: string): Promise<string> {
+  const wanted = (prescribedBy || '').trim().toLowerCase();
+  if (!wanted) return prescribedBy;
+  try {
+    const users = await findByType<UserDoc>(usersDB(), 'user', {});
+    const matches = users.filter(u => (u.name || '').trim().toLowerCase() === wanted);
+    if (matches.length === 1) return matches[0]._id;
+  } catch {
+    // Directory unavailable — fall through to the name.
+  }
+  return prescribedBy;
+}
+
+/**
+ * Put a task on the prescriber's list when their order stalls at the
+ * pharmacy — a clarification request or a stock-out both need the prescriber
+ * to act (clarify the order, or substitute the medication), and until now
+ * neither reached them: `recordUnfilled` parked the prescription at
+ * `held_awaiting_clarification` / `stockout_partial_referred` and notified
+ * nobody, so the medicine just stalled silently.
+ *
+ * Mirrors lab-service's `raiseCriticalResultTask`: best-effort, because the
+ * dispense note is already durably written and a notification failure must
+ * not roll that back.
+ */
+async function raisePharmacyTask(
+  rx: PrescriptionDoc,
+  reason: 'stock_out' | 'clarification_requested',
+  note: string,
+): Promise<void> {
+  try {
+    if (!rx.prescribedBy) return; // No one to notify — the pharmacy queue still shows it.
+    const { createTask } = await import('./clinician-task-service');
+    const title = reason === 'clarification_requested'
+      ? `Pharmacy needs clarification: ${rx.medication}`
+      : `Rx unavailable (stock-out): ${rx.medication}`;
+    await createTask({
+      userId: await resolvePrescriberId(rx.prescribedBy),
+      userName: rx.prescribedBy,
+      title,
+      description: `${rx.patientName} — ${note}`,
+      priority: 'high',
+      patientId: rx.patientId,
+      patientName: rx.patientName,
+      hospitalId: rx.hospitalId,
+      orgId: rx.orgId,
+    });
+  } catch (err) {
+    console.warn('[dispensing] could not raise prescriber task (dispense note was saved):', err);
+  }
+}
+
+/**
  * Record that a prescription cannot be filled — no stock at all, or the
  * pharmacist needs the prescriber to clarify. Both leave the order active so
- * it stays on someone's list rather than disappearing.
+ * it stays on someone's list rather than disappearing, and both now put a
+ * task on the prescriber's own list so the stall actually reaches them.
  */
 export async function recordUnfilled(
   rx: PrescriptionDoc,
@@ -728,6 +791,7 @@ export async function recordUnfilled(
       actor.id, actor.name,
       `${rx.medication} for ${rx.patientName} (Rx: ${rx._id}): ${note}`,
     );
+    await raisePharmacyTask(rx, reason, note);
   }
   return updated;
 }

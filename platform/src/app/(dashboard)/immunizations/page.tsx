@@ -169,6 +169,14 @@ export default function ImmunizationsPage() {
     setShowModal(true);
   }, [searchParams, patients]);
 
+  // The visit/note that ordered the dose, when this page was opened from a
+  // consultation plan (e.g. `/immunizations?patientId=...&encounterId=...`).
+  // Read once alongside the patientId prefill above, then stamped onto the
+  // dose on save so the immunization traces back to the encounter/note that
+  // called for it.
+  const encounterId = searchParams.get('encounterId') || undefined;
+  const noteId = searchParams.get('noteId') || undefined;
+
   // Best phone number available for a defaulter's caregiver: the patient's
   // own phone first (in practice the reachable number for young children),
   // falling back to the recorded next-of-kin phone.
@@ -304,6 +312,8 @@ export default function ImmunizationsPage() {
     await register({
       patientId: form.patientId || `child-new-${Date.now()}`,
       patientName: form.patientName,
+      ...(encounterId ? { encounterId } : {}),
+      ...(noteId ? { noteId } : {}),
       gender: form.gender,
       dateOfBirth: form.dateOfBirth,
       vaccine: form.vaccine,
@@ -696,7 +706,7 @@ export default function ImmunizationsPage() {
                     const rowKey = `${d.patientId}-${d.vaccine}-${i}`;
                     const hasPhone = !!phoneForDefaulter(d.patientId);
                     return (
-                      <tr key={rowKey} className="cursor-pointer" onClick={() => router.push(`/patients/${d.patientId}`)}>
+                      <tr key={rowKey} className="cursor-pointer" onClick={() => router.push(`/patients/${d.patientId}?tab=immunizations`)}>
                         <td><PatientName patientId={d.patientId} name={d.patientName} gender={d.gender} nameClassName="font-medium text-sm" /></td>
                         <td className="text-xs">{Math.floor(d.ageMonths / 12)}y {d.ageMonths % 12}m</td>
                         <td className="text-xs">{d.gender}</td>
@@ -796,7 +806,7 @@ export default function ImmunizationsPage() {
                       <Badge tone="danger">{t('immun.overdueCount', { count: overdueCount })}</Badge>
                     )}
                     <Link
-                      href={`/patients/${childId}`}
+                      href={`/patients/${childId}?tab=immunizations`}
                       onClick={(e) => e.stopPropagation()}
                       className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:bg-[var(--accent-light)]"
                       style={{ color: 'var(--accent-primary)' }}

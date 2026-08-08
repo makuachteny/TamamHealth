@@ -21,10 +21,12 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context';
 import { useTelehealth } from '@/lib/hooks/useTelehealth';
 import { useLiveKitRoom } from '@/lib/hooks/useLiveKitRoom';
 import { useToast } from '@/components/Toast';
+import type { TelehealthSessionWithEncounter } from '@/lib/services/telehealth-service';
 import {
   Mic, MicOff, Video, MonitorSmartphone, MessageSquare,
   Users, PhoneOff, FileText, Send, LogIn, X, Signal,
@@ -52,6 +54,7 @@ export default function TelehealthVisitRoom({
   const { currentUser } = useAuth();
   const { sessions, create, updateStatus, recordConsent, reload: reloadSessions } = useTelehealth();
   const { showToast } = useToast();
+  const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>('entering');
   // Consent is NOT assumed. The session record previously hardcoded
@@ -69,6 +72,16 @@ export default function TelehealthVisitRoom({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [elapsed, setElapsed] = useState(0);
+
+  // ── End-of-visit wrap-up (KAN-???) ──────────────────────────────────────
+  // A telehealth visit used to just toast and navigate away on "End visit" —
+  // no chance to record a follow-up or referral, so neither ever happened.
+  // This is a small gate in front of the same completion, not a separate flow.
+  const [wrapUpOpen, setWrapUpOpen] = useState(false);
+  const [followUpRequired, setFollowUpRequired] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [referralRequired, setReferralRequired] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   // Real media. Everything that used to be simulated — remote video, patient
@@ -405,6 +418,9 @@ export default function TelehealthVisitRoom({
   }, [currentUser, disconnectRoom, onLeave, patientName, reloadSessions, showToast]);
 
   // ── Picture-in-Picture charting: float the call, open the note ─────────────
+  // The PiP float itself is unchanged — only the destination changed, from a
+  // new tab to a same-tab navigation that links the note to this visit's
+  // encounter (once admission has linked one; see ensureTelehealthEncounter).
   const chartInPiP = useCallback(async () => {
     try {
       const v = selfVideoRef.current;
@@ -414,24 +430,83 @@ export default function TelehealthVisitRoom({
         await (v as any).requestPictureInPicture();
       }
     } catch { /* PiP not available — fall through to opening the note */ }
-    window.open(`/consultation?patientId=${encodeURIComponent(patientId)}`, '_blank');
-  }, [patientId]);
+    const encounterId = (session as TelehealthSessionWithEncounter | null)?.encounterId;
+    const params = new URLSearchParams({ patientId });
+    if (encounterId) params.set('encounter', encounterId);
+    router.push(`/consultation?${params.toString()}`);
+  }, [patientId, router, session]);
 
-  // ── End the visit ──────────────────────────────────────────────────────────
-  const endVisit = useCallback(async () => {
+  // ── Wrap-up: what "End visit" now opens instead of completing directly ─────
+  const openWrapUp = useCallback(() => setWrapUpOpen(true), []);
+
+  // ── Complete the visit ──────────────────────────────────────────────────────
+  // Persists the follow-up/referral choices the clinician made in the wrap-up
+  // dialog (replacing what used to be hardcoded `false` at session creation
+  // and never revisited) and, when a follow-up was requested, best-effort
+  // schedules it so the follow-up worklist is real rather than a rate nothing
+  // ever populated. The encounter itself is deliberately left untouched here —
+  // closing it is note-signing's and checkout's job, not this dialog's.
+  const completeVisit = useCallback(async (withNote: boolean) => {
+    if (completing) return;
+    setCompleting(true);
     disconnectRoom();
+
+    const encounterId = (session as TelehealthSessionWithEncounter | null)?.encounterId;
+
     if (sessionIdRef.current) {
       try {
         await updateStatus(sessionIdRef.current, 'completed', {
           actualEndTime: new Date().toISOString(),
           duration: Math.max(1, Math.round(elapsed / 60)),
+          followUpRequired,
+          referralRequired,
+          ...(followUpRequired && followUpDate ? { followUpDate } : {}),
         });
-      } catch { /* non-fatal */ }
+      } catch { /* non-fatal — the room still closes even if this write fails */ }
+
+      if (followUpRequired) {
+        try {
+          const { createFollowUp } = await import('@/lib/services/follow-up-service');
+          const scheduledDate = followUpDate
+            || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+          await createFollowUp({
+            patientId,
+            patientName,
+            encounterId,
+            hospitalId: currentUser?.hospitalId,
+            assignedWorker: currentUser?._id || '',
+            assignedWorkerName: currentUser?.name || currentUser?.username || '',
+            status: 'active',
+            condition: chiefComplaint || 'Telehealth follow-up',
+            facilityLevel: currentUser?.hospital?.facilityLevel || 'county',
+            scheduledDate,
+            state: currentUser?.state || currentUser?.hospital?.state || '',
+            county: currentUser?.county || '',
+            orgId: currentUser?.orgId,
+          });
+          showToast('Follow-up scheduled', 'success');
+        } catch {
+          showToast('Visit completed, but the follow-up could not be scheduled', 'error');
+        }
+      }
     }
+
+    setWrapUpOpen(false);
     setPhase('ended');
     showToast('Telehealth visit ended', 'success');
-    onLeave();
-  }, [disconnectRoom, elapsed, onLeave, showToast, updateStatus]);
+    setCompleting(false);
+
+    if (withNote) {
+      const params = new URLSearchParams({ patientId });
+      if (encounterId) params.set('encounter', encounterId);
+      router.push(`/consultation?${params.toString()}`);
+    } else {
+      onLeave();
+    }
+  }, [
+    completing, disconnectRoom, session, elapsed, followUpRequired, followUpDate, referralRequired,
+    updateStatus, patientId, patientName, currentUser, chiefComplaint, showToast, router, onLeave,
+  ]);
 
   // The hook tears its own connection down on unmount, which stops every
   // published track — no separate stream bookkeeping to leak here.
@@ -462,7 +537,7 @@ export default function TelehealthVisitRoom({
         </div>
         <div className="th-room-head-right">
           {phase === 'in_call' && <span className="th-timer"><Signal className="w-3.5 h-3.5" color="currentColor" /> {mmss}</span>}
-          <button type="button" className="th-icon-btn" aria-label="Close" onClick={endVisit}><X className="w-4 h-4" color="currentColor" /></button>
+          <button type="button" className="th-icon-btn" aria-label="Close" onClick={openWrapUp}><X className="w-4 h-4" color="currentColor" /></button>
         </div>
       </div>
 
@@ -642,10 +717,87 @@ export default function TelehealthVisitRoom({
         <div className="th-ctrl th-ctrl-static" aria-hidden>
           <Users className="w-5 h-5" color="currentColor" /><span>{phase === 'in_call' ? '2' : '1'}</span>
         </div>
-        <button type="button" className="th-ctrl leave" onClick={endVisit} aria-label="Leave visit">
+        <button type="button" className="th-ctrl leave" onClick={openWrapUp} aria-label="Leave visit">
           <PhoneOff className="w-5 h-5" color="currentColor" /><span>End visit</span>
         </button>
       </div>
+
+      {/* End-of-visit wrap-up. Built from the room's own dark card language
+          (th-chat/th-consent/th-admit-btn/th-reject-btn) rather than the
+          light-theme-aware global Modal — the room itself is unconditionally
+          dark, and nesting a light-mode panel inside it would make this
+          dialog's text unreadable in light mode. */}
+      {wrapUpOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="th-wrapup-title"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(6, 10, 18, 0.72)', padding: 16,
+          }}
+          onClick={() => setWrapUpOpen(false)}
+        >
+          <div className="th-chat" style={{ width: 340, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            <div className="th-chat-head" id="th-wrapup-title">
+              End visit with {patientName.split(' ')[0]}
+              <button type="button" className="th-icon-btn" aria-label="Cancel" onClick={() => setWrapUpOpen(false)}>
+                <X className="w-3.5 h-3.5" color="currentColor" />
+              </button>
+            </div>
+            <div className="th-chat-body">
+              <label className="th-consent" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={followUpRequired}
+                  onChange={e => setFollowUpRequired(e.target.checked)}
+                />
+                <span>Follow-up required</span>
+              </label>
+              {followUpRequired && (
+                <input
+                  type="date"
+                  value={followUpDate}
+                  onChange={e => setFollowUpDate(e.target.value)}
+                  aria-label="Follow-up date"
+                  style={{
+                    background: '#0E1420', color: '#E8EDF4', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 8, padding: '8px 12px', fontSize: 13,
+                  }}
+                />
+              )}
+              <label className="th-consent" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={referralRequired}
+                  onChange={e => setReferralRequired(e.target.checked)}
+                />
+                <span>Referral required</span>
+              </label>
+            </div>
+            <div className="th-chat-input" style={{ justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="th-reject-btn"
+                disabled={completing}
+                onClick={() => void completeVisit(false)}
+              >
+                Complete visit
+              </button>
+              <button
+                type="button"
+                className="th-admit-btn"
+                style={{ marginTop: 0 }}
+                disabled={completing}
+                onClick={() => void completeVisit(true)}
+              >
+                Complete &amp; write note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

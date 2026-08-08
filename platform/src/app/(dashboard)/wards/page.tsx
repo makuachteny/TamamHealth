@@ -24,7 +24,7 @@ export default function WardsPage() {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const { patients } = usePatients();
-  const { wards, activeAdmissions, totalBeds, occupiedBeds, availableBeds, occupancyRate, admit, discharge } = useWards();
+  const { wards, beds, activeAdmissions, totalBeds, occupiedBeds, availableBeds, occupancyRate, admit, discharge } = useWards();
   const { showToast } = useToast();
   const searchParams = useSearchParams();
   const admitFromQueryRef = useRef(false);
@@ -43,8 +43,9 @@ export default function WardsPage() {
     admittingDiagnosis: '',
     severity: 'moderate' as AdmissionDoc['severity'],
     wardId: '',
-    bedNumber: '',
+    bedId: '',
     isolationRequired: false,
+    encounterId: '',
   });
 
   const [dischargeForm, setDischargeForm] = useState({
@@ -53,16 +54,19 @@ export default function WardsPage() {
     followUpRequired: false,
   });
 
-  // Deep link from consultation (?admitPatientId=&diagnosis=): open the admit
-  // modal pre-filled with the patient and diagnosis just captured there,
-  // instead of leaving the clinician to reselect both from scratch.
+  // Deep link from consultation (?admitPatientId=&diagnosis=&encounterId=): open
+  // the admit modal pre-filled with the patient, diagnosis, and the open visit
+  // just captured there, instead of leaving the clinician to reselect both
+  // from scratch — and losing the encounterId means the admission never closes
+  // the OPD visit it grew out of.
   useEffect(() => {
     const admitPatientId = searchParams?.get('admitPatientId');
     if (!admitPatientId || admitFromQueryRef.current) return;
     if (!patients.some(p => p._id === admitPatientId)) return;
     admitFromQueryRef.current = true;
     const diagnosis = searchParams?.get('diagnosis') || '';
-    setAdmitForm(prev => ({ ...prev, patientId: admitPatientId, admittingDiagnosis: diagnosis }));
+    const encounterId = searchParams?.get('encounterId') || '';
+    setAdmitForm(prev => ({ ...prev, patientId: admitPatientId, admittingDiagnosis: diagnosis, encounterId }));
     setAdmitOpen(true);
   }, [searchParams, patients]);
 
@@ -84,6 +88,14 @@ export default function WardsPage() {
     [activeAdmissions, filterWard, admissionSearch],
   );
 
+  // Beds actually free in the chosen ward — without this the admit modal's
+  // bed field was free text, `bedId` never got set, `updateBedStatus` never
+  // ran, and ward occupancy sat at 0% no matter how many patients were admitted.
+  const availableBedsForWard = useMemo(
+    () => admitForm.wardId ? beds.filter(b => b.wardId === admitForm.wardId && b.status === 'available') : [],
+    [beds, admitForm.wardId],
+  );
+
   const handleAdmit = async () => {
     const patient = patients.find(p => p._id === admitForm.patientId);
     const ward = facilityWards.find(w => w._id === admitForm.wardId);
@@ -96,6 +108,7 @@ export default function WardsPage() {
       return;
     }
     if (!currentUser) return;
+    const bed = admitForm.bedId ? beds.find(b => b._id === admitForm.bedId) : undefined;
     try {
       await admit({
         patientId: patient._id,
@@ -107,7 +120,8 @@ export default function WardsPage() {
         admittedByName: currentUser.name,
         wardId: ward._id,
         wardName: ward.name,
-        bedNumber: admitForm.bedNumber || undefined,
+        bedId: bed?._id,
+        bedNumber: bed?.bedNumber,
         facilityId: ward.facilityId,
         facilityName: ward.facilityName,
         facilityLevel: ward.facilityLevel,
@@ -121,10 +135,14 @@ export default function WardsPage() {
         // expect a state code (e.g. "Central Equatoria"), not a hospital
         // ("Juba Teaching Hospital").
         state: patient.state || currentUser.hospital?.state || '',
+        // Closes the OPD visit this admission grew out of, when the admit
+        // modal was opened from one (deep-linked ?encounterId=). Best-effort
+        // on the service side — an admission never fails because of this.
+        encounterId: admitForm.encounterId || undefined,
       });
       showToast(t('ward.admittedToast', { name: `${patient.firstName} ${patient.surname}`, ward: ward.name }), 'success');
       setAdmitOpen(false);
-      setAdmitForm({ patientId: '', admittingDiagnosis: '', severity: 'moderate', wardId: '', bedNumber: '', isolationRequired: false });
+      setAdmitForm({ patientId: '', admittingDiagnosis: '', severity: 'moderate', wardId: '', bedId: '', isolationRequired: false, encounterId: '' });
     } catch (err) {
       console.error(err);
       showToast(t('ward.admitFailedToast'), 'error');
@@ -303,7 +321,7 @@ export default function WardsPage() {
                   </div>
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.wardRequired')}</label>
-                    <Select value={admitForm.wardId} onChange={e => setAdmitForm({ ...admitForm, wardId: e.target.value })}>
+                    <Select value={admitForm.wardId} onChange={e => setAdmitForm({ ...admitForm, wardId: e.target.value, bedId: '' })}>
                       <option value="">{t('ward.selectWard')}</option>
                       {facilityWards.filter(w => w.availableBeds > 0).map(w => (
                         <option key={w._id} value={w._id}>{t('ward.wardFree', { name: w.name, count: w.availableBeds })}</option>
@@ -314,7 +332,12 @@ export default function WardsPage() {
                 <div className="grid grid-cols-2 gap-3 items-center">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('ward.bedNumber')}</label>
-                    <input type="text" value={admitForm.bedNumber} onChange={e => setAdmitForm({ ...admitForm, bedNumber: e.target.value })} placeholder={t('ward.optional')} />
+                    <Select value={admitForm.bedId} onChange={e => setAdmitForm({ ...admitForm, bedId: e.target.value })} disabled={!admitForm.wardId}>
+                      <option value="">{admitForm.wardId ? t('ward.optional') : t('ward.selectWard')}</option>
+                      {availableBedsForWard.map(b => (
+                        <option key={b._id} value={b._id}>{b.bedNumber}</option>
+                      ))}
+                    </Select>
                   </div>
                   <label className="flex items-center gap-2 mt-5 text-sm" style={{ color: 'var(--text-primary)' }}>
                     <input type="checkbox" checked={admitForm.isolationRequired} onChange={e => setAdmitForm({ ...admitForm, isolationRequired: e.target.checked })} />

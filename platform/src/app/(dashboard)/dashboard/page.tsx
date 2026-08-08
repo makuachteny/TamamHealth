@@ -16,6 +16,7 @@ import { usePhoneNotesInbox } from '@/lib/hooks/usePhoneNotesInbox';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useAppointments } from '@/lib/hooks/useAppointments';
+import { useFollowUpsDue } from '@/lib/hooks/useFollowUpsDue';
 import { patientFullName, patientAge } from '@/lib/patient-utils';
 import { getDefaultDashboard } from '@/lib/permissions';
 import { getNoteType } from '@/lib/clinical-notes/note-catalog';
@@ -27,6 +28,7 @@ import type {
   AppointmentDoc,
   AssessmentDoc,
   MedicalRecordDoc,
+  FollowUpDoc,
   PatientDoc,
   PatientTransferDoc,
   PhoneNoteDoc,
@@ -36,6 +38,11 @@ import type {
 import type { ClinicalNoteDoc } from '@/lib/clinical-notes/types';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
+
+// A community-health follow-up counts as "due" on this worklist when it's
+// scheduled today or within this many days out — close enough that the
+// clinician should know before it lapses into a missed home visit.
+const FOLLOW_UP_DUE_WINDOW_DAYS = 3;
 
 // In production we suppress fabricated demo values (e.g. sampled ward/division
 // labels) so users never see invented data. Set NEXT_PUBLIC_DEMO_MODE=false on
@@ -55,6 +62,7 @@ export interface DoctorWorklistInput {
   referrals: ReferralDoc[];
   resumableEncounters: ResumableEncounter[];
   incomingTransfers: PatientTransferDoc[];
+  followUpsDue: FollowUpDoc[];
   /** Injectable so callers (tests) get a deterministic "today" / cutoff instead
    *  of the real wall clock. Defaults to `new Date()`. */
   now?: Date;
@@ -86,6 +94,7 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
     patients, triages, currentUser, appointments,
     unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes,
     phoneNotesInbox, referrals, resumableEncounters, incomingTransfers,
+    followUpsDue,
   } = input;
   const now = input.now ?? new Date();
   const nowMs = now.getTime();
@@ -218,7 +227,7 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
       subtitle: 'Draft consult note — needs signature',
       meta: shortDate(r.visitDate || r.createdAt),
       tone: 'warning' as const,
-      href: `/patients/${r.patientId}`,
+      href: `/patients/${r.patientId}?tab=notes`,
     })),
     ...awaitingCosign.map(r => ({
       id: r._id,
@@ -226,14 +235,14 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
       subtitle: 'Trainee note — awaiting co-signature',
       meta: shortDate(r.visitDate || r.createdAt),
       tone: 'warning' as const,
-      href: `/patients/${r.patientId}`,
+      href: `/patients/${r.patientId}?tab=notes`,
     })),
     ...heldAssessments.map(a => ({
       id: a._id,
       title: signingPatientName(a.patientId),
       subtitle: 'Outcome assessment — review & sign',
       meta: shortDate(a.createdAt),
-      href: `/patients/${a.patientId}`,
+      href: `/patients/${a.patientId}?tab=notes`,
     })),
     ...unsignedNotes.map(n => ({
       id: n._id,
@@ -251,7 +260,9 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
     subtitle: n.subject || n.message,
     meta: shortDate(n.createdAt),
     tone: 'warning' as const,
-    href: '/messages',
+    // Opens the patient's own notes tab — where the callback actually gets
+    // resolved — rather than /messages, which has no per-patient context.
+    href: n.patientId ? `/patients/${n.patientId}?tab=notes` : '/patients',
   }));
 
   // "Open" = submitted but not yet resolved — excludes completed/cancelled
@@ -289,6 +300,27 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
     href: e.allResultsBack ? `/consultation?encounter=${e._id}` : '/lab',
   }));
 
+  // Community-health follow-ups due (or nearly due) for this clinician's org/
+  // hospital. `followUpsDue` (useFollowUpsDue) already scopes and pre-filters
+  // for the live app, but the window check is re-applied here against the
+  // injected `now` so this stays a pure, deterministic function of its
+  // inputs — same reasoning as the triage 24h cutoff and telehealth's
+  // "today" filter above, both computed in the assembler rather than a hook.
+  const dueCutoffMs = nowMs + FOLLOW_UP_DUE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const dueFollowUps = followUpsDue.filter(f => {
+    if (f.status !== 'active') return false;
+    const scheduledMs = f.scheduledDate ? new Date(f.scheduledDate).getTime() : NaN;
+    return !Number.isNaN(scheduledMs) && scheduledMs <= dueCutoffMs;
+  });
+  const followUpEntries = dueFollowUps.map(f => ({
+    id: f._id,
+    title: f.patientName,
+    subtitle: f.condition,
+    meta: shortDate(f.scheduledDate),
+    tone: 'warning' as const,
+    href: `/patients/${f.patientId}?tab=careChecklist`,
+  }));
+
   const transferEntries = incomingTransfers.map(t => {
     const overdue = isTransferOverdue(t, now);
     return {
@@ -313,11 +345,12 @@ export function assembleDoctorWorklist(input: DoctorWorklistInput): DoctorWorkli
       href: '/patients',
       entries: transferEntries,
     },
-    { label: 'Documents to sign', count: signCount, tone: signCount > 0 ? 'warning' as const : 'neutral' as const, href: '/consultation', entries: documentEntries },
-    { label: 'Phone notes', count: phoneNotesInbox.length, tone: phoneNotesInbox.length > 0 ? 'warning' as const : 'neutral' as const, href: '/messages', entries: phoneNoteEntries },
+    { label: 'Documents to sign', count: signCount, tone: signCount > 0 ? 'warning' as const : 'neutral' as const, href: '/patients', entries: documentEntries },
+    { label: 'Phone notes', count: phoneNotesInbox.length, tone: phoneNotesInbox.length > 0 ? 'warning' as const : 'neutral' as const, href: '/patients', entries: phoneNoteEntries },
     { label: 'Open referrals', count: myOpenReferrals.length, href: '/referrals', entries: referralEntries },
     { label: 'Awaiting labs', count: resumableEncounters.length, tone: resumableEncounters.length > 0 ? 'danger' as const : 'neutral' as const, href: '/lab', entries: labEntries },
     { label: 'Telehealth visits', count: telehealthToday.length, tone: telehealthToday.length > 0 ? 'warning' as const : 'neutral' as const, href: '/appointments', entries: telehealthEntries },
+    { label: 'Follow-ups due', count: dueFollowUps.length, tone: dueFollowUps.length > 0 ? 'warning' as const : 'neutral' as const, href: '/patients', entries: followUpEntries },
   ];
 
   return {
@@ -347,6 +380,8 @@ export default function DashboardPage() {
   // invisible to the person who has to answer it — they have no reason to open
   // a chart that isn't theirs yet.
   const { incoming: incomingTransfers } = useTransferQueue();
+  // Community-health follow-ups due (or nearly due) — the "Follow-ups due" rail.
+  const { followUpsDue } = useFollowUpsDue();
 
   // `/dashboard` is shared. Doctors / clinical officers / clinicians get the
   // clinical view; the medical superintendent gets its own admin view (rendered
@@ -374,6 +409,7 @@ export default function DashboardPage() {
     patients, triages, currentUser, appointments,
     unsignedDrafts, awaitingCosign, heldAssessments, unsignedNotes,
     phoneNotesInbox, referrals, resumableEncounters, incomingTransfers,
+    followUpsDue,
   });
 
   return (

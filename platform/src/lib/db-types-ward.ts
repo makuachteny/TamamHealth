@@ -46,6 +46,12 @@ export interface AdmissionDoc extends BaseDoc {
   patientId: string;
   patientName: string;
   hospitalNumber?: string;
+  /**
+   * The outpatient encounter this admission grew out of. Links the visit
+   * lineage and lets admission close the OPD encounter (status `admitted`)
+   * instead of leaving it open to absorb the patient's next arrival.
+   */
+  encounterId?: string;
   // Admission details
   admissionDate: string;
   admittingDiagnosis: string;

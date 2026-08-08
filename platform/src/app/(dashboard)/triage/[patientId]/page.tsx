@@ -17,15 +17,14 @@
  * they need to assess.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useToast } from '@/components/Toast';
+import { useAuth } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useAppointments } from '@/lib/hooks/useAppointments';
-import type { AppointmentStatus } from '@/lib/db-types';
-import { APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_STATUS_FLOW, APPOINTMENT_STATUS_EXITS, APPOINTMENT_STATUS_TONES, appointmentStatusLabel } from '@/lib/appointment-status';
-import { usePermissions } from '@/lib/hooks/usePermissions';
+import { APPOINTMENT_CLOSED_STATUSES, APPOINTMENT_STATUS_TONES, appointmentStatusLabel } from '@/lib/appointment-status';
+import { getRoleConfig } from '@/lib/permissions';
 import { jubaDate } from '@/lib/time-juba';
 import { patientFullName, patientGenderAge, initials, stateTint } from '@/lib/patient-utils';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -38,17 +37,23 @@ export default function PatientTriagePage() {
   const params = useParams();
   const router = useRouter();
   const { t } = useTranslation();
+  const { currentUser } = useAuth();
   const patientId = String(params?.patientId || '');
   const { patients, loading } = usePatients();
   const { triages } = useTriage();
-  const { appointments, updateStatus } = useAppointments();
-  const { showToast } = useToast();
-  const {
-    canConfirmAppointments, canCheckInAppointments, canAdvanceAppointments, canManageAppointmentSchedule,
-  } = usePermissions();
+  const { appointments } = useAppointments();
 
-  // Same undo affordance as the ward board: Rescheduled drops the visit off
-  // the live surfaces, so the toast carries the way back.
+  // Where "back" goes depends on who is here: the nurse's triage station is
+  // not in a doctor's route table, so a doctor following the chart's
+  // "Triage/ETAT" form landed on RoleGuard's Access Restricted screen.
+  const nurseStation = '/dashboard/nurse';
+  const backTarget = currentUser && getRoleConfig(currentUser.role)?.allowedRoutes?.some(
+    route => nurseStation === route || nurseStation.startsWith(`${route}/`),
+  )
+    ? '/dashboard/nurse?station=triage'
+    : currentUser
+      ? getRoleConfig(currentUser.role)?.defaultDashboard || '/dashboard'
+      : '/dashboard';
 
   // Today's open visit, if there is one. Saving a triage puts it on the Triaged
   // rung; the nurse's next step — Roomed — is the next option in this same
@@ -95,11 +100,12 @@ export default function PatientTriagePage() {
           to the chart, which has its own way back. */}
       <button
         type="button"
-        onClick={() => router.push('/dashboard/nurse?station=triage')}
+        onClick={() => router.push(backTarget)}
         className="flex items-center gap-1.5 text-[12px] font-bold mb-2 no-print"
         style={{ color: 'var(--accent-primary)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
       >
-        <ArrowLeft className="w-4 h-4" style={{ stroke: 'currentColor' }} /> Triage station
+        <ArrowLeft className="w-4 h-4" style={{ stroke: 'currentColor' }} />
+        {backTarget.startsWith('/dashboard/nurse') ? 'Triage station' : 'Back to dashboard'}
       </button>
 
       {/* Who is being triaged, stated once at the top — the form below has no

@@ -1,6 +1,6 @@
-import { appointmentsDB } from '../db';
+import { appointmentsDB, encountersDB } from '../db';
 import { findByType } from './db-query';
-import type { AppointmentDoc, AppointmentStatus, UserRole } from '../db-types';
+import type { AppointmentDoc, AppointmentStatus, UserRole, EncounterDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
@@ -289,6 +289,69 @@ export async function getAppointmentById(id: string): Promise<AppointmentDoc | n
   }
 }
 
+/** The encounter this appointment's visit is being tracked against, if any. */
+async function findLinkedEncounterForAppointment(appointmentId: string): Promise<EncounterDoc | null> {
+  const rows = await findByType<EncounterDoc>(
+    encountersDB(), 'clinical_encounter', { appointmentId }, { indexFields: ['type', 'appointmentId'] },
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Appointment → encounter bridge: closing an appointment should close the
+ * visit it stands for, in the direction an appointment status change can
+ * legitimately drive it. Previously the two tracked independently — an
+ * appointment marked completed left its encounter open forever (absorbable
+ * by a later same-day arrival, per `findOpenEncounterForPatient`), and a
+ * no-show/cancellation left a patient who was never seen sitting in the
+ * triage queue indefinitely.
+ *
+ * The reverse direction — an encounter reaching a terminal status updating
+ * its appointment — is a separate concern that lives with encounter-service,
+ * not here.
+ *
+ * Best-effort: the appointment status is already durably written by the time
+ * this runs, so a bridge failure must never surface as a failed status
+ * update.
+ */
+async function bridgeEncounterOnAppointmentStatus(
+  appointment: AppointmentDoc,
+  status: AppointmentStatus,
+  actorId: string | undefined,
+): Promise<void> {
+  if (status !== 'completed' && status !== 'no_show' && status !== 'cancelled') return;
+  try {
+    const encounter = await findLinkedEncounterForAppointment(appointment._id);
+    if (!encounter) return;
+    const { isTerminal } = await import('../clinical-flow/encounter-journey');
+    if (isTerminal(encounter.status)) return; // already closed — nothing to bridge
+
+    if (status === 'completed') {
+      // Only actually discharges when the encounter has reached a
+      // checkout-eligible state; otherwise dischargeEncounter is a no-op and
+      // leaves it untouched — a visit the clinician hasn't closed yet is
+      // never force-discharged just because reception checked the appointment out.
+      const { dischargeEncounter } = await import('./encounter-service');
+      await dischargeEncounter(encounter._id, { actorId });
+      return;
+    }
+
+    // no_show / cancelled: only ever close a visit nothing clinical has
+    // happened on yet. An encounter that has reached a clinician (or beyond)
+    // carries real clinical activity — the appointment closing must never
+    // silently discard that; leave it untouched instead.
+    const { PRE_CLINICIAN_STATUSES, recordLeftWithoutBeingSeen } = await import('./encounter-service');
+    if (!PRE_CLINICIAN_STATUSES.includes(encounter.status)) return;
+
+    await recordLeftWithoutBeingSeen(encounter._id, {
+      actorId,
+      reason: status === 'no_show' ? 'Appointment no_show' : 'Appointment cancelled',
+    });
+  } catch (err) {
+    console.warn(`[appointment] could not bridge encounter on ${status} (appointment status was saved):`, err);
+  }
+}
+
 export async function updateAppointmentStatus(
   id: string,
   status: AppointmentStatus,
@@ -414,6 +477,7 @@ export async function updateAppointmentStatus(
       orgId: updated.orgId,
       hospitalId: updated.facilityId,
     });
+    await bridgeEncounterOnAppointmentStatus(updated, status, actorId);
     return updated;
   } catch (err) {
     if (err instanceof BookingConflictError) throw err;

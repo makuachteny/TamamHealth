@@ -34,6 +34,8 @@ import AllergiesModal from './AllergiesModal';
 import CareCoordinationModal, {
   type CareCoordinationResult, type SummaryProblem, type SummarySocialHistory,
 } from './CareCoordinationModal';
+import FollowUpModal, { type FollowUpModalResult } from './FollowUpModal';
+import PatientEducationModal, { type PatientEducationModalResult } from './PatientEducationModal';
 import {
   NOTE_TYPE_ORDER, NOTE_TYPES, getNoteType, getSectionLabel,
   availableOptionalSections, isNoteTypeId,
@@ -46,7 +48,7 @@ import {
   listClinicalNotes,
 } from '@/lib/clinical-notes/note-service';
 import { formatPhoneDisplay } from '@/lib/field-formats';
-import type { PatientDoc, PatientDocumentDoc } from '@/lib/db-types';
+import type { PatientDoc, PatientDocumentDoc, UserRole } from '@/lib/db-types';
 import { loadChartSnapshot, snapshotForSection, formatProblems } from '@/lib/clinical-notes/chart-snapshot';
 import { stripTemplateMarkers } from '@/lib/clinical-notes/section-templates';
 import type {
@@ -109,6 +111,8 @@ export default function ClinicalNoteEditor({
   const [showAllergies, setShowAllergies] = useState(false);
   const [showPrescribe, setShowPrescribe] = useState(false);
   const [showLabOrder, setShowLabOrder] = useState(false);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [showPatientEducation, setShowPatientEducation] = useState(false);
   const [problems, setProblems] = useState<SummaryProblem[]>([]);
   const [socialHistory, setSocialHistory] = useState<SummarySocialHistory[]>([]);
 
@@ -327,8 +331,12 @@ export default function ClinicalNoteEditor({
       case 'record_vitals':
         router.push(`/patients/${note.patientId}?tab=vitals`);
         return;
+      // Opens FollowUpModal, which only collects the form; the write
+      // (createFollowUp, then recordPlanAction) happens in
+      // handleScheduleFollowUp once a real FollowUpDoc exists — the old
+      // router.push to /appointments only filtered a list and created nothing.
       case 'schedule_followup':
-        router.push(`/appointments?patientId=${note.patientId}`);
+        setShowFollowUp(true);
         return;
       case 'order_lab':
         setShowLabOrder(true);
@@ -342,17 +350,21 @@ export default function ClinicalNoteEditor({
       // `/immunizations?patientId=` does read and act on this param (it opens
       // the add-immunization form prefilled), but the order is not placed
       // until the clinician submits it there, so nothing is recorded yet.
+      // encounterId/noteId ride along so the immunization, once placed, can
+      // link back to this visit and note.
       case 'order_vaccine':
-        router.push(`/immunizations?patientId=${note.patientId}`);
+        router.push(`/immunizations?patientId=${note.patientId}&encounterId=${note.encounterId || ''}&noteId=${noteId}`);
         return;
-      // `/messages` does not read either param — this is a hand-off, not a
-      // completed send, so the plan is not stamped.
+      // Opens PatientEducationModal — the old router.push to /messages read
+      // neither param, so nothing was ever sent. handleSendEducation sends
+      // through the same createMessage flag shape the chart's own
+      // "Patient education" action uses, and only then stamps the plan.
       case 'patient_education':
-        router.push(`/messages?patientId=${note.patientId}&kind=education`);
+        setShowPatientEducation(true);
         return;
       default: return;
     }
-  }, [note, router]);
+  }, [note, router, noteId]);
 
   // ── Assessment: problems checked in the Include Problems popup become
   //    diagnosis lines on the note, deduped against what is already there ──
@@ -429,6 +441,97 @@ export default function ClinicalNoteEditor({
       createdBy: currentUser?._id,
     }));
     showToast(`Referral created for ${result.recipient}.`, 'success');
+
+    // Best-effort: a referral out ends the clinic portion of this visit.
+    // 'referred_out' is in CLOSES_CLINIC_PORTION (stamps closedAt) — that is
+    // intended. The referral above already stands regardless of whether the
+    // encounter can be advanced, so this never undoes it on failure.
+    if (note.encounterId) {
+      try {
+        const { getEncounter, transitionEncounter } = await import('@/lib/services/encounter-service');
+        const enc = await getEncounter(note.encounterId);
+        if (enc?.status === 'with_clinician') {
+          await transitionEncounter(note.encounterId, 'referred_out', {
+            actorId: currentUser?._id,
+            actorRole: currentUser?.role as UserRole | undefined,
+            reason: `Referred to ${result.recipient}`,
+          });
+        }
+      } catch { /* the referral stands even if the visit can't be advanced */ }
+    }
+  };
+
+  // Follow-up: FollowUpModal collects the form; this creates the real
+  // FollowUpDoc and only then stamps the plan action, mirroring
+  // handleCoordination above and the LabOrderModal onPlaced discipline —
+  // the note never claims a follow-up exists before one really does.
+  const handleScheduleFollowUp = async (result: FollowUpModalResult) => {
+    if (!note) return;
+    const { createFollowUp } = await import('@/lib/services/follow-up-service');
+    const followUp = await createFollowUp({
+      patientId: note.patientId,
+      patientName: note.patientName,
+      encounterId: note.encounterId,
+      hospitalId: note.hospitalId,
+      geocodeId: patient?.geocodeId,
+      // The visible field only asks for a name (see FollowUpModal); the id
+      // is always the clinician creating this from the note, matching how
+      // POST /api/follow-ups defaults assignedWorker to the acting user.
+      assignedWorker: currentUser?._id || '',
+      assignedWorkerName: result.assignedWorkerName,
+      status: 'active',
+      condition: result.condition,
+      // No facility-level picker on this note-driven flow yet; 'county'
+      // matches the clinic tier this note itself is written from.
+      facilityLevel: 'county',
+      scheduledDate: result.scheduledDate,
+      notes: result.notes || undefined,
+      state: patient?.state || '',
+      county: patient?.county || '',
+      orgId: note.orgId ?? currentUser?.orgId,
+    });
+
+    await persist(() => recordPlanAction(noteId, {
+      kind: 'follow_up',
+      label: `Follow-up: ${result.condition} on ${result.scheduledDate}`,
+      targetId: followUp._id,
+      createdBy: currentUser?._id,
+    }));
+    showToast('Follow-up scheduled.', 'success');
+  };
+
+  // Patient education: PatientEducationModal collects subject/body; this
+  // sends it with the same createMessage flag shape the chart's own
+  // "Patient education" action uses (see patients/[id]/page.tsx
+  // sendPatientMessage / onPatientEd) so it files under the chart's
+  // Documents ▸ Patient education, then stamps the plan on success.
+  const handleSendEducation = async (result: PatientEducationModalResult) => {
+    if (!note) return;
+    const { createMessage } = await import('@/lib/services/message-service');
+    await createMessage({
+      patientId: note.patientId,
+      patientName: note.patientName,
+      patientPhone: patient?.phone || '',
+      recipientType: 'patient',
+      direction: 'staff_to_patient',
+      fromDoctorId: currentUser?._id || '',
+      fromDoctorName: userName,
+      fromHospitalId: note.hospitalId,
+      fromHospitalName: note.hospitalName || '',
+      subject: result.subject,
+      body: result.body,
+      channel: 'app',
+      patientEducation: true,
+      sentAt: new Date().toISOString(),
+      orgId: note.orgId ?? currentUser?.orgId,
+    });
+
+    await persist(() => recordPlanAction(noteId, {
+      kind: 'patient_education',
+      label: 'Patient education sent',
+      createdBy: currentUser?._id,
+    }));
+    showToast('Patient education sent.', 'success');
   };
 
   const handleSaveAndClose = async () => {
@@ -441,6 +544,22 @@ export default function ClinicalNoteEditor({
           text: section.text,
           templateSelection: section.templateSelection,
         }).catch(() => undefined);
+      }
+      // Best-effort: pause the visit so a clinician stepping away mid-consult
+      // shows up on the resume rail (RESUMABLE_STATUSES / "Awaiting labs")
+      // instead of looking indistinguishable from one still with_clinician.
+      // Never blocks navigation — the draft is already saved above regardless.
+      if (note.encounterId) {
+        try {
+          const { getEncounter, transitionEncounter } = await import('@/lib/services/encounter-service');
+          const enc = await getEncounter(note.encounterId);
+          if (enc?.status === 'with_clinician') {
+            await transitionEncounter(note.encounterId, 'consultation_paused_draft', {
+              actorId: currentUser?._id,
+              actorRole: currentUser?.role as UserRole | undefined,
+            });
+          }
+        } catch { /* the draft is saved regardless; navigation proceeds either way */ }
       }
     }
     showToast('Note saved.', 'success');
@@ -835,8 +954,15 @@ export default function ClinicalNoteEditor({
         <span className="cn-saved">
           {saving ? 'Saving…' : savedAt ? `Last saved ${new Date(savedAt).toLocaleTimeString()}` : ''}
         </span>
-        <button type="button" className="cn-btn" onClick={handleSaveAndClose}>
-          <Save size={14} /> Save &amp; Close
+        <button
+          type="button"
+          className="cn-btn"
+          onClick={handleSaveAndClose}
+          title={note.encounterId
+            ? 'Saves the draft and pauses the visit for later resume'
+            : undefined}
+        >
+          <Save size={14} /> {note.encounterId ? 'Pause visit & close' : 'Save & Close'}
         </button>
       </div>
 
@@ -975,6 +1101,23 @@ export default function ClinicalNoteEditor({
           socialHistory={socialHistory}
           onSend={handleCoordination}
           onClose={() => setShowCoordination(false)}
+        />
+      )}
+
+      {showFollowUp && (
+        <FollowUpModal
+          patientName={note.patientName}
+          defaultAssignedWorkerName={userName}
+          onSchedule={handleScheduleFollowUp}
+          onClose={() => setShowFollowUp(false)}
+        />
+      )}
+
+      {showPatientEducation && (
+        <PatientEducationModal
+          patientName={note.patientName}
+          onSend={handleSendEducation}
+          onClose={() => setShowPatientEducation(false)}
         />
       )}
 

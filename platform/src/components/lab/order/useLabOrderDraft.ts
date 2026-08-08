@@ -144,6 +144,7 @@ export function useLabOrderDraft(options: { presetPatientId?: string } = {}) {
       let deskEncounterId: string | undefined;
       try {
         const { ensureLabOrderEncounter } = await import('@/lib/services/encounter-service');
+        const { isImagingStudy } = await import('@/lib/clinical-flow/lab-catalog');
         const encounter = await ensureLabOrderEncounter({
           patientId: patient._id,
           patientName,
@@ -155,6 +156,12 @@ export function useLabOrderDraft(options: { presetPatientId?: string } = {}) {
           clinicianName: draft.orderedByName || currentUser?.name,
           actorId: currentUser?._id,
           placedAt,
+          // An all-imaging requisition parks the visit at awaiting_imaging so
+          // the radiology queue and the visit state tell the same story.
+          to: draft.tests.length > 0
+            && draft.tests.every(t => isImagingStudy({ specimen: t.specimen, testName: t.name }))
+            ? 'awaiting_imaging'
+            : 'awaiting_labs',
         });
         deskEncounterId = encounter._id;
       } catch (err) {
@@ -162,11 +169,9 @@ export function useLabOrderDraft(options: { presetPatientId?: string } = {}) {
       }
 
       const { createLabResult } = await import('@/lib/services/lab-service');
+      const { isImagingStudy: isImaging } = await import('@/lib/clinical-flow/lab-catalog');
       const createdIds: string[] = [];
       const accessionNumbers: string[] = [];
-      const orderedAtLabel = new Date().toLocaleString('en-US', {
-        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-      });
 
       for (const test of draft.tests) {
         // Only this test's AOE answers travel with this test's document.
@@ -201,7 +206,14 @@ export function useLabOrderDraft(options: { presetPatientId?: string } = {}) {
           orderedById: !draft.orderedByName || draft.orderedByName === currentUser?.name
             ? currentUser?._id
             : undefined,
-          orderedAt: orderedAtLabel,
+          // ISO, not a locale string: every consumer parses through
+          // new Date(), and the chart's Orders/Results sections sort
+          // lexicographically — a locale "08/08/2026…" sorted below every
+          // ISO "2026-…" regardless of date.
+          orderedAt: placedAt,
+          // Modality discriminator — without it every CT scan renders as a
+          // "Lab order" in the chart.
+          orderKind: isImaging({ specimen: test.specimen, testName: test.name }) ? 'imaging' : 'lab',
           completedAt: '',
           hospitalId,
           hospitalName: currentUser?.hospitalName,

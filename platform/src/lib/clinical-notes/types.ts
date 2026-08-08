@@ -68,7 +68,7 @@ export interface NoteAddendum {
 /** Orders and actions raised from the Plan section, recorded on the note. */
 export interface NotePlanAction {
   id: string;
-  kind: 'medication' | 'lab' | 'vaccine' | 'patient_education' | 'referral';
+  kind: 'medication' | 'lab' | 'vaccine' | 'patient_education' | 'referral' | 'follow_up';
   label: string;
   /** Id of the document this action created (prescription, lab order, …). */
   targetId?: string;

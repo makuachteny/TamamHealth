@@ -23,6 +23,17 @@ export class ConsentRequiredError extends Error {
   }
 }
 
+/**
+ * `encounterId` links a telehealth session to the clinical visit encounter it
+ * belongs to (see `ensureTelehealthEncounter`). It is not yet part of
+ * `TelehealthSessionDoc` in db-types.ts — declared locally here rather than
+ * widening that shared type from this change alone. Every write goes through
+ * `updateSession`, which spreads onto the existing document rather than
+ * replacing it, so the field round-trips through PouchDB/CouchDB fine even
+ * though the shared type doesn't know about it yet.
+ */
+export type TelehealthSessionWithEncounter = TelehealthSessionDoc & { encounterId?: string };
+
 export async function getAllSessions(scope?: DataScope): Promise<TelehealthSessionDoc[]> {
   const db = telehealthDB();
   const all = (await findByType<TelehealthSessionDoc>(db, 'telehealth_session'))
@@ -496,6 +507,78 @@ export async function enterWaitingRoom(
 }
 
 /**
+ * Best-effort: make sure the telehealth session's visit encounter exists and
+ * is linked to it.
+ *
+ * Without this a telehealth visit produced no encounter at all — it never
+ * showed up on the clinician's worklists, could not carry a signed note or a
+ * charge, and left `getTelehealthStats().followUpRate` reading a field
+ * nothing ever set. Reuses the patient's already-open encounter at this
+ * facility when one exists (created earlier the same day by a check-in,
+ * another consult, or a prior admit on THIS session) rather than always
+ * minting a new one, matching the pattern `ensureLabOrderEncounter` already
+ * uses for the same reason. Only advances a reused encounter toward
+ * `with_clinician` when it is still in a pre-clinician state — one already
+ * `with_clinician` or further along (labs, checkout, …) is linked as-is,
+ * never pulled backwards or forwards past where a human already moved it.
+ *
+ * Idempotent: a session that already carries an `encounterId` is returned
+ * unchanged, so re-admitting the same session (a reconnect) never spawns a
+ * second encounter for the same visit.
+ *
+ * Non-fatal by design — every failure here is caught and logged rather than
+ * thrown, because the visit itself must run whether or not this bookkeeping
+ * succeeds.
+ */
+export async function ensureTelehealthEncounter(
+  session: TelehealthSessionDoc,
+): Promise<TelehealthSessionDoc | null> {
+  if ((session as TelehealthSessionWithEncounter).encounterId) return session;
+
+  try {
+    const {
+      findOpenEncounterForPatient, createEncounter, advanceEncounterToClinician, PRE_CLINICIAN_STATUSES,
+    } = await import('./encounter-service');
+
+    let encounterId: string;
+    const open = await findOpenEncounterForPatient(session.patientId, session.facilityId);
+    if (open) {
+      encounterId = open._id;
+      if (PRE_CLINICIAN_STATUSES.includes(open.status)) {
+        await advanceEncounterToClinician(open._id, {
+          clinicianId: session.providerId,
+          clinicianName: session.providerName,
+          actorId: session.providerId,
+        });
+      }
+      // Already with_clinician or further along (labs, checkout, …) — leave
+      // it exactly where it is and just link the session to it.
+    } else {
+      const created = await createEncounter({
+        patientId: session.patientId,
+        patientName: session.patientName,
+        clinicianId: session.providerId,
+        clinicianName: session.providerName,
+        hospitalId: session.facilityId,
+        hospitalName: session.facilityName,
+        orgId: session.orgId,
+        status: 'with_clinician',
+        arrivalChannel: 'telehealth',
+        snapshot: {},
+        labOrderIds: [],
+        startedAt: new Date().toISOString(),
+      });
+      encounterId = created._id;
+    }
+
+    return await updateSession(session._id, { encounterId } as unknown as Partial<TelehealthSessionDoc>);
+  } catch (err) {
+    console.warn(`[telehealth] could not link a visit encounter for session ${session._id}`, err);
+    return session;
+  }
+}
+
+/**
  * The clinician admits the waiting patient.
  *
  * Goes through `updateSessionStatus`, so the KAN-125 consent gate applies and
@@ -521,6 +604,9 @@ export async function admitFromWaitingRoom(
       opts.admittedByName,
       `Patient admitted to telehealth session ${id}`,
     );
+    // Best-effort — a failure to link the encounter must not undo an
+    // admission that already succeeded.
+    return (await ensureTelehealthEncounter(updated)) || updated;
   }
   return updated;
 }

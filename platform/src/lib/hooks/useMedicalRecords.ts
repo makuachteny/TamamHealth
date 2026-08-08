@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { MedicalRecordDoc } from '../db-types';
 import { medicalRecordsDB } from '../db';
+import { useDataScope } from './useDataScope';
 
 export function useMedicalRecords(patientId?: string) {
   const [records, setRecords] = useState<MedicalRecordDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const scope = useDataScope();
 
   const loadRecords = useCallback(async () => {
     if (!patientId) {
@@ -18,7 +20,7 @@ export function useMedicalRecords(patientId?: string) {
     try {
       setError(null);
       const { getRecordsByPatient } = await import('../services/medical-record-service');
-      const data = await getRecordsByPatient(patientId);
+      const data = await getRecordsByPatient(patientId, scope);
       setRecords(data);
     } catch (err) {
       console.error(err);
@@ -26,7 +28,7 @@ export function useMedicalRecords(patientId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [patientId]);
+  }, [patientId, scope]);
 
   useEffect(() => {
     loadRecords();

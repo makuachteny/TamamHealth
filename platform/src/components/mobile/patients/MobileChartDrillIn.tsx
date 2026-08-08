@@ -87,7 +87,7 @@ export default function MobileChartDrillIn({ patientId, onClose }: MobileChartDr
         {tab === 'notes' && <MobileNotesTab patientId={patient._id} />}
       </div>
       <div className="mobile-chart-actions">
-        <button type="button" onClick={() => router.push(`/lab?patient=${patient._id}`)}>Order labs</button>
+        <button type="button" onClick={() => router.push(`/lab?patient=${encodeURIComponent(patientFullName(patient))}`)}>Order labs</button>
         <button type="button" className="primary" onClick={() => router.push(`/consultation?patientId=${patient._id}`)}>
           Start consultation
         </button>

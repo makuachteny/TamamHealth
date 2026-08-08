@@ -11,7 +11,7 @@
  * full-page flow) rather than fabricating a pre-filled form.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, ChevronRight, FileText } from '@/components/icons/lucide';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -57,6 +57,28 @@ export default function ClinicalFormsPanel({ patient, router, canConsult, curren
   // gate the row rather than letting the click land on "Access Restricted".
   const canTriage = isPathAllowed(currentUser?.role || '', '/triage');
 
+  // The Ward Admission row deep-links into /wards so admitting from the chart
+  // can close the OPD visit it grew out of (wards reads ?encounterId=). The
+  // panel isn't handed the open encounter directly, so it's resolved
+  // best-effort the same way the rest of the chart would — no encounter found
+  // just means the link falls back to a plain admit with nothing to close.
+  const [openEncounterId, setOpenEncounterId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    const hospitalId = currentUser?.hospitalId;
+    if (!hospitalId) { setOpenEncounterId(undefined); return; }
+    (async () => {
+      try {
+        const { findOpenEncounterForPatient } = await import('@/lib/services/encounter-service');
+        const enc = await findOpenEncounterForPatient(patient._id, hospitalId);
+        if (!cancelled) setOpenEncounterId(enc?._id);
+      } catch {
+        if (!cancelled) setOpenEncounterId(undefined);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [patient._id, currentUser?.hospitalId]);
+
   const forms = useMemo<ClinicalFormItem[]>(() => {
     const lastRecord = records[0];
     const lastTriage = triages[0];
@@ -101,11 +123,14 @@ export default function ClinicalFormsPanel({ patient, router, canConsult, curren
         id: 'ward-admission',
         name: 'Ward Admission',
         lastCompleted: lastAdmission ? formatDate(lastAdmission.admissionDate) : 'Never',
-        href: `/wards?patientId=${patient._id}`,
+        // wards/page.tsx reads `admitPatientId`, not `patientId` — the mismatch
+        // meant this link never actually pre-filled the admit modal. The
+        // encounterId (when an open visit was found) lets admission close it.
+        href: `/wards?admitPatientId=${patient._id}${openEncounterId ? `&encounterId=${openEncounterId}` : ''}`,
         enabled: true,
       },
     ];
-  }, [records, triages, patientANC, patientScreenings, patientAdmissions, patient._id, canConsult, canTriage]);
+  }, [records, triages, patientANC, patientScreenings, patientAdmissions, patient._id, canConsult, canTriage, openEncounterId]);
 
   const filtered = forms.filter(f => f.name.toLowerCase().includes(search.trim().toLowerCase()));
 

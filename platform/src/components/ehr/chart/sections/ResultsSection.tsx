@@ -28,6 +28,13 @@ const STATUS_BADGE: Record<string, string> = {
   completed: 'omrs-panel-badge omrs-panel-badge--done',
 };
 
+/** Defensive sort key: an invalid/missing date sorts as oldest (0) rather
+ *  than winning a lexicographic string comparison it has no business in. */
+const ts = (x?: string): number => {
+  const t = new Date(x || '').getTime();
+  return Number.isFinite(t) ? t : 0;
+};
+
 interface ResultsSectionProps {
   patientId: string;
   canOrderLabs: boolean;
@@ -47,7 +54,7 @@ export default function ResultsSection({ patientId, canOrderLabs, onAdd, focusId
   const patientLabs = useMemo(
     () => (results || [])
       .filter(l => l.patientId === patientId)
-      .sort((a, b) => (b.orderedAt || b.createdAt || '').localeCompare(a.orderedAt || a.createdAt || '')),
+      .sort((a, b) => ts(b.orderedAt || b.createdAt) - ts(a.orderedAt || a.createdAt)),
     [results, patientId],
   );
 

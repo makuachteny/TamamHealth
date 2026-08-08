@@ -444,7 +444,7 @@ export default function MarWorkflow({ onAdminister }: { onAdminister?: () => voi
                         : initials(entry.patientName)}
                     </div>
                     <div className="ehr-appointment-main appointment-card-patient">
-                      <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`/patients/${entry.patientId}`); }}>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`/patients/${entry.patientId}?tab=prescriptions`); }}>
                         {entry.patientName}
                       </button>
                       <p>{entry.frequency || 'Scheduled dose'}</p>

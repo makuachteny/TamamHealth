@@ -16,6 +16,7 @@ import type { AllergyEntry } from '../types/patient-clinical';
 import type { PrescriptionDoc, ProblemDoc, MedicalRecordDoc, TriageDoc } from '../db-types';
 import type { NoteSectionId } from './note-catalog';
 import type { DataScope } from '../services/data-scope';
+import { mergeVitalsTimeline } from '../clinical/vitals';
 
 /** "38.1 °C · 150/90 · HR 92" — the line a clinician scans, not a table. */
 export function formatVitals(record: Partial<Pick<MedicalRecordDoc, 'vitalSigns' | 'triageVitals'>> | null): string {
@@ -186,26 +187,26 @@ async function newestVitals(
   patientId: string,
   scope?: DataScope,
 ): Promise<Partial<Pick<MedicalRecordDoc, 'vitalSigns' | 'triageVitals'>> | null> {
-  const [fromRecord, fromTriage] = await Promise.all([
+  const [records, triages] = await Promise.all([
     safely(async () => {
       const { getRecordsByPatient } = await import('../services/medical-record-service');
-      const rows = await getRecordsByPatient(patientId, scope);
-      // Newest record that actually carries observations.
-      const record = rows.find(r => r.vitalSigns || r.triageVitals) ?? null;
-      return record ? { at: record.consultedAt || record.visitDate || record.createdAt || '', record } : null;
-    }, null as { at: string; record: MedicalRecordDoc } | null),
+      return getRecordsByPatient(patientId, scope);
+    }, [] as MedicalRecordDoc[]),
     safely(async () => {
       const { getTriageByPatient } = await import('../services/triage-service');
-      const rows = await getTriageByPatient(patientId, scope);
-      const withVitals = rows
-        .filter(t => t.temperature || t.pulse || t.respiratoryRate || t.systolic || t.diastolic || t.oxygenSaturation || t.weight)
-        .sort((a, b) => (b.triagedAt || '').localeCompare(a.triagedAt || ''));
-      return withVitals[0] ? { at: withVitals[0].triagedAt || '', triage: withVitals[0] } : null;
-    }, null as { at: string; triage: TriageDoc } | null),
+      return getTriageByPatient(patientId, scope);
+    }, [] as TriageDoc[]),
   ]);
 
-  if (fromTriage && (!fromRecord || fromTriage.at.localeCompare(fromRecord.at) > 0)) {
-    const t = fromTriage.triage;
+  // The shared merge picks the newest entry across both sources (record wins
+  // a same-instant tie) — resolve it back to the original doc so the return
+  // shape (and formatVitals(), which reads it) is unchanged.
+  const winner = mergeVitalsTimeline(records, triages)[0];
+  if (!winner) return null;
+
+  if (winner.source === 'Triage') {
+    const t = triages.find(row => row._id === winner.id);
+    if (!t) return null;
     return {
       triageVitals: {
         temperature: t.temperature, systolic: t.systolic, diastolic: t.diastolic,
@@ -214,7 +215,7 @@ async function newestVitals(
       },
     };
   }
-  return fromRecord?.record ?? null;
+  return records.find(row => row._id === winner.id) ?? null;
 }
 
 async function safely<T>(fn: () => Promise<T>, fallback: T): Promise<T> {

@@ -477,7 +477,7 @@ export default function ClaimsPage() {
                     <td style={{ fontWeight: 600 }}>{claim.claimNumber}</td>
                     <td>
                       {claim.patientId && !claim.patientId.startsWith('demo-') && !claim.patientId.includes('_demo') ? (
-                        <Link href={`/patients/${claim.patientId}`} onClick={e => e.stopPropagation()} className="bl-link">
+                        <Link href={`/patients/${claim.patientId}?tab=billing`} onClick={e => e.stopPropagation()} className="bl-link">
                           {claim.patientName}
                         </Link>
                       ) : (

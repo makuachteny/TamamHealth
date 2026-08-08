@@ -174,9 +174,21 @@ export default function OpenmrsChartShell({
   };
   const closeDrawer = () => { notifyIfNoteClosing(null); setOpenPanel(null); setDrawerMaximized(false); };
 
+  // A `?tab=` link inside the note editor (e.g. "go to Vitals") switches
+  // tabs but leaves the editor mounted underneath — the drawer then covers
+  // the tab it just navigated to. Leaving the note drawer is the one thing a
+  // tab switch should always do; it autosaves, so nothing is lost by closing.
+  useEffect(() => {
+    if (openPanel === CLINICAL_NOTE_PANEL.id) closeDrawer();
+    // Only the tab switch itself should trigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const goToRecallTab = () => {
-    // Recall is consolidated into the patient's appointments/follow-up view.
-    setActiveTab('appointments');
+    // Recall reminders render on the Care plan tab (RemindersPanel), not
+    // Appointments — pointing there landed the task-list "recall" link on an
+    // empty tab.
+    setActiveTab('careChecklist');
     closeDrawer();
   };
 

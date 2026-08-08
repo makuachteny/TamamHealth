@@ -88,6 +88,7 @@ export default function DocumentsPanel({
   onSendEducation,
   onOpenAllReferrals,
   onNewReferral,
+  focusId,
 }: {
   patient: PatientDoc;
   /** This patient's referrals, already filtered by the chart. */
@@ -100,6 +101,10 @@ export default function DocumentsPanel({
   onOpenAllReferrals?: () => void;
   /** Opens the chart's refer modal. Omitted for roles that cannot refer. */
   onNewReferral?: () => void;
+  /** When set (e.g. deep-linked from elsewhere in the chart), the sub-view
+   *  holding this document `_id` is switched to, then the row is scrolled
+   *  into view and highlighted. */
+  focusId?: string;
 }) {
   const { currentUser } = useAuth();
   const confirm = useConfirm();
@@ -217,6 +222,23 @@ export default function DocumentsPanel({
     return GENERAL_CATEGORY_OPTIONS.filter(c => set.has(c));
   }, [generalDocs]);
 
+  // Deep-link focus: switch to whichever sub-view holds the focused document
+  // once it loads, then scroll it into view and let the highlight draw
+  // attention — same pattern as ResultsSection, adapted for the three-view
+  // split here (a doc can only be found once its own view's bucket is known).
+  useEffect(() => {
+    if (!focusId) return;
+    if (generalDocs.some(d => d._id === focusId)) setView('documents');
+    else if (referralDocs.some(d => d._id === focusId)) setView('referrals');
+    else if (educationDocs.some(d => d._id === focusId)) setView('education');
+  }, [focusId, generalDocs, referralDocs, educationDocs]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const el = document.getElementById(`doc-row-${focusId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusId, view]);
+
   const shownGeneral = filter === 'all' ? generalDocs : generalDocs.filter(d => d.category === filter);
 
   const counts: Record<DocView, number> = {
@@ -227,8 +249,18 @@ export default function DocumentsPanel({
 
   const docRow = (d: PatientDocumentDoc) => {
     const isImage = d.mimeType.startsWith('image/');
+    const focused = d._id === focusId;
     return (
-      <div key={d._id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+      <div
+        key={d._id}
+        id={`doc-row-${d._id}`}
+        className="flex items-center gap-3 p-2.5 rounded-lg"
+        style={{
+          background: focused ? 'var(--accent-light)' : 'var(--overlay-subtle)',
+          border: focused ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)',
+          boxShadow: focused ? 'inset 3px 0 0 var(--accent-primary)' : undefined,
+        }}
+      >
         {isImage ? (
           <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 bg-black/20">
             {/* eslint-disable-next-line @next/next/no-img-element */}

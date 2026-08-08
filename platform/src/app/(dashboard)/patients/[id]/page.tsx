@@ -44,6 +44,7 @@ import { usePatientAppointments } from '@/lib/hooks/useAppointments';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useDataScope } from '@/lib/hooks/useDataScope';
 import { useTriage } from '@/lib/hooks/useTriage';
+import { mergeVitalsTimeline } from '@/lib/clinical/vitals';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatientPayments } from '@/lib/hooks/usePayments';
 import BillingTab from '@/components/patients/BillingTab';
@@ -57,6 +58,7 @@ import AssessmentsPanel from '@/components/patients/AssessmentsPanel';
 import ScreeningsPanel from '@/components/patients/ScreeningsPanel';
 import RemindersPanel from '@/components/patients/RemindersPanel';
 import TransferHistoryPanel, { TransferBanner } from '@/components/patients/TransferHistoryPanel';
+import CareAlertsBanner from '@/components/patients/CareAlertsBanner';
 import DocumentsPanel from '@/components/patients/DocumentsPanel';
 import { useProblems } from '@/lib/hooks/useProblems';
 import type {
@@ -65,7 +67,6 @@ import type {
   LabResultDoc,
   MedicalRecordDoc,
   PatientDoc,
-  PatientNoteDoc,
   PrescriptionDoc,
   ProblemDoc,
 } from '@/lib/db-types';
@@ -135,7 +136,10 @@ const DEFAULT_FACESHEET_PANELS = FACESHEET_PANEL_OPTIONS.map(panel => panel.id);
 /** Primary write-action per facesheet card, keyed by panel id. An entry is
  *  omitted when the current role can't perform it, in which case no action
  *  button renders for that card. */
-type FacesheetActions = Partial<Record<FacesheetPanelId, {
+// 'allergies' is not its own facesheet panel (it's the second list inside the
+// 'problems' Safety alerts card) but still needs its own add action, so the
+// lookup key set is widened by one rather than by a whole new panel.
+type FacesheetActions = Partial<Record<FacesheetPanelId | 'allergies', {
   label: string;
   onClick: () => void;
   /** Defaults to a "+" — override for actions that aren't additive (Edit, Review). */
@@ -176,6 +180,22 @@ export default function PatientDetailPage() {
   const [activeTab, setActiveTab] = useState(
     initialTab === 'transfers' ? 'referrals' : initialTab === 'recall' ? 'appointments' : initialTab && DEEP_LINK_TAB_IDS.has(initialTab) ? initialTab : 'overview',
   );
+  // The initializer above only reads `?tab=` once, at mount — a later
+  // navigation to a new `?tab=` while this page instance stays mounted (e.g.
+  // a link inside the in-chart note editor drawer, "go to Vitals") left
+  // `activeTab` stuck on whatever it was. Resync it whenever the URL's tab
+  // param actually changes, using the same mapping the initializer uses.
+  // `focusId` above needs no equivalent effect — it's a plain read of
+  // `searchParams` on every render, and `useSearchParams()` itself already
+  // re-renders this component when the URL's query changes. Clinical-tab
+  // gating still runs afterward in the allowedTabIds effect below, so a
+  // non-clinical viewer deep-linked to a clinical tab is still bounced back.
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (!tabParam) return;
+    const mapped = tabParam === 'transfers' ? 'referrals' : tabParam === 'recall' ? 'appointments' : tabParam;
+    if (DEEP_LINK_TAB_IDS.has(mapped)) setActiveTab(mapped);
+  }, [searchParams]);
   const [demographicsTab, setDemographicsTab] = useState('profile');
   const [vitalsView, setVitalsView] = useState<'table' | 'flowsheet'>('table');
   const [showCustomizeView, setShowCustomizeView] = useState(false);
@@ -249,6 +269,20 @@ export default function PatientDetailPage() {
 
   const { t } = useTranslation();
   const { currentUser } = useAuth();
+  // Best-effort link from a nurse-entered vitals observation to the patient's
+  // currently open visit, so it lands under that encounter instead of
+  // floating free. Resolved when the modal opens rather than kept live, since
+  // "the open encounter" can change between visits.
+  const [nurseVitalsEncounterId, setNurseVitalsEncounterId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!showNurseVitals || !id || !currentUser) return;
+    let cancelled = false;
+    import('@/lib/services/encounter-service')
+      .then(m => m.findOpenEncounterForPatient(id, currentUser.hospitalId || ''))
+      .then(enc => { if (!cancelled) setNurseVitalsEncounterId(enc?._id); })
+      .catch(() => { if (!cancelled) setNurseVitalsEncounterId(undefined); });
+    return () => { cancelled = true; };
+  }, [showNurseVitals, id, currentUser]);
   const scope = useDataScope();
   const { patients, loading, update: updatePatient } = usePatients();
   const { hospitals } = useHospitals();
@@ -288,6 +322,14 @@ export default function PatientDetailPage() {
   const { appointments: patientAppointments } = usePatientAppointments(patient?._id);
   const { prescriptions: allPrescriptions } = usePrescriptions(patient?._id);
   const { triages: patientTriages } = useTriage(patient?._id);
+  // Merged vitals history across both places they're captured — a consult's
+  // own vitalSigns and a triage stop's own vitals fields — normalized and
+  // sorted newest-first. Feeds the vitals band, the vitals table and the
+  // trends view, so a patient who was just triaged (and not yet seen) shows
+  // those readings instead of an older or blank one. Declared before the
+  // loading/not-found early return below, alongside the other data hooks —
+  // no hook in this component is called after that return.
+  const vitalsTimeline = useMemo(() => mergeVitalsTimeline(records, patientTriages), [records, patientTriages]);
   const { canConsult, canViewClinical, canOrderLabs, canEnterLabResults, canDispense, canPrescribe, canBookAppointments, canManageReferrals, canRecordVitalEvents } = usePermissions();
   const canAssignPatients = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
 
@@ -310,26 +352,7 @@ export default function PatientDetailPage() {
   }, [allowedTabIds, activeTab]);
   const { balance: patientBalance, reload: reloadPayments } = usePatientPayments(patient?._id);
   const { problems: patientProblems } = useProblems(patient?._id);
-  // Patient care notes (free-text staff notes) — surfaced on the overview only
-  // when present, so the page never shows an empty "Notes" placeholder.
-  const [, setPatientNotes] = useState<PatientNoteDoc[]>([]);
   const patientIdForNotes = patient?._id;
-  const reloadPatientNotes = useCallback(() => {
-    if (!patientIdForNotes) { setPatientNotes([]); return; }
-    import('@/lib/services/patient-note-service')
-      .then(m => m.getNotesByPatient(patientIdForNotes))
-      .then(n => setPatientNotes(n))
-      .catch(() => { /* best-effort */ });
-  }, [patientIdForNotes]);
-  useEffect(() => {
-    let cancelled = false;
-    if (!patientIdForNotes) { setPatientNotes([]); return; }
-    import('@/lib/services/patient-note-service')
-      .then(m => m.getNotesByPatient(patientIdForNotes))
-      .then(n => { if (!cancelled) setPatientNotes(n); })
-      .catch(() => { /* best-effort */ });
-    return () => { cancelled = true; };
-  }, [patientIdForNotes]);
 
   // Clinical notes for this patient. They are the encounter record now that
   // the consultation wizard is retired, so the chart's Visits timeline needs
@@ -372,22 +395,6 @@ export default function PatientDetailPage() {
       setActiveTab('notes');
     }
   }, [patient, createClinicalNoteDraft, scope]);
-
-  // Outstanding balance for the most recent encounter — surfaced as a chip on
-  // the "Most Recent Record" hero so clinicians see if the visit is settled.
-  const [, setEncounterBalance] = useState<number | null>(null);
-  // The ledger is keyed by encounterId (enc-…), not the medical-record id (mr-…),
-  // so the balance must be looked up by the record's encounterId.
-  const latestEncounterId = (records[0] as { encounterId?: string } | undefined)?.encounterId;
-  useEffect(() => {
-    if (!latestEncounterId) { setEncounterBalance(null); return; }
-    let cancelled = false;
-    import('@/lib/services/ledger-service')
-      .then(m => m.getEncounterBalance(latestEncounterId))
-      .then(b => { if (!cancelled) setEncounterBalance(b); })
-      .catch(() => { /* best-effort */ });
-    return () => { cancelled = true; };
-  }, [latestEncounterId]);
 
   // Edit form state — initialised when modal opens
   const [editForm, setEditForm] = useState({
@@ -441,7 +448,11 @@ export default function PatientDetailPage() {
   const facesheetActions: FacesheetActions = {
     ...(canPrescribe ? { medications: { label: 'Prescribe', onClick: () => setShowPrescribeModal(true) } } : {}),
     ...(canConsult ? { problems: { label: 'Add', onClick: () => openSectionAdd('problems') } } : {}),
-    ...((canConsult || canRecordVitalEvents) && patient ? { vitals: { label: 'Record', onClick: () => canConsult ? router.push(`/consultation?patientId=${patient._id}`) : setShowNurseVitals(true) } } : {}),
+    ...(canConsult ? { allergies: { label: 'Add', onClick: () => openSectionAdd('allergies') } } : {}),
+    // Vitals entry is always the nurse-vitals form now, for doctors and nurses
+    // alike — a full /consultation redirect was the wrong weight for "record
+    // a set of numbers" and orphaned the visit from the chart tab it was on.
+    ...((canConsult || canRecordVitalEvents) && patient ? { vitals: { label: 'Record', onClick: () => { setActiveTab('vitals'); setShowNurseVitals(true); } } } : {}),
     ...(canConsult ? { recommendations: { label: 'Review', onClick: () => setActiveTab('careChecklist'), icon: ClipboardList } } : {}),
   };
 
@@ -555,6 +566,7 @@ export default function PatientDetailPage() {
     { id: 'allergies', label: 'Allergies', icon: ShieldAlert },
     { id: 'vitals', label: 'Vitals & Biometrics', icon: Activity },
     { id: 'notes', label: 'Notes', icon: FileText },
+    { id: 'sbar', label: 'SBAR handoff', icon: MessageSquare },
     { id: 'labs', label: 'Results', icon: FlaskConical },
     { id: 'orders', label: 'Orders', icon: ClipboardList },
     { id: 'procedures', label: 'Procedures', icon: Bandage },
@@ -568,14 +580,60 @@ export default function PatientDetailPage() {
   ];
   const tabs = allowedTabIds ? allTabs.filter(tb => allowedTabIds.includes(tb.id)) : allTabs;
 
-  // records[] is sorted newest-first by the service layer.
-  const latestRecord = records[0];
+  // records[] is sorted newest-first by the service layer. A standalone
+  // nursing vitals check (recordKind 'nursing_vitals') is not a consultation
+  // — the printed record and the superbill's encounter link are both about
+  // the VISIT, so they skip past a nursing stub to the newest real one.
+  const latestRecord = records.find(r => r.recordKind !== 'nursing_vitals');
   const latestVitals = latestRecord?.vitalSigns;
   // The sticky vitals band shows the most recent record that actually carries
   // vital signs — records[0] is often a note with no vitals, which would leave
   // the band blank even when older encounters have readings. The band's
   // freshness timestamp follows this record too, so "X days old" is meaningful.
   const latestVitalsRecord = records.find(r => r.vitalSigns);
+  // Newest entry across records AND triage — what the vitals band shows.
+  const latestVitalsEntry = vitalsTimeline[0];
+  // VitalsTrends only reads MedicalRecordDoc[] — a triage stop has no
+  // medical_record to live on, so triage-sourced timeline entries are
+  // represented as minimal synthetic records (never persisted, never shown
+  // anywhere a real record normally would be) purely so the trend charts see
+  // them too, instead of only ever plotting consult/nursing observations.
+  const recordsWithTriageVitals: MedicalRecordDoc[] = [
+    ...records,
+    ...vitalsTimeline.filter(entry => entry.source === 'Triage').map(entry => ({
+      _id: entry.id,
+      type: 'medical_record',
+      patientId: patient._id,
+      hospitalId: currentUser?.hospitalId || '',
+      hospitalName: entry.facility || '',
+      visitDate: entry.at,
+      consultedAt: entry.at,
+      visitType: 'outpatient',
+      providerName: 'Triage',
+      providerRole: 'nurse',
+      department: 'Triage',
+      chiefComplaint: 'Triage vitals',
+      historyOfPresentIllness: '',
+      vitalSigns: {
+        temperature: entry.temperature,
+        systolic: entry.systolic,
+        diastolic: entry.diastolic,
+        pulse: entry.pulse,
+        respiratoryRate: entry.respiratoryRate,
+        oxygenSaturation: entry.oxygenSaturation,
+        weight: entry.weight,
+        muac: entry.muac,
+        bloodGlucose: entry.bloodGlucose,
+        recordedAt: entry.at,
+      },
+      diagnoses: [],
+      prescriptions: [],
+      labResults: [],
+      treatmentPlan: '',
+      createdAt: entry.at,
+      updatedAt: entry.at,
+    } as unknown as MedicalRecordDoc)),
+  ];
 
 
   // ── Chart rail ───────────────────────────────────────────────────────────
@@ -601,13 +659,23 @@ export default function PatientDetailPage() {
     { id: 'history', label: 'Visits', icon: History, group: 'Clinical' },
     // The encounter notes themselves, next to the visits they document.
     { id: 'notes', label: 'Notes', icon: Stethoscope, group: 'Clinical' },
+    // A shift-handoff summary, not a documentation flow of its own — sits
+    // beside Notes since it's read the same way. Previously unreachable (no
+    // rail slot); cheaper to surface it here than to delete a working view.
+    { id: 'sbar', label: 'SBAR handoff', icon: MessageSquare, group: 'Clinical' },
     { id: 'allergies', label: 'Allergies', icon: ShieldAlert, group: 'Clinical' },
     { id: 'problems', label: 'Conditions', icon: AlertTriangle, group: 'Clinical' },
     { id: 'immunizations', label: 'Immunizations', icon: Syringe, group: 'Clinical' },
     { id: 'procedures', label: 'Procedures', icon: Bandage, group: 'Clinical' },
     { id: 'programs', label: 'Programs', icon: Layers, group: 'Clinical' },
+    // Screenings/reminders/assessments — the forward-looking follow-through
+    // half of the chart, closing out the Clinical group.
+    { id: 'careChecklist', label: 'Care plan', icon: ClipboardList, group: 'Clinical' },
     { id: 'documents', label: 'Documents', icon: FileText, group: 'Record' },
     { id: 'appointments', label: 'Appointments', icon: Calendar, group: 'Record' },
+    // Internal transfers and external referrals — who else is involved in
+    // this patient's care, and the record of handing them off.
+    { id: 'referrals', label: 'Care coordination', icon: ArrowRightLeft, group: 'Record' },
     // Who the patient is, as registered — contact details, address, next of
     // kin, payor. Sits with the administrative tail rather than the clinical
     // sections above it, and only appears for roles whose `tabs` include it.
@@ -1217,7 +1285,7 @@ export default function PatientDetailPage() {
             router={router}
             onOpenPrescribeModal={() => setShowPrescribeModal(true)}
             onOpenOrderLabModal={() => setShowOrderLabModal(true)}
-            onNoteSaved={() => { reloadPatientNotes(); setNotesRefreshToken(t => t + 1); }}
+            onNoteSaved={() => setNotesRefreshToken(t => t + 1)}
             panelRequest={chartPanelRequest}
             onPanelRequestHandled={() => setChartPanelRequest(null)}
             header={
@@ -1253,13 +1321,24 @@ export default function PatientDetailPage() {
             }
             vitalsBand={canViewClinical ? (
               <ChartVitalsBand
-                latestVitals={latestVitalsRecord?.vitalSigns}
-                latestRecordDate={latestVitalsRecord?.consultedAt || latestVitalsRecord?.visitDate}
+                // The newest reading overall, including a triage stop the
+                // patient hasn't been formally seen for yet — not only the
+                // newest medical_record, which would leave the band showing
+                // stale (or no) vitals right after triage.
+                latestVitals={latestVitalsEntry ? {
+                  temperature: latestVitalsEntry.temperature,
+                  systolic: latestVitalsEntry.systolic,
+                  diastolic: latestVitalsEntry.diastolic,
+                  pulse: latestVitalsEntry.pulse,
+                  respiratoryRate: latestVitalsEntry.respiratoryRate,
+                  oxygenSaturation: latestVitalsEntry.oxygenSaturation,
+                  weight: latestVitalsEntry.weight,
+                  height: latestVitalsEntry.height,
+                  bmi: latestVitalsEntry.bmi,
+                } : undefined}
+                latestRecordDate={latestVitalsEntry?.at}
                 onViewVitalsHistory={() => setActiveTab('vitals')}
-                onRecordVitals={() => {
-                  if (canConsult) router.push(`/consultation?patientId=${patient._id}`);
-                  else { setActiveTab('vitals'); setShowNurseVitals(true); }
-                }}
+                onRecordVitals={() => { setActiveTab('vitals'); setShowNurseVitals(true); }}
                 canRecordVitals={canConsult || canRecordVitalEvents}
               />
             ) : undefined}
@@ -1272,6 +1351,16 @@ export default function PatientDetailPage() {
               start work the receiving team is about to take over. */}
           {patient && (
             <TransferBanner patient={patient} onOpenHistory={() => setActiveTab('referrals')} />
+          )}
+
+          {/* Chart-permanent safety alerts (fall risk, difficult IV access,
+              a referral's own acknowledgement, etc.) — previously only
+              rendered in the mobile facesheet, so the desktop chart never
+              showed them at all. Shown on every tab, same as the banner
+              above. `hideAddButton` matches the mobile usage: this is a
+              visibility surface, not a second place to write one. */}
+          {canViewClinical && patient && (
+            <CareAlertsBanner patient={patient} hideAddButton />
           )}
 
 
@@ -1456,12 +1545,13 @@ export default function PatientDetailPage() {
                 patient={patient}
                 referrals={patientReferrals}
                 canViewClinical={canViewClinical}
+                focusId={focusId}
                 onSendEducation={() => {
                   setMessageSubject('Patient education');
                   setMessageIsEducation(true);
                   setShowMessageModal(true);
                 }}
-                onOpenAllReferrals={() => router.push(`/referrals?patient=${encodeURIComponent(patientFullName(patient))}`)}
+                onOpenAllReferrals={() => router.push(`/referrals?patient=${encodeURIComponent(patient._id)}`)}
                 onNewReferral={canManageReferrals ? () => setShowReferModal(true) : undefined}
               />
             </div>
@@ -1513,11 +1603,14 @@ export default function PatientDetailPage() {
               )}
               <MedicationsSection
                 patientId={patient._id}
+                patientName={patientFullName(patient)}
                 canPrescribe={canPrescribe}
                 onAdd={() => setShowPrescribeModal(true)}
                 noKnownMedications={patient.noKnownMedications}
                 reconciliation={patient.medReconciliation}
                 reconciledAt={patient.medReconciliationAt}
+                currentUser={currentUser}
+                focusId={focusId}
               />
             </div>
           )}
@@ -1526,7 +1619,7 @@ export default function PatientDetailPage() {
           {activeTab === 'vitals' && (
             <ChartSection
               title={vitalsView === 'flowsheet' ? 'Vital sign flowsheet' : 'Vitals'}
-              onAdd={(canRecordVitalEvents && vitalsView === 'table') ? () => setShowNurseVitals(true) : undefined}
+              onAdd={canRecordVitalEvents ? () => setShowNurseVitals(true) : undefined}
               addLabel="Record vitals"
               toggleSlot={(
                 <div className="ehr-chart-subtabs" role="tablist" aria-label="Vitals view">
@@ -1553,14 +1646,15 @@ export default function PatientDetailPage() {
             >
               {vitalsView === 'flowsheet' ? (
                 <div className="p-5">
-                  <VitalsTrends records={records} />
+                  <VitalsTrends records={recordsWithTriageVitals} />
                 </div>
               ) : (
                 <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
-                <table className="omrs-table" style={{ minWidth: 1080 }}>
+                <table className="omrs-table" style={{ minWidth: 1140 }}>
                   <thead>
                     <tr>
                       <th>Date</th>
+                      <th>Source</th>
                       <th>Temp (°C)</th>
                       <th>BP (mmHg)</th>
                       <th>Pulse</th>
@@ -1572,26 +1666,38 @@ export default function PatientDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {records.every(rec => !rec.vitalSigns) && (
+                    {vitalsTimeline.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
+                        <td colSpan={10} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
                           No vitals recorded yet for this patient.
                         </td>
                       </tr>
                     )}
-                    {records.filter(rec => rec.vitalSigns).map(rec => {
-                      const v = rec.vitalSigns;
+                    {vitalsTimeline.map(entry => {
+                      const hasBp = entry.systolic !== undefined && entry.diastolic !== undefined;
+                      const sourceStyle = entry.source === 'Triage'
+                        ? { background: 'var(--accent-light)', color: 'var(--accent-primary)' }
+                        : entry.source === 'Nursing'
+                          ? { background: 'rgba(124,58,237,0.12)', color: 'var(--accent-purple)' }
+                          : { background: 'rgba(31,157,111,0.14)', color: 'var(--color-success)' };
                       return (
-                        <tr key={rec._id}>
-                          <td className="font-mono text-xs">{formatDate(rec.visitDate)}</td>
-                          <td style={{ color: v.temperature > 37.5 ? 'var(--color-danger)' : 'inherit', fontWeight: v.temperature > 37.5 ? 600 : 400 }}>{v.temperature}</td>
-                          <td style={{ color: v.systolic > 140 ? 'var(--color-danger)' : 'inherit', fontWeight: v.systolic > 140 ? 600 : 400 }}>{v.systolic}/{v.diastolic}</td>
-                          <td style={{ color: v.pulse > 100 ? 'var(--color-danger)' : 'inherit' }}>{v.pulse}</td>
-                          <td>{v.respiratoryRate}</td>
-                          <td style={{ color: v.oxygenSaturation < 95 ? 'var(--color-danger)' : 'inherit' }}>{v.oxygenSaturation}%</td>
-                          <td>{v.weight}</td>
-                          <td>{v.bmi}</td>
-                          <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{(rec.hospitalName || '').replace(' Hospital', '').replace(' Teaching', '')}</td>
+                        <tr key={entry.id}>
+                          <td className="font-mono text-xs">{formatDate(entry.at)}</td>
+                          <td><span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={sourceStyle}>{entry.source}</span></td>
+                          <td style={{ color: entry.temperature !== undefined && entry.temperature > 37.5 ? 'var(--color-danger)' : 'inherit', fontWeight: entry.temperature !== undefined && entry.temperature > 37.5 ? 600 : 400 }}>
+                            {entry.temperature ?? '—'}
+                          </td>
+                          <td style={{ color: entry.systolic !== undefined && entry.systolic > 140 ? 'var(--color-danger)' : 'inherit', fontWeight: entry.systolic !== undefined && entry.systolic > 140 ? 600 : 400 }}>
+                            {hasBp ? `${entry.systolic}/${entry.diastolic}` : '—'}
+                          </td>
+                          <td style={{ color: entry.pulse !== undefined && entry.pulse > 100 ? 'var(--color-danger)' : 'inherit' }}>{entry.pulse ?? '—'}</td>
+                          <td>{entry.respiratoryRate ?? '—'}</td>
+                          <td style={{ color: entry.oxygenSaturation !== undefined && entry.oxygenSaturation < 95 ? 'var(--color-danger)' : 'inherit' }}>
+                            {entry.oxygenSaturation !== undefined ? `${entry.oxygenSaturation}%` : '—'}
+                          </td>
+                          <td>{entry.weight ?? '—'}</td>
+                          <td>{entry.bmi ?? '—'}</td>
+                          <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{(entry.facility || '').replace(' Hospital', '').replace(' Teaching', '') || '—'}</td>
                         </tr>
                       );
                     })}
@@ -1614,9 +1720,9 @@ export default function PatientDetailPage() {
               missed: { bg: 'rgba(252,211,77,0.16)', color: 'var(--color-warning)' },
             };
             return (
-              <ChartSection title="Immunizations" addLabel="Add" onAdd={() => router.push('/immunizations')}>
+              <ChartSection title="Immunizations" addLabel="Add" onAdd={() => router.push(`/immunizations?patientId=${patient._id}`)}>
                 {immRecords.length === 0 ? (
-                  <OmrsEmptyState itemLabel="immunizations" actionLabel="Record immunizations" onAction={() => router.push('/immunizations')} />
+                  <OmrsEmptyState itemLabel="immunizations" actionLabel="Record immunizations" onAction={() => router.push(`/immunizations?patientId=${patient._id}`)} />
                 ) : (
                   <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                   <table className="omrs-table" style={{ minWidth: 840 }}>
@@ -1664,7 +1770,7 @@ export default function PatientDetailPage() {
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Referrals</span>
                 </div>
-                <button onClick={() => router.push(`/referrals?patient=${encodeURIComponent(patientFullName(patient))}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
+                <button onClick={() => router.push(`/referrals?patient=${encodeURIComponent(patient._id)}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
                   All referrals <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -1745,7 +1851,7 @@ export default function PatientDetailPage() {
                 setShowPaymentPanel={setShowPaymentPanel}
                 setShowPlanWizard={setShowPlanWizard}
                 reloadPayments={reloadPayments}
-                superbillEncounterId={(records[0] as { encounterId?: string } | undefined)?.encounterId}
+                superbillEncounterId={(latestRecord as { encounterId?: string } | undefined)?.encounterId}
                 hospitalName={hospitals.find(h => h._id === patient.registrationHospital)?.name}
               />
             </div>
@@ -1759,6 +1865,7 @@ export default function PatientDetailPage() {
               canOrderLabs={canOrderLabs}
               onAddDrug={() => setShowPrescribeModal(true)}
               onAddLab={() => setShowOrderLabModal(true)}
+              focusId={focusId}
             />
           )}
 
@@ -1786,6 +1893,7 @@ export default function PatientDetailPage() {
           hospitalId={currentUser.hospitalId || patient.registrationHospital || ''}
           hospitalName={currentUser.hospital?.name || currentUser.hospitalName || patient.registrationHospital || undefined}
           orgId={currentUser.orgId}
+          encounterId={nurseVitalsEncounterId}
           currentUser={currentUser}
           onClose={() => setShowNurseVitals(false)}
         />
@@ -2155,13 +2263,29 @@ function PatientFacesheetView({
               </div>
             ))}
             {activeAllergies.slice(0, 4).map((allergy, index) => (
-              <div key={`${allergy.name}-${index}`} className="tebra-list-row">
+              <div
+                key={`${allergy.name}-${index}`}
+                className="tebra-list-row"
+                // Allergies live on their own tab, not Conditions — without
+                // this an allergy row opened the Conditions tab instead.
+                onClick={event => { event.stopPropagation(); onOpenTab('allergies'); }}
+              >
                 <strong>Allergy: {allergy.name}</strong>
                 <span>{allergy.detail || 'Active'}</span>
               </div>
             ))}
           </div>
         ) : <p className="tebra-none">No active problems or allergies documented.</p>}
+        {actions.allergies && (
+          <button
+            type="button"
+            className="tebra-panel-action"
+            style={{ marginTop: 8 }}
+            onClick={event => { event.stopPropagation(); actions.allergies!.onClick(); }}
+          >
+            <Plus aria-hidden /> {actions.allergies.label} allergy
+          </button>
+        )}
       </section>
       )}
 

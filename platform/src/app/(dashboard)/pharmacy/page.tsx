@@ -1280,7 +1280,7 @@ export default function PharmacyPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <button className="btn btn-secondary btn-sm" onClick={() => router.push(`/patients/${activePatient._id}`)}>{t('pharmacy.viewAll')}</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => router.push(`/patients/${activePatient._id}?tab=prescriptions`)}>{t('pharmacy.viewAll')}</button>
                 <button onClick={() => setSelectedPatient(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label={t('action.close')}>
                   <X className="w-4 h-4" />
                 </button>

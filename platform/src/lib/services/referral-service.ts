@@ -134,18 +134,30 @@ export async function getOverdueReferrals(
  */
 async function notifySendingFacility(
   referral: ReferralDoc,
-  status: 'received' | 'seen',
+  status: 'received' | 'seen' | 'completed',
+  outcome?: ReferralOutcome,
 ): Promise<void> {
   try {
     const { addCareAlert } = await import('./care-alert-service');
-    const verb = status === 'received' ? 'received' : 'been seen at';
+    let message: string;
+    if (status === 'completed') {
+      // The loop's closing moment: tell the sender what actually happened,
+      // not just that the status flipped — a disposition on its own
+      // ("treated discharged") is a fact the sending clinician has to be
+      // able to read without opening the referral.
+      const dispositionLabel = outcome?.disposition.replace(/_/g, ' ') ?? 'completed';
+      message = `Referral to ${referral.toHospital} (${referral.department}, ${referral.urgency}) has been completed`
+        + ` — ${dispositionLabel}${outcome?.summary ? `: ${outcome.summary}` : ''}.`;
+    } else {
+      const verb = status === 'received' ? 'received' : 'been seen at';
+      message = `Referral to ${referral.toHospital} (${referral.department}, ${referral.urgency}) has ${verb} the receiving facility.`;
+    }
     await addCareAlert(referral.patientId, {
       category: 'administrative',
       // Emergency and urgent referrals are the ones a sending clinician is
       // actively waiting on, so they surface at high priority.
       priority: referral.urgency === 'routine' ? 'normal' : 'high',
-      message:
-        `Referral to ${referral.toHospital} (${referral.department}, ${referral.urgency}) has ${verb} the receiving facility.`,
+      message,
       recordedByName: referral.toHospital,
     });
   } catch (err) {
@@ -304,6 +316,11 @@ export async function completeReferralWithOutcome(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_REFERRAL', undefined, undefined, `Referral ${id} completed with outcome (${outcome.disposition})`);
+    // Close the loop back to the sending facility (KAN-43) — this is the
+    // loop's closing moment, and previously nothing told the referring
+    // clinician what happened to their patient short of reopening the
+    // referral to look. Best-effort: the outcome is already durably written.
+    await notifySendingFacility(existing, 'completed', outcome);
     emitSyncEvent({
       resourceType: 'referral',
       resourceId: updated._id,

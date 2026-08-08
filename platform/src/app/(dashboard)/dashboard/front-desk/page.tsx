@@ -702,7 +702,11 @@ export default function FrontDeskDashboardPage() {
   // list, which is exactly the self-satisfying behaviour the ticket removed.
   // Unmet critical conditions BLOCK the discharge; the desk may override only
   // with an explicit reason, which is audited naming the overridden conditions.
-  const handleCompleteCheckout = useCallback(async (target: CheckoutTarget, override?: { reason: string }) => {
+  const handleCompleteCheckout = useCallback(async (
+    target: CheckoutTarget,
+    override?: { reason: string; authorizedBy: string },
+    disposition?: import('@/lib/services/encounter-service').DischargeDisposition,
+  ) => {
     try {
       let gateNote = '';
       try {
@@ -728,13 +732,22 @@ export default function FrontDeskDashboardPage() {
             await logAuditSafe(
               'CHECKOUT_GATE_OVERRIDDEN', currentUser?._id, currentUser?.name,
               `Discharged ${target.patientName} over unmet gate conditions ` +
-              `[${evaluation.blocking.map(b => b.key).join(', ')}] — ${override.reason}`,
+              `[${evaluation.blocking.map(b => b.key).join(', ')}] — ${override.reason} ` +
+              `(authorized by ${override.authorizedBy})`,
             );
             gateNote = ` — override: ${evaluation.blocking.map(b => b.label).join('; ')}`;
           }
+          // A walk-out ("dismissed") keeps its disposition even over unmet
+          // items — it IS the maximal pending case; otherwise unmet items
+          // force discharged_with_pending_items.
+          const finalDisposition = disposition === 'dismissed_without_formal_checkout'
+            ? disposition
+            : !evaluation.canDischarge
+              ? 'discharged_with_pending_items'
+              : disposition ?? 'discharged';
           await dischargeEncounter(enc._id, {
             actorId: currentUser?._id,
-            pendingItems: !evaluation.canDischarge,
+            disposition: finalDisposition,
           });
         }
       } catch (e) {
@@ -1884,7 +1897,11 @@ function CheckoutModal({
 }: {
   target: CheckoutTarget;
   onClose: () => void;
-  onComplete: (target: CheckoutTarget, override?: { reason: string }) => Promise<void>;
+  onComplete: (
+    target: CheckoutTarget,
+    override?: { reason: string; authorizedBy: string },
+    disposition?: import('@/lib/services/encounter-service').DischargeDisposition,
+  ) => Promise<void>;
   canCollectPayment: boolean;
   onCollectPayment: (patientId: string) => void;
 }) {
@@ -1896,6 +1913,10 @@ function CheckoutModal({
   // resolved or explicitly overridden with a reason.
   const [gate, setGate] = useState<import('@/lib/services/checkout-gate-service').CheckoutGateEvaluation | null>(null);
   const [overrideReason, setOverrideReason] = useState('');
+  // An override needs a named authorizer, not just a reason — "reason +
+  // authorization, logged" is the documented gate rule (Principle 2.12).
+  const [overrideAuthorizedBy, setOverrideAuthorizedBy] = useState('');
+  const [disposition, setDisposition] = useState<import('@/lib/services/encounter-service').DischargeDisposition>('discharged');
 
   useEffect(() => {
     let cancelled = false;
@@ -2023,8 +2044,35 @@ function CheckoutModal({
                 className="mt-2.5 w-full rounded-lg px-3 py-2 text-[12px]"
                 style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-primary)' }}
               />
+              <input
+                type="text"
+                value={overrideAuthorizedBy}
+                onChange={e => setOverrideAuthorizedBy(e.target.value)}
+                placeholder="Authorized by (name of the approving clinician/manager)"
+                className="mt-2 w-full rounded-lg px-3 py-2 text-[12px]"
+                style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-primary)' }}
+              />
             </div>
           )}
+
+          {/* Discharge disposition — before this, every checkout reported as a
+              routine discharge; referral hand-offs and walk-outs were
+              unrepresentable in the record. */}
+          <label className="block">
+            <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              Disposition
+            </span>
+            <select
+              value={disposition}
+              onChange={e => setDisposition(e.target.value as typeof disposition)}
+              className="mt-1 w-full rounded-lg px-3 py-2 text-[12px]"
+              style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-primary)' }}
+            >
+              <option value="discharged">Routine discharge</option>
+              <option value="discharged_with_referral">Discharged with referral</option>
+              <option value="dismissed_without_formal_checkout">Patient left without formal checkout</option>
+            </select>
+          </label>
         </div>
 
         {/* Footer */}
@@ -2034,12 +2082,17 @@ function CheckoutModal({
           </button>
           {(() => {
             const blocked = !!gate && gate.blocking.length > 0;
-            const canSubmit = !completing && (!blocked || overrideReason.trim().length > 0);
+            const canSubmit = !completing
+              && (!blocked || (overrideReason.trim().length > 0 && overrideAuthorizedBy.trim().length > 0));
             return (
               <button
                 onClick={async () => {
                   setCompleting(true);
-                  await onComplete(target, blocked ? { reason: overrideReason.trim() } : undefined);
+                  await onComplete(
+                    target,
+                    blocked ? { reason: overrideReason.trim(), authorizedBy: overrideAuthorizedBy.trim() } : undefined,
+                    disposition,
+                  );
                   setCompleting(false);
                 }}
                 disabled={!canSubmit}
