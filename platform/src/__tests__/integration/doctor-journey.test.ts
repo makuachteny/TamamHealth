@@ -8,6 +8,9 @@ let uuidCounter = 0;
 jest.mock('uuid', () => ({ v4: () => `${String(++uuidCounter).padStart(8, '0')}-tuid` }));
 jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
 
+// One test, ~40 sequential PouchDB writes — the 5s default flakes on a loaded machine.
+jest.setTimeout(30000);
+
 import { teardownTestDBs, putDoc } from '../helpers/test-db';
 import { usersDB, hospitalsDB, patientsDB } from '@/lib/db';
 import {

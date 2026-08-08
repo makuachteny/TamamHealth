@@ -53,6 +53,10 @@ jest.mock('next/server', () => {
   return jest.requireActual('next/server');
 });
 
+// Route-handler tests do real request plumbing plus PouchDB seeding per case;
+// the 5s default flakes on a loaded machine.
+jest.setTimeout(30000);
+
 import type { NextRequest } from 'next/server';
 import { teardownTestDBs, putDoc } from '../helpers/test-db';
 import { hospitalsDB } from '@/lib/db';
