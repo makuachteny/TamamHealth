@@ -24186,6 +24186,18 @@ table.patient-data-table.patient-data-table {
   font-size: 0;
 }
 
+/* The labelled "Open chart" pill shares .ehr-visit-pop-icon, and the hover
+   half of the reset above out-ranks the pill rules further down (0-2-1 vs
+   0-2-0) — on hover the label collapsed to font-size 0 and the pill shrank
+   to a bare square, sprang back when the pointer left it, and flickered.
+   Re-state the pill's geometry at the same hover specificity. The values
+   mirror the .ehr-visit-pop-actions .ehr-visit-pop-labelled rules. */
+.ehr-visit-pop-tabs .ehr-visit-pop-labelled:hover {
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+
 .ehr-visit-pop-tabs .ehr-visit-pop-icon.is-primary {
   border-color: var(--accent-primary);
 }
