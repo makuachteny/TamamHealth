@@ -214,9 +214,7 @@ export class SyncService {
     // the stream, so a permanently-rejected doc can never wedge the push
     // checkpoint and stall every later document — new patients included.
     const pushDir: PouchDB.Replication.ReplicateOptions = {
-      ...(process.env.NEXT_PUBLIC_DISABLE_PUSH_FILTER === 'true'
-        ? {}
-        : { filter: this.pushFilter as unknown as (doc: object) => boolean }),
+      filter: this.pushFilter as unknown as (doc: object) => boolean,
     };
 
     if (this.direction === 'both') {
