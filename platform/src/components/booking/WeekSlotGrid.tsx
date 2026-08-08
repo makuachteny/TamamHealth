@@ -10,8 +10,13 @@
  *
  * A cell shows a few openings and then a "+N more" that expands in place, so a
  * doctor with twenty free slots does not push the next doctor off the screen.
- * A day with nothing shows an em dash: a clinician who is off on Wednesday is a
- * fact worth stating, not a blank to squint at.
+ * A day with nothing shows dashes — one per rank of the row, on the same line
+ * rhythm as the chips beside them — so a clinician who is off on Wednesday is
+ * a fact stated in line, not a blank to squint at.
+ *
+ * Visual language (chips, dashes, nav) lives in globals.css under the `bwg-`
+ * namespace, on a fixed 30px line rhythm so chips align horizontally across
+ * every column of a row.
  */
 
 import { useMemo, useState } from 'react';
@@ -92,7 +97,7 @@ export default function WeekSlotGrid({
           // The date strip is what the reader steers the whole grid by, so it
           // gets the weight of a heading rather than of a caption — and hugs
           // it, rather than sitting in a band of empty space twice its height.
-          padding: '0 0 12px',
+          padding: '0 0 8px',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: 4 }}>
@@ -144,12 +149,9 @@ export default function WeekSlotGrid({
           </p>
           <button
             type="button"
+            className="bwg-slot"
             onClick={() => onStartDateChange(addDays(startDate, days))}
-            style={{
-              marginTop: 10, padding: '7px 14px', borderRadius: 999,
-              border: '1px solid var(--border-medium)', background: 'transparent',
-              color: 'var(--accent-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            }}
+            style={{ marginTop: 10, width: 'auto', maxWidth: 'none', padding: '0 16px' }}
           >
             Look at the next {days} days
           </button>
@@ -186,6 +188,16 @@ function ProviderRow({
   const [expanded, setExpanded] = useState<string | null>(null);
   const isTelehealth = [...slotsByDate.values()].flat().some(s => s.modality === 'telehealth');
 
+  // Collapsed line count of the row's busiest day. Empty days print this many
+  // dashes on the same line rhythm as the chips, so each rank of times rules
+  // straight across the week instead of a lone dash floating at the top.
+  // Collapsed on purpose: expanding one day should not grow the dash stacks.
+  const baseLines = Math.max(1, ...columns.map(date => {
+    const n = slotsByDate.get(date)?.length ?? 0;
+    if (n === 0) return 0;
+    return Math.min(n, maxPerCell) + (n > maxPerCell ? 1 : 0);
+  }));
+
   return (
     <div
       style={{
@@ -200,12 +212,12 @@ function ProviderRow({
         // No rule between rows: the whitespace and the avatar already separate
         // one clinician from the next, and three hairlines across a grid that
         // is itself all boxes just added noise.
-        padding: '16px 0 20px',
+        padding: '10px 0 14px',
       }}
     >
       {/* Clinician */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, paddingTop: 2 }}>
-        <StaffAvatar name={provider.providerName} photoUrl={provider.photoUrl} size={72} />
+        <StaffAvatar name={provider.providerName} photoUrl={provider.photoUrl} size={48} />
         <div style={{ minWidth: 0 }}>
           {/* Wrapped, not truncated. "CO Deng Mabior K…" and "Dr. Achol Mayen
               De…" are the same nine characters for two different people —
@@ -225,7 +237,7 @@ function ProviderRow({
             <span
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3,
-                padding: '2px 7px', borderRadius: 999, fontSize: 10, fontWeight: 600,
+                padding: '2px 8px', fontSize: 11, fontWeight: 600,
                 background: 'var(--accent-light)', color: 'var(--accent-primary)',
               }}
             >
@@ -244,20 +256,16 @@ function ProviderRow({
 
         if (daySlots.length === 0) {
           return (
-            <div key={date} style={{
-              textAlign: 'center', color: 'var(--text-muted)', fontSize: 15,
-              alignSelf: 'start', paddingTop: 9,
-            }}>
-              —
+            <div key={date} className="bwg-cell">
+              {Array.from({ length: baseLines }, (_, i) => (
+                <span key={i} className="bwg-dash" aria-hidden>—</span>
+              ))}
             </div>
           );
         }
 
         return (
-          <div style={{
-            display: 'flex', flexDirection: 'column', gap: 8,
-            alignItems: 'center', alignSelf: 'start',
-          }} key={date}>
+          <div key={date} className="bwg-cell">
             {shown.map(slot => {
               const isSelected = selected
                 && selected.providerId === slot.providerId
@@ -267,40 +275,21 @@ function ProviderRow({
                 <button
                   key={slot.startTime}
                   type="button"
+                  className={isSelected ? 'bwg-slot bwg-slot--selected' : 'bwg-slot'}
                   onClick={() => onPick(slot)}
-                  style={{
-                    padding: '8px 6px',
-                    width: '100%',
-                    maxWidth: 124,
-                    border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-medium)'}`,
-                    background: isSelected ? 'var(--accent-primary)' : 'var(--bg-card-solid)',
-                    color: isSelected ? '#fff' : 'var(--accent-primary)',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
                 >
                   {to12Hour(slot.startTime)}
                 </button>
               );
             })}
             {(hidden > 0 || isOpen) && (
+              // Same chip as the slots it reveals. Dashed-and-muted read as
+              // disabled — the one chip in the cell that looked unavailable
+              // was the one that opens the rest.
               <button
                 type="button"
+                className="bwg-slot"
                 onClick={() => setExpanded(isOpen ? null : date)}
-                style={{
-                  // Same shape and weight as the slots it reveals. Dashed-and-
-                  // muted read as disabled — the one chip in the cell that
-                  // looked unavailable was the one that opens the rest.
-                  padding: '8px 6px',
-                  width: '100%',
-                  maxWidth: 124,
-                  border: '1px solid var(--border-medium)',
-                  background: 'var(--bg-card-solid)',
-                  color: 'var(--accent-primary)',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                }}
               >
                 {isOpen ? 'less' : `+${hidden} more`}
               </button>
@@ -324,20 +313,11 @@ function NavButton({
   return (
     <button
       type="button"
+      className="bwg-nav"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
       title={label}
-      style={{
-        width: 34, height: 34,
-        border: '1px solid var(--border-medium)',
-        background: 'var(--bg-card-solid)',
-        color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.45 : 1,
-        flexShrink: 0,
-      }}
     >
       <Icon className="w-4 h-4" />
     </button>

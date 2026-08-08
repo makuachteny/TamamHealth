@@ -228,6 +228,46 @@ async function installOne(baseUrl, authHeader, dbName) {
   return { ok: false, reason };
 }
 
+/**
+ * Grant per-DB read/write membership to org roles so authenticated CouchDB
+ * users (provisioned by lib/sync/couch-auth.ts with `org:<orgId>` roles) can
+ * replicate. Without this, CouchDB 3.x's admins-only default blocks every
+ * browser pull/push with 403. Admin operations stay with the server admin
+ * credentials — the admins block is intentionally left empty.
+ *
+ * Org list comes from COUCHDB_MEMBER_ORG_IDS (comma-separated orgIds);
+ * defaults to the two demo-seed organizations.
+ */
+function memberRoles() {
+  const orgIds = (process.env.COUCHDB_MEMBER_ORG_IDS || 'org-moh-ss,org-mercy-hospital')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return orgIds.map((id) => `org:${id}`);
+}
+
+async function applySecurity(baseUrl, authHeader, dbName, roles) {
+  const res = await fetch(`${baseUrl}/${dbName}/_security`, {
+    method: 'PUT',
+    headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      admins: { names: [], roles: [] },
+      members: { names: [], roles },
+    }),
+  });
+  if (res.status === 200 || res.status === 201) return { ok: true };
+  let reason = `PUT _security ${res.status}`;
+  try {
+    const errBody = await res.json();
+    if (errBody && (errBody.error || errBody.reason)) {
+      reason += ` ${errBody.error || ''} ${errBody.reason || ''}`.trim();
+    }
+  } catch {
+    // ignore — non-JSON error body
+  }
+  return { ok: false, reason };
+}
+
 async function main() {
   const { baseUrl, authHeader } = resolveConfig();
   console.log(
@@ -257,7 +297,39 @@ async function main() {
     `[install-validate-doc-updates] done ok=${okCount} error=${errCount} ` +
     `total=${ORG_SCOPED_DATABASES.length}`,
   );
-  if (errCount > 0) process.exit(1);
+
+  // ── _security membership on every app database ──────────────────────────
+  // Replication needs membership on all tamamhealth_* DBs, not only the
+  // org-scoped subset above, so enumerate the live database list.
+  const roles = memberRoles();
+  let secOk = 0;
+  let secErr = 0;
+  const allDbsRes = await fetch(`${baseUrl}/_all_dbs`, {
+    headers: { Authorization: authHeader },
+  });
+  const allDbs = (await allDbsRes.json()).filter(
+    (name) => typeof name === 'string' && name.startsWith('tamamhealth_'),
+  );
+  for (const db of allDbs) {
+    try {
+      const result = await applySecurity(baseUrl, authHeader, db, roles);
+      if (result.ok) {
+        secOk++;
+      } else {
+        console.log(`[error] ${db} ${result.reason}`);
+        secErr++;
+      }
+    } catch (err) {
+      console.log(`[error] ${db} _security ${err && err.message ? err.message : String(err)}`);
+      secErr++;
+    }
+  }
+  console.log(
+    `[install-validate-doc-updates] _security membership roles=[${roles.join(', ')}] ` +
+    `ok=${secOk} error=${secErr} total=${allDbs.length}`,
+  );
+
+  if (errCount > 0 || secErr > 0) process.exit(1);
 }
 
 main().catch((err) => {

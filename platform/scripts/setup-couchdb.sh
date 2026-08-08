@@ -187,6 +187,21 @@ curl -sf -X PUT "${COUCHDB_URL}/_node/_local/_config/cors/methods" \
 
 echo "OK: CORS configured."
 
+# ---------- 4b. Session lifetime ----------
+# Align the CouchDB AuthSession cookie lifetime with the platform's 8h JWT.
+# The default (600s) makes browser replication die with 401s ten minutes into
+# every session; couch-client-auth.ts renews sessions in-memory, but the
+# baseline timeout must still cover a page reload mid-shift.
+echo ""
+echo "--- Configuring session timeout (8h)..."
+curl -sf -X PUT "${COUCHDB_URL}/_node/_local/_config/chttpd_auth/timeout" \
+  -H "Content-Type: application/json" \
+  -d '"28800"' > /dev/null 2>&1 || \
+curl -sf -X PUT "${COUCHDB_URL}/_node/_local/_config/couch_httpd_auth/timeout" \
+  -H "Content-Type: application/json" \
+  -d '"28800"' > /dev/null 2>&1
+echo "OK: session timeout configured."
+
 # ---------- 5. Summary ----------
 echo ""
 echo "=== Setup Complete ==="

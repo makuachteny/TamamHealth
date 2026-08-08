@@ -128,7 +128,7 @@ export default function EhrDayStatsChart({
                       y={barY(count)}
                       width={7}
                       height={baseline - barY(count)}
-                      rx={0}
+                      rx={2}
                       fill={seriesFill[seriesIndex]}
                     >
                       <title>{`${hourLabel} — ${count} ${seriesNames[seriesIndex].toLowerCase()}`}</title>

@@ -24,6 +24,7 @@ import MarWorkflow from './MarWorkflow';
 import TriageWorkflow from './TriageWorkflow';
 import RoomingWorkflow from './RoomingWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
+import PrintListDialog, { type PrintListSection } from '@/components/PrintListDialog';
 
 /* Handoff is no longer a station: it is a dialog raised by "Start handoff", so
    it has no tab and no board of its own. Triage and rooming remain addressable
@@ -161,13 +162,77 @@ export default function NurseDashboard() {
   // Ward/MAR/Triage/Rooming/Handoff switch via the daybar tabs.
   const daybarTabs = stationTabs;
 
+  // "Print" — choose which board and which output (paper/PDF or CSV) instead
+  // of window.print()'s whole-dashboard dump.
+  const [printOpen, setPrintOpen] = useState(false);
+
   // Header actions per the nurse-station design: "+ New triage" as the rail
   // CTA, then Print and the primary "Start handoff" on the right.
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
     { label: 'New Triage', icon: Plus, onClick: () => selectStation('triage'), tone: 'primary' },
-    { label: 'Print', icon: Printer, onClick: () => window.print(), tone: 'neutral' },
+    { label: 'Print', icon: Printer, onClick: () => setPrintOpen(true), tone: 'neutral' },
     { label: 'Start Handoff', icon: ArrowRightLeft, onClick: () => setHandoffOpen(true), tone: 'primary' },
   ]), [selectStation]);
+
+  // The print dialog's choices: the station's two standing registers as pure
+  // text lists — the full ward roster and today's triage, uncapped and
+  // unfiltered by the rail search. Built only while the dialog is open.
+  const printSections: PrintListSection[] = printOpen ? [
+    {
+      key: 'ward',
+      label: 'Ward patients',
+      columns: [
+        { key: 'patient', label: 'Patient' },
+        { key: 'mrn', label: 'MRN' },
+        { key: 'location', label: 'Location' },
+        { key: 'diagnosis', label: 'Diagnosis' },
+        { key: 'careTeam', label: 'Care team' },
+        { key: 'status', label: 'Status' },
+      ],
+      // Same fallback rule as the board and its tab count: real admissions,
+      // or the demo roster in demo mode so paper matches the screen.
+      rows: (activeAdmissions.length > 0 || !IS_DEMO)
+        ? activeAdmissions.map(admission => ({
+          patient: admission.patientName,
+          mrn: admission.hospitalNumber || '',
+          location: admission.bedNumber ? `${admission.wardName} · Bed ${admission.bedNumber}` : admission.wardName,
+          diagnosis: admission.admittingDiagnosis || '',
+          careTeam: [
+            admission.attendingPhysicianName || 'Doctor unassigned',
+            admission.nurseAssignedName || 'Nurse unassigned',
+          ].join(' · '),
+          status: admission.severity === 'critical' ? 'Critical' : admission.severity === 'severe' ? 'Severe' : 'Stable',
+        }))
+        : DEMO_WARD_PATIENTS.map(demo => ({
+          patient: `${demo.firstName || ''} ${demo.surname || ''}`.trim(),
+          mrn: demo.hospitalNumber || '',
+          location: 'Ward',
+          diagnosis: demo._triage?.chiefComplaint || '',
+          careTeam: 'Doctor unassigned · Nurse unassigned',
+          status: demo._triage ? PRIORITY_META[demo._triage.priority].label : '',
+        })),
+    },
+    {
+      key: 'triage',
+      label: "Today's triage",
+      columns: [
+        { key: 'patient', label: 'Patient' },
+        { key: 'time', label: 'Time' },
+        { key: 'complaint', label: 'Complaint' },
+        { key: 'acuity', label: 'Acuity' },
+        { key: 'status', label: 'Status' },
+        { key: 'room', label: 'Room' },
+      ],
+      rows: triageToday.map(triage => ({
+        patient: triage.patientName,
+        time: rowTime(triage.triagedAt) || '',
+        complaint: triage.chiefComplaint || 'ETAT assessment',
+        acuity: PRIORITY_META[triage.priority].label,
+        status: triage.status === 'seen' ? 'Seen' : triage.status === 'pending' ? 'Waiting' : triage.status,
+        room: triage.assignedRoom || '',
+      })),
+    },
+  ] : [];
 
   // Patient portraits by id, so triage and ward rows show the same face as the
   // patient register instead of falling back to initials.
@@ -411,6 +476,16 @@ export default function NurseDashboard() {
           <HandoffWorkflow
             variant="modal"
             onClose={() => setHandoffOpen(false)}
+          />
+        )}
+
+        {printOpen && (
+          <PrintListDialog
+            title="Print nurse station"
+            subtitle={`${dateLabel} — ${currentUser.name || 'Nurse'}`}
+            sections={printSections}
+            filename={`nurse-station-${today}`}
+            onClose={() => setPrintOpen(false)}
           />
         )}
       </main>

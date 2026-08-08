@@ -47,6 +47,7 @@ import EhrVisitPopup, { EhrQueueMoveDialog, waitLabel } from '@/components/ehr/E
 import { PRIORITY_META, appointmentTriage } from '@/lib/clinical/triage-display';
 import PatientDispenseModal from '@/components/pharmacy/PatientDispenseModal';
 import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
+import PrintListDialog, { type PrintListSection } from '@/components/PrintListDialog';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
 import { useCreateNote } from '@/lib/clinical-notes/useCreateNote';
 import EhrWorkItemProgress from '@/components/ehr/EhrWorkItemProgress';
@@ -527,6 +528,9 @@ export default function EhrClinicalDashboard({
   // "Find availability" — the booking form as a dialog; it used to route to
   // /appointments?new=1 and leave the clinician on the schedule module.
   const [bookingOpen, setBookingOpen] = useState(false);
+  // "Print" — choose which lanes and which output (paper/PDF or CSV) instead
+  // of window.print()'s whole-dashboard dump.
+  const [printOpen, setPrintOpen] = useState(false);
   // Inline search under the mini-calendar that filters the day's appointment list.
   const [appointmentSearch, setAppointmentSearch] = useState('');
   const findPatientInputRef = useRef<HTMLInputElement>(null);
@@ -849,6 +853,33 @@ export default function EhrClinicalDashboard({
   const groupCounts = tallyByStatusGroup(visiblePatientRows, rowStatusGroup);
   const filteredPatientRows = visiblePatientRows.filter(row => rowStatusGroup(row) === worklistFilter);
 
+  // The print dialog's choices: each lane as a pure text list, derived through
+  // the same rowQueueColumns as the on-screen table so paper matches screen.
+  // Built only while the dialog is open.
+  const printSections: PrintListSection[] = printOpen ? APPOINTMENT_STATUS_GROUPS.map(group => ({
+    key: group,
+    label: APPOINTMENT_STATUS_GROUP_LABELS[group],
+    columns: [
+      { key: 'patient', label: 'Patient' },
+      { key: 'reason', label: 'Reason' },
+      { key: 'time', label: 'Time' },
+      { key: 'careTeam', label: 'Care team' },
+      { key: 'context', label: 'Context' },
+      { key: 'status', label: 'Status' },
+    ],
+    rows: visiblePatientRows.filter(row => rowStatusGroup(row) === group).map(row => {
+      const columns = rowQueueColumns(row);
+      return {
+        patient: row.name,
+        reason: row.reason || '',
+        time: [columns.waitText, columns.waitSubtext].filter(Boolean).join(' · '),
+        careTeam: [columns.careTeamPrimary, columns.careTeamSecondary].filter(Boolean).join(' · '),
+        context: [columns.queueText, columns.comingFrom].filter(Boolean).join(' · '),
+        status: [columns.statusText, columns.statusSubtext].filter(Boolean).join(' · '),
+      };
+    }),
+  })) : [];
+
   // Row popup (visit info + actions) and the Move dialog it can open.
   const [visitRow, setVisitRow] = useState<UnifiedPatientRow | null>(null);
 
@@ -1165,8 +1196,8 @@ export default function EhrClinicalDashboard({
           )}
           <button
             type="button"
-            aria-label="Print today's schedule"
-            onClick={() => window.print()}
+            aria-label="Print worklist"
+            onClick={() => setPrintOpen(true)}
           >
             <Printer className="w-4 h-4" /> Print
           </button>
@@ -1657,6 +1688,16 @@ export default function EhrClinicalDashboard({
             <BookAppointmentModal
               defaultDate={selectedDate}
               onClose={() => setBookingOpen(false)}
+            />
+          )}
+
+          {printOpen && (
+            <PrintListDialog
+              title="Print worklist"
+              subtitle={`${new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} — ${clinicianName}`}
+              sections={printSections}
+              filename={`worklist-${selectedDate}`}
+              onClose={() => setPrintOpen(false)}
             />
           )}
         </main>

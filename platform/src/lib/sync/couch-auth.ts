@@ -88,9 +88,11 @@ async function couchFetch(opts: CouchFetchOpts): Promise<unknown> {
  * supplied plaintext password and the given role list. Re-running with a new
  * password rotates it (CouchDB will re-hash on store).
  *
- * Roles use the convention `org-<orgId>` so per-DB security objects can grant
- * access by role name without enumerating every user. Add `facility-<id>`
- * roles when Phase 2 lands.
+ * Roles use the `org:<orgId>` / `facility:<id>` / `role:<platformRole>`
+ * convention — the same prefixes the validate_doc_update functions compiled
+ * from write-permissions.ts inspect (`org:` for the tenant boundary, `role:`
+ * for the per-type write matrix), and the prefix per-DB `_security` member
+ * grants are keyed on.
  */
 export async function ensureCouchUser(input: {
   username: string;
@@ -103,9 +105,9 @@ export async function ensureCouchUser(input: {
   const path = `/_users/${encodeURIComponent(docId)}`;
 
   const roles: string[] = [];
-  if (input.orgId) roles.push(`org-${input.orgId}`);
-  if (input.hospitalId) roles.push(`facility-${input.hospitalId}`);
-  if (input.platformRole) roles.push(`platform-${input.platformRole}`);
+  if (input.orgId) roles.push(`org:${input.orgId}`);
+  if (input.hospitalId) roles.push(`facility:${input.hospitalId}`);
+  if (input.platformRole) roles.push(`role:${input.platformRole}`);
 
   // Read current rev (if any) so PUT can replace cleanly.
   const existing = (await couchFetch({

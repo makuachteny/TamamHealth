@@ -154,10 +154,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 14px 0 12px;
+  padding: 0 12px 0 10px;
   background: var(--color-white);
   border: 1px solid rgba(33, 145, 208, 0.45);
-  border-radius: var(--search-radius);
+  border-radius: 6px;
   box-shadow: none;
 }
 
@@ -569,9 +569,9 @@
   align-items: center;
   gap: 10px;
   min-height: 42px;
-  padding: 0 14px;
+  padding: 0 12px;
   border: 1px solid var(--border-medium);
-  border-radius: var(--search-radius);
+  border-radius: 0;
   background: var(--bg-card-solid);
 }
 
@@ -919,16 +919,9 @@
   --section-spacing: 80px;
   --section-spacing-medium: 56px;
   --section-spacing-small: 40px;
-  /* Square corners everywhere — see the blanket rule at the end of this file.
-     These were a pill/rounded set: buttons and search fully rounded so a
-     control you PRESS read as a self-contained object, cards at 14px, fields
-     you TYPE INTO at 10px so a pill would not crowd the text. The flat
-     clinical direction drops the distinction entirely — shape no longer
-     separates press-me from read-me or object from text, weight and color do. */
-  --btn-radius: 0;
-  --card-radius: 0;
-  --input-radius: 0;
-  --search-radius: 0;
+  --btn-radius: 10px;
+  --card-radius: 14px;
+  --input-radius: 10px;
   --sidebar-width: 220px;
   --sidebar-collapsed: 72px;
   --font-platform: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
@@ -1024,12 +1017,10 @@
      independently — 3px on the vitals sub-tabs, 4px-top on the demographics
      tabs, 6/8px in the notes module — so navigation that sits inches apart
      did not look related. Controls take --radius-control, surfaces that hold
-     them take --radius-card. All three are 0 now — --radius-pill included, so
-     badges and severity chips square off with everything else and the name is
-     the only thing left of the pill. */
-  --radius-control: 0;
-  --radius-card: 0;
-  --radius-pill: 0;
+     them take --radius-card. */
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-pill: 999px;
 
   --bg-app:        var(--tb-blue-50);
   --bg-primary:    var(--tb-blue-50);
@@ -1834,22 +1825,13 @@ textarea {
   width: 100%;
 }
 
-/* Search used to be the one typed control that took a pill, so it could be
-   told apart from the form fields beside it. --search-radius is 0 now like
-   every other corner, and the icon inset below does that work instead. */
-input[type="search"] {
-  border-radius: var(--search-radius);
-}
-
 input[type="search"].search-icon-input {
-  /* A touch more inset than a square field needs: on a curved left edge, 12px
-     puts the icon on the curve rather than beside the text. */
-  padding-left: 2.9rem;
+  padding-left: 2.75rem;
 }
 
 .search-input-icon {
   position: absolute;
-  left: 15px;
+  left: 12px;
   top: 50%;
   width: 15px;
   height: 15px;
@@ -2040,9 +2022,8 @@ small,
   color: var(--accent-primary) !important;
 }
 
-/* Size variants keep the pill; only the padding and type scale change. */
-.btn-sm { padding: 7px 16px; font-size: 0.78rem; border-radius: var(--btn-radius); }
-.btn-lg { padding: 14px 32px; font-size: 0.95rem; border-radius: var(--btn-radius); }
+.btn-sm { padding: 7px 16px; font-size: 0.78rem; border-radius: 6px; }
+.btn-lg { padding: 14px 32px; font-size: 0.95rem; border-radius: 10px; }
 
 /* ============ Focus visible — keyboard accessibility ============ */
 :focus-visible {
@@ -3288,8 +3269,8 @@ html:has(.ehr-top-rail) {
   gap: 8px;
   height: 40px;
   margin: 10px 14px;
-  padding: 0 16px;
-  border-radius: var(--search-radius);
+  padding: 0 14px;
+  border-radius: 12px;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
   color: var(--text-muted);
@@ -4621,7 +4602,7 @@ html:has(.ehr-top-rail) {
 .tamam-ehr-app .card-elevated,
 .tamam-ehr-app .dash-card,
 .tamam-ehr-app .card {
-  border-radius: 0 !important;
+  border-radius: 6px !important;
   box-shadow: none !important;
   border-color: var(--ehr-border) !important;
   background: var(--ehr-panel) !important;
@@ -4629,17 +4610,17 @@ html:has(.ehr-top-rail) {
 
 .tamam-ehr-app .rounded-2xl,
 .tamam-ehr-app .rounded-xl {
-  border-radius: 0 !important;
+  border-radius: 6px !important;
 }
 
 .tamam-ehr-app .hero-banner {
-  border-radius: 0 !important;
+  border-radius: 6px !important;
   background-color: var(--color-brand-700) !important;
   border: 1px solid var(--ehr-border);
 }
 
 .tamam-ehr-app .hero-banner button {
-  border-radius: 0 !important;
+  border-radius: 6px !important;
 }
 
 .tamam-ehr-app .card-elevated:hover,
@@ -4656,16 +4637,15 @@ html:has(.ehr-top-rail) {
 .tamam-ehr-app input,
 .tamam-ehr-app select,
 .tamam-ehr-app textarea {
-  border-radius: 0 !important;
+  border-radius: 4px !important;
 }
 
-/* Search fields were the one pill exemption from the square-input override
-   above; they are square now like every other surface, and go to 0 rather
-   than inheriting that rule's 4px so they match the cards they sit against. */
+/* Search fields are pills in the design — exempt them from the square-input
+   override above. */
 .tamam-ehr-app .ehr-rail-search input,
 .tamam-ehr-app .ehr-top-search input,
 .tamam-ehr-app .ehr-care-search input {
-  border-radius: 0 !important;
+  border-radius: 999px !important;
 }
 
 .tamam-ehr-app .page-container:has(> .ehr-schedule-shell) {
@@ -5419,7 +5399,7 @@ html:has(.ehr-top-rail) {
   width: 124px;
   height: 30px;
   border: 1px solid var(--ehr-border);
-  border-radius: 0 !important;
+  border-radius: 999px !important;
   background: white;
   color: var(--ehr-text);
   padding: 0 4px;
@@ -6814,7 +6794,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .modal-portal-backdrop > div > * {
-  border-radius: 0 !important;
+  border-radius: 6px !important;
 }
 
 /* A portal dialog's width belongs to `Modal`'s `width` prop, which caps the
@@ -7519,7 +7499,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-consult-patient-picker {
-  border-radius: 0 !important;
+  border-radius: 6px !important;
   padding: 0 !important;
   margin-bottom: 8px !important;
   overflow: visible !important;
@@ -7650,7 +7630,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-soap-scroll .card-elevated {
   display: flex;
   flex-direction: column;
-  border-radius: 0 !important;
+  border-radius: var(--card-radius) !important;
   overflow: hidden;
 }
 
@@ -7807,7 +7787,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-consult-sidecar {
   background: var(--bg-card) !important;
   border: 1px solid var(--border-light) !important;
-  border-radius: 0 !important;
+  border-radius: var(--card-radius) !important;
   box-shadow: var(--card-shadow) !important;
   min-height: 0;
 }
@@ -7926,7 +7906,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  border-radius: 0 !important;
+  border-radius: 6px !important;
 }
 
 .ehr-consult-progress-list {
@@ -7979,7 +7959,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   flex-direction: column;
   gap: 12px;
   padding: 16px !important;
-  border-radius: 0 !important;
+  border-radius: 6px !important;
 }
 
 .ehr-chart-details {
@@ -8053,7 +8033,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   min-height: 132px;
   margin: 0 var(--ehr-chart-content-pad-x) 8px !important;
   padding: 18px var(--ehr-chart-content-pad-x) !important;
-  border-radius: 0 !important;
+  border-radius: var(--card-radius) !important;
   border: 1px solid var(--ehr-border) !important;
   background: var(--ehr-panel) !important;
   box-shadow: var(--card-shadow) !important;
@@ -8524,7 +8504,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 .ehr-chart-page .badge {
-  border-radius: 0 !important;
+  border-radius: 999px !important;
   letter-spacing: 0 !important;
 }
 
@@ -8585,7 +8565,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 .ehr-vitals-header button {
   height: 28px;
-  border-radius: 0 !important;
+  border-radius: 999px !important;
   background: var(--ehr-panel) !important;
   border: 1px solid var(--ehr-border) !important;
   color: var(--ehr-blue) !important;
@@ -9325,7 +9305,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-chart-content > .grid > .card-elevated,
 .ehr-chart-content .chart-summary-panel {
   border: 1px solid var(--ehr-border) !important;
-  border-radius: 0 !important;
+  border-radius: var(--card-radius) !important;
   background: var(--ehr-panel) !important;
   box-shadow: var(--card-shadow) !important;
 }
@@ -9464,7 +9444,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .billing-card-action {
   min-height: 34px;
   padding: 0 12px;
-  border-radius: 0 !important;
+  border-radius: 6px !important;
   white-space: nowrap;
 }
 
@@ -9529,7 +9509,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   min-width: 0 !important;
   min-height: 26px !important;
   padding: 0 14px !important;
-  border-radius: 0 !important;
+  border-radius: 999px !important;
   font-size: 11px !important;
   line-height: 1 !important;
 }
@@ -9559,7 +9539,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-chart-page textarea {
   min-height: 36px;
   border: 1px solid var(--ehr-border) !important;
-  border-radius: 0 !important;
+  border-radius: 3px !important;
   background: #ffffff !important;
   color: var(--ehr-text) !important;
 }
@@ -9584,7 +9564,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 .ehr-encounter-card {
   border: 1px solid var(--ehr-border) !important;
-  border-radius: 0 !important;
+  border-radius: 4px !important;
   background: #ffffff !important;
   box-shadow: none !important;
 }
@@ -10083,7 +10063,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
    every chart card; the banner is the page's headline card and reads better
    rounded (higher specificity, so it wins over the blanket rule). */
 .ehr-chart-page .card-elevated.ehr-patient-banner {
-  border-radius: 0 !important;
+  border-radius: var(--card-radius) !important;
 }
 
 /* In the three-panel layout the banner already spans the centre column
@@ -10319,7 +10299,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-chart-content .tebra-demographics,
 .ehr-chart-content .tebra-panel {
   border: 1px solid var(--ehr-ledger-border) !important;
-  border-radius: 0 !important;
+  border-radius: var(--card-radius) !important;
   background: #ffffff !important;
   box-shadow: var(--card-shadow) !important;
 }
@@ -10403,7 +10383,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 .ehr-chart-content .ehr-encounter-card {
   border: 1px solid var(--ehr-ledger-border) !important;
-  border-radius: 0 !important;
+  border-radius: var(--card-radius) !important;
   box-shadow: var(--card-shadow) !important;
 }
 
@@ -10419,7 +10399,7 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-chart-content .record-signature-bar {
   border-color: var(--ehr-ledger-border) !important;
   background: var(--ehr-ledger-soft) !important;
-  border-radius: 0 !important;
+  border-radius: 4px !important;
 }
 
 .ehr-chart-content .tebra-demo-tabs {
@@ -10884,7 +10864,7 @@ svg circle {
   background: var(--bg-card) !important;
   color: var(--text-secondary) !important;
   border: 1px solid var(--border-panel) !important;
-  border-radius: 0 !important;
+  border-radius: 4px !important;
   padding: 3px 8px !important;
   font-size: 10px !important;
   font-family: var(--font-platform) !important;
@@ -10900,7 +10880,7 @@ svg circle {
   background: var(--bg-card) !important;
   color: var(--text-secondary) !important;
   border-color: var(--border-panel) !important;
-  border-radius: 0 !important;
+  border-radius: var(--btn-radius) !important;
 }
 
 .leaflet-control-zoom a:hover {
@@ -10910,7 +10890,7 @@ svg circle {
 .leaflet-control-attribution {
   background: var(--overlay-subtle) !important;
   font-size: 9px !important;
-  border-radius: 0 !important;
+  border-radius: 3px !important;
 }
 
 /* ============ Hide scrollbar ============ */
@@ -11900,6 +11880,20 @@ span:has(> svg:only-child) {
   from { opacity: 1; transform: translateY(0); }
   to   { opacity: 0; transform: translateY(-12px); }
 }
+/* The notice is fixed at z-60, but the EHR top rail is fixed at z-1200 —
+   anchored to the viewport top it slid in BEHIND the bar, leaving only a
+   red/amber sliver visible under the rail edge. Anchor it below the rail
+   (via the shared overlay inset) when one is on the page. */
+.connectivity-notice-wrap {
+  top: calc(var(--app-overlay-top-inset, 0px) + 10px);
+}
+/* Under 1024px the EHR rail grows to 82px (--ehr-top-rail-height, scoped to
+   .tamam-ehr-app where html-level rules can't read it) while the overlay
+   inset stays at the 60px base — clear the taller rail explicitly. */
+@media (max-width: 1023px) {
+  html:has(.ehr-top-rail) .connectivity-notice-wrap { top: 92px; }
+}
+
 .connectivity-notice-enter {
   animation: connectivity-notice-enter-kf 220ms ease-out both;
 }
@@ -12897,7 +12891,7 @@ span:has(> svg:only-child) {
 /* ── Events: week / day slots ── */
 .rbc-tamam .rbc-day-slot .rbc-event {
   padding: 3px 7px 3px 9px;
-  border-radius: 0 !important;
+  border-radius: 6px !important;
   border: none !important;
   overflow: hidden;
   display: flex;
@@ -13020,7 +13014,7 @@ span:has(> svg:only-child) {
 
 /* ── Events: month view (compact pill) ── */
 .rbc-tamam .rbc-row-segment .rbc-event {
-  border-radius: 0 !important;
+  border-radius: 4px !important;
   border: none !important;
   padding: 1px 6px;
   margin: 1px 3px;
@@ -13662,7 +13656,7 @@ span:has(> svg:only-child) {
   .tamam-ehr-app .card,
   .tamam-ehr-app .dash-card,
   .tamam-ehr-app .card-elevated {
-    border-radius: 0 !important;
+    border-radius: 6px !important;
   }
 
   .tamam-ehr-app table,
@@ -14399,7 +14393,7 @@ span:has(> svg:only-child) {
 
 .tebra-panel {
   padding: 16px 18px !important;
-  border-radius: 0 !important;
+  border-radius: var(--card-radius) !important;
   box-shadow: var(--card-shadow) !important;
 }
 
@@ -15627,7 +15621,7 @@ textarea.ehr-handoff-input {
   min-height: 34px;
   padding: 6px 10px;
   border: 1px solid var(--ehr-border);
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   background: #fff;
   color: var(--ehr-text);
   font-size: 13px;
@@ -16160,7 +16154,7 @@ textarea.ehr-handoff-input {
   gap: 7px !important;
   padding: 0 10px !important;
   border: 0 !important;
-  border-radius: 0 !important;
+  border-radius: 6px !important;
   background: transparent !important;
   color: var(--nav-text, var(--ehr-muted)) !important;
   font-size: 12px !important;
@@ -21569,7 +21563,7 @@ textarea.ehr-handoff-input {
   max-width: 260px;
   padding: 6px 30px 6px 12px;
   border: 1px solid var(--ehr-border);
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   background: #fff;
   color: var(--ehr-text);
   font-size: 12.5px;
@@ -21593,7 +21587,7 @@ textarea.ehr-handoff-input {
   max-width: 100%;
   padding: 6px 12px;
   border: 1px solid var(--ehr-border);
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   background: #fff;
   color: var(--ehr-text);
   font-size: 12.5px;
@@ -22424,7 +22418,7 @@ textarea.ehr-handoff-input {
 .settings-manage-shell select,
 .settings-manage-shell textarea {
   border-color: var(--ehr-border) !important;
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   background-color: #fff !important;
 }
 
@@ -23500,7 +23494,7 @@ table.patient-data-table.patient-data-table {
   height: 30px;
   padding: 0 9px;
   border: 1px solid var(--ehr-border);
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   background: #fff;
   color: var(--text-primary);
   font-size: 12.5px;
@@ -23523,7 +23517,7 @@ table.patient-data-table.patient-data-table {
   height: 30px;
   padding: 0 10px;
   border: 1px solid var(--ehr-border);
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   font-size: 12.5px;
 }
 
@@ -23531,7 +23525,7 @@ table.patient-data-table.patient-data-table {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--ehr-border);
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   background: #fff;
   color: var(--text-secondary);
   font-size: 12px;
@@ -25498,7 +25492,7 @@ table.patient-data-table.patient-data-table {
   background-color: var(--omrs-field-01);
   border: none;
   border-bottom: 1px solid var(--omrs-ui-04);
-  /* `.tamam-ehr-app input { border-radius: 0 !important }` also matches
+  /* `.tamam-ehr-app input { border-radius: 4px !important }` also matches
      here; Carbon fields are square, so this has to out-shout it. */
   border-radius: 0 !important;
   font-size: 14px;
@@ -26349,48 +26343,6 @@ table.patient-data-table.patient-data-table {
   color: var(--color-danger, #dc2626);
 }
 
-/* ── Square corners, everywhere ───────────────────────────────────────────
-   Nothing in the UI is rounded: cards, worklist rows, buttons, tabs, search
-   bars, status pills, patient avatars, chart bars, badges — all 0.
-
-   One blanket rule rather than a list of selectors. This file sets a corner
-   radius in ~700 places across a dozen partly-overlapping namespaces, several
-   with !important (.tamam-ehr-app, the shared-daybar tab rule, the status
-   select), so an enumerated override turns into a specificity chase that
-   silently misses whatever is added next. `*` cannot be out-specified, and
-   the radius tokens above are 0 too so the intent is readable from the top of
-   the file, not just enforced at the bottom.
-
-   SVG corners are NOT covered here — border-radius does not apply to SVG
-   shapes. Recharts `radius` props and `rx` attributes are set to 0 at their
-   call sites instead. */
-*,
-*::before,
-*::after {
-  border-radius: 0 !important;
-}
-
-/* Exemptions — things whose roundness is the shape itself, not decoration on
-   a rectangle. Each needs !important to clear the blanket rule above; the
-   declarations at their own definitions are left intact so those rules still
-   read true on their own.
-
-   1. Spinners: a rotating ring squared is a square spinning in place — a
-      glitch, not a flat aesthetic.
-   2. The account avatar and its initials mark: a portrait slot. Squared, the
-      white ring reads as a second nested card in the top bar.
-   3. The messaging launcher and its unread count: a draggable object floating
-      over the page rather than a surface docked into the layout. */
-.animate-spin,
-.animate-spin::before,
-.animate-spin::after,
-.ehr-avatar,
-.ehr-avatar-mark,
-[data-tour="messaging-dock"],
-[data-tour="messaging-dock"] > span {
-  border-radius: 9999px !important;
-}
-
 /* ── Side-card header rule ────────────────────────────────────────────────
    Every right-rail card (Reception / Clinic today / Today's triage, Patient
    flow, Outstanding items, the mission card, …) closes its header with a
@@ -26518,4 +26470,93 @@ table.patient-data-table.patient-data-table {
 .modal-portal-backdrop [role="dialog"] > .modal-panel > div:first-child:not(.modal-panel):has(h2, h3):not(:has(input, select, textarea, form, table, ul, ol)) {
   margin: -24px -24px 20px !important;
   padding: 16px 22px !important;
+}
+
+/* ============ Booking week grid (bwg-) ============
+   The clinician × day availability matrix in Book Appointment, aligned like
+   the Tebra scheduler in this platform's control language. Two rules do
+   the aligning:
+
+   1. Every line in a cell — time chip, "+N more", dash — is exactly 30px
+      tall on a 6px gap, so the third slot of one column sits level with the
+      third slot of every other column.
+   2. An empty day prints one dash PER RANK of the row (the component counts
+      them), on that same rhythm — each rank of times then rules straight
+      across the week instead of a lone dash floating at the top. */
+.booking-week-grid .bwg-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  align-self: start;
+  min-width: 0;
+}
+
+.booking-week-grid .bwg-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 122px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-control, 6px);
+  background: var(--bg-card-solid);
+  color: var(--accent-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.booking-week-grid .bwg-slot:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-light);
+}
+
+.booking-week-grid .bwg-slot--selected,
+.booking-week-grid .bwg-slot--selected:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.booking-week-grid .bwg-dash {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  color: var(--text-muted);
+  font-size: 14px;
+  user-select: none;
+}
+
+/* Week paging chevrons. */
+.booking-week-grid .bwg-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-control, 6px);
+  background: var(--bg-card-solid);
+  color: var(--text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.booking-week-grid .bwg-nav:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.booking-week-grid .bwg-nav:disabled {
+  color: var(--text-muted);
+  opacity: 0.45;
+  cursor: not-allowed;
 }

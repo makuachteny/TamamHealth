@@ -246,6 +246,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
               setCurrentUser({ ...data.user, hospital, organization, branding });
               setIsAuthenticated(true);
+
+              // The platform session was restored from cookies, but the
+              // CouchDB AuthSession cookie may be gone (host-scoped, shorter
+              // life). Re-establish it server-side so replication resumes
+              // instead of silently 401-looping for the rest of the session.
+              if (process.env.NEXT_PUBLIC_SYNC_ENABLED === 'true') {
+                try {
+                  const { refreshCouchSessionFromServer } = await import('./sync/couch-client-auth');
+                  await refreshCouchSessionFromServer();
+                } catch {
+                  // Best-effort; offline-first PouchDB still works.
+                }
+              }
             }
           }
         } catch {
@@ -467,12 +480,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // (offline-first PouchDB still works), so we don't fail login.
           if (process.env.NEXT_PUBLIC_SYNC_ENABLED === 'true') {
             try {
-              const { loginCouch } = await import('./sync/couch-client-auth');
+              const { loginCouch, registerCouchCredentials, startCouchSessionHeartbeat } =
+                await import('./sync/couch-client-auth');
               const result = await loginCouch(sanitizedUsername, password);
               if (!result.ok) {
                 // Expected when CouchDB is down (offline-first still works) —
                 // one concise line, not an alarming error.
                 console.warn(`[sync] CouchDB session unavailable — offline-only this session (${result.error || result.status})`);
+              } else {
+                // The AuthSession cookie expires server-side; keep it renewed
+                // for as long as this tab lives, or replication dies with 401s
+                // mid-session (in-memory only, never persisted).
+                registerCouchCredentials(sanitizedUsername, password);
+                startCouchSessionHeartbeat();
               }
             } catch (err) {
               console.warn(`[sync] CouchDB session unavailable — offline-only this session (${err instanceof Error ? err.message : String(err)})`);
@@ -646,10 +666,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // best-effort
     }
     // Drop the CouchDB AuthSession cookie so the next user on this browser
-    // can't replay this session against the sync endpoint.
+    // can't replay this session against the sync endpoint. Also clear the
+    // in-memory renewal credentials and stop the session heartbeat.
     if (process.env.NEXT_PUBLIC_SYNC_ENABLED === 'true') {
       try {
-        const { logoutCouch } = await import('./sync/couch-client-auth');
+        const { logoutCouch, clearCouchCredentials } = await import('./sync/couch-client-auth');
+        clearCouchCredentials();
         await logoutCouch();
       } catch {
         // best-effort

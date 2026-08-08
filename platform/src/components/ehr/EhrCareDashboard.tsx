@@ -2,8 +2,9 @@
 
 import { Children, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Search, Stethoscope, Video, X, type LucideIcon } from '@/components/icons/lucide';
+import { ClipboardList, Printer, Search, Stethoscope, Video, X, type LucideIcon } from '@/components/icons/lucide';
 import ProgressFeedCard from '@/components/ehr/ProgressFeedCard';
+import PrintListDialog, { type PrintListSection } from '@/components/PrintListDialog';
 import EhrMiniCalendar, { formatDateTitle, parseIsoDate, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { EhrWeekActivityChart, type DayStatsItem } from '@/components/ehr/EhrDayStatsChart';
 import { PRIORITY_META } from '@/lib/clinical/triage-display';
@@ -468,8 +469,44 @@ export default function EhrCareDashboard({
   // renders in the right-hand header row (wrapping when needed) — including
   // panel toggles that swap what occupies the center.
   const primaryAction = actions[0];
-  const headerActions = actions.slice(1);
   const headerTitle = greetingName ? `Welcome, ${greetingName}` : title;
+
+  // Every station header carries a Print action: the shared choose-what /
+  // choose-format dialog over the board's current rows, never window.print()'s
+  // whole-dashboard dump. A page that supplies its own "Print" action (the
+  // nurse station prints its two registers) keeps it — no double button.
+  const [printOpen, setPrintOpen] = useState(false);
+  const headerActions: EhrCareDashboardAction[] = [
+    ...actions.slice(1),
+    ...(actions.some(action => action.label === 'Print') ? [] : [
+      { label: 'Print', icon: Printer, onClick: () => setPrintOpen(true), tone: 'neutral' as const },
+    ]),
+  ];
+
+  // The printable list = the board as currently shown (active lane, selected
+  // day), derived from the same row fields as the on-screen columns. Relative
+  // countdowns are left off — they go stale the moment paper leaves the tray.
+  const activeTabLabel = tabs.find(tab => tab.key === activeTab)?.label || title;
+  const printSections: PrintListSection[] = printOpen ? [{
+    key: 'board',
+    label: activeTabLabel,
+    columns: [
+      { key: 'patient', label: 'Patient' },
+      { key: 'details', label: 'Details' },
+      { key: 'time', label: 'Time' },
+      { key: 'careTeam', label: 'Care team' },
+      { key: 'context', label: 'Context' },
+      { key: 'status', label: 'Status' },
+    ],
+    rows: visibleRows.map(row => ({
+      patient: row.title,
+      details: row.subtitle || '',
+      time: [row.time || row.date || '—', row.timeSecondary].filter(Boolean).join(' · '),
+      careTeam: [row.careTeam || row.compactMeta || row.meta || '', row.careTeamSecondary].filter(Boolean).join(' · '),
+      context: row.location || row.room || row.meta || '',
+      status: [row.statusLabel || (row.status ? titleCase(row.status) : ''), row.statusSecondary].filter(Boolean).join(' · '),
+    })),
+  }] : [];
 
   return (
     <div className="ehr-schedule-shell ehr-care-dashboard">
@@ -912,6 +949,18 @@ export default function EhrCareDashboard({
         )}
       </div>
 
+      {printOpen && (
+        <PrintListDialog
+          // Some pages (front desk) pass an empty title and lead with the
+          // greeting alone — fall back to "worklist" so the dialog and the
+          // printed page are never headed just "Print".
+          title={`Print ${title.trim() || 'worklist'}`}
+          subtitle={`${selectedDateLabel}${greetingName ? ` — ${greetingName}` : ''}`}
+          sections={printSections}
+          filename={`${title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'worklist'}-${selectedDate}`}
+          onClose={() => setPrintOpen(false)}
+        />
+      )}
     </div>
   );
 }

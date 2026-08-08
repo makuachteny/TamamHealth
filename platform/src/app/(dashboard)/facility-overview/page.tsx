@@ -262,7 +262,7 @@ function FacilityOverview() {
                     <YAxis tick={axisTick} />
                     <Tooltip {...chartTooltipStyle} />
                     <Legend {...{ ...legendProps, iconType: 'square' as const }} />
-                    {visitSeries.map(s => <Bar key={s.key} dataKey={s.key} fill={s.color} radius={0} />)}
+                    {visitSeries.map(s => <Bar key={s.key} dataKey={s.key} fill={s.color} radius={[3, 3, 0, 0]} />)}
                   </BarChart>
                 </ResponsiveContainer>
               );

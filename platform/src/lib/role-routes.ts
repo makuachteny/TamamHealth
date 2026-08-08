@@ -44,7 +44,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/org-admin', '/org-admin/analytics',
       '/dashboard', '/patients', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/reports', '/hospitals', '/settings',
+      '/surveillance', '/reports', '/hospitals', '/settings', '/settings/manage',
       '/epidemic-intelligence', '/mch-analytics', '/government',
       '/vital-statistics', '/facility-assessments', '/data-quality',
       '/dhis2-export', '/public-stats',
@@ -69,7 +69,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       // Console targets inside the IT/system console: data quality and the
       // conflict queue (org_admin is in CONFLICT_RESOLUTION_ROLES).
       '/it', '/system-admin', '/data-quality', '/admin/conflicts',
-      '/hospitals', '/reports', '/settings',
+      '/hospitals', '/reports', '/settings', '/settings/manage',
       '/patients', '/pharmacy', '/messages',
       '/appointments',
       '/billing', '/payments', '/payments/claims',
@@ -219,7 +219,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard', '/patients', '/triage', '/consultation', '/notes', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/reports', '/hospitals', '/settings',
+      '/surveillance', '/reports', '/hospitals', '/settings', '/settings/manage',
       '/facility-settings',
       '/it', '/system-admin',
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
@@ -285,7 +285,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       // by lab techs/pharmacists; the manager sees utilisation via reports, not
       // the live work queues.
       '/patients', '/wards', '/referrals', '/appointments', '/messages',
-      '/settings',
+      '/settings', '/settings/manage',
     ],
     defaultDashboard: '/facility-management',
   },
@@ -360,6 +360,15 @@ const DEFAULT_DASHBOARD_FALLBACK = '/dashboard';
  */
 const UNIVERSAL_ROUTES: readonly string[] = ['/notifications'];
 
+/**
+ * Sub-routes that must be granted explicitly and never inherited from a
+ * parent prefix. Without this, `/payments` in a role's allow-list silently
+ * grants `/payments/claims`, and the universal `/settings` grants the
+ * admin-facing `/settings/manage`. A role reaches these only when the exact
+ * entry appears in its own allow-list.
+ */
+const EXPLICIT_GRANT_ROUTES: readonly string[] = ['/payments/claims', '/settings/manage'];
+
 function getConfig(role: UserRole | string): RoleRouteConfig | undefined {
   return (ROLE_ROUTE_TABLE as Record<string, RoleRouteConfig>)[role];
 }
@@ -390,6 +399,12 @@ export function isPathAllowed(role: UserRole | string, pathname: string): boolea
   // target the same route, and a real pathname never contains ? or #.
   const path = pathname.split(/[?#]/)[0];
   const matches = (route: string) => path === route || path.startsWith(route + '/');
+  // Explicit-grant routes ignore prefix inheritance: the role's own allow-list
+  // must name the route (or something nested beneath it).
+  const explicit = EXPLICIT_GRANT_ROUTES.find(matches);
+  if (explicit) {
+    return config.allowed.some((route) => route === explicit || route.startsWith(explicit + '/'));
+  }
   return UNIVERSAL_ROUTES.some(matches) || config.allowed.some(matches);
 }
 

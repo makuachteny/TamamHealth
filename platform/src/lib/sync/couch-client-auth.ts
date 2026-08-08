@@ -87,6 +87,88 @@ export async function logoutCouch(): Promise<void> {
 }
 
 /**
+ * In-memory CouchDB credentials for session renewal.
+ *
+ * CouchDB's AuthSession cookie expires after `couch_httpd_auth.timeout`
+ * seconds (600 by default). Without renewal, every live replication starts
+ * failing with 401 mid-session and sync silently dies — the platform session
+ * (8h JWT) outlives the CouchDB one. The credentials are held in module
+ * memory only (never storage): a page reload drops them, which is safe
+ * because the cookie itself survives the reload and the timeout is aligned
+ * with the platform session length by setup-couchdb.sh.
+ */
+let sessionCreds: { username: string; password: string } | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+export function registerCouchCredentials(username: string, password: string): void {
+  sessionCreds = { username, password };
+}
+
+export function clearCouchCredentials(): void {
+  sessionCreds = null;
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+/**
+ * Verify the CouchDB session is alive; re-login with the registered
+ * credentials when it is not. Returns true when a valid session exists
+ * after the call.
+ */
+export async function ensureCouchSession(): Promise<boolean> {
+  const who = await whoamiCouch();
+  if (who.ok) return true;
+  if (!sessionCreds) return false;
+  const res = await loginCouch(sessionCreds.username, sessionCreds.password);
+  return res.ok;
+}
+
+/**
+ * Restore a CouchDB session when the platform session is restored (page
+ * reload / new tab) but no CouchDB credentials are held in memory. Asks the
+ * server — which holds admin creds — for a fresh single-use CouchDB password
+ * bound to the already-authenticated platform JWT, exchanges it at /_session,
+ * and registers it for renewal. Returns true when a live session results.
+ *
+ * Without this, replication 401-loops for the rest of a restored session and
+ * locally-entered data never pushes.
+ */
+export async function refreshCouchSessionFromServer(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  // If a valid cookie already survived the reload, nothing to do.
+  if (await whoamiCouch().then((w) => w.ok).catch(() => false)) return true;
+  try {
+    const { apiFetch } = await import('../api-fetch');
+    const res = await apiFetch('/api/sync/couch-session', { method: 'POST' });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { enabled?: boolean; username?: string; password?: string };
+    if (!body.enabled || !body.username || !body.password) return false;
+    const login = await loginCouch(body.username, body.password);
+    if (!login.ok) return false;
+    registerCouchCredentials(body.username, body.password);
+    startCouchSessionHeartbeat();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Start a periodic session check (default every 4 minutes — well inside the
+ * shortest realistic `couch_httpd_auth.timeout` of 600s). Singleton: calling
+ * again replaces the previous timer.
+ */
+export function startCouchSessionHeartbeat(intervalMs = 4 * 60 * 1000): void {
+  if (typeof window === 'undefined') return;
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    void ensureCouchSession();
+  }, intervalMs);
+}
+
+/**
  * GET /_session — returns the current session info, used by sync init to
  * decide whether the cookie is still good before starting replication.
  */

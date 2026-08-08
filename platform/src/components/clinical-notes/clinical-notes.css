@@ -356,9 +356,9 @@
   text-align: left;
 }
 
-.cn-section-nav-item:hover { background: #f5f3f0; }
+.cn-section-nav-item:hover { background: var(--color-surface-muted, #f1f5f9); }
 .cn-section-nav-item[aria-current='true'] {
-  background: var(--color-primary-soft, var(--accent-light));
+  background: #fff;
   font-weight: 600;
 }
 

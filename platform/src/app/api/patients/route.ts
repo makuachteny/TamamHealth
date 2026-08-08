@@ -19,11 +19,12 @@ const READ_ROLES: UserRole[] = [
   'data_entry_clerk',
   'nutritionist', 'radiologist', 'government',
 ];
-// Roles that may create patients
+// Roles that may create patients. data_entry_clerk keeps READ (patient lookup
+// while registering vital events) but not CREATE — the role has no /patients
+// module in ROLE_ROUTE_TABLE, so registration is not part of its workflow.
 const CREATE_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'clinician', 'nurse',
   'midwife', 'front_desk', 'medical_superintendent', 'hrio',
-  'data_entry_clerk',
 ];
 export async function GET(request: NextRequest) {
   try {
